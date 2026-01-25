@@ -23,10 +23,22 @@
                     <p class="tagline">Freshly Caught! Pre-ordered for you!</p>
                 </div>
                 <nav class="nav" id="main-nav">
-                    <a href="#home" class="nav-link active">Home</a>
-                    <a href="#products" class="nav-link">Products</a>
-                    <a href="#about" class="nav-link">About</a>
-                    <a href="#contact" class="nav-link">Contact</a>
+                    <a href="#home" class="nav-link active" data-section="home">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </a>
+                    <a href="#products" class="nav-link" data-section="products">
+                        <i class="fas fa-shopping-bag"></i>
+                        <span>Products</span>
+                    </a>
+                    <a href="#about" class="nav-link" data-section="about">
+                        <i class="fas fa-info-circle"></i>
+                        <span>About</span>
+                    </a>
+                    <a href="#contact" class="nav-link" data-section="contact">
+                        <i class="fas fa-envelope"></i>
+                        <span>Contact</span>
+                    </a>
                 </nav>
                 <div class="header-actions">
                     <a href="/orders.html" id="my-orders-btn" class="orders-btn" style="display: none;">
@@ -63,7 +75,7 @@
 
     <!-- Hero Section -->
     <section id="home" class="hero">
-        <video class="hero-video" autoplay muted loop playsinline preload="auto">
+        <video class="hero-video" autoplay muted loop playsinline preload="auto" id="hero-video">
             <source src="/landing page top.mp4" type="video/mp4">
             <source src="/landing%20page%20top.mp4" type="video/mp4">
             <!-- Fallback if video doesn't load -->
@@ -173,17 +185,7 @@
                         </div>
                     </div>
                     
-                    <!-- OTP Section (shown after email/password entered) -->
-                    <div id="login-otp-section" class="otp-section" style="display: none;">
-                        <div class="form-group">
-                            <label for="login-otp">Enter OTP Code</label>
-                            <div style="display: flex; gap: 0.5rem;">
-                                <input type="text" id="login-otp" placeholder="000000" maxlength="6" pattern="[0-9]{6}" style="flex: 1;">
-                                <button type="button" id="resend-login-otp-btn" class="btn btn-outline" style="white-space: nowrap;">Resend</button>
-                            </div>
-                            <small style="color: #666; font-size: 0.85rem;">Check your email for the 6-digit code</small>
-                        </div>
-                    </div>
+                    <!-- OTP Section removed from login - login now works with email/password only -->
                 </div>
                 
                 <!-- Register mode fields - Multi-step Registration -->
@@ -747,62 +749,60 @@
     <!-- Scripts -->
     <script src="/js/app.js"></script>
     <script>
-        // Handle hero video loading
-        document.addEventListener('DOMContentLoaded', () => {
-            const heroVideo = document.querySelector('.hero-video');
+        // Handle hero video loading - fix delay issue by loading immediately
+        (function() {
+            const heroVideo = document.getElementById('hero-video') || document.querySelector('.hero-video');
             const heroSection = document.querySelector('.hero');
             
             if (heroVideo) {
-                console.log('Video element found:', heroVideo);
-                console.log('Video sources:', heroVideo.querySelectorAll('source'));
-                
-                // Force video to be visible
+                // Immediately make video visible and start loading
                 heroVideo.style.display = 'block';
                 heroVideo.style.opacity = '1';
                 heroVideo.style.visibility = 'visible';
                 heroVideo.style.zIndex = '0';
                 
-                // Hide fallback background when video loads
-                heroVideo.addEventListener('loadeddata', () => {
-                    console.log('✅ Hero video loaded successfully');
+                // Force video to load immediately (don't wait for DOMContentLoaded)
+                heroVideo.load();
+                
+                // Show video as soon as it can play (even before full load) - this fixes the delay
+                heroVideo.addEventListener('canplay', () => {
+                    heroVideo.classList.remove('loading');
+                    heroVideo.classList.add('ready');
+                    heroVideo.play().catch(e => {
+                        // Auto-play might be blocked, that's okay
+                        console.log('Auto-play prevented (normal):', e);
+                    });
                     if (heroSection) {
                         heroSection.style.background = 'transparent';
                     }
-                });
+                }, { once: true });
                 
+                // Also handle when enough data is loaded
+                heroVideo.addEventListener('loadeddata', () => {
+                    heroVideo.classList.remove('loading');
+                    heroVideo.classList.add('ready');
+                    if (heroSection) {
+                        heroSection.style.background = 'transparent';
+                    }
+                }, { once: true });
+                
+                // Handle metadata load - try to play immediately
                 heroVideo.addEventListener('loadedmetadata', () => {
-                    console.log('Video metadata loaded');
-                    console.log('Video dimensions:', heroVideo.videoWidth, 'x', heroVideo.videoHeight);
-                });
+                    // Try to play as soon as metadata is ready
+                    heroVideo.play().catch(e => {
+                        console.log('Auto-play blocked (normal on some browsers):', e);
+                    });
+                }, { once: true });
                 
                 // Show fallback background if video fails
                 heroVideo.addEventListener('error', (e) => {
                     console.error('❌ Video failed to load:', e);
-                    console.error('Video error details:', heroVideo.error);
-                    console.log('Video file path attempted:', heroVideo.querySelector('source')?.src);
-                    console.log('Please ensure "landing page top.mp4" is in the frontend folder at:');
-                    console.log('d:\\Program Files\\Coding\\imtired\\frontend\\landing page top.mp4');
                     if (heroSection) {
-                        heroSection.style.background = 'var(--primary-color)';
+                        heroSection.style.background = 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))';
                     }
-                });
-                
-                // Check if video can play
-                heroVideo.addEventListener('canplay', () => {
-                    console.log('Video can play');
-                    heroVideo.play().then(() => {
-                        console.log('Video playing');
-                    }).catch(err => {
-                        console.error('Video autoplay failed:', err);
-                    });
-                });
-                
-                // Try to load the video
-                heroVideo.load();
-            } else {
-                console.error('Video element not found!');
+                }, { once: true });
             }
-        });
+        })();
     </script>
 </body>
 </html>

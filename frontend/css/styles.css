@@ -126,7 +126,8 @@ body {
 
 .nav {
     display: flex;
-    gap: 2rem;
+    gap: 0.5rem;
+    align-items: center;
 }
 
 .nav-link {
@@ -134,11 +135,70 @@ body {
     color: var(--text-color);
     font-weight: 500;
     transition: var(--transition);
+    padding: 0.6rem 1.2rem;
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+    overflow: hidden;
+    background: transparent;
+}
+
+.nav-link i {
+    font-size: 0.9rem;
+    transition: var(--transition);
+}
+
+.nav-link span {
+    position: relative;
+    z-index: 1;
+}
+
+/* Hover effect with background */
+.nav-link::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    border-radius: var(--border-radius);
+    z-index: 0;
+}
+
+.nav-link:hover::before,
+.nav-link.active::before {
+    opacity: 0.1;
 }
 
 .nav-link:hover,
 .nav-link.active {
     color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.nav-link:hover i,
+.nav-link.active i {
+    transform: scale(1.1);
+    color: var(--primary-color);
+}
+
+/* Active state underline effect */
+.nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    border-radius: 2px;
+    z-index: 1;
 }
 
 .header-actions {
@@ -258,11 +318,26 @@ body {
     height: 100%;
     object-fit: cover;
     z-index: 0;
-    background: transparent;
+    background: #1a1a1a; /* Dark background while loading */
     display: block !important;
     opacity: 1 !important;
     visibility: visible !important;
     pointer-events: none;
+    /* Ensure video loads immediately */
+    preload: auto;
+    /* Prevent delay */
+    will-change: opacity;
+    /* Smooth fade-in when ready */
+    transition: opacity 0.3s ease;
+}
+
+/* Video loading state */
+.hero-video.loading {
+    opacity: 0;
+}
+
+.hero-video.ready {
+    opacity: 1;
 }
 
 .hero-overlay {
@@ -2848,6 +2923,17 @@ textarea.invalid:focus {
 
     .nav.open {
         display: flex;
+    }
+
+    .nav-link {
+        width: 100%;
+        justify-content: flex-start;
+        padding: 0.8rem 1rem;
+        border-radius: var(--border-radius);
+    }
+
+    .nav-link::after {
+        display: none; /* Hide underline on mobile */
     }
 
     .header-actions {

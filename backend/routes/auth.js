@@ -202,41 +202,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Verify OTP was verified for this email (for login purpose)
-    // Check if there's a recently verified OTP that hasn't expired
-    const otpCheck = await pool.query(
-      `SELECT id, created_at, expires_at FROM otps 
-       WHERE email = $1 AND purpose = 'login' AND is_used = true 
-       ORDER BY created_at DESC LIMIT 1`,
-      [user.email]
-    );
-
-    if (otpCheck.rows.length === 0) {
-      return res.status(403).json({ 
-        message: 'OTP verification required. Please verify your OTP first.' 
-      });
-    }
-
-    const otpRecord = otpCheck.rows[0];
-    const now = new Date();
-    const otpExpiresAt = new Date(otpRecord.expires_at);
-    const otpCreatedAt = new Date(otpRecord.created_at);
-    
-    // Check if OTP has expired (expires_at is in the past)
-    if (otpExpiresAt < now) {
-      return res.status(403).json({ 
-        message: 'OTP verification expired. Please request a new OTP and verify again.' 
-      });
-    }
-
-    // Check if OTP was created recently (within last 10 minutes - OTP validity period)
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-    if (otpCreatedAt < tenMinutesAgo) {
-      return res.status(403).json({ 
-        message: 'OTP verification expired. Please request a new OTP and verify again.' 
-      });
-    }
-
+    // OTP verification removed from login - users can login directly with email/password
     // Role validation: Allow admin/super_admin to login with any requested role
     // For non-admin users, validate that their actual role matches requested role
     if (requestedRole && user.role !== 'admin' && user.role !== 'super_admin') {
