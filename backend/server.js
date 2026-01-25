@@ -17,10 +17,37 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
   ? { rejectUnauthorized: false }
   : false;
 
-// Middleware
+// Middleware - CORS Configuration
+// Allow multiple origins for production and development
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+// Add agricatch.store if not already included
+if (!allowedOrigins.includes('https://agricatch.store')) {
+  allowedOrigins.push('https://agricatch.store');
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*', // Allow all origins in development
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, or same-origin requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      // In development, allow all origins
+      if (process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -220,6 +247,17 @@ try {
 }
 
 try {
+  app.use('/api/contact', require('./routes/contact'));
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:58',message:'Contact route loaded successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+} catch (error) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:58',message:'Contact route failed to load',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+}
+
+try {
   app.use('/api/farmers', require('./routes/farmers'));
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:58',message:'Farmers route loaded successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'})}).catch(()=>{});
@@ -334,11 +372,15 @@ fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{metho
 // #endregion
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
-// Add CORS for local development
+// Additional CORS headers (backup - main CORS is handled above)
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin) || allowedOrigins.includes('*') || !origin) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
   next();
 });
 

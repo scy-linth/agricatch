@@ -127,10 +127,15 @@ async function sendOtpEmail(to, otp, purpose = "login") {
     try {
       console.log("DEBUG: Attempting to initialize Resend with API Key:", process.env.RESEND_API_KEY ? "*****" + process.env.RESEND_API_KEY.slice(-4) : "undefined");
       const resend = new Resend(process.env.RESEND_API_KEY);
+      
+      // Use RESEND_FROM_EMAIL if set, otherwise use default
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "AgriCatch <onboarding@resend.dev>";
+      
       console.log(`📧 Sending OTP email via Resend to: ${to}`);
+      console.log(`📧 From email: ${fromEmail}`);
       
       const { data, error } = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || "AgriCatch <onboarding@resend.dev>",
+        from: fromEmail,
         to: [to],
         subject: `Your ${purposeText} OTP Code`,
         html: htmlContent,
@@ -139,14 +144,16 @@ async function sendOtpEmail(to, otp, purpose = "login") {
 
       if (error) {
         console.error("❌ Resend email error object:", JSON.stringify(error, null, 2));
-        return { success: false, error: error.message || error.name || "Resend API error" };
+        const errorMessage = error.message || error.name || "Resend API error";
+        return { success: false, error: errorMessage };
       }
 
       console.log(`✅ OTP email sent via Resend to ${to}:`, data.id);
       return { success: true, messageId: data.id };
     } catch (error) {
       console.error("❌ Resend API error:", error);
-      return { success: false, error: error.message };
+      const errorMessage = error.message || "Unknown error";
+      return { success: false, error: errorMessage };
     }
   }
 

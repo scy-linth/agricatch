@@ -72,6 +72,36 @@ router.post('/send', async (req, res) => {
       }
     }
 
+    // Rate limiting: Check if OTP was sent recently (60 second cooldown)
+    try {
+      const recentOtp = await pool.query(
+        `SELECT created_at FROM otps 
+         WHERE email = $1 AND purpose = $2 
+         ORDER BY created_at DESC LIMIT 1`,
+        [email, purpose]
+      );
+
+      if (recentOtp.rows.length > 0) {
+        const lastSent = new Date(recentOtp.rows[0].created_at);
+        const now = new Date();
+        const secondsSinceLastSent = Math.floor((now - lastSent) / 1000);
+        const cooldownSeconds = 60; // 60 second cooldown
+
+        if (secondsSinceLastSent < cooldownSeconds) {
+          const remainingSeconds = cooldownSeconds - secondsSinceLastSent;
+          console.log(`⏳ OTP cooldown active: ${remainingSeconds} seconds remaining`);
+          return res.status(429).json({
+            message: `Please wait ${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''} before requesting another OTP`,
+            cooldownSeconds: remainingSeconds,
+            retryAfter: remainingSeconds
+          });
+        }
+      }
+    } catch (cooldownError) {
+      console.error('❌ Error checking OTP cooldown:', cooldownError);
+      // Continue if cooldown check fails (don't block OTP sending)
+    }
+
     // Generate OTP
     const otp = generateOtp();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -102,6 +132,7 @@ router.post('/send', async (req, res) => {
       console.error('❌ OTP email send failed:', emailResult.error);
       // Provide more detailed error information
       let errorMessage = 'Failed to send OTP email.';
+      
       if (emailResult.error) {
         if (emailResult.error.includes('Invalid login') || emailResult.error.includes('authentication failed')) {
           errorMessage = 'SMTP authentication failed. Please verify email credentials.';

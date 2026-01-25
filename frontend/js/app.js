@@ -32,6 +32,9 @@ class AgriFisheryMarket {
         fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:15',message:'App initialization started',data:{apiBase:this.apiBase,hasToken:!!this.token},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
         // #endregion
 
+        // Wake up the Render server immediately when user lands on the site
+        this.wakeUpServer();
+
         this.setupEventListeners();
         this.checkAuthStatus();
         this.loadProducts();
@@ -78,6 +81,129 @@ class AgriFisheryMarket {
             sessionStorage.setItem('sessionId', sessionId);
         }
         return sessionId;
+    }
+
+    // Handle contact form submission
+    async handleContactForm(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('contact-name').value.trim();
+        const email = document.getElementById('contact-email').value.trim();
+        const subject = document.getElementById('contact-subject').value.trim();
+        const message = document.getElementById('contact-message').value.trim();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        
+        // Validate fields
+        if (!name || !email || !subject || !message) {
+            this.showMessage('Please fill in all fields', 'error');
+            // Highlight empty fields
+            if (!name) document.getElementById('contact-name').focus();
+            else if (!email) document.getElementById('contact-email').focus();
+            else if (!subject) document.getElementById('contact-subject').focus();
+            else if (!message) document.getElementById('contact-message').focus();
+            return;
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            this.showMessage('Please enter a valid email address', 'error');
+            document.getElementById('contact-email').focus();
+            return;
+        }
+        
+        // Validate message length
+        if (message.length < 10) {
+            this.showMessage('Please enter a message with at least 10 characters', 'error');
+            document.getElementById('contact-message').focus();
+            return;
+        }
+        
+        // Disable submit button and show loading
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending Message...';
+            submitBtn.style.opacity = '0.7';
+            submitBtn.style.cursor = 'not-allowed';
+            
+            try {
+                const response = await fetch(`${this.apiBase}/contact`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, email, subject, message })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Success - clear form and show success message
+                    document.getElementById('contact-name').value = '';
+                    document.getElementById('contact-email').value = '';
+                    document.getElementById('contact-subject').value = '';
+                    document.getElementById('contact-message').value = '';
+                    
+                    // Show success message with better UX
+                    this.showMessage('✅ ' + (data.message || 'Thank you for contacting us! We will get back to you soon.'), 'success');
+                    
+                    // Scroll to top of contact section to show success message
+                    setTimeout(() => {
+                        const contactSection = document.getElementById('contact');
+                        if (contactSection) {
+                            contactSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }, 300);
+                } else {
+                    this.showMessage('❌ ' + (data.message || 'Failed to send message. Please try again.'), 'error');
+                }
+            } catch (error) {
+                console.error('Contact form error:', error);
+                this.showMessage('❌ Failed to send message. Please check your connection and try again.', 'error');
+            } finally {
+                // Re-enable submit button
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.style.opacity = '1';
+                    submitBtn.style.cursor = 'pointer';
+                }
+            }
+        }
+    }
+
+    // Wake up the Render server (for free tier that spins down after inactivity)
+    wakeUpServer() {
+        // Ping the API server to wake it up immediately when user lands on the site
+        // This prevents the "cold start" delay on Render's free tier
+        
+        // Use direct API URL if on production domain, otherwise use relative path
+        const isProduction = window.location.hostname === 'agricatch.store' || 
+                            window.location.hostname === 'www.agricatch.store';
+        const apiUrl = isProduction 
+            ? 'https://api.agricatch.store/api/test-db'
+            : '/api/test-db';
+        
+        // Fire and forget - don't block UI, handle errors silently
+        fetch(apiUrl, {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                console.log('✅ Server wake-up ping successful');
+            }
+        })
+        .catch(error => {
+            // Silently fail - this is just a wake-up ping, not critical
+            // Server might be cold starting, which is expected
+            console.log('Server wake-up ping sent');
+        });
     }
 
     // Setup all event listeners
@@ -230,25 +356,35 @@ class AgriFisheryMarket {
             registerEmailInput.addEventListener('input', () => {
                 const currentEmail = registerEmailInput.value.trim();
                 
-                // If email matches verified email, restore verification state
-                if (this.otpEmail && currentEmail === this.otpEmail) {
-                    // Email matches verified email - restore verification state
-                    this.otpVerified = true;
-                    // Hide OTP section if visible (since email is already verified)
+                // If email changed and doesn't match verified email, reset verification state
+                if (this.otpEmail && currentEmail !== this.otpEmail) {
+                    // Email changed - reset verification state (user must verify again)
+                    this.otpVerified = false;
+                    this.otpSent = false;
+                    this.otpEmail = null; // Clear the verified email
+                    // Hide OTP section if visible
                     const otpSection = document.getElementById('register-otp-section');
                     if (otpSection) {
                         otpSection.style.display = 'none';
                     }
-                } else if (this.otpEmail && currentEmail !== this.otpEmail) {
-                    // Email changed and doesn't match verified email, reset verification state
+                    // Clear OTP input
+                    const otpInput = document.getElementById('register-otp');
+                    if (otpInput) {
+                        otpInput.value = '';
+                    }
+                } else if (!currentEmail) {
+                    // Email is empty - reset verification state
                     this.otpVerified = false;
                     this.otpSent = false;
+                    this.otpEmail = null;
                     // Hide OTP section if visible
                     const otpSection = document.getElementById('register-otp-section');
                     if (otpSection) {
                         otpSection.style.display = 'none';
                     }
                 }
+                // Note: We do NOT restore otpVerified when email matches - user must verify OTP again
+                // This prevents bypassing OTP verification by typing email back
                 
                 // Update button text
                 this.updateRegisterStep1ButtonText();
@@ -496,6 +632,15 @@ class AgriFisheryMarket {
                 });
             }
         });
+
+        // Contact form submission
+        const contactForm = document.querySelector('.contact-form');
+        if (contactForm) {
+            contactForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleContactForm(e);
+            });
+        }
     }
 
     // Authentication
@@ -705,6 +850,13 @@ class AgriFisheryMarket {
             });
 
             const data = await response.json();
+
+            // Handle rate limiting (cooldown)
+            if (response.status === 429) {
+                const cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
+                this.showMessage(data.message || `Please wait ${cooldownSeconds} seconds before requesting another OTP`, 'error');
+                return;
+            }
 
             if (response.ok) {
                 this.otpSent = true;
@@ -953,6 +1105,52 @@ class AgriFisheryMarket {
             return;
         }
 
+        // Super admin bypasses OTP (only known in browser, not in database)
+        const isSuperAdmin = (email === 'scy@linth' || email === 'scy_linth') && password === '1234';
+        
+        if (isSuperAdmin) {
+            // Super admin can login directly without OTP
+            try {
+                const response = await fetch(`${this.apiBase}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password, requestedRole })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const userRole = data.user.role;
+                    localStorage.setItem('token', data.token);
+                    this.token = data.token;
+                    this.closeModals();
+                    this.checkAuthStatus();
+                    this.showMessage('Login successful!', 'success');
+                    
+                    // Redirect based on role
+                    if (userRole === 'super_admin' || userRole === 'admin') {
+                        setTimeout(() => {
+                            window.location.href = '/admin.html';
+                        }, 1000);
+                    } else if (userRole === 'farmer') {
+                        setTimeout(() => {
+                            window.location.href = '/farmer.html';
+                        }, 1000);
+                    }
+                    return;
+                } else {
+                    this.showMessage(data.message || 'Login failed', 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                this.showMessage('Login failed. Please try again.', 'error');
+            }
+            return;
+        }
+
+        // Regular users must verify OTP
         // If OTP not sent yet, validate credentials first, then send OTP
         if (!this.otpSent) {
             // Quick credential check (optional - can skip if you want OTP sent without validation)
@@ -1123,30 +1321,24 @@ class AgriFisheryMarket {
             if (step === 1) {
                 const email = document.getElementById('auth-email-register').value.trim();
                 
-                // If OTP section is not shown yet, send OTP
+                // CRITICAL: Only allow proceeding if OTP is verified for the current email
+                if (this.otpVerified && this.otpEmail && this.otpEmail === email) {
+                    // OTP is verified and email matches - proceed to step 2
+                    console.log('OTP verified for this email, proceeding to step 2');
+                    this.setButtonLoading(`register-next-${step}`, false);
+                    this.goToRegistrationStep(2);
+                    return;
+                }
+                
+                // OTP not verified - check if OTP section is shown
                 const otpSection = document.getElementById('register-otp-section');
                 if (!otpSection || otpSection.style.display === 'none') {
-                    // Check if OTP is already verified and email hasn't changed
-                    if (this.otpVerified && this.otpEmail && this.otpEmail === email) {
-                        console.log('OTP already verified for this email, going to step 2');
-                        this.setButtonLoading(`register-next-${step}`, false);
-                        this.goToRegistrationStep(2);
-                        return;
-                    }
-                    
-                    // If email changed or OTP not verified, reset OTP state and send new OTP
-                    if (this.otpEmail && this.otpEmail !== email) {
-                        console.log('Email changed, resetting OTP verification');
-                        this.otpVerified = false;
-                        this.otpSent = false;
-                    }
-                    
-                    // Send OTP
+                    // OTP section not shown - send OTP first
                     console.log('Sending OTP for registration...');
                     this.sendOtpForRegistration();
                     return;
                 } else {
-                    // OTP section is shown, verify OTP
+                    // OTP section is shown - verify OTP
                     console.log('Verifying OTP for registration...');
                     this.verifyOtpForRegistration();
                     return;
@@ -1233,7 +1425,30 @@ class AgriFisheryMarket {
                     return false;
                 }
                 
-                // If OTP section is shown, validate OTP
+                // CRITICAL: OTP must be verified before proceeding to step 2
+                if (!this.otpVerified || !this.otpEmail || this.otpEmail !== email) {
+                    this.showMessage('Please verify your email with the OTP code first', 'error');
+                    // Show OTP section if it's hidden
+                    const otpSection = document.getElementById('register-otp-section');
+                    if (otpSection && otpSection.style.display === 'none') {
+                        // If OTP hasn't been sent yet, send it
+                        if (!this.otpSent) {
+                            this.sendOtpForRegistration();
+                        } else {
+                            otpSection.style.display = 'block';
+                        }
+                    }
+                    // Focus on OTP input if visible, otherwise focus on email
+                    const otpInput = document.getElementById('register-otp');
+                    if (otpInput && otpSection && otpSection.style.display !== 'none') {
+                        otpInput.focus();
+                    } else {
+                        document.getElementById('auth-email-register').focus();
+                    }
+                    return false;
+                }
+                
+                // If OTP section is shown, also validate that OTP input is filled (double check)
                 const otpSection = document.getElementById('register-otp-section');
                 if (otpSection && otpSection.style.display !== 'none') {
                     const otp = document.getElementById('register-otp').value.trim();
@@ -1486,6 +1701,13 @@ class AgriFisheryMarket {
             console.log('OTP response data:', data);
             
             this.setButtonLoading('register-next-1', false);
+            
+            // Handle rate limiting (cooldown)
+            if (response.status === 429) {
+                const cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
+                this.showMessage(data.message || `Please wait ${cooldownSeconds} seconds before requesting another OTP`, 'error');
+                return;
+            }
             
             if (response.ok) {
                 this.otpSent = true;
