@@ -1,31 +1,34 @@
-const nodemailer = require('nodemailer');
-require('dotenv').config();
+const nodemailer = require("nodemailer");
+require("dotenv").config();
 
 // Check if Resend API key is available (preferred for cloud deployments)
 // TEMPORARILY DISABLED FOR SMTP TESTING - Set FORCE_SMTP=true to test SMTP
 let useResend = false;
 let Resend;
-if (process.env.FORCE_SMTP !== 'true') {
+if (process.env.FORCE_SMTP !== "true") {
   try {
     if (process.env.RESEND_API_KEY) {
-      Resend = require('resend');
+      console.log("DEBUG: RESEND_API_KEY detected. Length:", process.env.RESEND_API_KEY.length);
+      Resend = require("resend");
       useResend = true;
-      console.log('✅ Using Resend API for emails (cloud-friendly)');
+      console.log("✅ Using Resend API for emails (cloud-friendly)");
+    } else {
+      console.log("DEBUG: RESEND_API_KEY not found in process.env");
     }
   } catch (error) {
-    console.log('⚠️ Resend package not installed, falling back to SMTP');
+    console.log("⚠️ Resend package not installed, falling back to SMTP");
   }
 } else {
-  console.log('🔧 FORCE_SMTP enabled - Using SMTP instead of Resend');
+  console.log("🔧 FORCE_SMTP enabled - Using SMTP instead of Resend");
 }
 
 // Create reusable transporter using SMTP (fallback)
 let transporter = null;
 if (!useResend) {
   transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: parseInt(process.env.SMTP_PORT || "587"),
+    secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
     auth: {
       user: process.env.SMTP_USER, // Your email
       pass: process.env.SMTP_PASSWORD, // Your email password or app password
@@ -45,10 +48,10 @@ if (!useResend) {
   // Verify SMTP connection
   transporter.verify(function (error, success) {
     if (error) {
-      console.error('❌ SMTP connection error:', error);
-      console.error('💡 Tip: Consider using Resend API (RESEND_API_KEY) for cloud deployments');
+      console.error("❌ SMTP connection error:", error);
+      console.error("💡 Tip: Consider using Resend API (RESEND_API_KEY) for cloud deployments");
     } else {
-      console.log('✅ SMTP server is ready to send emails');
+      console.log("✅ SMTP server is ready to send emails");
     }
   });
 }
@@ -60,12 +63,12 @@ if (!useResend) {
  * @param {string} purpose - Purpose: 'login', 'register', 'reset_password'
  * @returns {Promise}
  */
-async function sendOtpEmail(to, otp, purpose = 'login') {
+async function sendOtpEmail(to, otp, purpose = "login") {
   const purposeText = {
-    login: 'Login',
-    register: 'Registration',
-    reset_password: 'Password Reset',
-  }[purpose] || 'Verification';
+    login: "Login",
+    register: "Registration",
+    reset_password: "Password Reset",
+  }[purpose] || "Verification";
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -96,7 +99,7 @@ async function sendOtpEmail(to, otp, purpose = 'login') {
           </div>
           <p>This OTP is valid for <strong>10 minutes</strong>.</p>
           <p class="warning">⚠️ Do not share this code with anyone. AgriCatch will never ask for your OTP.</p>
-          <p>If you didn't request this code, please ignore this email.</p>
+          <p>If you didn\'t request this code, please ignore this email.</p>
         </div>
         <div class="footer">
           <p>© ${new Date().getFullYear()} AgriCatch. All rights reserved.</p>
@@ -115,17 +118,18 @@ async function sendOtpEmail(to, otp, purpose = 'login') {
     
     Do not share this code with anyone.
     
-    If you didn't request this code, please ignore this email.
+    If you didn\'t request this code, please ignore this email.
   `;
 
   // Use Resend API if available (preferred for cloud)
   if (useResend && Resend) {
     try {
+      console.log("DEBUG: Attempting to initialize Resend with API Key:", process.env.RESEND_API_KEY ? "*****" + process.env.RESEND_API_KEY.slice(-4) : "undefined");
       const resend = new Resend(process.env.RESEND_API_KEY);
       console.log(`📧 Sending OTP email via Resend to: ${to}`);
       
       const { data, error } = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || 'AgriCatch <onboarding@resend.dev>',
+        from: process.env.RESEND_FROM_EMAIL || "AgriCatch <onboarding@resend.dev>",
         to: [to],
         subject: `Your ${purposeText} OTP Code`,
         html: htmlContent,
@@ -133,21 +137,21 @@ async function sendOtpEmail(to, otp, purpose = 'login') {
       });
 
       if (error) {
-        console.error('❌ Resend email error:', error);
+        console.error("❌ Resend email error:", error);
         return { success: false, error: error.message };
       }
 
       console.log(`✅ OTP email sent via Resend to ${to}:`, data.id);
       return { success: true, messageId: data.id };
     } catch (error) {
-      console.error('❌ Resend API error:', error);
+      console.error("❌ Resend API error:", error);
       return { success: false, error: error.message };
     }
   }
 
   // Fallback to SMTP
   if (!transporter) {
-    return { success: false, error: 'No email service configured. Set RESEND_API_KEY or SMTP credentials.' };
+    return { success: false, error: "No email service configured. Set RESEND_API_KEY or SMTP credentials." };
   }
 
   const mailOptions = {
@@ -165,8 +169,8 @@ async function sendOtpEmail(to, otp, purpose = 'login') {
     console.log(`✅ OTP email sent to ${to}:`, info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('❌ Error sending OTP email:', error);
-    console.error('❌ Error details:', {
+    console.error("❌ Error sending OTP email:", error);
+    console.error("❌ Error details:", {
       message: error.message,
       code: error.code,
       command: error.command,
@@ -175,11 +179,11 @@ async function sendOtpEmail(to, otp, purpose = 'login') {
     });
     
     // Suggest Resend if SMTP fails
-    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
-      console.error('💡 Tip: SMTP connection failed. Consider using Resend API (set RESEND_API_KEY) for cloud deployments.');
+    if (error.code === "ETIMEDOUT" || error.code === "ECONNREFUSED") {
+      console.error("💡 Tip: SMTP connection failed. Consider using Resend API (set RESEND_API_KEY) for cloud deployments.");
     }
     
-    let errorMsg = error.message || 'Unknown error';
+    let errorMsg = error.message || "Unknown error";
     if (error.code) {
       errorMsg = `${errorMsg} (Code: ${error.code})`;
     }
