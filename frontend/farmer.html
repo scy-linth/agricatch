@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmer Dashboard - AgriCatch</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <meta name="color-scheme" content="light">
+</head>
+<body class="admin-theme farmer-theme">
+    <div class="admin-layout farmer-layout">
+        <div class="sidebar-overlay" id="farmer-sidebar-overlay"></div>
+        <button class="mobile-menu-toggle" id="farmer-mobile-menu-toggle" aria-label="Toggle menu" style="position: fixed; top: 1rem; left: 1rem; z-index: 2001; background: var(--sidebar-bg); color: white; border: none; padding: 0.75rem; border-radius: 8px;">
+            <i class="fas fa-bars"></i>
+        </button>
+        <aside class="admin-sidebar" id="farmer-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo-container">
+                    <img src="/images/logo.png" alt="AgriCatch Logo" class="sidebar-logo">
+                    <div class="brand-text">
+                        <span class="brand-title">
+                            <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
+                        </span>
+                        <span class="brand-subtitle">Farmer</span>
+                    </div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a class="sidebar-link active" href="#overview" data-section="overview"><i class="fas fa-gauge-high"></i> Overview</a>
+                <a class="sidebar-link" href="#products" data-section="products"><i class="fas fa-box"></i> Products</a>
+                <a class="sidebar-link" href="#orders" data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</a>
+                <a class="sidebar-link" href="#chat" data-section="chat"><i class="fas fa-comments"></i> Chat</a>
+                <button id="logout-btn" class="sidebar-link logout-link" type="button"><i class="fas fa-sign-out-alt"></i> Log out</button>
+            </nav>
+        </aside>
+
+        <main class="admin-main">
+            <div class="admin-welcome-banner">
+                <div class="welcome-text">
+                    <h1 class="welcome-title">
+                        <i class="fas fa-seedling"></i>
+                        Farmer Dashboard
+                    </h1>
+                    <p class="welcome-subtitle">Manage your shop, products, and orders</p>
+                </div>
+            </div>
+
+            <header class="admin-topbar">
+                <div class="topbar-left">
+                    <h1 id="farmer-page-title" class="page-title">Overview</h1>
+                </div>
+                <div class="topbar-right">
+                    <button id="farmer-search-toggle" class="icon-btn" aria-label="Search" type="button">
+                        <i class="fas fa-magnifying-glass"></i>
+                    </button>
+                    <input id="farmer-search-input" class="search-input" placeholder="Search..." style="min-width: 260px;">
+                    <button id="back-to-top-btn" class="icon-btn" aria-label="Back to top" type="button">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                    <div class="admin-profile">
+                        <img src="https://via.placeholder.com/40" alt="Farmer avatar" class="profile-avatar">
+                        <div class="profile-meta">
+                            <span id="user-name" class="profile-name">Farmer</span>
+                            <span id="user-email" class="profile-email">—</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <section id="overview" class="admin-section-card active">
+                <div class="section-header">
+                    <h2>Shop Overview</h2>
+                </div>
+                <div class="section-content">
+                    <div class="shop-header">
+                        <div class="shop-avatar">
+                            <i class="fas fa-store"></i>
+                        </div>
+                        <div class="shop-info">
+                            <h3 id="shop-name-display">—</h3>
+                            <p id="shop-location-display"><i class="fas fa-location-dot"></i> <span>—</span></p>
+                            <p id="shop-description-display">—</p>
+
+                            <!-- Hidden edit form (shown when clicking Edit) -->
+                            <div id="shop-profile-edit" style="display:none; margin-top: 12px;">
+                                <div class="form-group">
+                                    <label for="shop-name-input">Farm Name</label>
+                                    <input type="text" id="shop-name-input" class="editable-field" placeholder="My Farm Shop">
+                                </div>
+                                <div class="form-group">
+                                    <label for="shop-location-input"><i class="fas fa-location-dot"></i> Farm Location</label>
+                                    <input type="text" id="shop-location-input" class="editable-field" placeholder="Farm location not set">
+                                </div>
+                                <div class="form-group">
+                                    <label for="shop-description-input">Farm Description</label>
+                                    <textarea id="shop-description-input" class="editable-field" rows="3" placeholder="Add a short description about your farm and products."></textarea>
+                                </div>
+                                <div style="display:flex; gap:10px; justify-content:flex-end;">
+                                    <button type="button" id="cancel-shop-profile-btn" class="btn btn-secondary btn-small">Cancel</button>
+                                    <button type="button" id="save-shop-profile-btn" class="btn btn-primary btn-small">Save</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" id="edit-shop-profile-btn" class="btn btn-secondary btn-small">Edit</button>
+                    </div>
+
+                    <div class="admin-stats" style="margin-top: 1.5rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon" style="color: #10b981;"><i class="fas fa-box"></i></div>
+                            <div class="stat-details">
+                                <h3>My Products</h3>
+                                <div class="stat-number" id="my-products">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="color: #f59e0b;"><i class="fas fa-clipboard-list"></i></div>
+                            <div class="stat-details">
+                                <h3>Total Orders</h3>
+                                <div class="stat-number" id="total-orders">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="color: #22c55e;"><i class="fas fa-basket-shopping"></i></div>
+                            <div class="stat-details">
+                                <h3>Total Sold</h3>
+                                <div class="stat-number" id="total-sold">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="color: #22c55e;"><i class="fas fa-peso-sign"></i></div>
+                            <div class="stat-details">
+                                <h3>Revenue</h3>
+                                <div class="stat-number" id="total-revenue">₱0.00</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="color: #3b82f6;"><i class="fas fa-message"></i></div>
+                            <div class="stat-details">
+                                <h3>Messages</h3>
+                                <div class="stat-number" id="unread-messages">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="products" class="admin-section-card">
+                <div class="section-header">
+                    <h2>Product Management</h2>
+                </div>
+                <div class="section-content">
+                    <div class="product-tabs">
+                        <button id="list-products-tab" class="tab-btn active" type="button">List Products</button>
+                        <button id="add-product-tab" class="tab-btn" type="button">Add Product</button>
+                    </div>
+
+                    <div id="list-products-section" class="tab-content active" data-tab-scope="products">
+                        <div class="product-filters">
+                            <input type="text" id="product-search" placeholder="Search products..." class="search-input">
+                            <select id="product-status-filter" class="filter-select">
+                                <option value="all">All Status</option>
+                                <option value="available">Available</option>
+                                <option value="unavailable">Unavailable</option>
+                            </select>
+                            <button id="refresh-products-btn" class="btn btn-secondary btn-small" type="button">Refresh</button>
+                        </div>
+                        <div id="my-products-grid" class="products-grid"></div>
+                    </div>
+
+                    <div id="add-product-section" class="tab-content" data-tab-scope="products">
+                        <form id="add-product-form" class="product-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="product-name">Product Name *</label>
+                                    <input type="text" id="product-name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="product-price">Price (₱) *</label>
+                                    <input type="number" id="product-price" step="0.01" required>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="product-category">Category *</label>
+                                    <select id="product-category" required>
+                                        <option value="1">Agricultural Products</option>
+                                        <option value="2">Fishery Products</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="product-unit">Unit *</label>
+                                    <select id="product-unit" required>
+                                        <option value="kg">Kilogram (kg)</option>
+                                        <option value="pieces">Pieces</option>
+                                        <option value="boxes">Boxes</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="product-stock">Stock Quantity *</label>
+                                <input type="number" id="product-stock" min="0" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="product-description">Description</label>
+                                <textarea id="product-description" rows="3" placeholder="Describe your fresh product..."></textarea>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="harvest-date">Harvest Date</label>
+                                    <input type="date" id="harvest-date">
+                                </div>
+                                <div class="form-group">
+                                    <label for="expiry-date">Expiry Date</label>
+                                    <input type="date" id="expiry-date">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="product-location">Farm Location</label>
+                                <input type="text" id="product-location" placeholder="e.g., Laguna, Philippines">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="product-image">Product Image</label>
+                                <input type="file" id="product-image" accept="image/*">
+                                <small>Upload a clear image of your fresh product</small>
+                                <div id="product-image-preview" class="image-preview"></div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Add Product</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <section id="orders" class="admin-section-card">
+                <div class="section-header">
+                    <h2>Order Management</h2>
+                </div>
+                <div class="section-content">
+                    <div class="order-tabs">
+                        <button id="pending-orders-tab" class="tab-btn active" type="button">Pending</button>
+                        <button id="confirmed-orders-tab" class="tab-btn" type="button">Confirmed</button>
+                        <button id="preparing-orders-tab" class="tab-btn" type="button">Preparing</button>
+                        <button id="out_for_delivery-orders-tab" class="tab-btn" type="button">Out for Delivery</button>
+                        <button id="delivered-orders-tab" class="tab-btn" type="button">Delivered</button>
+                        <button id="cancelled-orders-tab" class="tab-btn" type="button">Cancelled</button>
+                    </div>
+
+                    <div id="pending-orders-section" class="tab-content active" data-tab-scope="orders">
+                        <div id="pending-orders-list" class="orders-list"></div>
+                    </div>
+
+                    <div id="confirmed-orders-section" class="tab-content" data-tab-scope="orders">
+                        <div id="confirmed-orders-list" class="orders-list"></div>
+                    </div>
+
+                    <div id="preparing-orders-section" class="tab-content" data-tab-scope="orders">
+                        <div id="preparing-orders-list" class="orders-list"></div>
+                    </div>
+
+                    <div id="out_for_delivery-orders-section" class="tab-content" data-tab-scope="orders">
+                        <div id="out_for_delivery-orders-list" class="orders-list"></div>
+                    </div>
+
+                    <div id="delivered-orders-section" class="tab-content" data-tab-scope="orders">
+                        <div id="delivered-orders-list" class="orders-list"></div>
+                    </div>
+
+                    <div id="cancelled-orders-section" class="tab-content" data-tab-scope="orders">
+                        <div id="cancelled-orders-list" class="orders-list"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="chat" class="admin-section-card">
+                <div class="section-header">
+                    <h2>Chat with Buyers</h2>
+                </div>
+                <div class="section-content">
+                    <div class="chat-layout">
+                        <div id="conversation-list" class="conversation-list"></div>
+                        <div class="chat-window">
+                            <div id="chat-messages" class="chat-messages"></div>
+                            <form id="chat-form" class="chat-form">
+                                <input type="text" id="chat-input" placeholder="Type a message..." required>
+                                <button type="submit" class="btn btn-primary btn-small">Send</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <aside id="farmer-detail-panel" class="admin-detail-panel">
+            <button class="panel-close" id="close-farmer-panel" aria-label="Close details" type="button">&times;</button>
+            <div id="farmer-detail-content" class="panel-content">
+                <div class="panel-placeholder">Select an order to view details</div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Edit Product Modal -->
+    <div id="edit-product-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Product</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="edit-product-form" class="product-form">
+                <input type="hidden" id="edit-product-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-product-name">Product Name *</label>
+                        <input type="text" id="edit-product-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-product-price">Price (₱) *</label>
+                        <input type="number" id="edit-product-price" step="0.01" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-product-category">Category *</label>
+                        <select id="edit-product-category" required>
+                            <option value="1">Agricultural Products</option>
+                            <option value="2">Fishery Products</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-product-unit">Unit *</label>
+                        <select id="edit-product-unit" required>
+                            <option value="kg">Kilogram (kg)</option>
+                            <option value="pieces">Pieces</option>
+                            <option value="boxes">Boxes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-product-stock">Stock Quantity *</label>
+                    <input type="number" id="edit-product-stock" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-product-description">Description</label>
+                    <textarea id="edit-product-description" rows="3" placeholder="Describe your fresh product..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-harvest-date">Harvest Date</label>
+                        <input type="date" id="edit-harvest-date">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-expiry-date">Expiry Date</label>
+                        <input type="date" id="edit-expiry-date">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-product-location">Farm Location</label>
+                    <input type="text" id="edit-product-location" placeholder="e.g., Laguna, Philippines">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-product-image">Product Image</label>
+                    <input type="file" id="edit-product-image" accept="image/*">
+                    <small>Upload a new image or leave empty to keep current image</small>
+                    <div id="edit-product-image-preview" class="image-preview"></div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" id="cancel-edit-btn" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/farmer.js"></script>
+    <script src="/js/chat.js"></script>
+</body>
+</html>

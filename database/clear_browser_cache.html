@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Browser Cache - Orders</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #45a049;
+        }
+        .button-danger {
+            background: #f44336;
+        }
+        .button-danger:hover {
+            background: #da190b;
+        }
+        .code-block {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+        .success {
+            color: #4CAF50;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 4px solid #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Clear Browser Cache for Orders</h1>
+        
+        <div class="info">
+            <strong>Instructions:</strong>
+            <ol>
+                <li>Make sure you've already run the database clear script: <code>node database/clear_orders.js</code></li>
+                <li>Click the button below to clear browser cache</li>
+                <li>Refresh your browser pages (F5) to see the changes</li>
+            </ol>
+        </div>
+
+        <button class="button" onclick="clearCache()">Clear Browser Cache</button>
+        <button class="button button-danger" onclick="clearAllAndReload()">Clear Cache & Reload All Pages</button>
+
+        <div id="result"></div>
+
+        <h2>Manual Method (Browser Console)</h2>
+        <p>Alternatively, open your browser console (F12) and run:</p>
+        <div class="code-block">
+// Clear localStorage (preserving token)
+const token = localStorage.getItem('token');
+localStorage.clear();
+if (token) localStorage.setItem('token', token);
+
+// Clear sessionStorage
+sessionStorage.clear();
+
+// Reload page
+location.reload();
+        </div>
+    </div>
+
+    <script>
+        function clearCache() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Clearing cache...</p>';
+
+            try {
+                // Preserve essential items
+                const token = localStorage.getItem('token');
+                const farmerSection = localStorage.getItem('farmerActiveSection');
+                const adminSection = localStorage.getItem('adminActiveSection');
+
+                // Clear all
+                localStorage.clear();
+                sessionStorage.clear();
+
+                // Restore essential items
+                if (token) localStorage.setItem('token', token);
+                if (farmerSection) localStorage.setItem('farmerActiveSection', farmerSection);
+                if (adminSection) localStorage.setItem('adminActiveSection', adminSection);
+
+                resultDiv.innerHTML = '<p class="success">✅ Browser cache cleared successfully!</p><p>Please refresh your pages (F5) to see the changes.</p>';
+            } catch (error) {
+                resultDiv.innerHTML = '<p style="color: red;">❌ Error: ' + error.message + '</p>';
+            }
+        }
+
+        function clearAllAndReload() {
+            clearCache();
+            setTimeout(() => {
+                if (confirm('Cache cleared! Would you like to reload this page now?')) {
+                    location.reload();
+                }
+            }, 500);
+        }
+    </script>
+</body>
+</html>
