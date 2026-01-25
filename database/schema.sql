@@ -192,6 +192,21 @@ CREATE TABLE IF NOT EXISTS refunds (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- OTPs table for email verification
+CREATE TABLE IF NOT EXISTS otps (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(100) NOT NULL,
+    otp_code VARCHAR(10) NOT NULL,
+    purpose VARCHAR(50) NOT NULL DEFAULT 'login', -- 'login', 'register', 'reset_password'
+    expires_at TIMESTAMP NOT NULL,
+    is_used BOOLEAN DEFAULT false,
+    attempts INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_otps_email_purpose ON otps(email, purpose);
+CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps(expires_at);
+
 -- Insert default categories
 INSERT INTO categories (name, description) VALUES
 ('Agricultural Products', 'Fresh vegetables, fruits, grains, and other farm products'),

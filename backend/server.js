@@ -43,7 +43,28 @@ const pool = new Pool({
 });
 
 // DB migrations (best-effort)
-// Currently no migrations needed
+// Ensure OTP table exists
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS otps (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(100) NOT NULL,
+        otp_code VARCHAR(10) NOT NULL,
+        purpose VARCHAR(50) NOT NULL DEFAULT 'login',
+        expires_at TIMESTAMP NOT NULL,
+        is_used BOOLEAN DEFAULT false,
+        attempts INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_otps_email_purpose ON otps(email, purpose)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps(expires_at)`);
+    console.log('✅ OTP table verified/created');
+  } catch (error) {
+    console.error('⚠️ OTP table creation check failed:', error.message);
+  }
+})();
 
 // Test database connection
 pool.connect((err, client, release) => {
