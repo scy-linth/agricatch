@@ -233,12 +233,31 @@ class AgriFisheryMarket {
             });
         }
 
-        // Navigation
+        // Navigation - handle clicks on links and child elements (icons/spans)
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.scrollToSection(e.target.getAttribute('href'));
+                // Get href from the link element (not the clicked child)
+                const href = link.getAttribute('href') || e.target.closest('.nav-link')?.getAttribute('href');
+                if (href) {
+                    this.scrollToSection(href);
+                    // Update active state
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                }
             });
+        });
+        
+        // Update active nav link on scroll
+        this.updateActiveNavLink();
+        
+        // Listen for scroll events to update active nav link
+        let scrollTimeout;
+        window.addEventListener('scroll', () => {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                this.updateActiveNavLink();
+            }, 100);
         });
 
         // Cart
@@ -316,17 +335,7 @@ class AgriFisheryMarket {
             });
         }
 
-        // Send OTP button
-        const sendOtpBtn = document.getElementById('send-otp-btn');
-        if (sendOtpBtn) {
-            sendOtpBtn.addEventListener('click', () => this.sendOtp());
-        }
-
-        // Resend OTP buttons
-        const resendLoginOtpBtn = document.getElementById('resend-login-otp-btn');
-        if (resendLoginOtpBtn) {
-            resendLoginOtpBtn.addEventListener('click', () => this.sendOtp());
-        }
+        // OTP buttons - only for registration (login no longer requires OTP)
         const resendRegisterOtpBtn = document.getElementById('resend-register-otp-btn');
         if (resendRegisterOtpBtn) {
             resendRegisterOtpBtn.addEventListener('click', () => {
@@ -816,14 +825,9 @@ class AgriFisheryMarket {
     }
 
     async sendOtp() {
-        const mode = this.authMode || (document.getElementById('auth-login-fields').style.display !== 'none' ? 'login' : 'register');
-        let email = '';
-        
-        if (mode === 'login') {
-            email = document.getElementById('auth-email').value;
-        } else {
-            email = document.getElementById('auth-email-register').value;
-        }
+        // OTP is only used for registration now - login no longer requires OTP
+        const mode = 'register';
+        let email = document.getElementById('auth-email-register').value;
 
         if (!email) {
             this.showMessage('Please enter your email first', 'error');
@@ -864,56 +868,9 @@ class AgriFisheryMarket {
                 // Reset OTP verified state when resending
                 this.otpVerified = false;
                 
-                // Clear the OTP input field
-                if (mode === 'login') {
-                    const loginOtpInput = document.getElementById('login-otp');
-                    if (loginOtpInput) {
-                        loginOtpInput.value = '';
-                    }
-                }
-                
-                this.showOtpSection();
-                this.updateSubmitButtonText();
-                
-                // Display OTP for testing if provided by backend
-                if (data.otp) {
-                    console.log('🔑 OTP Code (for testing):', data.otp);
-                    console.log('📧 Email:', email);
-                    console.log('⏰ Valid for 10 minutes');
-                    
-                    // Display OTP in the UI (for login OTP section)
-                    const loginOtpSection = document.getElementById('login-otp-section');
-                    if (loginOtpSection) {
-                        // Create or update OTP display in login section
-                        let loginOtpDisplay = document.getElementById('login-otp-test-display');
-                        if (!loginOtpDisplay) {
-                            loginOtpDisplay = document.createElement('div');
-                            loginOtpDisplay.id = 'login-otp-test-display';
-                            loginOtpDisplay.className = 'otp-test-display';
-                            loginOtpDisplay.innerHTML = `
-                                <div class="otp-test-box">
-                                    <strong>🔑 Testing Mode - Your OTP Code:</strong>
-                                    <div class="otp-code-display" id="login-otp-code-display">${data.otp}</div>
-                                    <small>This is shown for testing purposes only.</small>
-                                </div>
-                            `;
-                            loginOtpSection.insertBefore(loginOtpDisplay, loginOtpSection.firstChild);
-                        } else {
-                            // Update existing OTP display with new code
-                            const otpCodeDisplay = document.getElementById('login-otp-code-display');
-                            if (otpCodeDisplay) {
-                                otpCodeDisplay.textContent = data.otp;
-                            }
-                            loginOtpDisplay.style.display = 'block';
-                        }
-                    }
-                    
-                    // Show OTP in message
-                    const otpMessage = `OTP sent! For testing: Your OTP is ${data.otp}`;
-                    this.showMessage(otpMessage, 'success');
-                } else {
-                    this.showMessage('OTP sent to your email. Please check your inbox.', 'success');
-                }
+                // This function is now only for registration
+                // Registration OTP handling is done in sendOtpForRegistration()
+                // This function should not be called for login anymore
             } else {
                 // Show more detailed error message
                 let errorMessage = data.message || 'Failed to send OTP';
@@ -1022,7 +979,7 @@ class AgriFisheryMarket {
                 submitBtn.style.display = 'none';
                 return;
             }
-            // For login mode, show and update button text
+            // For login mode, show and update button text (no OTP required)
             submitBtn.style.display = 'block';
             submitBtn.textContent = 'Login';
         }
@@ -1150,24 +1107,7 @@ class AgriFisheryMarket {
             return;
         }
 
-        // Regular users must verify OTP
-        // If OTP not sent yet, validate credentials first, then send OTP
-        if (!this.otpSent) {
-            // Quick credential check (optional - can skip if you want OTP sent without validation)
-            // For now, we'll send OTP directly
-            await this.sendOtp();
-            return;
-        }
-
-        // If OTP sent but not verified, verify it first
-        if (!this.otpVerified) {
-            const verified = await this.verifyOtp();
-            if (!verified) {
-                return;
-            }
-        }
-
-        // OTP verified, proceed with login
+        // Login without OTP - proceed directly with email and password
 
         try {
             const response = await fetch(`${this.apiBase}/auth/login`, {
@@ -3396,7 +3336,40 @@ class AgriFisheryMarket {
                 top: offsetPosition,
                 behavior: 'smooth'
             });
+            
+            // Update active nav link after scrolling
+            setTimeout(() => {
+                this.updateActiveNavLink();
+            }, 500);
         }
+    }
+
+    updateActiveNavLink() {
+        const sections = ['home', 'products', 'about', 'contact'];
+        const scrollPosition = window.scrollY + 150; // Offset for header
+        
+        // Find which section is currently in view
+        let activeSection = 'home';
+        sections.forEach(sectionId => {
+            const section = document.getElementById(sectionId);
+            if (section) {
+                const sectionTop = section.offsetTop;
+                const sectionBottom = sectionTop + section.offsetHeight;
+                
+                if (scrollPosition >= sectionTop && scrollPosition < sectionBottom) {
+                    activeSection = sectionId;
+                }
+            }
+        });
+        
+        // Update nav links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+            const href = link.getAttribute('href');
+            if (href === `#${activeSection}`) {
+                link.classList.add('active');
+            }
+        });
     }
 
     showMessage(message, type = 'info') {
