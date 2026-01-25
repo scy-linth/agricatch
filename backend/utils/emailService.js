@@ -30,10 +30,16 @@ if (!useResend) {
       user: process.env.SMTP_USER, // Your email
       pass: process.env.SMTP_PASSWORD, // Your email password or app password
     },
-    // Add timeout and connection options
-    connectionTimeout: 30000, // 30 seconds (increased for cloud)
+    // Add timeout and connection options (increased for cloud)
+    connectionTimeout: 60000, // 60 seconds
     greetingTimeout: 30000,
-    socketTimeout: 30000,
+    socketTimeout: 60000,
+    // Additional options for better connection
+    requireTLS: true,
+    // Try different connection approach
+    pool: true,
+    maxConnections: 1,
+    maxMessages: 3
   });
 
   // Verify SMTP connection
