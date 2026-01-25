@@ -2,16 +2,21 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 // Check if Resend API key is available (preferred for cloud deployments)
+// TEMPORARILY DISABLED FOR SMTP TESTING - Set FORCE_SMTP=true to test SMTP
 let useResend = false;
 let Resend;
-try {
-  if (process.env.RESEND_API_KEY) {
-    Resend = require('resend');
-    useResend = true;
-    console.log('✅ Using Resend API for emails (cloud-friendly)');
+if (process.env.FORCE_SMTP !== 'true') {
+  try {
+    if (process.env.RESEND_API_KEY) {
+      Resend = require('resend');
+      useResend = true;
+      console.log('✅ Using Resend API for emails (cloud-friendly)');
+    }
+  } catch (error) {
+    console.log('⚠️ Resend package not installed, falling back to SMTP');
   }
-} catch (error) {
-  console.log('⚠️ Resend package not installed, falling back to SMTP');
+} else {
+  console.log('🔧 FORCE_SMTP enabled - Using SMTP instead of Resend');
 }
 
 // Create reusable transporter using SMTP (fallback)
