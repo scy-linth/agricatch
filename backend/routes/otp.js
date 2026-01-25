@@ -46,12 +46,18 @@ router.post('/send', async (req, res) => {
 
     // For register: check if email already exists
     if (purpose === 'register') {
-      const userExists = await pool.query(
-        'SELECT id FROM users WHERE email = $1',
-        [email]
-      );
-      if (userExists.rows.length > 0) {
-        return res.status(400).json({ message: 'Email already registered' });
+      try {
+        const userExists = await pool.query(
+          'SELECT id FROM users WHERE email = $1',
+          [email]
+        );
+        if (userExists.rows.length > 0) {
+          console.log('❌ OTP send failed: Email already registered');
+          return res.status(400).json({ message: 'Email already registered' });
+        }
+      } catch (dbError) {
+        console.error('❌ DB Error checking user existence:', dbError);
+        throw new Error('Database error while checking email availability');
       }
     }
 
@@ -70,17 +76,23 @@ router.post('/send', async (req, res) => {
     const otp = generateOtp();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Invalidate previous unused OTPs for this email and purpose
-    await pool.query(
-      'UPDATE otps SET is_used = true WHERE email = $1 AND purpose = $2 AND is_used = false',
-      [email, purpose]
-    );
+    try {
+      // Invalidate previous unused OTPs for this email and purpose
+      await pool.query(
+        'UPDATE otps SET is_used = true WHERE email = $1 AND purpose = $2 AND is_used = false',
+        [email, purpose]
+      );
 
-    // Store OTP in database
-    await pool.query(
-      'INSERT INTO otps (email, otp_code, purpose, expires_at) VALUES ($1, $2, $3, $4)',
-      [email, otp, purpose, expiresAt]
-    );
+      // Store OTP in database
+      await pool.query(
+        'INSERT INTO otps (email, otp_code, purpose, expires_at) VALUES ($1, $2, $3, $4)',
+        [email, otp, purpose, expiresAt]
+      );
+      console.log('✅ OTP stored in database');
+    } catch (dbError) {
+      console.error('❌ DB Error storing OTP:', dbError);
+      throw new Error('Database error while saving OTP code');
+    }
 
     // Send OTP via email
     console.log('📤 Attempting to send OTP email to:', email);
@@ -123,8 +135,11 @@ router.post('/send', async (req, res) => {
     
     res.json(responseData);
   } catch (error) {
-    console.error('Send OTP error:', error);
-    res.status(500).json({ message: 'Server error sending OTP' });
+    console.error('❌ Send OTP error (catch block):', error);
+    res.status(500).json({ 
+      message: `Server error sending OTP: ${error.message}`,
+      debug: error.message 
+    });
   }
 });
 

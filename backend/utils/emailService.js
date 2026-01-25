@@ -9,7 +9,8 @@ if (process.env.FORCE_SMTP !== "true") {
   try {
     if (process.env.RESEND_API_KEY) {
       console.log("DEBUG: RESEND_API_KEY detected. Length:", process.env.RESEND_API_KEY.length);
-      Resend = require("resend");
+      const resendModule = require("resend");
+      Resend = resendModule.Resend || resendModule; // Handle both { Resend } and default export
       useResend = true;
       console.log("✅ Using Resend API for emails (cloud-friendly)");
     } else {
@@ -137,8 +138,8 @@ async function sendOtpEmail(to, otp, purpose = "login") {
       });
 
       if (error) {
-        console.error("❌ Resend email error:", error);
-        return { success: false, error: error.message };
+        console.error("❌ Resend email error object:", JSON.stringify(error, null, 2));
+        return { success: false, error: error.message || error.name || "Resend API error" };
       }
 
       console.log(`✅ OTP email sent via Resend to ${to}:`, data.id);
