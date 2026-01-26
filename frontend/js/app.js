@@ -1577,7 +1577,7 @@ class AgriFisheryMarket {
                 let phoneDigits = phone.replace(/\D/g, '');
                 if (phoneDigits.startsWith('0')) phoneDigits = phoneDigits.substring(1);
                 if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
-                    this.showMessage('Contact number must be 10 digits and start with 9', 'error');
+                    this.showMessage('Oops BOBO! Your contact number is not a valid number. Try again Bitch!', 'error');
                     document.getElementById('auth-phone').focus();
                     return false;
                 }
@@ -3429,17 +3429,15 @@ class AgriFisheryMarket {
         const phoneInput = document.getElementById('auth-phone');
         if (!phoneInput) return;
 
-        // Format phone number as 9XX XXX XXXX
+        // Format phone number as XXX XXX XXXX
         const formatPhoneNumber = (value) => {
             // Remove all non-numeric characters
             let numbers = value.replace(/\D/g, '');
             // Remove leading 0 if present
             if (numbers.startsWith('0')) numbers = numbers.substring(1);
-            // Always start with 9
-            if (numbers.length > 0 && numbers[0] !== '9') numbers = '9' + numbers.replace(/^./, '');
             // Limit to 10 digits
             const digits = numbers.substring(0, 10);
-            // Format with spaces: 9XX XXX XXXX
+            // Format with spaces: XXX XXX XXXX
             if (digits.length <= 3) {
                 return digits;
             } else if (digits.length <= 6) {
@@ -3455,8 +3453,6 @@ class AgriFisheryMarket {
             let formatted = formatPhoneNumber(value);
             // If user tries to type 0 as first digit, remove it
             if (formatted.startsWith('0')) formatted = formatted.substring(1);
-            // Always start with 9
-            if (formatted.length > 0 && formatted[0] !== '9') formatted = '9' + formatted.slice(1);
             e.target.value = formatted;
         });
 
@@ -3466,7 +3462,6 @@ class AgriFisheryMarket {
             let paste = (e.clipboardData || window.clipboardData).getData('text');
             let numbers = paste.replace(/\D/g, '');
             if (numbers.startsWith('0')) numbers = numbers.substring(1);
-            if (numbers.length > 0 && numbers[0] !== '9') numbers = '9' + numbers.replace(/^./, '');
             phoneInput.value = formatPhoneNumber(numbers);
             phoneInput.dispatchEvent(new Event('input'));
         });
