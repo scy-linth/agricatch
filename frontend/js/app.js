@@ -3986,3 +3986,22 @@ window.loadProductsManually = function() {
         console.error('App not available. Cannot load products manually.');
     }
 };
+
+// Add to Cart button animation
+function setupAddToCartAnimation() {
+    document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            btn.classList.add('animated');
+            setTimeout(() => {
+                btn.classList.remove('animated');
+            }, 450); // Match animation duration
+        });
+    });
+}
+
+// Call this after DOM is loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupAddToCartAnimation);
+} else {
+    setupAddToCartAnimation();
+}

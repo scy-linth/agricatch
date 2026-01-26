@@ -1024,13 +1024,20 @@ class AdminDashboard {
         const usernameEl = document.getElementById('edit-user-username');
         const emailEl = document.getElementById('edit-user-email');
         const passwordEl = document.getElementById('edit-user-password');
+        const phoneEl = document.getElementById('edit-user-phone');
+        const locationEl = document.getElementById('edit-user-location');
 
         if (idEl) idEl.value = String(userId);
         if (fullNameEl) fullNameEl.value = user.full_name || '';
         if (usernameEl) usernameEl.value = user.username || '';
         if (emailEl) emailEl.value = user.email || '';
-        // Show current password in plain text (project stores plain text passwords)
         if (passwordEl) passwordEl.value = user.password || '';
+        if (phoneEl) phoneEl.value = user.phone || '';
+        if (locationEl) locationEl.value = user.address || user.location || '';
+
+        // Show preview of registered values
+        phoneEl && (phoneEl.placeholder = user.phone ? `Registered: ${user.phone}` : 'No phone registered');
+        locationEl && (locationEl.placeholder = user.address ? `Registered: ${user.address}` : (user.location ? `Registered: ${user.location}` : 'No location registered'));
 
         modal.style.display = 'block';
     }
@@ -1043,11 +1050,15 @@ class AdminDashboard {
         const username = document.getElementById('edit-user-username')?.value || '';
         const email = document.getElementById('edit-user-email')?.value || '';
         const password = document.getElementById('edit-user-password')?.value || '';
+        const phone = document.getElementById('edit-user-phone')?.value || '';
+        const location = document.getElementById('edit-user-location')?.value || '';
 
         const payload = {
             full_name: full_name.trim(),
             username: username.trim(),
             email: email.trim(),
+            phone: phone.trim(),
+            address: location.trim(),
         };
         if (password.trim()) payload.password = password;
 
