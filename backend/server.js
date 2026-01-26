@@ -435,4 +435,28 @@ app.listen(PORT, () => {
   // #endregion
 });
 
+// Self-ping to prevent Render free tier from sleeping (random interval 1-13 min)
+if (process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_URL) {
+  const https = require('https');
+  const url = process.env.RENDER_EXTERNAL_URL || 'https://api.agricatch.store';
+
+  function schedulePing() {
+    // Random interval between 1 and 13 minutes (in ms)
+    const min = 1 * 60 * 1000;
+    const max = 13 * 60 * 1000;
+    const interval = Math.floor(Math.random() * (max - min + 1)) + min;
+
+    setTimeout(() => {
+      https.get(url + '/api/test-db', (res) => {
+        console.log(`[Self-ping] Status: ${res.statusCode}`);
+      }).on('error', (err) => {
+        console.error('[Self-ping] Error:', err.message);
+      });
+      schedulePing();
+    }, interval);
+  }
+
+  schedulePing();
+}
+
 module.exports = app;
