@@ -861,16 +861,19 @@ class FarmerDashboard {
                 }
             });
 
+            const data = await response.json().catch(() => ({ message: 'Unknown error' }));
+
             if (response.ok) {
                 this.showMessage('Product deleted successfully!', 'success');
                 this.loadMyProducts();
                 this.loadFarmerStats();
             } else {
-                this.showMessage('Failed to delete product', 'error');
+                console.error('Delete product error:', data);
+                this.showMessage(data.message || 'Failed to delete product', 'error');
             }
         } catch (error) {
             console.error('Error deleting product:', error);
-            this.showMessage('Error deleting product', 'error');
+            this.showMessage(`Error deleting product: ${error.message}`, 'error');
         }
     }
 
@@ -1308,4 +1311,6 @@ class FarmerDashboard {
 let farmerDashboard;
 document.addEventListener('DOMContentLoaded', () => {
     farmerDashboard = new FarmerDashboard();
+    // Make it globally accessible for inline onclick handlers
+    window.farmerDashboard = farmerDashboard;
 });

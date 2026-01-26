@@ -71,6 +71,13 @@ class AgriFisheryMarket {
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:21',message:'App initialization completed',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
         // #endregion
+
+        // Mobile bug fix: always remove loading class and hide loading screen after init
+        document.body.classList.remove('loading');
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.add('hidden');
+        }
     }
 
     // Session management for guest users
@@ -204,6 +211,25 @@ class AgriFisheryMarket {
             // Server might be cold starting, which is expected
             console.log('Server wake-up ping sent');
         });
+        
+        // Ping api.agricatch.store when visiting the site
+        fetch('https://api.agricatch.store/api/test-db', {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                console.log('✅ API ping to api.agricatch.store successful');
+            }
+        })
+        .catch(error => {
+            // Silently fail - this is just a ping, not critical
+            console.log('API ping to api.agricatch.store sent');
+        });
     }
 
     // Setup all event listeners
@@ -268,6 +294,12 @@ class AgriFisheryMarket {
         const closeCartBtn = document.getElementById('close-cart');
         if (closeCartBtn) {
             closeCartBtn.addEventListener('click', () => this.closeCart());
+        }
+        
+        // Close cart when clicking overlay
+        const cartOverlay = document.getElementById('cart-overlay');
+        if (cartOverlay) {
+            cartOverlay.addEventListener('click', () => this.closeCart());
         }
         
         // Checkout button - use event delegation since it's rendered dynamically
@@ -648,6 +680,21 @@ class AgriFisheryMarket {
             contactForm.addEventListener('submit', (e) => {
                 e.preventDefault();
                 this.handleContactForm(e);
+            });
+        }
+        
+        // Product details modal close
+        const closeProductDetailsBtn = document.getElementById('close-product-details');
+        if (closeProductDetailsBtn) {
+            closeProductDetailsBtn.addEventListener('click', () => {
+                this.closeProductDetails();
+            });
+        }
+        
+        const productDetailsOverlay = document.querySelector('.product-details-overlay');
+        if (productDetailsOverlay) {
+            productDetailsOverlay.addEventListener('click', () => {
+                this.closeProductDetails();
             });
         }
     }
@@ -2042,9 +2089,22 @@ class AgriFisheryMarket {
             return;
         }
 
-        container.innerHTML = products.map(product => `
-            <div class="product-card">
-                <img src="${product.image_url || 'https://via.placeholder.com/280x200?text=No+Image'}"
+        container.innerHTML = products.map(product => {
+            const harvestDate = product.harvest_date ? new Date(product.harvest_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified';
+            const expiryDate = product.expiry_date ? new Date(product.expiry_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified';
+            
+            // Ensure image URL is properly formatted
+            let productImageUrl = product.image_url || '';
+            if (productImageUrl && !productImageUrl.startsWith('http') && !productImageUrl.startsWith('/')) {
+                productImageUrl = '/' + productImageUrl;
+            }
+            if (!productImageUrl || productImageUrl === 'null' || productImageUrl === 'undefined') {
+                productImageUrl = 'https://via.placeholder.com/280x200?text=No+Image';
+            }
+            
+            return `
+            <div class="product-card" onclick="app.showProductDetails(${product.id})" style="cursor: pointer;" data-product-id="${product.id}">
+                <img src="${productImageUrl}"
                      alt="${product.name}" class="product-image" onerror="this.src='https://via.placeholder.com/280x200?text=No+Image'">
                 <div class="product-info">
                     <h3 class="product-name">${product.name}</h3>
@@ -2067,15 +2127,20 @@ class AgriFisheryMarket {
                                 <span class="sales-count">${product.sales_count || 0} sold</span>
                             </div>
                         </div>
+                        <div class="product-harvest-info">
+                            <span class="harvest-date"><i class="fas fa-calendar-check"></i> Harvest: ${harvestDate}</span>
+                            ${product.expiry_date ? `<span class="expiry-date"><i class="fas fa-clock"></i> Expires: ${expiryDate}</span>` : ''}
+                        </div>
                     </div>
                     <button class="add-to-cart-btn"
-                            onclick="app.addToCart(${product.id})"
+                            onclick="event.stopPropagation(); app.addToCart(${product.id})"
                             ${product.stock_quantity === 0 ? 'disabled' : ''}>
                         ${product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
                     </button>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
 
     renderPagination(pagination) {
@@ -2126,6 +2191,205 @@ class AgriFisheryMarket {
         const productsSection = document.getElementById('products');
         if (productsSection) {
             productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    // Show product details in floating modal
+    async showProductDetails(productId) {
+        try {
+            const response = await fetch(`${this.apiBase}/products/${productId}`, {
+                headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to load product details');
+            }
+            
+            const data = await response.json();
+            // API returns { product: {...} }, so extract the product object
+            const product = data.product || data;
+            
+            console.log('Product data received:', product); // Debug log
+            
+            // Format dates from farmer's input
+            let harvestDate = 'Not specified';
+            if (product.harvest_date) {
+                try {
+                    const harvest = new Date(product.harvest_date);
+                    harvestDate = harvest.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                } catch (e) {
+                    harvestDate = product.harvest_date; // Use raw value if date parsing fails
+                }
+            }
+            
+            let expiryDate = 'Not specified';
+            if (product.expiry_date) {
+                try {
+                    const expiry = new Date(product.expiry_date);
+                    expiryDate = expiry.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                } catch (e) {
+                    expiryDate = product.expiry_date; // Use raw value if date parsing fails
+                }
+            }
+            
+            // Get image element and ensure proper image URL from farmer
+            const imageElement = document.getElementById('product-details-image');
+            let imageUrl = product.image_url || '';
+            
+            // Handle relative paths - ensure they start with /
+            if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/')) {
+                imageUrl = '/' + imageUrl;
+            }
+            
+            // If no image URL, use placeholder
+            if (!imageUrl || imageUrl === 'null' || imageUrl === 'undefined' || imageUrl.trim() === '') {
+                imageUrl = 'https://via.placeholder.com/600x400?text=No+Image';
+            }
+            
+            // Set image with error handling - PRIORITY: Image must sync with farmer's upload
+            imageElement.src = imageUrl;
+            imageElement.alt = product.name || 'Product Image';
+            
+            // Add error handler to ensure image loads correctly
+            imageElement.onerror = function() {
+                console.warn('Product image failed to load:', imageUrl);
+                this.src = 'https://via.placeholder.com/600x400?text=Image+Not+Available';
+                this.onerror = null; // Prevent infinite loop
+            };
+            
+            // Add load handler to ensure image is displayed
+            imageElement.onload = function() {
+                this.style.opacity = '1';
+            };
+            
+            // Show loading state initially
+            imageElement.style.opacity = '0.5';
+            imageElement.style.transition = 'opacity 0.3s ease';
+            
+            // Store product data for quantity calculations
+            this.currentProductDetails = product;
+            this.currentProductId = productId;
+            
+            // Populate details from farmer's input only - ensure all fields are populated
+            const nameEl = document.getElementById('product-details-name');
+            const descriptionEl = document.getElementById('product-details-description');
+            const farmerEl = document.getElementById('product-details-farmer');
+            const locationEl = document.getElementById('product-details-location');
+            const stockEl = document.getElementById('product-details-stock');
+            const harvestEl = document.getElementById('product-details-harvest');
+            const expiryEl = document.getElementById('product-details-expiry');
+            const priceEl = document.getElementById('product-details-price');
+            const quantityEl = document.getElementById('product-details-quantity');
+            
+            if (nameEl) nameEl.textContent = product.name || 'Product Name';
+            if (descriptionEl) descriptionEl.textContent = product.description || 'No description available.';
+            if (farmerEl) farmerEl.textContent = product.farmer_name || product.full_name || 'Local Farmer';
+            if (locationEl) locationEl.textContent = product.location || product.farm_location || 'Location not specified';
+            if (stockEl) stockEl.textContent = `${product.stock_quantity || 0} ${product.unit || 'unit'}`;
+            if (harvestEl) harvestEl.textContent = harvestDate;
+            if (expiryEl) expiryEl.textContent = expiryDate;
+            if (priceEl) priceEl.textContent = `₱${parseFloat(product.price || 0).toFixed(2)} per ${product.unit || 'unit'}`;
+            if (quantityEl) {
+                quantityEl.value = 1;
+                quantityEl.max = product.stock_quantity || 1;
+            }
+            
+            // Calculate and display total
+            this.updateProductTotal();
+            
+            // Update add to cart button
+            const addCartBtn = document.getElementById('product-details-add-cart');
+            if (addCartBtn) {
+                addCartBtn.onclick = () => {
+                    const quantity = parseInt(document.getElementById('product-details-quantity').value) || 1;
+                    // Add to cart with quantity
+                    for (let i = 0; i < quantity; i++) {
+                        this.addToCart(productId);
+                    }
+                    this.closeProductDetails();
+                };
+                addCartBtn.disabled = (product.stock_quantity || 0) === 0;
+                addCartBtn.innerHTML = (product.stock_quantity || 0) === 0 
+                    ? '<i class="fas fa-ban"></i> Out of Stock' 
+                    : '<i class="fas fa-shopping-cart"></i> Add to Cart';
+            }
+            
+            // Update quantity button states
+            this.updateQuantityButtons();
+            
+            // Show modal
+            const modal = document.getElementById('product-details-modal');
+            if (modal) {
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        } catch (error) {
+            console.error('Error loading product details:', error);
+            this.showMessage('Failed to load product details', 'error');
+        }
+    }
+    
+    closeProductDetails() {
+        const modal = document.getElementById('product-details-modal');
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+        this.currentProductDetails = null;
+        this.currentProductId = null;
+    }
+    
+    increaseQuantity() {
+        const quantityEl = document.getElementById('product-details-quantity');
+        if (!quantityEl || !this.currentProductDetails) return;
+        
+        const currentQty = parseInt(quantityEl.value) || 1;
+        const maxStock = this.currentProductDetails.stock_quantity || 1;
+        const newQty = Math.min(currentQty + 1, maxStock);
+        
+        quantityEl.value = newQty;
+        this.updateProductTotal();
+        this.updateQuantityButtons();
+    }
+    
+    decreaseQuantity() {
+        const quantityEl = document.getElementById('product-details-quantity');
+        if (!quantityEl) return;
+        
+        const currentQty = parseInt(quantityEl.value) || 1;
+        const newQty = Math.max(currentQty - 1, 1);
+        
+        quantityEl.value = newQty;
+        this.updateProductTotal();
+        this.updateQuantityButtons();
+    }
+    
+    updateProductTotal() {
+        const quantityEl = document.getElementById('product-details-quantity');
+        const totalEl = document.getElementById('product-details-total');
+        
+        if (!quantityEl || !totalEl || !this.currentProductDetails) return;
+        
+        const quantity = parseInt(quantityEl.value) || 1;
+        const price = parseFloat(this.currentProductDetails.price || 0);
+        const total = quantity * price;
+        
+        totalEl.textContent = `₱${total.toFixed(2)}`;
+    }
+    
+    updateQuantityButtons() {
+        const quantityEl = document.getElementById('product-details-quantity');
+        const decreaseBtn = document.getElementById('product-details-decrease');
+        const increaseBtn = document.getElementById('product-details-increase');
+        
+        if (!quantityEl || !this.currentProductDetails) return;
+        
+        const currentQty = parseInt(quantityEl.value) || 1;
+        const maxStock = this.currentProductDetails.stock_quantity || 1;
+        
+        if (decreaseBtn) {
+            decreaseBtn.disabled = currentQty <= 1;
+        }
+        if (increaseBtn) {
+            increaseBtn.disabled = currentQty >= maxStock;
         }
     }
 
@@ -2253,26 +2517,36 @@ class AgriFisheryMarket {
                 <div class="empty-cart">
                     <i class="fas fa-shopping-cart"></i>
                     <p>Your cart is empty</p>
-                    <button class="btn btn-primary" onclick="app.closeCart(); app.scrollToSection('#products');">Shop Now</button>
+                    <p style="font-size: 0.9rem; color: var(--gray); margin-top: -1rem;">Start adding products to your cart!</p>
+                    <button class="btn btn-primary" onclick="app.closeCart(); app.scrollToSection('#products');">
+                        <i class="fas fa-store"></i> Shop Now
+                    </button>
                 </div>
             `;
             cartTotal.textContent = '0.00';
             checkoutBtn.disabled = true;
+            checkoutBtn.style.opacity = '0.6';
             return;
         }
+        
+        checkoutBtn.style.opacity = '1';
 
         cartItems.innerHTML = data.cartItems.map(item => `
             <div class="cart-item">
-                <img src="${item.image_url || 'https://via.placeholder.com/60x60?text=No+Image'}"
-                     alt="${item.name}" class="cart-item-image" onerror="this.src='https://via.placeholder.com/60x60?text=No+Image'">
+                <img src="${item.image_url || '/images/logo.png'}"
+                     alt="${item.name}" class="cart-item-image" onerror="this.src='/images/logo.png'">
                 <div class="cart-item-details">
                     <div class="cart-item-name">${item.name}</div>
-                    <div class="cart-item-price">₱${parseFloat(item.price).toFixed(2)}</div>
+                    <div class="cart-item-price">₱${parseFloat(item.price).toFixed(2)} ${item.unit ? 'per ' + item.unit : ''}</div>
                     <div class="cart-item-quantity">
-                        <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity - 1})">-</button>
-                        <span>${item.quantity}</span>
-                        <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity + 1})">+</button>
-                        <button class="remove-item" onclick="app.removeCartItem(${item.id})">&times;</button>
+                        <div class="quantity-controls">
+                            <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity - 1})" title="Decrease quantity">−</button>
+                            <span class="quantity-value">${item.quantity}</span>
+                            <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity + 1})" title="Increase quantity">+</button>
+                        </div>
+                        <button class="remove-item" onclick="app.removeCartItem(${item.id})" title="Remove item">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2283,7 +2557,13 @@ class AgriFisheryMarket {
     }
 
     closeCart() {
-        document.getElementById('cart-sidebar').classList.remove('open');
+        const cartSidebar = document.getElementById('cart-sidebar');
+        const cartOverlay = document.getElementById('cart-overlay');
+        if (cartSidebar) {
+            cartSidebar.classList.remove('open');
+            if (cartOverlay) cartOverlay.classList.remove('active');
+            document.body.style.overflow = ''; // Restore body scroll
+        }
     }
 
     async updateCartItem(cartId, quantity) {
@@ -3332,15 +3612,17 @@ class AgriFisheryMarket {
             const elementPosition = element.offsetTop;
             const offsetPosition = elementPosition - headerOffset;
 
+            // Use smooth scroll with better easing
             window.scrollTo({
                 top: offsetPosition,
                 behavior: 'smooth'
             });
             
-            // Update active nav link after scrolling
+            // Update active nav link immediately and after scrolling
+            this.updateActiveNavLink();
             setTimeout(() => {
                 this.updateActiveNavLink();
-            }, 500);
+            }, 300);
         }
     }
 
