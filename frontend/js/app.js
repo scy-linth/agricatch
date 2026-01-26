@@ -397,14 +397,14 @@ class AgriFisheryMarket {
             resendRegisterOtpBtn.addEventListener('click', () => {
                 // If cooldown is active, do nothing
                 if (resendRegisterOtpBtn.disabled) return;
+                // Start cooldown immediately (default 60s)
+                startResendOtpCooldown(60);
                 // For registration, use the registration-specific function
                 if (this.authMode === 'register' || document.getElementById('auth-register-fields').style.display !== 'none') {
                     this.sendOtpForRegistration();
                 } else {
                     this.sendOtp();
                 }
-                // Start cooldown (default 60s, can be updated by backend response)
-                startResendOtpCooldown(60);
             });
         }
 
