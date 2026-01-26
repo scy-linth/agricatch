@@ -1573,10 +1573,11 @@ class AgriFisheryMarket {
                     document.getElementById('auth-phone').focus();
                     return false;
                 }
-                // Validate phone number: must be exactly 10 digits (remove spaces for validation)
-                const phoneDigits = phone.replace(/\D/g, '');
-                if (phoneDigits.length !== 10) {
-                    this.showMessage('Contact number must be exactly 10 digits', 'error');
+                // Validate phone number: must match 9XX XXX XXXX (10 digits, starts with 9, remove leading 0)
+                let phoneDigits = phone.replace(/\D/g, '');
+                if (phoneDigits.startsWith('0')) phoneDigits = phoneDigits.substring(1);
+                if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+                    this.showMessage('Contact number must be 10 digits and start with 9', 'error');
                     document.getElementById('auth-phone').focus();
                     return false;
                 }
@@ -1914,7 +1915,7 @@ class AgriFisheryMarket {
         } catch (error) {
             this.setButtonLoading('register-next-1', false);
             console.error('Send OTP error:', error);
-            this.showMessage('Failed to send OTP. Please check your connection and try again.', 'error');
+            // Do not show error message if email is received; just log the error
             // Reset button text on network error
             const nextButtonText = document.getElementById('register-next-1-text');
             if (nextButtonText) {
@@ -3427,16 +3428,18 @@ class AgriFisheryMarket {
     setupPhoneInput() {
         const phoneInput = document.getElementById('auth-phone');
         if (!phoneInput) return;
-        
-        // Format phone number with spaces (XXX XXX XXXX)
+
+        // Format phone number as 9XX XXX XXXX
         const formatPhoneNumber = (value) => {
             // Remove all non-numeric characters
-            const numbers = value.replace(/\D/g, '');
-            
+            let numbers = value.replace(/\D/g, '');
+            // Remove leading 0 if present
+            if (numbers.startsWith('0')) numbers = numbers.substring(1);
+            // Always start with 9
+            if (numbers.length > 0 && numbers[0] !== '9') numbers = '9' + numbers.replace(/^./, '');
             // Limit to 10 digits
             const digits = numbers.substring(0, 10);
-            
-            // Format with spaces: XXX XXX XXXX
+            // Format with spaces: 9XX XXX XXXX
             if (digits.length <= 3) {
                 return digits;
             } else if (digits.length <= 6) {
@@ -3445,37 +3448,43 @@ class AgriFisheryMarket {
                 return digits.substring(0, 3) + ' ' + digits.substring(3, 6) + ' ' + digits.substring(6);
             }
         };
-        
+
         // Only allow numbers and format with spaces
         phoneInput.addEventListener('input', (e) => {
-            const cursorPosition = e.target.selectionStart;
-            const oldValue = e.target.value;
-            const oldLength = oldValue.replace(/\s/g, '').length;
-            
-            // Format the value
-            const formatted = formatPhoneNumber(e.target.value);
+            let value = e.target.value;
+            let formatted = formatPhoneNumber(value);
+            // If user tries to type 0 as first digit, remove it
+            if (formatted.startsWith('0')) formatted = formatted.substring(1);
+            // Always start with 9
+            if (formatted.length > 0 && formatted[0] !== '9') formatted = '9' + formatted.slice(1);
             e.target.value = formatted;
-            
-            // Adjust cursor position after formatting
-            const newLength = formatted.replace(/\s/g, '').length;
-            const lengthDiff = newLength - oldLength;
-            const newCursorPosition = Math.min(cursorPosition + lengthDiff, formatted.length);
-            e.target.setSelectionRange(newCursorPosition, newCursorPosition);
         });
-        
-        // Prevent paste of non-numeric characters
+
+        // Prevent paste of non-numeric characters and enforce rules
         phoneInput.addEventListener('paste', (e) => {
             e.preventDefault();
-            const paste = (e.clipboardData || window.clipboardData).getData('text');
-            const numbers = paste.replace(/\D/g, '').substring(0, 10);
+            let paste = (e.clipboardData || window.clipboardData).getData('text');
+            let numbers = paste.replace(/\D/g, '');
+            if (numbers.startsWith('0')) numbers = numbers.substring(1);
+            if (numbers.length > 0 && numbers[0] !== '9') numbers = '9' + numbers.replace(/^./, '');
             phoneInput.value = formatPhoneNumber(numbers);
             phoneInput.dispatchEvent(new Event('input'));
         });
-        
-        // Prevent typing non-numeric characters
+
+        // Prevent typing non-numeric characters and block leading 0
         phoneInput.addEventListener('keypress', (e) => {
             const char = String.fromCharCode(e.which);
+            // Only allow numbers
             if (!/[0-9]/.test(char)) {
+                e.preventDefault();
+            }
+            // Prevent typing 0 as first digit
+            if (e.target.selectionStart === 0 && char === '0') {
+                e.preventDefault();
+            }
+            // Prevent typing if already 10 digits
+            const numbers = e.target.value.replace(/\D/g, '');
+            if (numbers.length >= 10) {
                 e.preventDefault();
             }
         });
