@@ -390,15 +390,42 @@ class AgriFisheryMarket {
 
         // OTP buttons - only for registration (login no longer requires OTP)
         const resendRegisterOtpBtn = document.getElementById('resend-register-otp-btn');
+        const resendOtpCooldown = document.getElementById('resend-otp-cooldown');
+        let resendOtpCooldownTimer = null;
+        let resendOtpCooldownEnd = 0;
         if (resendRegisterOtpBtn) {
             resendRegisterOtpBtn.addEventListener('click', () => {
+                // If cooldown is active, do nothing
+                if (resendRegisterOtpBtn.disabled) return;
                 // For registration, use the registration-specific function
                 if (this.authMode === 'register' || document.getElementById('auth-register-fields').style.display !== 'none') {
                     this.sendOtpForRegistration();
                 } else {
                     this.sendOtp();
                 }
+                // Start cooldown (default 60s, can be updated by backend response)
+                startResendOtpCooldown(60);
             });
+        }
+
+        // Helper to start cooldown
+        function startResendOtpCooldown(seconds) {
+            if (!resendRegisterOtpBtn || !resendOtpCooldown) return;
+            resendRegisterOtpBtn.disabled = true;
+            resendOtpCooldown.style.display = 'inline';
+            resendOtpCooldownEnd = Date.now() + seconds * 1000;
+            updateResendOtpCooldown();
+            if (resendOtpCooldownTimer) clearInterval(resendOtpCooldownTimer);
+            resendOtpCooldownTimer = setInterval(updateResendOtpCooldown, 250);
+        }
+        function updateResendOtpCooldown() {
+            const remaining = Math.max(0, Math.ceil((resendOtpCooldownEnd - Date.now()) / 1000));
+            resendOtpCooldown.textContent = remaining > 0 ? `Wait ${remaining}s` : '';
+            if (remaining <= 0) {
+                resendRegisterOtpBtn.disabled = false;
+                resendOtpCooldown.style.display = 'none';
+                if (resendOtpCooldownTimer) clearInterval(resendOtpCooldownTimer);
+            }
         }
 
         // OTP input validation (numbers only)
@@ -1807,11 +1834,12 @@ class AgriFisheryMarket {
             console.log('OTP response data:', data);
             
             this.setButtonLoading('register-next-1', false);
-            
+            let cooldownSeconds = 60;
             // Handle rate limiting (cooldown)
             if (response.status === 429) {
-                const cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
+                cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
                 this.showMessage(data.message || `Please wait ${cooldownSeconds} seconds before requesting another OTP`, 'error');
+                startResendOtpCooldown(cooldownSeconds);
                 // Keep OTP section visible even on cooldown
                 return;
             }
@@ -1821,23 +1849,19 @@ class AgriFisheryMarket {
                 this.otpEmail = email;
                 // Reset OTP verified state when resending
                 this.otpVerified = false;
-                
                 // OTP section is already shown above, just ensure it's visible
                 if (otpSection) {
                     otpSection.style.display = 'block';
                 }
-                
                 // Update button text to "Confirm OTP" after successful send
                 if (nextButtonText) {
                     nextButtonText.textContent = 'Confirm OTP';
                 }
-                
                 // Display OTP for testing if provided by backend
                 if (data.otp) {
                     console.log('🔑 OTP Code (for testing):', data.otp);
                     console.log('📧 Email:', email);
                     console.log('⏰ Valid for 10 minutes');
-                    
                     // Display OTP in the UI
                     const otpDisplay = document.getElementById('otp-test-display');
                     const otpCodeDisplay = document.getElementById('otp-code-display');
@@ -1852,13 +1876,14 @@ class AgriFisheryMarket {
                         otpDisplay.style.display = 'none';
                     }
                 }
-                
+                // Start cooldown if provided by backend
+                cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
+                startResendOtpCooldown(cooldownSeconds);
                 // Don't navigate - stay on step 1, just show OTP section
                 this.setButtonLoading('register-next-1', false);
             } else {
                 // Show more detailed error message
                 let errorMessage = data.message || 'Failed to send OTP';
-                
                 // Check for specific error cases
                 if (data.message && data.message.includes('already registered')) {
                     errorMessage = 'This email is already registered. Please use a different email or try logging in instead.';
@@ -1874,27 +1899,29 @@ class AgriFisheryMarket {
                         errorMessage = `${errorMessage}. Error: ${data.error}`;
                     }
                 }
-                
                 console.error('OTP send failed:', { status: response.status, message: errorMessage, data });
                 this.showMessage(errorMessage, 'error');
-                
                 // Reset button text on error so user can try again
                 const nextButtonText = document.getElementById('register-next-1-text');
                 if (nextButtonText) {
                     nextButtonText.textContent = 'Send Verification Code';
                 }
+                // Start cooldown if provided by backend
+                cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
+                startResendOtpCooldown(cooldownSeconds);
                 // Keep OTP section visible even on error (user already clicked, they expect to see it)
             }
         } catch (error) {
             this.setButtonLoading('register-next-1', false);
             console.error('Send OTP error:', error);
             this.showMessage('Failed to send OTP. Please check your connection and try again.', 'error');
-            
             // Reset button text on network error
             const nextButtonText = document.getElementById('register-next-1-text');
             if (nextButtonText) {
                 nextButtonText.textContent = 'Send Verification Code';
             }
+            // Start default cooldown on error
+            startResendOtpCooldown(60);
             // Keep OTP section visible even on network error
         }
     }

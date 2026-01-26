@@ -141,7 +141,6 @@
                 <div class="products-filters">
                     <div class="search-input-wrapper">
                         <input type="text" id="search-input" placeholder="Search products..." class="search-input">
-                        <i class="fas fa-search search-icon"></i>
                     </div>
                     <div class="filter-select-wrapper">
                         <select id="category-filter" class="filter-select">
@@ -354,6 +353,7 @@
                                 <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
                                     <input type="text" id="register-otp" placeholder="000000" maxlength="6" pattern="[0-9]{6}" style="flex: 1;">
                                     <button type="button" id="resend-register-otp-btn" class="btn btn-outline" style="white-space: nowrap;">Resend</button>
+                                    <span id="resend-otp-cooldown" style="min-width: 60px; color: #888; font-size: 0.95em; display: none; align-self: center;"></span>
                                 </div>
                                 <small class="field-hint">Check your email for the 6-digit verification code</small>
                             </div>
