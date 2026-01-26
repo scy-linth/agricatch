@@ -348,7 +348,44 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ message: 'You can only delete your own products' });
     }
 
-    await pool.query('DELETE FROM products WHERE id = $1', [id]);
+    // Check if product has active orders (not delivered or cancelled)
+    const activeOrdersCheck = await pool.query(
+      `SELECT COUNT(*) as count FROM orders 
+       WHERE product_id = $1 AND status NOT IN ('delivered', 'cancelled')`,
+      [id]
+    );
+    
+    if (parseInt(activeOrdersCheck.rows[0].count) > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot delete product because it has active orders. Please cancel or complete all orders first.' 
+      });
+    }
+
+    // Delete related records first to avoid foreign key constraint errors
+    try {
+      // Delete from cart
+      await pool.query('DELETE FROM cart WHERE product_id = $1', [id]);
+      // Delete from wishlist
+      await pool.query('DELETE FROM wishlist WHERE product_id = $1', [id]);
+      // Delete from reviews
+      await pool.query('DELETE FROM reviews WHERE product_id = $1', [id]);
+      // Delete from notifications
+      await pool.query('DELETE FROM notifications WHERE product_id = $1', [id]);
+      // Note: We keep orders and order_items as historical records
+      // They can reference a deleted product (product_id will remain but product won't exist)
+      
+      // Delete the product
+      await pool.query('DELETE FROM products WHERE id = $1', [id]);
+    } catch (deleteError) {
+      console.error('Delete product error:', deleteError);
+      // If foreign key constraint error, provide helpful message
+      if (deleteError.code === '23503') {
+        return res.status(400).json({ 
+          message: 'Cannot delete product due to existing related records. Please contact support.' 
+        });
+      }
+      throw deleteError;
+    }
 
     const oldPath = resolvePublicPath(productResult.rows[0].image_url);
     if (oldPath) {
