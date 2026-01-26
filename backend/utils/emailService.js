@@ -2,10 +2,13 @@ const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 // Check if Resend API key is available (preferred for cloud deployments)
-// TEMPORARILY DISABLED FOR SMTP TESTING - Set FORCE_SMTP=true to test SMTP
+// Use Resend by default if API key is available, only use SMTP as fallback
 let useResend = false;
 let Resend;
-if (process.env.FORCE_SMTP !== "true") {
+// Only use SMTP if explicitly forced OR if Resend API key is not available
+if (process.env.FORCE_SMTP === "true") {
+  console.log("🔧 FORCE_SMTP enabled - Using SMTP instead of Resend");
+} else {
   try {
     if (process.env.RESEND_API_KEY) {
       console.log("DEBUG: RESEND_API_KEY detected. Length:", process.env.RESEND_API_KEY.length);
@@ -13,19 +16,21 @@ if (process.env.FORCE_SMTP !== "true") {
       Resend = resendModule.Resend || resendModule; // Handle both { Resend } and default export
       useResend = true;
       console.log("✅ Using Resend API for emails (cloud-friendly)");
+      console.log("📧 Resend From Email:", process.env.RESEND_FROM_EMAIL || "AgriCatch <onboarding@resend.dev>");
     } else {
-      console.log("DEBUG: RESEND_API_KEY not found in process.env");
+      console.log("⚠️ RESEND_API_KEY not found in process.env - falling back to SMTP");
+      console.log("💡 Tip: Set RESEND_API_KEY in .env to use Resend API for emails");
     }
   } catch (error) {
     console.log("⚠️ Resend package not installed, falling back to SMTP");
+    console.log("💡 Tip: Install resend package: npm install resend");
   }
-} else {
-  console.log("🔧 FORCE_SMTP enabled - Using SMTP instead of Resend");
 }
 
-// Create reusable transporter using SMTP (fallback)
+// Create reusable transporter using SMTP (fallback only - not used if Resend is available)
 let transporter = null;
 if (!useResend) {
+  console.log("📧 Initializing SMTP transporter (Resend not available, using SMTP fallback)");
   transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp.gmail.com",
     port: parseInt(process.env.SMTP_PORT || "587"),
@@ -46,15 +51,17 @@ if (!useResend) {
     maxMessages: 3
   });
 
-  // Verify SMTP connection
+  // Verify SMTP connection (only if using SMTP)
   transporter.verify(function (error, success) {
     if (error) {
       console.error("❌ SMTP connection error:", error);
-      console.error("💡 Tip: Consider using Resend API (RESEND_API_KEY) for cloud deployments");
+      console.error("💡 Tip: Set RESEND_API_KEY in .env to use Resend API instead of SMTP");
     } else {
-      console.log("✅ SMTP server is ready to send emails");
+      console.log("✅ SMTP server is ready to send emails (fallback mode)");
     }
   });
+} else {
+  console.log("✅ Resend API is configured - SMTP will not be used");
 }
 
 /**

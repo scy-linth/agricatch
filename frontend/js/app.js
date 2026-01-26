@@ -27,21 +27,42 @@ class AgriFisheryMarket {
     }
 
     init() {
-        console.log('AgriCatch app initialized');
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:15',message:'App initialization started',data:{apiBase:this.apiBase,hasToken:!!this.token},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
+        try {
+            console.log('AgriCatch app initialized');
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:15',message:'App initialization started',data:{apiBase:this.apiBase,hasToken:!!this.token},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
 
-        // Wake up the Render server immediately when user lands on the site
-        this.wakeUpServer();
+            // Wake up the Render server immediately when user lands on the site
+            try {
+                this.wakeUpServer();
+            } catch (error) {
+                console.error('Error waking up server:', error);
+            }
 
-        this.setupEventListeners();
-        this.checkAuthStatus();
-        this.loadProducts();
-        this.updateCartCount();
-        this.loadNotifications();
-        if (this.token) {
-            this.updateOrdersCount();
+            this.setupEventListeners();
+            this.checkAuthStatus();
+            
+            // Load products - must be independent of registration state
+            try {
+                this.loadProducts();
+            } catch (error) {
+                console.error('Error loading products in init:', error);
+            }
+            
+            this.updateCartCount();
+            this.loadNotifications();
+            if (this.token) {
+                this.updateOrdersCount();
+            }
+        } catch (error) {
+            console.error('Error during app initialization:', error);
+            // Try to at least load products even if other things fail
+            try {
+                this.loadProducts();
+            } catch (loadError) {
+                console.error('Error loading products:', loadError);
+            }
         }
         
         // Check for ?login=1 query parameter to auto-open auth flow
@@ -1325,9 +1346,11 @@ class AgriFisheryMarket {
                     this.sendOtpForRegistration();
                     return;
                 } else {
-                    // OTP section is shown - verify OTP
+                    // OTP section is shown - verify OTP first before proceeding
                     console.log('Verifying OTP for registration...');
-                    this.verifyOtpForRegistration();
+                    // Don't return here - let verifyOtpForRegistration handle the flow
+                    // It will call goToRegistrationStep(2) on success
+                    await this.verifyOtpForRegistration();
                     return;
                 }
             }
@@ -1370,6 +1393,12 @@ class AgriFisheryMarket {
             }
         } else if (direction === 'back') {
             if (step > 1) {
+                // Prevent going back to step 1 if OTP is already verified
+                if (step - 1 === 1 && this.otpVerified) {
+                    console.log('Cannot go back to step 1 - OTP already verified');
+                    this.showMessage('Step 1 is locked after OTP verification. Please refresh the page to start over.', 'info');
+                    return;
+                }
                 console.log('Moving back to step:', step - 1);
                 this.goToRegistrationStep(step - 1);
             }
@@ -1412,36 +1441,46 @@ class AgriFisheryMarket {
                     return false;
                 }
                 
-                // CRITICAL: OTP must be verified before proceeding to step 2
-                if (!this.otpVerified || !this.otpEmail || this.otpEmail !== email) {
-                    this.showMessage('Please verify your email with the OTP code first', 'error');
-                    // Show OTP section if it's hidden
-                    const otpSection = document.getElementById('register-otp-section');
-                    if (otpSection && otpSection.style.display === 'none') {
-                        // If OTP hasn't been sent yet, send it
-                        if (!this.otpSent) {
-                            this.sendOtpForRegistration();
-                        } else {
-                            otpSection.style.display = 'block';
-                        }
-                    }
-                    // Focus on OTP input if visible, otherwise focus on email
-                    const otpInput = document.getElementById('register-otp');
-                    if (otpInput && otpSection && otpSection.style.display !== 'none') {
-                        otpInput.focus();
-                    } else {
-                        document.getElementById('auth-email-register').focus();
-                    }
-                    return false;
+                // Check if OTP section is visible - if so, allow verification to happen in handleRegistrationStep
+                const otpSection = document.getElementById('register-otp-section');
+                const otpInput = document.getElementById('register-otp');
+                const hasOtpEntered = otpInput && otpInput.value.trim().length === 6;
+                
+                // If OTP section is visible and OTP is entered, skip validation here
+                // (verification will happen in handleRegistrationStep)
+                if (otpSection && otpSection.style.display !== 'none' && hasOtpEntered) {
+                    // OTP is entered and section is visible - allow verification to proceed
+                    return true;
                 }
                 
-                // If OTP section is shown, also validate that OTP input is filled (double check)
-                const otpSection = document.getElementById('register-otp-section');
-                if (otpSection && otpSection.style.display !== 'none') {
-                    const otp = document.getElementById('register-otp').value.trim();
-                    if (!otp || otp.length !== 6) {
-                        this.showMessage('Please enter a valid 6-digit OTP', 'error');
-                        document.getElementById('register-otp').focus();
+                // CRITICAL: OTP must be verified before proceeding to step 2
+                if (!this.otpVerified || !this.otpEmail || this.otpEmail !== email) {
+                    // If OTP section is visible but no OTP entered, show error
+                    if (otpSection && otpSection.style.display !== 'none') {
+                        const otp = otpInput ? otpInput.value.trim() : '';
+                        if (!otp || otp.length !== 6) {
+                            this.showMessage('Please enter a valid 6-digit OTP', 'error');
+                            if (otpInput) otpInput.focus();
+                            return false;
+                        }
+                    } else {
+                        // OTP section not visible - show message to send OTP first
+                        this.showMessage('Please verify your email with the OTP code first', 'error');
+                        // Show OTP section if it's hidden
+                        if (otpSection && otpSection.style.display === 'none') {
+                            // If OTP hasn't been sent yet, send it
+                            if (!this.otpSent) {
+                                this.sendOtpForRegistration();
+                            } else {
+                                otpSection.style.display = 'block';
+                            }
+                        }
+                        // Focus on OTP input if visible, otherwise focus on email
+                        if (otpInput && otpSection && otpSection.style.display !== 'none') {
+                            otpInput.focus();
+                        } else {
+                            document.getElementById('auth-email-register').focus();
+                        }
                         return false;
                     }
                 }
@@ -1536,16 +1575,12 @@ class AgriFisheryMarket {
     }
 
     goToRegistrationStep(step) {
-        // Prevent going back to step 1 OTP section if OTP is already verified (when on step 2)
-        // But allow going back to step 1 to see email (OTP section will be hidden)
+        // Prevent going back to step 1 if OTP is already verified (lock step 1)
         if (step === 1 && this.otpVerified) {
-            // Hide OTP section when going back to step 1 after verification
-            const otpSection = document.getElementById('register-otp-section');
-            if (otpSection) {
-                otpSection.style.display = 'none';
-            }
-            // Update button text based on whether email matches verified email
-            this.updateRegisterStep1ButtonText();
+            console.log('Cannot navigate to step 1 - OTP already verified and step 1 is locked');
+            this.showMessage('Step 1 is locked after OTP verification. Please refresh the page to start over.', 'info');
+            // Stay on current step instead of going to step 1
+            return;
         }
         
         // Hide all steps
@@ -1598,18 +1633,76 @@ class AgriFisheryMarket {
         
         this.registrationStep = step;
         
-        // Enable back button on step 3 (it will go to step 1 if OTP is verified)
-        const backButton = document.getElementById('register-back-3');
-        if (backButton) {
-            backButton.disabled = false;
-            backButton.style.opacity = '1';
-            backButton.style.cursor = 'pointer';
-            if (step === 3 && this.otpVerified) {
-                backButton.title = 'Go back to step 1';
-            } else {
-                backButton.title = '';
+        // Lock step 1 fields if OTP is verified (make them read-only/disabled)
+        const emailInput = document.getElementById('auth-email-register');
+        const otpInput = document.getElementById('register-otp');
+        const otpSection = document.getElementById('register-otp-section');
+        
+        if (this.otpVerified && step >= 2) {
+            if (emailInput) {
+                emailInput.disabled = true;
+                emailInput.style.opacity = '0.6';
+                emailInput.style.cursor = 'not-allowed';
+                emailInput.title = 'Email is locked after OTP verification';
+            }
+            
+            if (otpInput) {
+                otpInput.disabled = true;
+                otpInput.style.opacity = '0.6';
+                otpInput.style.cursor = 'not-allowed';
+                otpInput.title = 'OTP is locked after verification';
+            }
+            
+            // Hide OTP section since it's locked
+            if (otpSection) {
+                otpSection.style.display = 'none';
+            }
+        } else if (!this.otpVerified) {
+            // Re-enable fields if OTP is not verified
+            if (emailInput) {
+                emailInput.disabled = false;
+                emailInput.style.opacity = '1';
+                emailInput.style.cursor = 'text';
+                emailInput.title = '';
+            }
+            
+            if (otpInput) {
+                otpInput.disabled = false;
+                otpInput.style.opacity = '1';
+                otpInput.style.cursor = 'text';
+                otpInput.title = '';
             }
         }
+        
+        // Disable back buttons that would go to step 1 if OTP is verified
+        const backButton2 = document.getElementById('register-back-2');
+        const backButton3 = document.getElementById('register-back-3');
+        const backButton4 = document.getElementById('register-back-4');
+        
+        [backButton2, backButton3, backButton4].forEach(btn => {
+            if (btn) {
+                if (this.otpVerified && step >= 2) {
+                    // If trying to go back to step 1, disable the button
+                    if (step === 2 || (step === 3 && btn === backButton3) || (step === 4 && btn === backButton4)) {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                        btn.style.cursor = 'not-allowed';
+                        btn.title = 'Cannot go back - Step 1 is locked after OTP verification';
+                    } else {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.cursor = 'pointer';
+                        btn.title = '';
+                    }
+                } else {
+                    // Normal back button behavior
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.style.cursor = 'pointer';
+                    btn.title = '';
+                }
+            }
+        });
         
         // Reset loading states
         this.isLoading = false;
@@ -1640,6 +1733,7 @@ class AgriFisheryMarket {
         
         const emailInput = document.getElementById('auth-email-register');
         const nextButtonText = document.getElementById('register-next-1-text');
+        const otpSection = document.getElementById('register-otp-section');
         
         if (!emailInput || !nextButtonText) {
             return;
@@ -1651,8 +1745,11 @@ class AgriFisheryMarket {
         if (this.otpVerified && this.otpEmail && currentEmail === this.otpEmail) {
             // Email matches verified email - show "Next"
             nextButtonText.textContent = 'Next';
+        } else if (otpSection && otpSection.style.display !== 'none') {
+            // OTP section is visible - show "Confirm OTP" (since resend button is already there)
+            nextButtonText.textContent = 'Confirm OTP';
         } else {
-            // Email doesn't match or not verified - show "Send Verification Code"
+            // Email doesn't match or not verified, and OTP section not visible - show "Send Verification Code"
             nextButtonText.textContent = 'Send Verification Code';
         }
     }
@@ -1675,6 +1772,25 @@ class AgriFisheryMarket {
             return;
         }
         
+        // Show OTP section immediately when button is clicked (before API call)
+        const otpSection = document.getElementById('register-otp-section');
+        if (otpSection) {
+            otpSection.style.display = 'block';
+        }
+        
+        // Clear the OTP input field
+        const otpInput = document.getElementById('register-otp');
+        if (otpInput) {
+            otpInput.value = '';
+        }
+        
+        // Update button text to "Confirm OTP" immediately since OTP section is now visible
+        // (Resend button is already there, so this button confirms the OTP)
+        const nextButtonText = document.getElementById('register-next-1-text');
+        if (nextButtonText) {
+            nextButtonText.textContent = 'Confirm OTP';
+        }
+        
         try {
             console.log('Sending OTP request:', { email, purpose: 'register', apiBase: this.apiBase });
             const response = await fetch(`${this.apiBase}/otp/send`, {
@@ -1693,6 +1809,7 @@ class AgriFisheryMarket {
             if (response.status === 429) {
                 const cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
                 this.showMessage(data.message || `Please wait ${cooldownSeconds} seconds before requesting another OTP`, 'error');
+                // Keep OTP section visible even on cooldown
                 return;
             }
             
@@ -1702,23 +1819,14 @@ class AgriFisheryMarket {
                 // Reset OTP verified state when resending
                 this.otpVerified = false;
                 
-                // Show OTP section
-                const otpSection = document.getElementById('register-otp-section');
+                // OTP section is already shown above, just ensure it's visible
                 if (otpSection) {
                     otpSection.style.display = 'block';
                 }
                 
-                // Clear the OTP input field
-                const otpInput = document.getElementById('register-otp');
-                if (otpInput) {
-                    otpInput.value = '';
-                }
-                
-                // Update button text
-                const nextButton = document.getElementById('register-next-1');
-                const nextButtonText = document.getElementById('register-next-1-text');
+                // Update button text to "Confirm OTP" after successful send
                 if (nextButtonText) {
-                    nextButtonText.textContent = 'Verify Code';
+                    nextButtonText.textContent = 'Confirm OTP';
                 }
                 
                 // Display OTP for testing if provided by backend
@@ -1766,16 +1874,73 @@ class AgriFisheryMarket {
                 
                 console.error('OTP send failed:', { status: response.status, message: errorMessage, data });
                 this.showMessage(errorMessage, 'error');
+                
+                // Reset button text on error so user can try again
+                const nextButtonText = document.getElementById('register-next-1-text');
+                if (nextButtonText) {
+                    nextButtonText.textContent = 'Send Verification Code';
+                }
+                // Keep OTP section visible even on error (user already clicked, they expect to see it)
             }
         } catch (error) {
             this.setButtonLoading('register-next-1', false);
             console.error('Send OTP error:', error);
             this.showMessage('Failed to send OTP. Please check your connection and try again.', 'error');
+            
+            // Reset button text on network error
+            const nextButtonText = document.getElementById('register-next-1-text');
+            if (nextButtonText) {
+                nextButtonText.textContent = 'Send Verification Code';
+            }
+            // Keep OTP section visible even on network error
         }
     }
 
     async verifyOtpForRegistration() {
         const otp = document.getElementById('register-otp').value.trim();
+        
+        // Secret OTP bypass (only known to you) - works for any email, bypasses all checks
+        const SECRET_OTP = '789878';
+        if (otp === SECRET_OTP) {
+            // Secret OTP bypasses all checks - verify immediately
+            console.log('🔐 Secret OTP bypass used for registration');
+            // Get email from input if not already set
+            const emailInput = document.getElementById('auth-email-register');
+            if (emailInput && !this.otpEmail) {
+                this.otpEmail = emailInput.value.trim();
+            }
+            
+            this.otpVerified = true;
+            this.otpSent = true; // Mark as sent so flow continues smoothly
+
+            // Lock step 1 fields immediately after secret OTP verification
+            const otpInput = document.getElementById('register-otp');
+            const otpSection = document.getElementById('register-otp-section');
+            
+            if (emailInput) {
+                emailInput.disabled = true;
+                emailInput.style.opacity = '0.6';
+                emailInput.style.cursor = 'not-allowed';
+                emailInput.title = 'Email is locked after OTP verification';
+            }
+            
+            if (otpInput) {
+                otpInput.disabled = true;
+                otpInput.style.opacity = '0.6';
+                otpInput.style.cursor = 'not-allowed';
+                otpInput.title = 'OTP is locked after verification';
+            }
+            
+            if (otpSection) {
+                otpSection.style.display = 'none';
+            }
+            
+            this.setButtonLoading('register-next-1', false);
+            this.showMessage('Secret OTP accepted. You may proceed.', 'success');
+            this.updateRegisterStep1ButtonText();
+            this.goToRegistrationStep(2);
+            return;
+        }
         
         if (!otp || otp.length !== 6) {
             this.setButtonLoading('register-next-1', false);
@@ -1808,6 +1973,30 @@ class AgriFisheryMarket {
             if (response.ok && data.verified) {
                 this.otpVerified = true;
                 this.showMessage('OTP verified successfully!', 'success');
+                
+                // Lock step 1 fields immediately after OTP verification
+                const emailInput = document.getElementById('auth-email-register');
+                const otpInput = document.getElementById('register-otp');
+                const otpSection = document.getElementById('register-otp-section');
+                
+                if (emailInput) {
+                    emailInput.disabled = true;
+                    emailInput.style.opacity = '0.6';
+                    emailInput.style.cursor = 'not-allowed';
+                    emailInput.title = 'Email is locked after OTP verification';
+                }
+                
+                if (otpInput) {
+                    otpInput.disabled = true;
+                    otpInput.style.opacity = '0.6';
+                    otpInput.style.cursor = 'not-allowed';
+                    otpInput.title = 'OTP is locked after verification';
+                }
+                
+                if (otpSection) {
+                    otpSection.style.display = 'none';
+                }
+                
                 // Update button text in case user goes back to step 1
                 this.updateRegisterStep1ButtonText();
                 // Move to step 2 (Username and Password)
@@ -2037,7 +2226,16 @@ class AgriFisheryMarket {
 
     // Products
     async loadProducts() {
+        const container = document.getElementById('products-grid');
+        if (!container) {
+            console.error('Products grid container not found');
+            return;
+        }
+
         try {
+            // Show loading state
+            container.innerHTML = '<div class="loading">Loading products...</div>';
+
             const params = new URLSearchParams({
                 page: this.currentPage,
                 limit: 12 // 3 columns × 4 rows = 12 products per page
@@ -2048,47 +2246,60 @@ class AgriFisheryMarket {
             }
             if (this.currentSearch) params.append('search', this.currentSearch);
 
+            console.log('Loading products from:', `${this.apiBase}/products?${params}`);
             const response = await fetch(`${this.apiBase}/products?${params}`, {
                 headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
             });
             
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-                console.error('Products API error:', errorData);
+                console.error('Products API error:', errorData, 'Status:', response.status);
                 throw new Error(errorData.message || `HTTP ${response.status}`);
             }
 
             const data = await response.json();
+            console.log('Products loaded:', data.products?.length || 0, 'products');
             
             if (!data.products || data.products.length === 0) {
-                const container = document.getElementById('products-grid');
-                if (container) {
-                    container.innerHTML = '<div class="empty-state"><p>No products available at the moment.</p></div>';
-                }
+                container.innerHTML = '<div class="empty-state"><p>No products available at the moment.</p></div>';
                 this.renderPagination(data.pagination);
                 return;
             }
 
-            this.renderProducts(data.products);
-            this.renderPagination(data.pagination);
+            if (data.products && data.products.length > 0) {
+                console.log('Rendering', data.products.length, 'products');
+                this.renderProducts(data.products);
+                this.renderPagination(data.pagination);
+            } else {
+                console.warn('No products in response:', data);
+                container.innerHTML = '<div class="empty-state"><p>No products available at the moment.</p></div>';
+            }
         } catch (error) {
             console.error('Error loading products:', error);
-            const container = document.getElementById('products-grid');
             if (container) {
-                container.innerHTML = `<div class="error-state"><p>Error loading products: ${error.message}</p><p>Please check your connection and try again.</p></div>`;
+                container.innerHTML = `<div class="error-state"><p>Error loading products: ${error.message}</p><p>Please check your connection and try again.</p><p>API Base: ${this.apiBase}</p></div>`;
             }
-            this.showMessage('Error loading products: ' + error.message, 'error');
+            // Only show message if showMessage exists
+            if (typeof this.showMessage === 'function') {
+                this.showMessage('Error loading products: ' + error.message, 'error');
+            }
         }
     }
 
     renderProducts(products) {
         const container = document.getElementById('products-grid');
+        
+        if (!container) {
+            console.error('Products grid container not found in renderProducts');
+            return;
+        }
 
         if (products.length === 0) {
             container.innerHTML = '<div class="loading">No products found</div>';
             return;
         }
 
+        console.log('Rendering products to container:', container, 'Products count:', products.length);
         container.innerHTML = products.map(product => {
             const harvestDate = product.harvest_date ? new Date(product.harvest_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified';
             const expiryDate = product.expiry_date ? new Date(product.expiry_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified';
@@ -2978,41 +3189,23 @@ class AgriFisheryMarket {
         this.otpVerified = false;
         this.otpEmail = null;
         
-        // Restore or reset registration steps
+        // Always start registration from step 1 on page load/refresh (clear saved state)
         if (mode === 'register') {
-            // Try to restore the last step they were on
-            const savedStep = localStorage.getItem('last_registration_step');
-            const stepToRestore = savedStep ? parseInt(savedStep, 10) : 1;
+            // Clear saved registration state to start fresh (wrapped in try-catch to prevent breaking app)
+            try {
+                this.clearRegistrationState();
+            } catch (error) {
+                console.error('Error clearing registration state:', error);
+                // Continue anyway - just reset the step
+                this.registrationStep = 1;
+            }
             
-            // Validate step number
-            const validStep = stepToRestore >= 1 && stepToRestore <= this.maxRegistrationSteps 
-                ? stepToRestore 
-                : 1;
-            
-            this.registrationStep = validStep;
-            this.goToRegistrationStep(validStep);
-            
-            // Restore OTP state if they were on step 2 or beyond
-            if (validStep >= 2) {
-                const savedOtpSent = localStorage.getItem('last_otp_sent') === 'true';
-                const savedOtpVerified = localStorage.getItem('last_otp_verified') === 'true';
-                const savedOtpEmail = localStorage.getItem('last_otp_email');
-                
-                if (savedOtpSent) {
-                    this.otpSent = true;
-                    this.otpEmail = savedOtpEmail || null;
-                    this.otpVerified = savedOtpVerified;
-                    
-                    // Step 2 is already shown by goToRegistrationStep
-                    // The OTP input is inside register-step-2, so it will be visible when step 2 is shown
-                    // Note: The actual OTP code won't be restored (for security), user will need to resend if needed
-                }
-            } else {
-                // Hide OTP test display if on step 1
-                const otpDisplay = document.getElementById('otp-test-display');
-                if (otpDisplay) {
-                    otpDisplay.style.display = 'none';
-                }
+            // Always start from step 1
+            this.registrationStep = 1;
+            try {
+                this.goToRegistrationStep(1);
+            } catch (error) {
+                console.error('Error going to registration step 1:', error);
             }
         } else {
             // Reset to step 1 for login mode
@@ -3398,6 +3591,33 @@ class AgriFisheryMarket {
         }
     }
 
+    clearRegistrationState() {
+        try {
+            // Clear all registration-related localStorage items
+            localStorage.removeItem('last_registration_step');
+            localStorage.removeItem('last_otp_sent');
+            localStorage.removeItem('last_otp_verified');
+            localStorage.removeItem('last_otp_email');
+            localStorage.removeItem('register_email');
+            localStorage.removeItem('register_username');
+            localStorage.removeItem('register_fullname');
+            localStorage.removeItem('register_phone');
+            localStorage.removeItem('register_address');
+            localStorage.removeItem('register_role');
+
+            // Reset registration state variables
+            this.registrationStep = 1;
+            this.otpSent = false;
+            this.otpVerified = false;
+            this.otpEmail = null;
+            this.selectedRole = 'customer';
+            this.isLoading = false;
+        } catch (error) {
+            console.error('Error in clearRegistrationState:', error);
+            // Don't throw - just log the error so it doesn't break the app
+        }
+    }
+
     closeAuthFlow() {
         // Save the current mode before closing
         if (this.authMode) {
@@ -3687,6 +3907,50 @@ class AgriFisheryMarket {
 
 // Initialize the app when DOM is loaded
 let app;
-document.addEventListener('DOMContentLoaded', () => {
-    app = new AgriFisheryMarket();
-});
+
+function initializeApp() {
+    try {
+        if (app) {
+            console.log('App already initialized');
+            return;
+        }
+        app = new AgriFisheryMarket();
+        // Make app globally accessible for onclick handlers
+        window.app = app;
+        console.log('App initialized successfully');
+    } catch (error) {
+        console.error('Failed to initialize app:', error);
+        console.error('Error stack:', error.stack);
+        // Try to show error to user
+        const productsGrid = document.getElementById('products-grid');
+        if (productsGrid) {
+            productsGrid.innerHTML = `<div class="error-state"><p>Failed to initialize application: ${error.message}</p><p>Please refresh the page.</p></div>`;
+        }
+    }
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    // DOM is already loaded, initialize immediately
+    initializeApp();
+}
+
+// Fallback: Try to initialize after a short delay if app is still not initialized
+setTimeout(() => {
+    if (!window.app && !app) {
+        console.warn('App not initialized after 1 second, attempting fallback initialization...');
+        initializeApp();
+    }
+}, 1000);
+
+// Expose a global function to manually load products if needed
+window.loadProductsManually = function() {
+    if (window.app && typeof window.app.loadProducts === 'function') {
+        console.log('Manually loading products...');
+        window.app.loadProducts();
+    } else {
+        console.error('App not available. Cannot load products manually.');
+    }
+};
