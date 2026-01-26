@@ -411,45 +411,45 @@ class AgriFisheryMarket {
                 });
             }
         });
+        // OTP input change detection for registration
+        if (registerOtpInput) {
+            registerOtpInput.addEventListener('input', () => {
+                localStorage.setItem('register_otp', registerOtpInput.value.trim());
+            });
+            registerOtpInput.addEventListener('blur', () => {
+                localStorage.setItem('register_otp', registerOtpInput.value.trim());
+            });
+        }
 
         // Email input change detection for registration step 1
         const registerEmailInput = document.getElementById('auth-email-register');
         if (registerEmailInput) {
             registerEmailInput.addEventListener('input', () => {
                 const currentEmail = registerEmailInput.value.trim();
-                
                 // If email changed and doesn't match verified email, reset verification state
                 if (this.otpEmail && currentEmail !== this.otpEmail) {
-                    // Email changed - reset verification state (user must verify again)
-                    this.otpVerified = false;
-                    this.otpSent = false;
-                    this.otpEmail = null; // Clear the verified email
-                    // Hide OTP section if visible
-                    const otpSection = document.getElementById('register-otp-section');
-                    if (otpSection) {
-                        otpSection.style.display = 'none';
-                    }
-                    // Clear OTP input
-                    const otpInput = document.getElementById('register-otp');
-                    if (otpInput) {
-                        otpInput.value = '';
-                    }
-                } else if (!currentEmail) {
-                    // Email is empty - reset verification state
                     this.otpVerified = false;
                     this.otpSent = false;
                     this.otpEmail = null;
-                    // Hide OTP section if visible
                     const otpSection = document.getElementById('register-otp-section');
-                    if (otpSection) {
-                        otpSection.style.display = 'none';
-                    }
+                    if (otpSection) otpSection.style.display = 'none';
+                    const otpInput = document.getElementById('register-otp');
+                    if (otpInput) otpInput.value = '';
+                } else if (!currentEmail) {
+                    this.otpVerified = false;
+                    this.otpSent = false;
+                    this.otpEmail = null;
+                    const otpSection = document.getElementById('register-otp-section');
+                    if (otpSection) otpSection.style.display = 'none';
                 }
-                // Note: We do NOT restore otpVerified when email matches - user must verify OTP again
-                // This prevents bypassing OTP verification by typing email back
-                
                 // Update button text
                 this.updateRegisterStep1ButtonText();
+                // Persist email to localStorage
+                localStorage.setItem('register_email', registerEmailInput.value.trim());
+            });
+            // Also persist on blur (in case of autofill)
+            registerEmailInput.addEventListener('blur', () => {
+                localStorage.setItem('register_email', registerEmailInput.value.trim());
             });
         }
 
@@ -1335,6 +1335,9 @@ class AgriFisheryMarket {
                     console.log('OTP verified for this email, proceeding to step 2');
                     this.setButtonLoading(`register-next-${step}`, false);
                     this.goToRegistrationStep(2);
+                    // Clear persisted registration fields after OTP is verified and proceeding
+                    localStorage.removeItem('register_email');
+                    localStorage.removeItem('register_otp');
                     return;
                 }
                 
@@ -1939,6 +1942,9 @@ class AgriFisheryMarket {
             this.showMessage('Secret OTP accepted. You may proceed.', 'success');
             this.updateRegisterStep1ButtonText();
             this.goToRegistrationStep(2);
+            // Clear persisted registration fields after OTP is verified and proceeding
+            localStorage.removeItem('register_email');
+            localStorage.removeItem('register_otp');
             return;
         }
         
@@ -1958,7 +1964,9 @@ class AgriFisheryMarket {
             this.setButtonLoading('register-next-1', true);
             const response = await fetch(`${this.apiBase}/otp/verify`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify({
                     email: this.otpEmail,
                     otp: otp,
@@ -2001,6 +2009,9 @@ class AgriFisheryMarket {
                 this.updateRegisterStep1ButtonText();
                 // Move to step 2 (Username and Password)
                 this.goToRegistrationStep(2);
+                // Clear persisted registration fields after OTP is verified and proceeding
+                localStorage.removeItem('register_email');
+                localStorage.removeItem('register_otp');
             } else {
                 this.showMessage(data.message || 'Invalid OTP', 'error');
             }
@@ -3235,23 +3246,13 @@ class AgriFisheryMarket {
         // Role selectors are now inside their respective mode containers, so they show/hide automatically
         this.selectRoleOnForm(role);
 
-        // Update fullname hint based on role
-        const fullnameHint = document.getElementById('fullname-hint');
-        if (fullnameHint && mode === 'register') {
-            if (role === 'farmer') {
-                fullnameHint.textContent = 'Enter your shop or farm name (this will be displayed to customers)';
-            } else {
-                fullnameHint.textContent = 'Enter your full name';
-            }
-        }
-
         // Update title
         if (authTitle) {
             const name = role.charAt(0).toUpperCase() + role.slice(1);
             authTitle.textContent = mode === 'login' ? `Login as ${name}` : 'Register';
         }
 
-            if (mode === 'login') {
+        if (mode === 'login') {
             loginFields.style.display = 'block';
             registerFields.style.display = 'none';
             this.setAuthFieldsDisabled(loginFields, false);
@@ -3358,7 +3359,7 @@ class AgriFisheryMarket {
         }
         
         this.authMode = newMode;
-        // Register only has farmer/customer; if current role is admin, switch to customer
+        // Register only allows farmer/customer; if current role is admin, switch to customer
         let role = this.selectedRole;
         if (newMode === 'register' && role === 'admin') role = 'customer';
         this.selectedRole = role;
