@@ -57,7 +57,8 @@ router.post('/send', async (req, res) => {
         }
       } catch (dbError) {
         console.error('❌ DB Error checking user existence:', dbError);
-        throw new Error('Database error while checking email availability');
+        // If DB error occurs here, return error
+        return res.status(500).json({ message: 'Database error while checking email availability' });
       }
     }
 
@@ -106,6 +107,8 @@ router.post('/send', async (req, res) => {
     const otp = generateOtp();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+    // Try to store OTP in database, but if it fails after email is sent, still return success
+    let dbErrorOccurred = false;
     try {
       // Invalidate previous unused OTPs for this email and purpose
       await pool.query(
@@ -120,8 +123,9 @@ router.post('/send', async (req, res) => {
       );
       console.log('✅ OTP stored in database');
     } catch (dbError) {
+      dbErrorOccurred = true;
       console.error('❌ DB Error storing OTP:', dbError);
-      throw new Error('Database error while saving OTP code');
+      // Do not throw, continue to send email
     }
 
     // Send OTP via email
@@ -151,28 +155,29 @@ router.post('/send', async (req, res) => {
     }
 
     console.log('✅ OTP email sent successfully to:', email);
-    
+
     // For development/testing: Include OTP in response if in development mode
     const responseData = {
-      message: 'OTP sent successfully to your email',
+      message: dbErrorOccurred
+        ? 'OTP sent to your email, but there was a server issue saving the OTP. Please try again if you do not receive the code.'
+        : 'OTP sent successfully to your email',
       expiresIn: 600, // 10 minutes in seconds
     };
-    
+
     // In development mode, include OTP for testing purposes
     if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
       responseData.otp = otp; // Include OTP for testing
       console.log('🔑 OTP Code (for testing):', otp);
     }
-    
-    res.json(responseData);
+
+    return res.json(responseData);
   } catch (error) {
     console.error('❌ Send OTP error (catch block):', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       message: `Server error sending OTP: ${error.message}`,
       debug: error.message 
     });
   }
-});
 
 /**
  * Verify OTP
