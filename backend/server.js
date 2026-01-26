@@ -23,10 +23,12 @@ const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
   : ['http://localhost:3000', 'http://127.0.0.1:3000'];
 
-// Add agricatch.store if not already included
-if (!allowedOrigins.includes('https://agricatch.store')) {
-  allowedOrigins.push('https://agricatch.store');
-}
+// Add agricatch.store, www.agricatch.store, and agricatch.netlify.app if not already included
+['https://agricatch.store', 'https://www.agricatch.store', 'https://agricatch.netlify.app'].forEach(domain => {
+  if (!allowedOrigins.includes(domain)) {
+    allowedOrigins.push(domain);
+  }
+});
 
 app.use(cors({
   origin: function (origin, callback) {
