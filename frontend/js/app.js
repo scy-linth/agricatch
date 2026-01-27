@@ -1,6 +1,7 @@
 // AgriFishery Market Frontend JavaScript
 
 class AgriFisheryMarket {
+    // ...existing code...
     constructor() {
         // Use relative /api so Netlify can proxy to Render.
         this.apiBase = '/api';
@@ -391,41 +392,16 @@ class AgriFisheryMarket {
         // OTP buttons - only for registration (login no longer requires OTP)
         const resendRegisterOtpBtn = document.getElementById('resend-register-otp-btn');
         const resendOtpCooldown = document.getElementById('resend-otp-cooldown');
-        let resendOtpCooldownTimer = null;
-        let resendOtpCooldownEnd = 0;
         if (resendRegisterOtpBtn) {
             resendRegisterOtpBtn.addEventListener('click', () => {
-                // If cooldown is active, do nothing
                 if (resendRegisterOtpBtn.disabled) return;
-                // Start cooldown immediately (default 60s)
-                startResendOtpCooldown(60);
-                // For registration, use the registration-specific function
+                this.startResendOtpCooldown(60);
                 if (this.authMode === 'register' || document.getElementById('auth-register-fields').style.display !== 'none') {
                     this.sendOtpForRegistration();
                 } else {
                     this.sendOtp();
                 }
             });
-        }
-
-        // Helper to start cooldown
-        function startResendOtpCooldown(seconds) {
-            if (!resendRegisterOtpBtn || !resendOtpCooldown) return;
-            resendRegisterOtpBtn.disabled = true;
-            resendOtpCooldown.style.display = 'inline';
-            resendOtpCooldownEnd = Date.now() + seconds * 1000;
-            updateResendOtpCooldown();
-            if (resendOtpCooldownTimer) clearInterval(resendOtpCooldownTimer);
-            resendOtpCooldownTimer = setInterval(updateResendOtpCooldown, 250);
-        }
-        function updateResendOtpCooldown() {
-            const remaining = Math.max(0, Math.ceil((resendOtpCooldownEnd - Date.now()) / 1000));
-            resendOtpCooldown.textContent = remaining > 0 ? `Wait ${remaining}s` : '';
-            if (remaining <= 0) {
-                resendRegisterOtpBtn.disabled = false;
-                resendOtpCooldown.style.display = 'none';
-                if (resendOtpCooldownTimer) clearInterval(resendOtpCooldownTimer);
-            }
         }
 
         // OTP input validation (numbers only)
@@ -1495,7 +1471,7 @@ class AgriFisheryMarket {
                         }
                     } else {
                         // OTP section not visible - show message to send OTP first
-                        this.showMessage('Please verify your email with the OTP code first', 'error');
+                        // Removed message: 'Please verify your email with the OTP code first'
                         // Show OTP section if it's hidden
                         if (otpSection && otpSection.style.display === 'none') {
                             // If OTP hasn't been sent yet, send it
@@ -1787,13 +1763,13 @@ class AgriFisheryMarket {
 
     async sendOtpForRegistration() {
         const email = document.getElementById('auth-email-register').value.trim();
-        
+
         if (!email) {
             this.setButtonLoading('register-next-1', false);
             this.showMessage('Please enter your email address first', 'error');
             return;
         }
-        
+
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
@@ -1802,25 +1778,27 @@ class AgriFisheryMarket {
             document.getElementById('auth-email-register').focus();
             return;
         }
-        
+
         // Show OTP section immediately when button is clicked (before API call)
         const otpSection = document.getElementById('register-otp-section');
         if (otpSection) {
             otpSection.style.display = 'block';
         }
-        
+
         // Clear the OTP input field
         const otpInput = document.getElementById('register-otp');
         if (otpInput) {
             otpInput.value = '';
         }
-        
+
         // Update button text to "Confirm OTP" immediately since OTP section is now visible
-        // (Resend button is already there, so this button confirms the OTP)
         const nextButtonText = document.getElementById('register-next-1-text');
         if (nextButtonText) {
             nextButtonText.textContent = 'Confirm OTP';
         }
+
+        // Start resend OTP cooldown immediately when sending verification
+        this.startResendOtpCooldown(60);
         
         try {
             console.log('Sending OTP request:', { email, purpose: 'register', apiBase: this.apiBase });
@@ -3934,6 +3912,31 @@ class AgriFisheryMarket {
     goToAdminPanel() {
         // Redirect super admin to admin panel
         window.location.href = '/admin.html';
+    }
+
+    startResendOtpCooldown(seconds) {
+        const resendRegisterOtpBtn = document.getElementById('resend-register-otp-btn');
+        const resendOtpCooldown = document.getElementById('resend-otp-cooldown');
+        if (!resendRegisterOtpBtn || !resendOtpCooldown) return;
+        resendRegisterOtpBtn.disabled = true;
+        resendOtpCooldown.style.display = 'inline';
+        this.resendOtpCooldownEnd = Date.now() + seconds * 1000;
+        this.updateResendOtpCooldown();
+        if (this.resendOtpCooldownTimer) clearInterval(this.resendOtpCooldownTimer);
+        this.resendOtpCooldownTimer = setInterval(() => this.updateResendOtpCooldown(), 250);
+    }
+
+    updateResendOtpCooldown() {
+        const resendRegisterOtpBtn = document.getElementById('resend-register-otp-btn');
+        const resendOtpCooldown = document.getElementById('resend-otp-cooldown');
+        if (!resendRegisterOtpBtn || !resendOtpCooldown) return;
+        const remaining = Math.max(0, Math.ceil((this.resendOtpCooldownEnd - Date.now()) / 1000));
+        resendOtpCooldown.textContent = remaining > 0 ? `Wait ${remaining}s` : '';
+        if (remaining <= 0) {
+            resendRegisterOtpBtn.disabled = false;
+            resendOtpCooldown.style.display = 'none';
+            if (this.resendOtpCooldownTimer) clearInterval(this.resendOtpCooldownTimer);
+        }
     }
 }
 
