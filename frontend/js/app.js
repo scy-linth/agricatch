@@ -3,8 +3,11 @@
 class AgriFisheryMarket {
     // ...existing code...
     constructor() {
-        // Use relative /api so Netlify can proxy to Render.
-        this.apiBase = '/api';
+        // Use direct Render URL for Cloudflare Pages domains, relative path for localhost
+        const isCloudflarePages = window.location.hostname === 'agricatch.page.dev' ||
+                                 window.location.hostname === 'agricatch.store' ||
+                                 window.location.hostname.includes('agricatch.store');
+        this.apiBase = isCloudflarePages ? 'https://agricatch.onrender.com/api' : '/api';
         this.token = localStorage.getItem('token');
         this.sessionId = this.getOrCreateSessionId();
         this.currentPage = 1;
