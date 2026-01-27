@@ -25,10 +25,15 @@ const allowedOrigins = process.env.FRONTEND_URL
   : [
       'http://localhost:3000',
       'http://127.0.0.1:3000',
+      'http://localhost:7242',
+      'http://127.0.0.1:7242',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
       'https://agricatch.pages.dev',
       'https://agricatch.page.dev',
       'https://agricatch.store',
-      'https://www.agricatch.store'
+      'https://www.agricatch.store',
+      'https://agricatch.onrender.com'
     ];
 
 app.use(cors({
