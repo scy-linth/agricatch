@@ -86,6 +86,7 @@ async function sendOtpEmail(to, otp, purpose = "login") {
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { background: #2e7d32; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .logo-img { max-width: 120px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
         .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
         .otp-box { background: white; border: 2px solid #2e7d32; border-radius: 5px; padding: 20px; text-align: center; margin: 20px 0; }
         .otp-code { font-size: 32px; font-weight: bold; color: #2e7d32; letter-spacing: 5px; }
@@ -96,6 +97,7 @@ async function sendOtpEmail(to, otp, purpose = "login") {
     <body>
       <div class="container">
         <div class="header">
+          <img src="https://res.cloudinary.com/dwv7lhgvm/image/upload/v1769510815/resendlogo_jlo0c7.png" alt="Resend Logo" class="logo-img" />
           <h1>AgriCatch</h1>
           <p>${purposeText} Verification</p>
         </div>
