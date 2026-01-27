@@ -156,11 +156,7 @@ class OrdersPage {
                 </div>
                 <div class="order-details">
                     <div class="order-item">
-<<<<<<< HEAD
                         <img src="${item.image_url || window.__PLACEHOLDER_IMAGE__}" alt="${item.product_name || 'Product'}">
-=======
-                        <img src="${item.image_url || 'https://via.placeholder.com/60x60?text=No+Image'}" alt="${item.product_name || 'Product'}">
->>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
                         <div class="order-item-info">
                             <div class="order-item-name">${item.product_name || 'Product'}</div>
                             <div class="order-item-meta">${item.quantity || order.quantity || 1} x ₱${parseFloat(item.price || order.price || 0).toFixed(2)} ${item.unit || ''}</div>

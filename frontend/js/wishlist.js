@@ -39,13 +39,8 @@ class WishlistPage {
 
         grid.innerHTML = items.map(item => `
             <div class="product-card">
-<<<<<<< HEAD
                  <img src="${item.image_url || window.__PLACEHOLDER_IMAGE__}"
                      alt="${item.name}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
-=======
-                <img src="${item.image_url || 'https://via.placeholder.com/280x200?text=No+Image'}"
-                     alt="${item.name}" class="product-image" onerror="this.src='https://via.placeholder.com/280x200?text=No+Image'">
->>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
                 <div class="product-info">
                     <h3 class="product-name">${item.name}</h3>
                     <div class="product-price">₱${parseFloat(item.price).toFixed(2)} per ${item.unit || ''}</div>

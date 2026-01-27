@@ -1,12 +1,9 @@
 // AgriFishery Market Frontend JavaScript
 
-<<<<<<< HEAD
 // Use a tiny inlined 1x1 GIF as a lightweight placeholder to avoid external requests
 // Use the project's resend logo as the default placeholder so Cloudinary or external services aren't called
 window.__PLACEHOLDER_IMAGE__ = '/images/resendlogo.png';
 
-=======
->>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
 class AgriFisheryMarket {
     // ...existing code...
     constructor() {
