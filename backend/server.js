@@ -22,31 +22,44 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 // Set allowed origins for CORS. Add all frontend URLs (Cloudflare Pages, custom domain, localhost, etc.)
 const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : [
+  : (() => {
+    // Production default origins (conservative)
+    if (process.env.NODE_ENV === 'production') {
+      return [
+        'https://agricatch.store',
+        'https://www.agricatch.store',
+        'https://agricatch.onrender.com'
+      ];
+    }
+
+    // Development defaults
+    return [
       'http://localhost:3000',
       'http://127.0.0.1:3000',
-      'https://agricatch.pages.dev',
-      'https://agricatch.page.dev',
-      'https://agricatch.store',
-      'https://www.agricatch.store'
+      'http://localhost:7242',
+      'http://127.0.0.1:7242',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173'
     ];
+  })();
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, Postman, or same-origin requests)
     if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list
-    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
-      callback(null, true);
-    } else {
-      // In development, allow all origins
-      if (process.env.NODE_ENV !== 'production') {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
+
+    // In development allow any origin (useful for local testing)
+    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+
+    // In production only allow explicit origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+
+    // Not allowed
+    const err = new Error('Not allowed by CORS');
+    err.status = 403;
+    return callback(err);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -98,19 +111,25 @@ const pool = new Pool({
 
 // Test database connection
 pool.connect((err, client, release) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:36',message:'Database connection test started',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+  // #region agent log (only in development)
+  if (process.env.NODE_ENV !== 'production') {
+    fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:36',message:'Database connection test started',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+  }
   // #endregion
 
   if (err) {
     console.error('Error connecting to database:', err);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:37',message:'Database connection failed',data:{error:err.message,code:err.code},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+    // #region agent log (only in development)
+    if (process.env.NODE_ENV !== 'production') {
+      fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:37',message:'Database connection failed',data:{error:err.message,code:err.code},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+    }
     // #endregion
   } else {
     console.log('Connected to PostgreSQL database');
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:40',message:'Database connection successful',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+    // #region agent log (only in development)
+    if (process.env.NODE_ENV !== 'production') {
+      fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server.js:40',message:'Database connection successful',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+    }
     // #endregion
     release();
   }
@@ -378,9 +397,21 @@ app.use(express.static(path.join(__dirname, '..', 'frontend')));
 // Additional CORS headers (backup - main CORS is handled above)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin) || allowedOrigins.includes('*') || !origin) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
+
+  // If no origin (server-to-server or same-origin), allow by default
+  if (!origin) {
+    res.header('Access-Control-Allow-Origin', '*');
+  } else if (process.env.NODE_ENV !== 'production') {
+    // Development: echo origin
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (allowedOrigins.includes(origin)) {
+    // Production: only allow explicit origins
+    res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    // Do not set CORS header for disallowed origins; client will see CORS error
+    console.warn('Blocked CORS request from origin:', origin);
   }
+
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
