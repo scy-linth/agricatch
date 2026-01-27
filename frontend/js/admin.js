@@ -1123,7 +1123,11 @@ class AdminDashboard {
             // Set image preview
             const imgPreview = document.getElementById('edit-product-image-preview');
             if (imgPreview) {
+<<<<<<< HEAD
                 imgPreview.src = product.image_url || window.__PLACEHOLDER_IMAGE__;
+=======
+                imgPreview.src = product.image_url || '/images/placeholder.png';
+>>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
             }
             // Reset file input
             const fileInput = document.getElementById('edit-product-image');
