@@ -514,9 +514,6 @@ class AgriFisheryMarket {
 
         // Save form data as user types (for persistence)
         this.setupFormPersistence();
-        
-        // Setup phone number input validation
-        this.setupPhoneInput();
 
         // Password toggle for register
         const toggleRegisterPassword = document.getElementById('toggle-register-password');
@@ -588,10 +585,49 @@ class AgriFisheryMarket {
         // Phone number input - only allow digits
         const checkoutPhoneInput = document.getElementById('checkout-phone');
         if (checkoutPhoneInput) {
-            checkoutPhoneInput.addEventListener('input', (e) => {
-                e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+            checkoutPhoneInput.addEventListener('input', (e) => {/* Lines 592-593 omitted */});
+        }
+
+        // Registration contact number input: format as '9XX XXX XXXX' and preserve cursor position
+        const registerPhoneInput = document.getElementById('auth-phone');
+        if (registerPhoneInput) {
+            registerPhoneInput.addEventListener('input', function(e) {
+                const input = e.target;
+                let value = input.value;
+                let selectionStart = input.selectionStart;
+
+                // Remove all non-numeric characters
+                let digits = value.replace(/\D/g, '');
+                if (digits.startsWith('0')) digits = digits.substring(1);
+                digits = digits.substring(0, 10);
+
+                // Format as 9XX XXX XXXX
+                let formatted = '';
+                if (digits.length <= 3) {
+                    formatted = digits;
+                } else if (digits.length <= 6) {
+                    formatted = digits.slice(0, 3) + ' ' + digits.slice(3);
+                } else {
+                    formatted = digits.slice(0, 3) + ' ' + digits.slice(3, 6) + ' ' + digits.slice(6);
+                }
+
+                // Calculate new cursor position
+                let pos = selectionStart;
+                let rawLeft = value.slice(0, pos).replace(/\D/g, '');
+                let newPos = rawLeft.length;
+                if (newPos > 3 && newPos <= 6) newPos += 1; // after first space
+                else if (newPos > 6) newPos += 2; // after two spaces
+
+                // If deleting a space, move cursor back
+                if (value[pos - 1] === ' ' && formatted.length < value.length) {
+                    newPos--;
+                }
+
+                input.value = formatted;
+                input.setSelectionRange(newPos, newPos);
             });
         }
+        
         
         // Saved address selector
         const savedAddresses = document.getElementById('saved-addresses');
