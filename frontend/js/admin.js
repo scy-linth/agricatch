@@ -120,6 +120,29 @@ class AdminDashboard {
         this.setupEventListeners();
         this.setupRealtime();
         this.startUnreadPolling();
+        // Description char counter for product edit
+        const desc = document.getElementById('edit-product-description');
+        const count = document.getElementById('edit-product-description-count');
+        if (desc && count) {
+            desc.addEventListener('input', () => {
+                count.textContent = desc.value.length;
+            });
+        }
+        // Live image preview
+        const imgInput = document.getElementById('edit-product-image');
+        const imgPreview = document.getElementById('edit-product-image-preview');
+        if (imgInput && imgPreview) {
+            imgInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        imgPreview.src = ev.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
     }
 
     setupRealtime() {
@@ -1096,6 +1119,18 @@ class AdminDashboard {
             document.getElementById('edit-product-price').value = product.price || '';
             document.getElementById('edit-product-stock').value = product.stock_quantity || '';
             document.getElementById('edit-product-location').value = product.location || '';
+            document.getElementById('edit-product-description').value = product.description || '';
+            // Set image preview
+            const imgPreview = document.getElementById('edit-product-image-preview');
+            if (imgPreview) {
+                imgPreview.src = product.image_url || '/images/placeholder.png';
+            }
+            // Reset file input
+            const fileInput = document.getElementById('edit-product-image');
+            if (fileInput) fileInput.value = '';
+            // Update char count
+            const descCount = document.getElementById('edit-product-description-count');
+            if (descCount) descCount.textContent = (product.description || '').length;
         }
         modal.style.display = 'block';
     }
@@ -1103,21 +1138,29 @@ class AdminDashboard {
     async submitProductEdit(e) {
         e.preventDefault();
         const productId = document.getElementById('edit-product-id').value;
-        const payload = {
-            name: document.getElementById('edit-product-name').value,
-            price: document.getElementById('edit-product-price').value,
-            stock_quantity: document.getElementById('edit-product-stock').value,
-            location: document.getElementById('edit-product-location').value
-        };
+        const name = document.getElementById('edit-product-name').value;
+        const price = document.getElementById('edit-product-price').value;
+        const stock_quantity = document.getElementById('edit-product-stock').value;
+        const location = document.getElementById('edit-product-location').value;
+        const description = document.getElementById('edit-product-description').value;
+        const imageInput = document.getElementById('edit-product-image');
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('price', price);
+        formData.append('stock_quantity', stock_quantity);
+        formData.append('location', location);
+        formData.append('description', description);
+        if (imageInput && imageInput.files && imageInput.files[0]) {
+            formData.append('image', imageInput.files[0]);
+        }
 
         try {
             const response = await fetch(`${this.apiBase}/admin/products/${productId}`, {
                 method: 'PUT',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify(payload)
+                body: formData
             });
 
             if (response.ok) {

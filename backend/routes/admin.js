@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const { writeAdminAuditLog, ensureAuditTable } = require('../utils/auditLog');
 const { broadcastEvent } = require('../utils/realtime');
+const { productUpload } = require('../middleware/upload');
 
 // Super admin virtual user storage (shared with auth.js)
 let superAdminProfile = {
@@ -477,9 +478,10 @@ router.put('/products/:id/assign', requireAdmin, async (req, res) => {
 });
 
 // Update product details (admin)
-router.put('/products/:id', requireAdmin, async (req, res) => {
+router.put('/products/:id', requireAdmin, productUpload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
+    // Use req.body for text fields, req.file for image
     const {
       name,
       description,
@@ -487,12 +489,18 @@ router.put('/products/:id', requireAdmin, async (req, res) => {
       category_id,
       stock_quantity,
       unit,
-      image_url,
       location,
       harvest_date,
       expiry_date,
       is_available
     } = req.body;
+
+    let image_url = req.body.image_url;
+    if (req.file) {
+      // Save relative path for frontend use
+      const relPath = req.file.path.replace(/.*frontend[\\/]/, '/');
+      image_url = relPath.replace(/\\/g, '/');
+    }
 
     const productResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
     if (productResult.rows.length === 0) {
@@ -503,96 +511,75 @@ router.put('/products/:id', requireAdmin, async (req, res) => {
     const values = [];
     let paramIndex = 1;
 
-    if (name !== undefined && name !== null) {
+    if (name !== undefined && name !== null && name !== "") {
       updates.push(`name = $${paramIndex}`);
       values.push(name);
       paramIndex++;
     }
-    if (description !== undefined && description !== null) {
+    if (description !== undefined && description !== null && description !== "") {
       updates.push(`description = $${paramIndex}`);
       values.push(description);
       paramIndex++;
     }
-    if (price !== undefined && price !== null) {
+    if (price !== undefined && price !== null && price !== "") {
       updates.push(`price = $${paramIndex}`);
-      values.push(price);
+      values.push(Number(price));
       paramIndex++;
     }
-    if (category_id !== undefined && category_id !== null) {
+    if (category_id !== undefined && category_id !== null && category_id !== "") {
       updates.push(`category_id = $${paramIndex}`);
-      values.push(category_id);
+      values.push(Number(category_id));
       paramIndex++;
     }
-    if (stock_quantity !== undefined && stock_quantity !== null) {
+    if (stock_quantity !== undefined && stock_quantity !== null && stock_quantity !== "") {
       updates.push(`stock_quantity = $${paramIndex}`);
-      values.push(stock_quantity);
+      values.push(Number(stock_quantity));
       paramIndex++;
     }
-    if (unit !== undefined && unit !== null) {
+    if (unit !== undefined && unit !== null && unit !== "") {
       updates.push(`unit = $${paramIndex}`);
       values.push(unit);
       paramIndex++;
     }
-    if (image_url !== undefined && image_url !== null) {
-      updates.push(`image_url = $${paramIndex}`);
-      values.push(image_url);
-      paramIndex++;
-    }
-    if (location !== undefined && location !== null) {
+    if (location !== undefined && location !== null && location !== "") {
       updates.push(`location = $${paramIndex}`);
       values.push(location);
       paramIndex++;
     }
-    if (harvest_date !== undefined && harvest_date !== null) {
+    if (harvest_date !== undefined && harvest_date !== null && harvest_date !== "") {
       updates.push(`harvest_date = $${paramIndex}`);
       values.push(harvest_date);
       paramIndex++;
     }
-    if (expiry_date !== undefined && expiry_date !== null) {
+    if (expiry_date !== undefined && expiry_date !== null && expiry_date !== "") {
       updates.push(`expiry_date = $${paramIndex}`);
       values.push(expiry_date);
       paramIndex++;
     }
-    if (is_available !== undefined && is_available !== null) {
+    if (is_available !== undefined && is_available !== null && is_available !== "") {
       updates.push(`is_available = $${paramIndex}`);
-      values.push(is_available);
+      values.push(is_available === 'true' || is_available === true ? true : false);
+      paramIndex++;
+    }
+    if (image_url !== undefined && image_url !== null && image_url !== "") {
+      updates.push(`image_url = $${paramIndex}`);
+      values.push(image_url);
       paramIndex++;
     }
 
-    if (updates.length === 0) {
+    if (!updates.length) {
       return res.status(400).json({ message: 'No fields provided to update' });
     }
 
-    updates.push('updated_at = CURRENT_TIMESTAMP');
+    const updateSql = `UPDATE products SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramIndex} RETURNING *`;
     values.push(id);
+    const updated = await pool.query(updateSql, values);
 
-    await pool.query(`
-      UPDATE products
-      SET ${updates.join(', ')}
-      WHERE id = $${paramIndex}
-    `, values);
-
-    if (image_url && image_url !== productResult.rows[0].image_url) {
-      const { deleteFileIfExists, resolvePublicPath } = require('../utils/fileUtils');
-      const oldPath = resolvePublicPath(productResult.rows[0].image_url);
-      if (oldPath) deleteFileIfExists(oldPath);
-    }
-
-    const afterProduct = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
-    await writeAdminAuditLog(pool, {
-      actor_admin_id: req.user.id,
-      action: 'product.update',
-      entity: 'products',
-      entity_id: parseInt(id, 10),
-      before: productResult.rows[0],
-      after: afterProduct.rows[0]
-    });
-    broadcastEvent('admin.audit', { action: 'product.update', entity: 'products', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
-
-    res.json({ message: 'Product updated successfully' });
+    // Optionally: broadcast event, log, etc.
+    res.json({ message: 'Product updated', product: updated.rows[0] });
   } catch (error) {
-    console.error('Admin update product error:', error);
-    res.status(500).json({ message: 'Server error updating product' });
+    console.error('Update product error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
