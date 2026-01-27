@@ -32,6 +32,8 @@ const ensureAuth = (req, res, next) => {
   next();
 };
 
+
+
 router.post('/product-image', ensureAuth, productUpload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Image is required' });
@@ -50,10 +52,22 @@ router.post('/product-image', ensureAuth, productUpload.single('image'), async (
   }
 });
 
+=======
+  try {
+    const result = await uploadToCloudinary(req.file.buffer, 'products');
+    res.json({ imageUrl: result.secure_url });
+  } catch (err) {
+    res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
+  }
+});
+
+
+>>>>>>> b3ab180 (cloudinary image by copilot)
 router.post('/shop-banner', ensureAuth, bannerUpload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Image is required' });
   }
+<<<<<<< HEAD
 
   try {
     const result = await cloudinary.uploader.upload(req.file.buffer, {
@@ -68,10 +82,22 @@ router.post('/shop-banner', ensureAuth, bannerUpload.single('image'), async (req
   }
 });
 
+=======
+  try {
+    const result = await uploadToCloudinary(req.file.buffer, 'shops/banners');
+    res.json({ imageUrl: result.secure_url });
+  } catch (err) {
+    res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
+  }
+});
+
+
+>>>>>>> b3ab180 (cloudinary image by copilot)
 router.post('/shop-avatar', ensureAuth, avatarUpload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Image is required' });
   }
+<<<<<<< HEAD
 
   try {
     const result = await cloudinary.uploader.upload(req.file.buffer, {
@@ -83,6 +109,13 @@ router.post('/shop-avatar', ensureAuth, avatarUpload.single('image'), async (req
   } catch (error) {
     console.error('Cloudinary upload error:', error);
     res.status(500).json({ message: 'Failed to upload image' });
+=======
+  try {
+    const result = await uploadToCloudinary(req.file.buffer, 'shops/avatars');
+    res.json({ imageUrl: result.secure_url });
+  } catch (err) {
+    res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
+>>>>>>> b3ab180 (cloudinary image by copilot)
   }
 });
 
