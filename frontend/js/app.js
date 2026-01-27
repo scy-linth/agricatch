@@ -3,10 +3,11 @@
 class AgriFisheryMarket {
     // ...existing code...
     constructor() {
-        // Use direct Render URL for Cloudflare Pages domains, relative path for localhost
+        // Use direct Render URL for Cloudflare Pages domains and Render frontend, relative path for localhost
         const isCloudflarePages = window.location.hostname === 'agricatch.page.dev' ||
                                  window.location.hostname === 'agricatch.store' ||
-                                 window.location.hostname.includes('agricatch.store');
+                                 window.location.hostname.includes('agricatch.store') ||
+                                 window.location.hostname === 'agricatch.onrender.com';
         this.apiBase = isCloudflarePages ? 'https://agricatch.onrender.com/api' : '/api';
         this.token = localStorage.getItem('token');
         this.sessionId = this.getOrCreateSessionId();
