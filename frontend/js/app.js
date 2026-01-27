@@ -1,9 +1,12 @@
 // AgriFishery Market Frontend JavaScript
 
+<<<<<<< HEAD
 // Use a tiny inlined 1x1 GIF as a lightweight placeholder to avoid external requests
 // Use the project's resend logo as the default placeholder so Cloudinary or external services aren't called
 window.__PLACEHOLDER_IMAGE__ = '/images/resendlogo.png';
 
+=======
+>>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
 class AgriFisheryMarket {
     // ...existing code...
     constructor() {
@@ -2372,13 +2375,22 @@ class AgriFisheryMarket {
                 productImageUrl = '/' + productImageUrl;
             }
             if (!productImageUrl || productImageUrl === 'null' || productImageUrl === 'undefined') {
+<<<<<<< HEAD
                 productImageUrl = window.__PLACEHOLDER_IMAGE__;
+=======
+                productImageUrl = 'https://via.placeholder.com/280x200?text=No+Image';
+>>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
             }
             
             return `
             <div class="product-card" onclick="app.showProductDetails(${product.id})" style="cursor: pointer;" data-product-id="${product.id}">
+<<<<<<< HEAD
                  <img src="${productImageUrl}"
                      alt="${product.name}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
+=======
+                <img src="${productImageUrl}"
+                     alt="${product.name}" class="product-image" onerror="this.src='https://via.placeholder.com/280x200?text=No+Image'">
+>>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
                 <div class="product-info">
                     <h3 class="product-name">${product.name}</h3>
                     <div class="product-price">₱${parseFloat(product.price).toFixed(2)} per ${product.unit}</div>
@@ -2514,9 +2526,15 @@ class AgriFisheryMarket {
                 imageUrl = '/' + imageUrl;
             }
             
+<<<<<<< HEAD
             // If no image URL, use project logo placeholder (avoid external requests)
             if (!imageUrl || imageUrl === 'null' || imageUrl === 'undefined' || imageUrl.trim() === '') {
                 imageUrl = window.__PLACEHOLDER_IMAGE__;
+=======
+            // If no image URL, use placeholder
+            if (!imageUrl || imageUrl === 'null' || imageUrl === 'undefined' || imageUrl.trim() === '') {
+                imageUrl = 'https://via.placeholder.com/600x400?text=No+Image';
+>>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
             }
             
             // Set image with error handling - PRIORITY: Image must sync with farmer's upload
@@ -2526,7 +2544,11 @@ class AgriFisheryMarket {
             // Add error handler to ensure image loads correctly
             imageElement.onerror = function() {
                 console.warn('Product image failed to load:', imageUrl);
+<<<<<<< HEAD
                 this.src = window.__PLACEHOLDER_IMAGE__;
+=======
+                this.src = 'https://via.placeholder.com/600x400?text=Image+Not+Available';
+>>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
                 this.onerror = null; // Prevent infinite loop
             };
             
@@ -2981,13 +3003,21 @@ class AgriFisheryMarket {
 
         checkoutItems.innerHTML = data.cartItems.map(item => {
             const itemTotal = parseFloat(item.price) * item.quantity;
+<<<<<<< HEAD
             const imageUrl = item.image_url || window.__PLACEHOLDER_IMAGE__;
+=======
+            const imageUrl = item.image_url || 'https://via.placeholder.com/100x100?text=No+Image';
+>>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
             return `
             <div class="checkout-item">
                 <div class="checkout-item-image">
                     <img src="${imageUrl}" 
                          alt="${item.name}" 
+<<<<<<< HEAD
                          onerror="this.src=window.__PLACEHOLDER_IMAGE__">
+=======
+                         onerror="this.src='https://via.placeholder.com/100x100?text=No+Image'">
+>>>>>>> f2c98e8770f5bb361ad93161b06facf0f4a2fcff
                 </div>
                 <div class="checkout-item-details">
                     <strong class="checkout-item-name">${item.name}</strong>
