@@ -1539,23 +1539,16 @@ body.loading {
     background: var(--primary-color);
     color: var(--white);
     border: none;
-    padding: 0.75rem 1.5rem;
+        padding: 0.75rem 1.5rem;
     border-radius: var(--border-radius);
     font-weight: 500;
     cursor: pointer;
-    transition: var(--transition), box-shadow 0.2s, transform 0.2s;
+    transition: var(--transition);
     margin-top: auto;
+}
+    transition: transform 0.2s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s;
     position: relative;
-    z-index: 2;
-    box-shadow: 0 2px 8px rgba(74, 222, 128, 0.10);
-}
-}
-.add-to-cart-btn:hover, .add-to-cart-btn:focus {
-    background: var(--secondary-color);
-    color: var(--primary-color);
-    transform: scale(1.06);
-    box-shadow: 0 6px 18px rgba(74, 222, 128, 0.18), 0 1.5px 6px rgba(0,0,0,0.08);
-    outline: none;
+    z-index: 1;
 }
 
 @keyframes addToCartPulse {
