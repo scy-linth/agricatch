@@ -205,11 +205,8 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       expiry_date
     } = req.body;
 
+    // Always use the Cloudinary URL from the request body
     let imageUrl = image_url || null;
-    if (req.file) {
-      const relativePath = req.file.path.split('frontend')[1].replace(/\\/g, '/');
-      imageUrl = relativePath;
-    }
 
     // Auto-populate location with shop address if not provided
     let productLocation = location;
@@ -292,15 +289,8 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
     const nextExpiryDate = typeof expiry_date === 'undefined' ? current.expiry_date : expiry_date;
     const nextIsAvailable = typeof is_available === 'undefined' ? current.is_available : is_available;
 
+    // Always use the Cloudinary URL from the request body
     let imageUrl = typeof image_url === 'undefined' ? current.image_url : image_url;
-    if (req.file) {
-      const relativePath = req.file.path.split('frontend')[1].replace(/\\/g, '/');
-      imageUrl = relativePath;
-      const oldPath = resolvePublicPath(current.image_url);
-      if (oldPath) {
-        deleteFileIfExists(oldPath);
-      }
-    }
 
     await pool.query(`
       UPDATE products SET
