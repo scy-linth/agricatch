@@ -48,7 +48,10 @@ router.post('/product-image', ensureAuth, productUpload.single('image'), async (
     res.json({ imageUrl: result.secure_url });
   } catch (error) {
     console.error('Cloudinary upload error:', error);
-    res.status(500).json({ message: 'Failed to upload image' });
+    res.status(500).json({
+      message: 'Failed to upload image',
+      error: error && error.message ? error.message : error
+    });
   }
 });
 
