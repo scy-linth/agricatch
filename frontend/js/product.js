@@ -34,10 +34,14 @@ class ProductPage {
         const container = document.getElementById('product-detail');
         if (!container) return;
 
+        // Prefer full image URL (Cloudinary). If missing, render an empty image element
+        // so the layout doesn't break. Avoid loading heavy placeholder images.
+        const imgSrc = product.image_url && product.image_url.trim() !== '' ? product.image_url : '';
+
         container.innerHTML = `
             <div class="product-card">
-                <img src="${product.image_url || 'https://via.placeholder.com/600x400?text=No+Image'}"
-                     alt="${product.name}" class="product-image" onerror="this.src='https://via.placeholder.com/600x400?text=No+Image'">
+                <img src="${imgSrc}"
+                     alt="${product.name}" class="product-image">
                 <div class="product-info">
                     <h2 class="product-name">${product.name}</h2>
                     <div class="product-price">₱${parseFloat(product.price).toFixed(2)} per ${product.unit}</div>
