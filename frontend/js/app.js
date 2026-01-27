@@ -1918,10 +1918,10 @@ class AgriFisheryMarket {
                 }
                 console.error('OTP send failed:', { status: response.status, message: errorMessage, data });
                 this.showMessage(errorMessage, 'error');
-                // Reset button text on error so user can try again
+                // Keep OTP section visible and set button text to 'Confirm OTP' even on error
                 const nextButtonText = document.getElementById('register-next-1-text');
                 if (nextButtonText) {
-                    nextButtonText.textContent = 'Send Verification Code';
+                    nextButtonText.textContent = 'Confirm OTP';
                 }
                 // Start cooldown if provided by backend
                 cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
@@ -1931,11 +1931,10 @@ class AgriFisheryMarket {
         } catch (error) {
             this.setButtonLoading('register-next-1', false);
             console.error('Send OTP error:', error);
-            // Do not show error message if email is received; just log the error
-            // Reset button text on network error
+            // Keep OTP section visible and set button text to 'Confirm OTP' even on network error
             const nextButtonText = document.getElementById('register-next-1-text');
             if (nextButtonText) {
-                nextButtonText.textContent = 'Send Verification Code';
+                nextButtonText.textContent = 'Confirm OTP';
             }
             // Start default cooldown on error
             startResendOtpCooldown(60);
