@@ -2029,9 +2029,48 @@ body.loading {
     background: var(--white);
     border-radius: var(--border-radius);
     width: 90%;
-    max-width: 500px;
+    max-width: 540px;
     max-height: 90vh;
     overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+/* Product Edit Modal Polishing */
+.edit-product-image-section {
+    margin-bottom: 1rem;
+}
+.image-preview-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #f3f4f6;
+    border-radius: 8px;
+    min-height: 120px;
+    margin-bottom: 0.5rem;
+    overflow-x: auto;
+}
+#edit-product-image-preview {
+    max-width: 100%;
+    max-height: 180px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #f3f4f6;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+#edit-product-description {
+    width: 100%;
+    min-height: 60px;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    padding: 0.75rem;
+    margin-bottom: 0.25rem;
+    background: #f9fafb;
+    resize: vertical;
+}
+#edit-product-description-count {
+    font-size: 0.95em;
+    color: #64748b;
 }
 
 /* Wider modal for registration form */
