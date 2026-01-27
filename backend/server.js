@@ -20,15 +20,15 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 // Middleware - CORS Configuration
 // Allow multiple origins for production and development
 // Set allowed origins for CORS. Add all frontend URLs (Cloudflare Pages, custom domain, localhost, etc.)
-const allowedOrigins = process.env.FRONTEND_URL 
+const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
   : [
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'https://agricatch.pages.dev',
+      'https://agricatch.page.dev',
       'https://agricatch.store',
-      'https://www.agricatch.store',
-      'https://agricatch.netlify.app'
+      'https://www.agricatch.store'
     ];
 
 app.use(cors({
