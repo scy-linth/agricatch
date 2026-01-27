@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - AgriCatch</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <div class="logo-and-title">
+                        <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
+                        <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
+                    </div>
+                    <p class="tagline">Freshly Caught! Pre-ordered for you!</p>
+                </div>
+                <nav class="nav" id="main-nav">
+                    <a href="/" class="nav-link">Home</a>
+                    <a href="/chat.html" class="nav-link active">Chat</a>
+                </nav>
+                <div class="header-actions">
+                    <a href="/" class="btn btn-secondary">Back to Shop</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="chat-page">
+        <div class="container">
+            <h2 class="chat-page-title">Chat with Farmers</h2>
+            <div class="chat-layout">
+                <div class="conversation-sidebar">
+                    <div class="conversation-sidebar-header">
+                        <h3>Conversations</h3>
+                    </div>
+                    <div id="conversation-list" class="conversation-list"></div>
+                </div>
+                <div class="chat-window">
+                    <div id="chat-header" class="chat-header">
+                        <div class="chat-header-info">
+                            <div class="chat-header-title" id="chat-header-title">Select a conversation</div>
+                            <div class="chat-header-subtitle" id="chat-header-subtitle"></div>
+                        </div>
+                    </div>
+                    <div id="chat-messages" class="chat-messages"></div>
+                    <form id="chat-form" class="chat-form">
+                        <input type="text" id="chat-input" placeholder="Type a message..." required>
+                        <button type="submit" class="btn btn-primary btn-small">Send</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>AgriCatch</h3>
+                    <p>Freshly Caught! Pre-ordered for you! Your trusted source for fresh agricultural and fishery products.</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 AgriCatch. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/chat.js"></script>
+    <script>
+        // Mobile menu toggle
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mainNav = document.getElementById('main-nav');
+        if (mobileMenuToggle && mainNav) {
+            mobileMenuToggle.addEventListener('click', () => {
+                mainNav.classList.toggle('open');
+                const icon = mobileMenuToggle.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-bars');
+                    icon.classList.toggle('fa-times');
+                }
+            });
+        }
+        // Mobile chat sidebar toggle
+        const conversationSidebar = document.querySelector('.conversation-sidebar');
+        if (conversationSidebar && window.innerWidth <= 768) {
+            const chatToggle = document.createElement('button');
+            chatToggle.className = 'btn btn-primary btn-small';
+            chatToggle.innerHTML = '<i class="fas fa-comments"></i> Conversations';
+            chatToggle.style.marginBottom = '1rem';
+            chatToggle.addEventListener('click', () => {
+                conversationSidebar.classList.toggle('open');
+            });
+            const chatPageTitle = document.querySelector('.chat-page-title');
+            if (chatPageTitle) {
+                chatPageTitle.parentNode.insertBefore(chatToggle, chatPageTitle.nextSibling);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/.env backup
+backend/env-config.txt
+*.env
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.cursor/debug.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs
+dist/
+build/
+*.exe
+*.dll
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Sensitive documentation
+LOGIN_CREDENTIALS.md
+SETUP_GUIDE_LOG.txt
+ADMIN_RECOVERY.md
+
+# PHPMailer (if not needed in repo)
+# PHPMailer-master/
+
+# Cache
+.cache/
+.npm/
+.yarn/
+
+# Test coverage
+coverage/
+.nyc_output/

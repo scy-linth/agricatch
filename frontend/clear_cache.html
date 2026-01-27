@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Browser Cache</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .button {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.3s;
+        }
+        .button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+        }
+        .button-danger {
+            background: #f44336;
+        }
+        .button-danger:hover {
+            background: #da190b;
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .result.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #4caf50;
+            display: block;
+        }
+        .result.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #f44336;
+            display: block;
+        }
+        .steps {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .steps ol {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+        .code {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Clear Browser Cache</h1>
+        <p class="subtitle">Remove cached order data from your browser</p>
+
+        <div class="steps">
+            <strong>Quick Steps:</strong>
+            <ol>
+                <li>Click the button below</li>
+                <li>Wait for confirmation</li>
+                <li>Refresh all your pages (F5 or Ctrl+R)</li>
+            </ol>
+        </div>
+
+        <button class="button" onclick="clearCache()">
+            🗑️ Clear All Cache
+        </button>
+        <button class="button button-danger" onclick="clearAndReload()">
+            🔄 Clear Cache & Reload This Page
+        </button>
+        <button class="button" onclick="clearUIOrders()" style="background: #ff9800;">
+            🧹 Clear Orders from UI (Force Refresh)
+        </button>
+
+        <div id="result"></div>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <strong>Manual Method (Console):</strong>
+            <p style="margin: 10px 0; color: #666; font-size: 14px;">Open browser console (F12) and run:</p>
+            <div class="code">
+localStorage.clear();<br>
+sessionStorage.clear();<br>
+if ('indexedDB' in window) indexedDB.databases().then(dbs => dbs.forEach(db => indexedDB.deleteDatabase(db.name)));<br>
+if ('caches' in window) caches.keys().then(names => names.forEach(name => caches.delete(name)));<br>
+if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));<br>
+location.reload(true);
+            </div>
+            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+                <strong>⚠️ CRITICAL:</strong> If orders still appear after clearing cache, the <strong>database</strong> still has orders!<br><br>
+                <strong>You MUST clear the database first:</strong><br>
+                1. Open terminal/command prompt<br>
+                2. Run: <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">node database/clear_orders.js</code><br>
+                3. Then come back and clear browser cache
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showResult(message, isSuccess = true) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result ' + (isSuccess ? 'success' : 'error');
+            resultDiv.innerHTML = message;
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function clearCache() {
+            try {
+                // Preserve login token
+                const token = localStorage.getItem('token');
+                const farmerSection = localStorage.getItem('farmerActiveSection');
+                const adminSection = localStorage.getItem('adminActiveSection');
+
+                // Clear everything
+                localStorage.clear();
+                sessionStorage.clear();
+
+                // Restore essential items
+                if (token) localStorage.setItem('token', token);
+                if (farmerSection) localStorage.setItem('farmerActiveSection', farmerSection);
+                if (adminSection) localStorage.setItem('adminActiveSection', adminSection);
+
+                // Clear IndexedDB
+                if ('indexedDB' in window) {
+                    indexedDB.databases().then(dbs => {
+                        dbs.forEach(db => indexedDB.deleteDatabase(db.name));
+                    });
+                }
+
+                // Clear Cache API
+                if ('caches' in window) {
+                    caches.keys().then(names => {
+                        names.forEach(name => caches.delete(name));
+                    });
+                }
+
+                // Clear service workers
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(registrations => {
+                        registrations.forEach(reg => reg.unregister());
+                    });
+                }
+
+                showResult('✅ Cache cleared successfully!<br><br><strong>Important:</strong> If orders still appear, the database might not be cleared.<br>Make sure you ran: <code>node database/clear_orders.js</code><br><br>Now refresh your pages (F5) to see the changes.', true);
+            } catch (error) {
+                showResult('❌ Error: ' + error.message, false);
+            }
+        }
+
+        function clearAndReload() {
+            clearCache();
+            setTimeout(() => {
+                if (confirm('Cache cleared! Reload this page now?')) {
+                    location.reload(true);
+                }
+            }, 500);
+        }
+
+        function clearUIOrders() {
+            try {
+                // Clear customer orders
+                if (window.ordersPage) {
+                    const container = document.getElementById('orders-list');
+                    if (container) container.innerHTML = '<div class="empty-state">No orders found.</div>';
+                    if (window.ordersPage.loadOrders) window.ordersPage.loadOrders();
+                }
+
+                // Clear farmer orders
+                if (window.farmerDashboard) {
+                    if (window.farmerDashboard.lastOrdersById) window.farmerDashboard.lastOrdersById.clear();
+                    if (window.farmerDashboard.lastOrdersByStatus) {
+                        window.farmerDashboard.lastOrdersByStatus = { 
+                            pending: [], confirmed: [], preparing: [], 
+                            out_for_delivery: [], delivered: [], cancelled: [] 
+                        };
+                    }
+                    const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+                    statuses.forEach(status => {
+                        const container = document.getElementById(`${status}-orders-list`);
+                        if (container) container.innerHTML = `<div class="empty-state"><p>No orders found.</p></div>`;
+                    });
+                    if (window.farmerDashboard.loadMyOrders) window.farmerDashboard.loadMyOrders();
+                }
+
+                // Clear admin orders
+                if (window.adminDashboard) {
+                    if (window.adminDashboard.lastOrders) window.adminDashboard.lastOrders = [];
+                    if (window.adminDashboard.renderOrders) window.adminDashboard.renderOrders([]);
+                    if (window.adminDashboard.loadOrders) window.adminDashboard.loadOrders();
+                }
+
+                showResult('✅ Orders cleared from UI!<br>All order displays have been cleared and will reload from server.', true);
+            } catch (error) {
+                showResult('❌ Error: ' + error.message, false);
+            }
+        }
+
+        // Auto-clear on page load (optional - uncomment if needed)
+        // window.addEventListener('load', () => {
+        //     if (confirm('Clear cache automatically?')) {
+        //         clearCache();
+        //     }
+        // });
+    </script>
+</body>
+</html>

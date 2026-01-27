@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Orders from UI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .button {
+            background: #f44336;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.3s;
+        }
+        .button:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .result.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #4caf50;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗑️ Clear Orders from UI</h1>
+        <p style="color: #666; margin-bottom: 30px;">This will immediately clear all orders from the browser UI and force a fresh reload from the server.</p>
+
+        <button class="button" onclick="clearUIOrders()">
+            🗑️ Clear All Orders from UI
+        </button>
+
+        <div id="result"></div>
+
+        <div style="margin-top: 30px; padding: 15px; background: #e3f2fd; border-radius: 6px; border-left: 4px solid #2196F3;">
+            <strong>💡 Tip:</strong> After clicking, refresh your pages (F5) to see the changes.
+        </div>
+    </div>
+
+    <script>
+        function showResult(message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result success';
+            resultDiv.innerHTML = message;
+        }
+
+        function clearUIOrders() {
+            try {
+                // Clear customer orders page
+                if (window.ordersPage) {
+                    if (typeof window.ordersPage.clearOrders === 'function') {
+                        window.ordersPage.clearOrders();
+                    } else {
+                        const container = document.getElementById('orders-list');
+                        if (container) container.innerHTML = '<div class="empty-state">No orders found.</div>';
+                        if (window.ordersPage.loadOrders) window.ordersPage.loadOrders();
+                    }
+                }
+
+                // Clear farmer dashboard orders
+                if (window.farmerDashboard) {
+                    if (typeof window.farmerDashboard.clearAllOrdersFromUI === 'function') {
+                        window.farmerDashboard.clearAllOrdersFromUI();
+                    } else {
+                        // Fallback: clear manually
+                        const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+                        statuses.forEach(status => {
+                            const container = document.getElementById(`${status}-orders-list`);
+                            if (container) container.innerHTML = `<div class="empty-state"><p>No orders found.</p></div>`;
+                        });
+                        if (window.farmerDashboard.loadMyOrders) window.farmerDashboard.loadMyOrders();
+                    }
+                }
+
+                // Clear admin dashboard orders
+                if (window.adminDashboard) {
+                    if (typeof window.adminDashboard.clearOrdersFromUI === 'function') {
+                        window.adminDashboard.clearOrdersFromUI();
+                    } else {
+                        if (window.adminDashboard.lastOrders) window.adminDashboard.lastOrders = [];
+                        if (window.adminDashboard.loadOrders) window.adminDashboard.loadOrders();
+                    }
+                }
+
+                showResult('✅ Orders cleared from UI!<br>Now refresh your pages (F5) to see the changes.');
+            } catch (error) {
+                showResult('❌ Error: ' + error.message);
+            }
+        }
+
+        // Auto-run if opened directly
+        if (window.location.search.includes('auto=true')) {
+            setTimeout(clearUIOrders, 500);
+        }
+    </script>
+</body>
+</html>

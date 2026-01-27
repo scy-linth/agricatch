@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriCatch - Freshly Caught! Pre-ordered for you!</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-logo">
+                <img src="/images/logo.png" alt="AgriCatch Logo" class="loading-logo-img">
+                <h1 class="loading-title">
+                    <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
+                </h1>
+            </div>
+            <div class="loading-spinner">
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+            </div>
+            <p class="loading-text">Loading...</p>
+        </div>
+    </div>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <div class="logo-and-title">
+                        <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
+                        <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
+                    </div>
+                    <p class="tagline">Freshly Caught! Pre-ordered for you!</p>
+                </div>
+                <nav class="nav" id="main-nav">
+                    <a href="#home" class="nav-link active" data-section="home">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </a>
+                    <a href="#products" class="nav-link" data-section="products">
+                        <i class="fas fa-shopping-bag"></i>
+                        <span>Products</span>
+                    </a>
+                    <a href="#about" class="nav-link" data-section="about">
+                        <i class="fas fa-info-circle"></i>
+                        <span>About</span>
+                    </a>
+                    <a href="#contact" class="nav-link" data-section="contact">
+                        <i class="fas fa-envelope"></i>
+                        <span>Contact</span>
+                    </a>
+                </nav>
+                <div class="header-actions">
+                    <a href="/orders.html" id="my-orders-btn" class="orders-btn" style="display: none;">
+                        <i class="fas fa-shopping-bag"></i>
+                        <span id="orders-count" class="cart-count" style="display: none;">0</span>
+                    </a>
+                    <div class="notifications-wrapper">
+                        <button id="notifications-btn" class="notifications-btn">
+                            <i class="fas fa-bell"></i>
+                            <span id="notifications-count" class="notifications-count">0</span>
+                        </button>
+                        <div id="notifications-dropdown" class="notifications-dropdown">
+                            <div class="notifications-header">
+                                <span>Notifications</span>
+                                <button id="mark-all-read" class="btn btn-small btn-secondary">Mark all read</button>
+                            </div>
+                            <div id="notifications-list" class="notifications-list">
+                                <!-- Notifications will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div id="user-menu" class="user-menu">
+                        <button id="login-register-btn" class="btn btn-primary">Login/Register</button>
+                    </div>
+                    <div id="user-profile" class="user-profile" style="display: none;">
+                        <span id="user-name"></span>
+                        <button id="super-admin-panel-btn" class="btn btn-primary" style="display: none;">Admin Panel</button>
+                        <button id="logout-btn" class="btn btn-secondary">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <video class="hero-video" autoplay muted loop playsinline preload="auto" id="hero-video">
+            <source src="/landing page top.mp4" type="video/mp4">
+            <source src="/landing%20page%20top.mp4" type="video/mp4">
+            <!-- Fallback if video doesn't load -->
+            Your browser does not support the video tag.
+        </video>
+        <div class="hero-overlay"></div>
+        <div class="container">
+            <div class="hero-content">
+                <h2>Freshly Caught! Pre-ordered for you!</h2>
+                <p>Discover the finest agricultural and fishery products directly from local farmers. Quality guaranteed, farm-fresh delivery.</p>
+                <div class="hero-buttons">
+                    <button id="shop-now-btn" class="btn btn-primary btn-large">Shop Now</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Categories Section -->
+    <section class="categories">
+        <div class="container">
+            <h2 class="section-title">Our Categories</h2>
+            <div class="categories-grid">
+                <div class="category-card" data-category="Agricultural Products">
+                    <div class="category-icon">
+                        <i class="fas fa-carrot"></i>
+                    </div>
+                    <h3>Agricultural Products</h3>
+                    <p>Fresh vegetables, fruits, grains, and more from local farms</p>
+                </div>
+                <div class="category-card" data-category="Fishery Products">
+                    <div class="category-icon">
+                        <i class="fas fa-fish"></i>
+                    </div>
+                    <h3>Fishery Products</h3>
+                    <p>Premium seafood and aquaculture products, caught fresh daily</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Products Section -->
+    <section id="products" class="products">
+        <div class="container">
+            <div class="products-header">
+                <h2 class="section-title">Featured Products</h2>
+                <div class="products-filters">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="search-input" placeholder="Search products..." class="search-input">
+                    </div>
+                    <div class="filter-select-wrapper">
+                        <select id="category-filter" class="filter-select">
+                            <option value="">All Categories</option>
+                            <option value="Agricultural Products">Agricultural Products</option>
+                            <option value="Fishery Products">Fishery Products</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div id="products-grid" class="products-grid">
+                <!-- Products will be loaded here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Details Floating Modal -->
+    <div id="product-details-modal" class="product-details-modal">
+        <div class="product-details-overlay"></div>
+        <div class="product-details-content">
+            <button class="product-details-close" id="close-product-details">&times;</button>
+            <div class="product-details-container">
+                <div class="product-details-image-section">
+                    <h2 id="product-details-name" class="product-details-name"></h2>
+                    <img id="product-details-image" src="" alt="Product Image" class="product-details-image">
+                    <div class="product-details-description" id="product-details-description"></div>
+                </div>
+                <div class="product-details-info-section">
+                    <div class="product-details-info-list">
+                        <div class="product-details-info-item">
+                            <i class="fas fa-user"></i>
+                            <div class="info-content">
+                                <span class="info-label">Farmer</span>
+                                <span class="info-value" id="product-details-farmer"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="product-details-info-item">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <div class="info-content">
+                                <span class="info-label">Location</span>
+                                <span class="info-value" id="product-details-location"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="product-details-info-item">
+                            <i class="fas fa-box"></i>
+                            <div class="info-content">
+                                <span class="info-label">Stock</span>
+                                <span class="info-value" id="product-details-stock"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="product-details-info-item">
+                            <i class="fas fa-calendar-check"></i>
+                            <div class="info-content">
+                                <span class="info-label">Harvest Date</span>
+                                <span class="info-value" id="product-details-harvest"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="product-details-info-item">
+                            <i class="fas fa-clock"></i>
+                            <div class="info-content">
+                                <span class="info-label">Expiry Date</span>
+                                <span class="info-value" id="product-details-expiry"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="product-details-price-section">
+                        <div class="product-details-price-info">
+                            <span class="price-label">Price:</span>
+                            <span class="price-value" id="product-details-price"></span>
+                        </div>
+                        
+                        <div class="product-details-quantity-section">
+                            <span class="quantity-label">Quantity:</span>
+                            <div class="quantity-controls">
+                                <button class="quantity-btn" id="product-details-decrease" onclick="app.decreaseQuantity()">-</button>
+                                <input type="number" id="product-details-quantity" class="quantity-input" value="1" min="1" readonly>
+                                <button class="quantity-btn" id="product-details-increase" onclick="app.increaseQuantity()">+</button>
+                            </div>
+                        </div>
+                        
+                        <div class="product-details-total-section">
+                            <span class="total-label">Total:</span>
+                            <span class="total-value" id="product-details-total"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="product-details-actions">
+                        <button class="btn btn-primary btn-large" id="product-details-add-cart">
+                            <i class="fas fa-shopping-cart"></i> Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart Overlay -->
+    <div class="cart-overlay" id="cart-overlay"></div>
+    
+    <!-- Cart Sidebar -->
+    <div id="cart-sidebar" class="cart-sidebar">
+        <div class="cart-header">
+            <h3>Shopping Cart</h3>
+            <button id="close-cart" class="close-btn">&times;</button>
+        </div>
+        <div id="cart-items" class="cart-items">
+            <!-- Cart items will be loaded here -->
+        </div>
+        <div class="cart-footer">
+            <div class="cart-total">
+                <strong>Total: ₱<span id="cart-total">0.00</span></strong>
+            </div>
+            <button id="checkout-btn" class="btn btn-primary btn-full">Proceed to Checkout</button>
+        </div>
+    </div>
+
+    <!-- Unified Auth Modal (login form first, then role selector box on form) -->
+    <div id="auth-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="auth-modal-title">Login</h3>
+                <button class="close-btn" id="auth-close-btn">&times;</button>
+            </div>
+            <form id="auth-form" class="auth-form">
+                <input type="hidden" id="auth-role" value="customer">
+                
+                <!-- Login mode fields -->
+                <div id="auth-login-fields" class="auth-mode-fields">
+                    <div class="form-group">
+                        <label for="auth-email">Email or Username</label>
+                        <input type="text" id="auth-email" placeholder="Username or Email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="auth-password">Password</label>
+                        <input type="password" id="auth-password" required>
+                    </div>
+                    
+                    <!-- Role selector box: choose Farmer, Customer, or Admin (login) -->
+                    <div class="form-group role-selector-group">
+                        <label>I am</label>
+                        <div id="role-selector-login" class="role-selector-box">
+                            <button type="button" class="role-box" data-role="customer">Customer</button>
+                            <button type="button" class="role-box" data-role="farmer">Farmer</button>
+                            <button type="button" class="role-box" data-role="admin">Admin</button>
+                        </div>
+                    </div>
+                    
+                    <!-- OTP Section removed from login - login now works with email/password only -->
+                </div>
+                
+                <!-- Register mode fields - Multi-step Registration -->
+                <div id="auth-register-fields" class="auth-mode-fields" style="display: none;">
+                    <!-- Progress Indicator -->
+                    <div class="registration-progress">
+                        <div class="progress-steps">
+                            <div class="progress-step" data-step="1">
+                                <div class="step-number">1</div>
+                                <div class="step-label">Verify</div>
+                            </div>
+                            <div class="progress-step" data-step="2">
+                                <div class="step-number">2</div>
+                                <div class="step-label">Account</div>
+                            </div>
+                            <div class="progress-step" data-step="3">
+                                <div class="step-number">3</div>
+                                <div class="step-label">Profile</div>
+                            </div>
+                            <div class="progress-step" data-step="4">
+                                <div class="step-number">4</div>
+                                <div class="step-label">Complete</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 1: Email + OTP Verification -->
+                    <div class="registration-step" id="register-step-1" data-step="1">
+                        <h4 class="step-title">Verify Your Email</h4>
+                        <div class="form-group">
+                            <label for="auth-email-register">
+                                Email Address
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <input type="email" id="auth-email-register" placeholder="your.email@example.com" required>
+                            <small class="field-hint">We'll send a verification code to this email</small>
+                        </div>
+                        
+                        <!-- OTP Section (shown after email is submitted) -->
+                        <div id="register-otp-section" class="otp-section" style="display: none;">
+                            <!-- Success message -->
+                            <div class="otp-success-message" style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 0.75rem; border-radius: var(--border-radius); margin-bottom: 1rem;">
+                                <i class="fas fa-check-circle"></i> A code has been sent to your email
+                            </div>
+                            
+                            <!-- Testing OTP Display (shown when OTP is available) -->
+                            <div id="otp-test-display" class="otp-test-display" style="display: none;">
+                                <div class="otp-test-box">
+                                    <strong>🔑 Testing Mode - Your OTP Code:</strong>
+                                    <div class="otp-code-display" id="otp-code-display">------</div>
+                                    <small>This is shown for testing purposes only. Check your email for the actual code.</small>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="register-otp">Enter OTP Code</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                                    <input type="text" id="register-otp" placeholder="000000" maxlength="6" pattern="[0-9]{6}" style="flex: 1;">
+                                    <button type="button" id="resend-register-otp-btn" class="btn btn-outline" style="white-space: nowrap;">Resend</button>
+                                    <span id="resend-otp-cooldown" style="min-width: 60px; color: #888; font-size: 0.95em; display: none; align-self: center;"></span>
+                                </div>
+                                <small class="field-hint">Check your email for the 6-digit verification code</small>
+                            </div>
+                        </div>
+                        
+                        <div class="step-actions">
+                            <button type="button" class="btn btn-primary btn-full" id="register-next-1">
+                                <span class="btn-text" id="register-next-1-text">Send Verification Code</span>
+                                <span class="btn-loader" style="display: none;">
+                                    <i class="fas fa-spinner fa-spin"></i> Sending...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Username and Password -->
+                    <div class="registration-step" id="register-step-2" data-step="2" style="display: none;">
+                        <h4 class="step-title">Create Your Account</h4>
+                        <div class="form-group">
+                            <label for="auth-username">
+                                Username
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <input type="text" id="auth-username" placeholder="Choose a unique username" pattern="[a-zA-Z0-9_]{3,20}" minlength="3" maxlength="20" required>
+                            <small class="field-hint">3-20 characters, letters, numbers, and underscores only</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="auth-password-register">
+                                Password
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="auth-password-register" placeholder="Create a strong password" minlength="6" required>
+                                <button type="button" class="password-toggle" id="toggle-register-password" aria-label="Show password">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <div id="password-strength" class="password-strength" style="display: none;">
+                                <div class="strength-bar">
+                                    <div class="strength-fill" id="strength-fill"></div>
+                                </div>
+                                <small class="strength-text" id="strength-text"></small>
+                            </div>
+                            <small class="field-hint">At least 6 characters recommended</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="auth-password-confirm">
+                                Confirm Password
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="auth-password-confirm" placeholder="Re-enter your password" minlength="6" required>
+                                <button type="button" class="password-toggle" id="toggle-confirm-password" aria-label="Show password">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <small class="field-hint" id="password-match-hint"></small>
+                        </div>
+                        <div class="step-actions">
+                            <button type="button" class="btn btn-outline" id="register-back-2">Back</button>
+                            <button type="button" class="btn btn-primary" id="register-next-2">
+                                <span class="btn-text">Next</span>
+                                <span class="btn-loader" style="display: none;">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Profile Information -->
+                    <div class="registration-step" id="register-step-3" data-step="3" style="display: none;">
+                        <h4 class="step-title">Complete Your Profile</h4>
+                        <div class="form-group">
+                            <label for="auth-fullname">
+                                Full Name
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <input type="text" id="auth-fullname" placeholder="Enter your full name" required>
+                            <small class="field-hint" id="fullname-hint">For farmers, this will be your shop/farm name</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="auth-phone">
+                                Contact Number
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <div class="phone-input-wrapper">
+                                <span class="phone-prefix">+63</span>
+                                <input type="tel" id="auth-phone" placeholder="929 819 6629" maxlength="12" pattern="[0-9\s]{10,12}" required>
+                            </div>
+                            <small class="field-hint">Enter 10-digit mobile number (e.g., 929 819 6629)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="auth-address">
+                                Address
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <textarea id="auth-address" rows="3" placeholder="Enter your complete address" required></textarea>
+                            <small class="field-hint">Street, City, Province, Postal Code</small>
+                        </div>
+                        <div class="step-actions">
+                            <button type="button" class="btn btn-outline" id="register-back-3">Back</button>
+                            <button type="button" class="btn btn-primary" id="register-next-3">
+                                <span class="btn-text">Next</span>
+                                <span class="btn-loader" style="display: none;">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Role Selection + Terms and Conditions (Combined) -->
+                    <div class="registration-step" id="register-step-4" data-step="4" style="display: none;">
+                        <h4 class="step-title">Complete Your Registration</h4>
+                        
+                        <!-- Role Selection -->
+                        <div class="form-group role-selector-group">
+                            <label>I am a <span class="required-indicator">*</span></label>
+                            <div id="role-selector-register" class="role-selector-box-enhanced">
+                                <button type="button" class="role-box-enhanced" data-role="customer">
+                                    <div class="role-icon">
+                                        <i class="fas fa-shopping-cart"></i>
+                                    </div>
+                                    <div class="role-content">
+                                        <div class="role-title">Customer</div>
+                                        <div class="role-description">Browse and purchase fresh agricultural and fishery products</div>
+                                    </div>
+                                    <div class="role-check">
+                                        <i class="fas fa-check-circle"></i>
+                                    </div>
+                                </button>
+                                <button type="button" class="role-box-enhanced" data-role="farmer">
+                                    <div class="role-icon">
+                                        <i class="fas fa-seedling"></i>
+                                    </div>
+                                    <div class="role-content">
+                                        <div class="role-title">Farmer</div>
+                                        <div class="role-description">Sell your agricultural and fishery products to customers</div>
+                                    </div>
+                                    <div class="role-check">
+                                        <i class="fas fa-check-circle"></i>
+                                    </div>
+                                </button>
+                            </div>
+                            <small class="field-hint">Select your account type. You can change this later in settings.</small>
+                        </div>
+
+                        <!-- Terms and Conditions -->
+                        <div class="form-group">
+                            <div class="terms-container-compact">
+                                <div class="terms-header">
+                                    <h5>Terms and Conditions</h5>
+                                    <button type="button" class="terms-toggle" id="terms-toggle">
+                                        <span>Read Terms</span>
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                                <div class="terms-content-compact" id="terms-content" style="display: none;">
+                                    <p><strong>Last Updated:</strong> January 2026</p>
+                                    
+                                    <h6>1. Acceptance of Terms</h6>
+                                    <p>By registering an account with AgriCatch, you agree to be bound by these Terms of Service and our Privacy Policy.</p>
+                                    
+                                    <h6>2. Account Responsibilities</h6>
+                                    <p>You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.</p>
+                                    
+                                    <h6>3. User Conduct</h6>
+                                    <p>You agree to use AgriCatch only for lawful purposes and in a way that does not infringe the rights of others or restrict their use of the platform.</p>
+                                    
+                                    <h6>4. Product Listings</h6>
+                                    <p>Farmers are responsible for accurate product descriptions, pricing, and availability. AgriCatch reserves the right to remove listings that violate our policies.</p>
+                                    
+                                    <h6>5. Transactions</h6>
+                                    <p>All transactions are between buyers and sellers. AgriCatch facilitates the marketplace but is not a party to transactions.</p>
+                                    
+                                    <h6>6. Privacy</h6>
+                                    <p>Your personal information will be handled according to our Privacy Policy. We use your email for account verification and important notifications.</p>
+                                    
+                                    <h6>7. Limitation of Liability</h6>
+                                    <p>AgriCatch is not liable for any indirect, incidental, or consequential damages arising from your use of the platform.</p>
+                                    
+                                    <h6>8. Changes to Terms</h6>
+                                    <p>We reserve the right to modify these terms at any time. Continued use of the platform constitutes acceptance of modified terms.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="checkbox-label-enhanced">
+                                <input type="checkbox" id="auth-terms-checkbox" required>
+                                <span>I have read and agree to the <strong>Terms and Conditions</strong> and <strong>Privacy Policy</strong></span>
+                                <span class="required-indicator">*</span>
+                            </label>
+                        </div>
+                        
+                        <div class="step-actions">
+                            <button type="button" class="btn btn-outline" id="register-back-4">Back</button>
+                            <button type="submit" class="btn btn-primary" id="register-submit-btn">
+                                <span class="btn-text">Complete Registration</span>
+                                <span class="btn-loader" style="display: none;">
+                                    <i class="fas fa-spinner fa-spin"></i> Registering...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-full" id="auth-submit-btn">Login</button>
+            </form>
+            <div class="modal-footer">
+                <p id="auth-mode-toggle">
+                    <!-- Will be populated by JavaScript -->
+                </p>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Checkout Modal -->
+    <div id="checkout-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Complete Your Order</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="checkout-form" class="checkout-form">
+                <div class="checkout-content">
+                    <!-- Order Summary Section -->
+                    <div class="checkout-section checkout-items">
+                        <div class="section-header">
+                            <h4><i class="fas fa-shopping-cart"></i> Order Summary</h4>
+                        </div>
+                        <div class="checkout-items-container">
+                            <div id="checkout-items-list">
+                                <!-- Checkout items will be loaded here -->
+                            </div>
+                        </div>
+                        <div class="checkout-summary-total">
+                            <div class="summary-row">
+                                <span>Subtotal:</span>
+                                <span>₱<span id="checkout-subtotal">0.00</span></span>
+                            </div>
+                            <div class="summary-row total-row">
+                                <strong>Total:</strong>
+                                <strong>₱<span id="checkout-total">0.00</span></strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Delivery Information Section -->
+                    <div class="checkout-section checkout-details">
+                        <div class="section-header">
+                            <h4><i class="fas fa-truck"></i> Delivery Information</h4>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="saved-addresses">
+                                <i class="fas fa-bookmark"></i> Use Saved Address
+                            </label>
+                            <select id="saved-addresses" class="form-select">
+                                <option value="">Select a saved address</option>
+                            </select>
+                            <button type="button" id="open-add-address-modal" class="btn-add-address">
+                                <i class="fas fa-plus-circle"></i> Add New Address
+                            </button>
+                        </div>
+
+                        <div class="form-divider">
+                            <span>Or enter manually</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="checkout-fullname">
+                                Full Name <span class="required">*</span>
+                            </label>
+                            <input type="text" id="checkout-fullname" class="form-input" placeholder="Enter recipient's full name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="checkout-phone">
+                                Phone Number <span class="required">*</span>
+                            </label>
+                            <div class="phone-input-wrapper">
+                                <span class="phone-prefix">+63</span>
+                                <input type="tel" id="checkout-phone" class="form-input" placeholder="9123456789" maxlength="10" required>
+                            </div>
+                            <small class="form-hint">Enter 10 digits without the +63 prefix</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="delivery-address">
+                                Delivery Address <span class="required">*</span>
+                            </label>
+                            <textarea id="delivery-address" class="form-textarea" rows="3" placeholder="Enter your complete delivery address (street, barangay, city, province)" required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="delivery-date">
+                                <i class="fas fa-calendar-alt"></i> Preferred Delivery Date <span class="required">*</span>
+                            </label>
+                            <input type="date" id="delivery-date" class="form-input" required>
+                            <small class="form-hint">Select your preferred delivery date</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="special-instructions">
+                                <i class="fas fa-sticky-note"></i> Special Instructions (Optional)
+                            </label>
+                            <textarea id="special-instructions" class="form-textarea" rows="2" placeholder="Any special delivery instructions or notes for the delivery person..."></textarea>
+                        </div>
+
+                        <!-- Payment Information -->
+                        <div class="payment-info">
+                            <div class="section-header">
+                                <h4><i class="fas fa-credit-card"></i> Payment Method</h4>
+                            </div>
+                            <div class="payment-method-card">
+                                <div class="payment-icon">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <div class="payment-details">
+                                    <strong>Cash on Delivery</strong>
+                                    <p>Pay when your order arrives at your doorstep</p>
+                                </div>
+                            </div>
+                            <div class="policy-notice">
+                                <div class="policy-icon">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </div>
+                                <div class="policy-content">
+                                    <strong>Important Policy Notice</strong>
+                                    <p>Due to the perishable nature of our fresh products (fish, meat, vegetables, fruits), we have a <strong>strict no refund, no exchange policy</strong> to ensure product freshness and quality. All sales are final.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Checkout Footer -->
+                <div class="checkout-footer">
+                    <div class="checkout-footer-content">
+                        <div class="checkout-total-display">
+                            <span class="total-label">Total Amount:</span>
+                            <span class="total-amount">₱<span id="checkout-total-footer">0.00</span></span>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-large checkout-submit-btn">
+                            <i class="fas fa-check-circle"></i> Place Order
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Address Modal (Floating) -->
+    <div id="add-address-modal" class="modal">
+        <div class="modal-content modal-medium">
+            <div class="modal-header">
+                <h3><i class="fas fa-map-marker-alt"></i> Add New Address</h3>
+                <button class="close-btn" id="close-add-address-modal">&times;</button>
+            </div>
+            <form id="add-address-form" class="address-form-floating">
+                <div class="form-group">
+                    <label for="floating-address-fullname">
+                        Full Name <span class="required">*</span>
+                    </label>
+                    <input type="text" id="floating-address-fullname" class="form-input" placeholder="Enter your full name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-phone">
+                        Phone Number <span class="required">*</span>
+                    </label>
+                    <div class="phone-input-wrapper">
+                        <span class="phone-prefix">+63</span>
+                        <input type="tel" id="floating-address-phone" class="form-input" placeholder="9123456789" maxlength="10" required>
+                    </div>
+                    <small class="form-hint">Enter 10 digits without the +63 prefix</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-full">
+                        Address <span class="required">*</span>
+                    </label>
+                    <textarea id="floating-address-full" class="form-textarea" rows="3" placeholder="Enter your complete address (street, barangay, city, province)" required></textarea>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="floating-address-default">
+                        <span>Set as default address</span>
+                    </label>
+                    <small class="form-hint">Default address will be used for deliveries</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-add-address">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Address
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- About Section -->
+    <section id="about" class="about">
+        <div class="container">
+            <div class="about-content">
+                <div class="about-text">
+                    <h2>About AgriCatch</h2>
+                    <p>We connect local farmers and fishermen directly with consumers, ensuring you get the freshest agricultural and fishery products at fair prices. Our platform supports sustainable farming practices and helps local communities thrive.</p>
+                    <ul class="about-features">
+                        <li><i class="fas fa-check-circle"></i> Farm-fresh products guaranteed</li>
+                        <li><i class="fas fa-check-circle"></i> Direct from local farmers</li>
+                        <li><i class="fas fa-check-circle"></i> Cash on delivery payment</li>
+                        <li><i class="fas fa-check-circle"></i> Quality assurance</li>
+                    </ul>
+                </div>
+                <div class="about-image">
+                    <img src="/images/Farm%20Fresh.png" alt="Farm fresh products" onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\'%3E%3Crect fill=\'%23f0f0f0\' width=\'400\' height=\'300\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23999\' font-family=\'sans-serif\' font-size=\'18\'%3EFarm Fresh%3C/text%3E%3C/svg%3E'">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact">
+        <div class="container">
+            <h2 class="section-title">Contact Us</h2>
+            <div class="contact-content">
+                <div class="contact-info">
+                    <div class="contact-item">
+                        <i class="fas fa-phone"></i>
+                        <span>+63 929 819 6629</span>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fas fa-envelope"></i>
+                        <span>agricatchph@gmail.com</span>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>Metro Manila, Philippines</span>
+                    </div>
+                </div>
+                <form class="contact-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="contact-name">Name</label>
+                            <input type="text" id="contact-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="contact-email">Email</label>
+                            <input type="email" id="contact-email" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-subject">Subject</label>
+                        <input type="text" id="contact-subject" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="contact-message">Message</label>
+                        <textarea id="contact-message" rows="5" required maxlength="500"></textarea>
+                        <small class="field-hint">Maximum 500 characters only</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Send Message</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                <h3>AgriCatch</h3>
+                <p>Freshly Caught! Pre-ordered for you! Your trusted source for fresh agricultural and fishery products.</p>
+                </div>
+                <div class="footer-section">
+                    <h3>Quick Links</h3>
+                    <ul>
+                        <li><a href="#home">Home</a></li>
+                        <li><a href="#products">Products</a></li>
+                        <li><a href="#about">About</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 AgriCatch. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Floating Cart Button -->
+    <button id="cart-btn" class="float-cart-btn" type="button" aria-label="Open cart">
+        <i class="fas fa-shopping-cart"></i>
+        <span id="cart-count" class="float-cart-count" style="display: none;">0</span>
+    </button>
+
+    <!-- Scripts -->
+    <script src="/js/app.js"></script>
+    <script>
+        // Handle hero video loading - ensure full video loads before playing
+        (function() {
+            const heroVideo = document.getElementById('hero-video');
+            const heroSection = document.querySelector('.hero');
+            
+            if (!heroVideo) return;
+            
+            // Ensure video is visible
+            heroVideo.style.display = 'block';
+            heroVideo.style.opacity = '1';
+            heroVideo.style.visibility = 'visible';
+            
+            // Ensure loop is enabled
+            heroVideo.loop = true;
+            heroVideo.muted = true;
+            heroVideo.playsInline = true;
+            
+            let videoDuration = 0;
+            let hasStartedPlaying = false;
+            
+            // Wait for video metadata to get duration
+            heroVideo.addEventListener('loadedmetadata', () => {
+                videoDuration = heroVideo.duration;
+                console.log('Video duration:', videoDuration, 'seconds');
+                
+                // Only proceed if we have a valid duration
+                if (videoDuration && videoDuration > 1) {
+                    // Wait for enough data to be loaded before playing
+                    heroVideo.addEventListener('canplaythrough', () => {
+                        if (!hasStartedPlaying) {
+                            hasStartedPlaying = true;
+                            heroVideo.classList.remove('loading');
+                            heroVideo.classList.add('ready');
+                            
+                            // Start playing
+                            heroVideo.play().then(() => {
+                                if (heroSection) {
+                                    heroSection.style.background = 'transparent';
+                                }
+                            }).catch(error => {
+                                console.log('Video autoplay prevented:', error);
+                            });
+                        }
+                    }, { once: true });
+                } else {
+                    console.warn('Video duration seems incorrect:', videoDuration);
+                }
+            }, { once: true });
+            
+            // Fallback: if canplaythrough doesn't fire, use canplay
+            heroVideo.addEventListener('canplay', () => {
+                if (!hasStartedPlaying && videoDuration > 1) {
+                    // Wait a bit more for buffering
+                    setTimeout(() => {
+                        if (!hasStartedPlaying) {
+                            hasStartedPlaying = true;
+                            heroVideo.classList.remove('loading');
+                            heroVideo.classList.add('ready');
+                            heroVideo.play().catch(() => {});
+                            if (heroSection) {
+                                heroSection.style.background = 'transparent';
+                            }
+                        }
+                    }, 500);
+                }
+            }, { once: true });
+            
+            // Ensure video loops properly when it ends
+            heroVideo.addEventListener('timeupdate', () => {
+                // Check if we're near the end (within 0.1 seconds)
+                if (videoDuration > 0 && heroVideo.currentTime >= videoDuration - 0.1) {
+                    // Video should loop naturally, but ensure it does
+                    if (!heroVideo.loop) {
+                        heroVideo.loop = true;
+                    }
+                }
+            });
+            
+            // Handle video end - restart if loop fails
+            heroVideo.addEventListener('ended', () => {
+                if (videoDuration > 1) {
+                    heroVideo.currentTime = 0;
+                    heroVideo.play().catch(() => {});
+                }
+            });
+            
+            // Reload video to start fresh
+            heroVideo.load();
+            
+            // Handle errors
+            heroVideo.addEventListener('error', (e) => {
+                console.error('Video failed to load:', e);
+                if (heroSection) {
+                    heroSection.style.background = 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))';
+                }
+            }, { once: true });
+        })();
+
+
+        // Categories section overlap effect with fade - optimized for performance
+        (function() {
+            const heroSection = document.querySelector('.hero');
+            const categoriesSection = document.querySelector('.categories');
+            
+            if (!heroSection || !categoriesSection) return;
+            
+            let lastScrollTop = 0;
+            let ticking = false;
+            let cachedHeroHeight = 0;
+            let cachedOverlapAmount = 0;
+            
+            // Cache hero dimensions (only recalculate on resize)
+            function cacheHeroDimensions() {
+                cachedHeroHeight = heroSection.offsetHeight;
+                cachedOverlapAmount = cachedHeroHeight * 0.15;
+            }
+            cacheHeroDimensions();
+            
+            function updateOverlap() {
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                const heroRect = heroSection.getBoundingClientRect();
+                const heroBottom = heroRect.bottom;
+                const scrollDirection = scrollTop > lastScrollTop ? 'down' : 'up';
+                
+                // Use cached values for better performance
+                const heroHeight = cachedHeroHeight;
+                const overlapAmount = cachedOverlapAmount;
+                
+                // Calculate overlap progress
+                let currentOverlap = 0;
+                let opacity = 1;
+                
+                if (heroBottom > 0 && heroBottom < heroHeight) {
+                    const overlapProgress = Math.min(1, Math.max(0, (heroHeight - heroBottom) / heroHeight));
+                    currentOverlap = overlapAmount * overlapProgress;
+                    
+                    // Fade effect (simplified calculation)
+                    if (overlapProgress < 0.3) {
+                        opacity = 0.7 + (overlapProgress / 0.3) * 0.3;
+                    } else {
+                        opacity = 1;
+                    }
+                } else if (heroBottom <= 0) {
+                    // Fully overlapped
+                    currentOverlap = overlapAmount;
+                    opacity = 1;
+                } else {
+                    // No overlap
+                    currentOverlap = 0;
+                    opacity = 1;
+                }
+                
+                // Use transform instead of margin-top for better performance
+                categoriesSection.style.transform = `translateY(-${currentOverlap}px) translateZ(0)`;
+                categoriesSection.style.opacity = opacity;
+                
+                lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
+                ticking = false;
+            }
+            
+            function requestTick() {
+                if (!ticking) {
+                    window.requestAnimationFrame(updateOverlap);
+                    ticking = true;
+                }
+            }
+            
+            // Throttled scroll handler
+            let lastTime = 0;
+            const throttleDelay = 16; // ~60fps
+            
+            function handleScroll() {
+                const now = performance.now();
+                if (now - lastTime >= throttleDelay) {
+                    requestTick();
+                    lastTime = now;
+                }
+            }
+            
+            // Initial call
+            updateOverlap();
+            
+            window.addEventListener('scroll', handleScroll, { passive: true });
+            window.addEventListener('resize', () => {
+                cacheHeroDimensions();
+                requestTick();
+            }, { passive: true });
+        })();
+
+        // Hide loading screen when page is fully loaded
+        window.addEventListener('load', function() {
+            const loadingScreen = document.getElementById('loading-screen');
+            const body = document.body;
+            
+            if (loadingScreen) {
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                    body.classList.remove('loading');
+                    // Remove from DOM after animation
+                    setTimeout(() => {
+                        loadingScreen.remove();
+                    }, 500);
+                }, 500); // Small delay for smooth transition
+            }
+        });
+
+        // Add loading class to body immediately
+        document.body.classList.add('loading');
+    </script>
+</body>
+</html>

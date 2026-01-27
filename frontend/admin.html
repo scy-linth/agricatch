@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - AgriCatch</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="admin-theme">
+    <div class="admin-layout">
+        <div class="sidebar-overlay" id="admin-sidebar-overlay"></div>
+        <button class="mobile-menu-toggle" id="admin-mobile-menu-toggle" aria-label="Toggle menu" style="position: fixed; top: 1rem; left: 1rem; z-index: 2001; background: var(--sidebar-bg); color: white; border: none; padding: 0.75rem; border-radius: 8px;">
+            <i class="fas fa-bars"></i>
+        </button>
+        <aside class="admin-sidebar" id="admin-sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-logo-container">
+                    <img src="/images/logo.png" alt="AgriCatch Logo" class="sidebar-logo">
+                    <div class="brand-text">
+                        <span class="brand-title">
+                            <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
+                        </span>
+                        <span class="brand-subtitle">Admin</span>
+                    </div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <button id="visit-site-btn" class="sidebar-link visit-site-link" style="display: none;"><i class="fas fa-home"></i> Visit Site</button>
+                <a class="sidebar-link active" href="#orders" data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</a>
+                <a id="users-link" class="sidebar-link" href="#users" data-section="users"><i class="fas fa-users"></i> Customers</a>
+                <a class="sidebar-link" href="#products" data-section="products"><i class="fas fa-box"></i> Products</a>
+                <a class="sidebar-link" href="#logs" data-section="logs"><i class="fas fa-clipboard-check"></i> Logs</a>
+                <button id="logout-btn" class="sidebar-link logout-link"><i class="fas fa-sign-out-alt"></i> Log out</button>
+            </nav>
+        </aside>
+
+        <main class="admin-main">
+            <!-- Admin Welcome Banner -->
+            <div class="admin-welcome-banner">
+                <div class="welcome-text">
+                    <h1 class="welcome-title">
+                        <i class="fas fa-crown"></i>
+                        Admin Dashboard
+                    </h1>
+                    <p class="welcome-subtitle">Manage your AgriCatch platform</p>
+                </div>
+            </div>
+
+            <header class="admin-topbar">
+                <div class="topbar-left">
+                    <h1 class="page-title">Orders Management</h1>
+                </div>
+                <div class="topbar-filters" id="order-filters" style="display: flex;">
+                    <select id="order-status-filter" class="filter-select">
+                        <option value="">Any status</option>
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="preparing">Preparing</option>
+                        <option value="ready">Ready</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    <select id="order-price-filter" class="filter-select">
+                        <option value="">Any price</option>
+                        <option value="0-500">₱0 - ₱500</option>
+                        <option value="500-1500">₱500 - ₱1500</option>
+                        <option value="1500-3000">₱1500 - ₱3000</option>
+                    </select>
+                    <select id="order-sort-filter" class="filter-select">
+                        <option value="date_desc">Sort by Date</option>
+                        <option value="date_asc">Oldest</option>
+                        <option value="total_desc">Highest Total</option>
+                        <option value="total_asc">Lowest Total</option>
+                    </select>
+                </div>
+                <div class="topbar-right">
+                    <button id="admin-search-toggle" class="icon-btn" aria-label="Search">
+                        <i class="fas fa-magnifying-glass"></i>
+                    </button>
+                    <input id="admin-search-input" class="search-input" placeholder="Search..." style="min-width: 260px;">
+                    <div class="admin-profile">
+                        <img src="/images/resendlogo.png" alt="Admin avatar" class="profile-avatar">
+                        <div class="profile-meta">
+                            <span id="user-name" class="profile-name">Admin</span>
+                            <span id="user-email" class="profile-email">admin@agricatch.ph</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Statistics - Always Visible at Top -->
+            <div class="admin-stats" style="margin-bottom: 2rem;">
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: #3b82f6;"><i class="fas fa-users"></i></div>
+                    <div class="stat-details">
+                        <h3>Total Users</h3>
+                        <div class="stat-number" id="total-users">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: #10b981;"><i class="fas fa-box"></i></div>
+                    <div class="stat-details">
+                        <h3>Total Products</h3>
+                        <div class="stat-number" id="total-products">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: #f59e0b;"><i class="fas fa-shopping-cart"></i></div>
+                    <div class="stat-details">
+                        <h3>Total Orders</h3>
+                        <div class="stat-number" id="total-orders">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="color: #22c55e;"><i class="fas fa-peso-sign"></i></div>
+                    <div class="stat-details">
+                        <h3>Total Revenue</h3>
+                        <div class="stat-number" id="total-revenue">₱0.00</div>
+                    </div>
+                </div>
+            </div>
+
+            <section id="orders" class="admin-section-card active">
+                <div class="section-header">
+                    <h2>Orders</h2>
+                </div>
+                <div class="section-content">
+                    <table id="orders-table" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" aria-label="Select all orders"></th>
+                                <th>Order</th>
+                                <th>Customer</th>
+                                <th>Status</th>
+                                <th>Total</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="users" class="admin-section-card">
+                <div class="section-header">
+                    <h2>Customers</h2>
+                </div>
+                <div class="section-content">
+                    <table id="users-table" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>User</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Password</th>
+                                <th>Role</th>
+                                <th>Verified</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="products" class="admin-section-card">
+                <div class="section-header">
+                    <h2>Products</h2>
+                </div>
+                <div class="section-content">
+                    <table id="products-table" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Product</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>Farmer</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="logs" class="admin-section-card">
+                <div class="section-header">
+                    <h2>Audit Logs</h2>
+                </div>
+                <div class="section-content">
+                    <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap; margin-bottom: 12px;">
+                        <input id="logs-actor-filter" class="search-input" placeholder="Admin ID (optional)" style="min-width: 180px;">
+                        <input id="logs-action-filter" class="search-input" placeholder="Action (optional)" style="min-width: 220px;">
+                        <input id="logs-entity-filter" class="search-input" placeholder="Entity (users/products/orders)" style="min-width: 220px;">
+                        <button id="logs-refresh-btn" class="btn btn-secondary btn-small" type="button">Refresh</button>
+                    </div>
+
+                    <table id="logs-table" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Admin</th>
+                                <th>Action</th>
+                                <th>Entity</th>
+                                <th>Entity ID</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <aside id="order-detail-panel" class="admin-detail-panel">
+            <button class="panel-close" id="close-order-panel" aria-label="Close order details">&times;</button>
+            <div id="order-detail-content" class="panel-content">
+                <div class="panel-placeholder">Select an order to view details</div>
+            </div>
+        </aside>
+    </div>
+
+    <div id="admin-chat-drawer" class="admin-chat-drawer">
+        <div class="chat-drawer-header">
+            <h3>Chat with Farmers</h3>
+            <button id="close-chat-drawer" class="icon-btn" aria-label="Close chat">&times;</button>
+        </div>
+        <div class="chat-drawer-body">
+            <div class="conversation-sidebar">
+                <div class="conversation-sidebar-header">
+                    <h4>Conversations</h4>
+                </div>
+                <div id="conversation-list" class="conversation-list"></div>
+            </div>
+            <div class="chat-window">
+                <div id="chat-header" class="chat-header">
+                    <div class="chat-header-info">
+                        <div class="chat-header-title" id="chat-header-title">Select a conversation</div>
+                        <div class="chat-header-subtitle" id="chat-header-subtitle"></div>
+                    </div>
+                </div>
+                <div id="chat-messages" class="chat-messages"></div>
+                <form id="chat-form" class="chat-form">
+                    <input type="text" id="chat-input" placeholder="Type a message..." required>
+                    <button type="submit" class="btn btn-primary btn-small">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <button id="admin-float-chat-btn" class="admin-float-chat-btn" type="button" aria-label="Open chat">
+        <i class="fas fa-message"></i>
+        <span id="admin-chat-unread" class="admin-chat-unread" style="display:none;">0</span>
+    </button>
+
+    <div id="edit-user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit User</h3>
+                <button class="close-btn" data-close-modal="edit-user-modal">&times;</button>
+            </div>
+            <form id="edit-user-form" class="modal-body">
+                <input type="hidden" id="edit-user-id">
+
+                <label for="edit-user-fullname">Full Name</label>
+                <input type="text" id="edit-user-fullname" placeholder="Full name">
+
+                <label for="edit-user-username">Username</label>
+                <input type="text" id="edit-user-username" placeholder="Username" required>
+
+                <label for="edit-user-email">Email</label>
+                <input type="email" id="edit-user-email" placeholder="Email" required>
+
+                <label for="edit-user-password">Password (plain text)</label>
+                <input type="text" id="edit-user-password" placeholder="Password">
+
+                <label for="edit-user-phone">Phone Number</label>
+                <input type="text" id="edit-user-phone" placeholder="Phone number">
+
+                <label for="edit-user-location">Location</label>
+                <input type="text" id="edit-user-location" placeholder="Location">
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal="edit-user-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="edit-product-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Product</h3>
+                <button class="close-btn" data-close-modal="edit-product-modal">&times;</button>
+            </div>
+            <form id="edit-product-form" class="modal-body">
+                <input type="hidden" id="edit-product-id">
+                <div class="edit-product-image-section">
+                    <label for="edit-product-image">Product Image</label>
+                    <div class="image-preview-wrapper">
+                        <img id="edit-product-image-preview" src="" alt="Product Image Preview" style="max-width: 100%; max-height: 180px; border-radius: 8px; object-fit: contain; background: #f3f4f6; display: block; margin-bottom: 8px;">
+                    </div>
+                    <input type="file" id="edit-product-image" accept="image/*">
+                </div>
+                <label for="edit-product-name">Product Name</label>
+                <input type="text" id="edit-product-name">
+                <label for="edit-product-price">Price</label>
+                <input type="number" id="edit-product-price" min="0" step="0.01">
+                <label for="edit-product-stock">Stock</label>
+                <input type="number" id="edit-product-stock" min="0">
+                <label for="edit-product-location">Location</label>
+                <input type="text" id="edit-product-location">
+                <label for="edit-product-description">Description</label>
+                <textarea id="edit-product-description" rows="3" maxlength="500" style="resize:vertical;"></textarea>
+                <div style="font-size: 0.9em; color: #64748b; margin-bottom: 8px;">
+                    <span id="edit-product-description-count">0</span>/500 characters
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal="edit-product-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/admin.js"></script>
+    <script src="/js/chat.js"></script>
+</body>
+</html>

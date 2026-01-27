@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmers - AgriCatch</title>
+    <link rel="stylesheet" href="../public/css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <div class="logo-and-title">
+                        <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
+                        <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
+                    </div>
+                    <p class="tagline">Freshly Caught! Pre-ordered for you!</p>
+                </div>
+                <nav class="nav" id="main-nav">
+                    <a href="/" class="nav-link">Home</a>
+                    <a href="/#products" class="nav-link">Products</a>
+                    <a href="/farmers.html" class="nav-link active">Farmers</a>
+                </nav>
+                <div class="header-actions">
+                    <a href="/" class="btn btn-secondary">Back to Shop</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="farmers-page">
+        <div class="container">
+            <div class="farmers-header">
+                <h2>Meet Our Farmers</h2>
+                <p>Discover trusted local farmers and their fresh products.</p>
+                <div class="farmers-filters">
+                    <input type="text" id="farmer-search" placeholder="Search farmers..." class="search-input">
+                </div>
+            </div>
+
+            <div id="farmers-grid" class="farmers-grid">
+                <!-- Farmers will be loaded here -->
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>AgriCatch</h3>
+                    <p>Freshly Caught! Pre-ordered for you! Your trusted source for fresh agricultural and fishery products.</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 AgriCatch. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../public/js/farmers.js"></script>
+    <script>
+        // Mobile menu toggle
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mainNav = document.getElementById('main-nav');
+        if (mobileMenuToggle && mainNav) {
+            mobileMenuToggle.addEventListener('click', () => {
+                mainNav.classList.toggle('open');
+                const icon = mobileMenuToggle.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-bars');
+                    icon.classList.toggle('fa-times');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

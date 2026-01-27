@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Addresses - AgriCatch</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <div class="logo-and-title">
+                        <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
+                        <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
+                    </div>
+                    <p class="tagline">Freshly Caught! Pre-ordered for you!</p>
+                </div>
+                <nav class="nav" id="main-nav">
+                    <a href="/" class="nav-link">Home</a>
+                    <a href="/addresses.html" class="nav-link active">Addresses</a>
+                </nav>
+                <div class="header-actions">
+                    <a href="/" class="btn btn-secondary">Back to Shop</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="addresses-page">
+        <div class="container">
+            <h2>My Addresses</h2>
+            <div id="addresses-list" class="addresses-list"></div>
+
+            <h3>Add / Edit Address</h3>
+            <form id="address-form" class="address-form">
+                <input type="hidden" id="address-id">
+                
+                <div class="form-group">
+                    <label for="address-fullname">
+                        Full Name <span class="required">*</span>
+                    </label>
+                    <input type="text" id="address-fullname" placeholder="Enter your full name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="address-phone">
+                        Phone Number <span class="required">*</span>
+                    </label>
+                    <div class="phone-input-wrapper">
+                        <span class="phone-prefix">+63</span>
+                        <input type="tel" id="address-phone" placeholder="9123456789" maxlength="10" required>
+                    </div>
+                    <small class="form-hint">Enter 10 digits without the +63 prefix</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="address-full">
+                        Address <span class="required">*</span>
+                    </label>
+                    <textarea id="address-full" rows="3" placeholder="Enter your complete address (street, barangay, city, province)" required></textarea>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="address-default">
+                        <span>Set as default address</span>
+                    </label>
+                    <small class="form-hint">Default address will be used for deliveries</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-large">
+                        <i class="fas fa-save"></i> Save Address
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="cancel-edit" style="display: none;">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>AgriCatch</h3>
+                    <p>Freshly Caught! Pre-ordered for you! Your trusted source for fresh agricultural and fishery products.</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 AgriCatch. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/addresses.js"></script>
+    <script>
+        // Mobile menu toggle
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mainNav = document.getElementById('main-nav');
+        if (mobileMenuToggle && mainNav) {
+            mobileMenuToggle.addEventListener('click', () => {
+                mainNav.classList.toggle('open');
+                const icon = mobileMenuToggle.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-bars');
+                    icon.classList.toggle('fa-times');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
