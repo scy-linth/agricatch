@@ -1681,35 +1681,37 @@ class AgriFisheryMarket {
             }
         }
         
-        // Disable back buttons that would go to step 1 if OTP is verified
+        // Disable back button that would go to step 1 if OTP is verified
         const backButton2 = document.getElementById('register-back-2');
         const backButton3 = document.getElementById('register-back-3');
         const backButton4 = document.getElementById('register-back-4');
-        
-        [backButton2, backButton3, backButton4].forEach(btn => {
-            if (btn) {
-                if (this.otpVerified && step >= 2) {
-                    // If trying to go back to step 1, disable the button
-                    if (step === 2 || (step === 3 && btn === backButton3) || (step === 4 && btn === backButton4)) {
-                        btn.disabled = true;
-                        btn.style.opacity = '0.5';
-                        btn.style.cursor = 'not-allowed';
-                        btn.title = 'Cannot go back - Step 1 is locked after OTP verification';
-                    } else {
-                        btn.disabled = false;
-                        btn.style.opacity = '1';
-                        btn.style.cursor = 'pointer';
-                        btn.title = '';
-                    }
-                } else {
-                    // Normal back button behavior
-                    btn.disabled = false;
-                    btn.style.opacity = '1';
-                    btn.style.cursor = 'pointer';
-                    btn.title = '';
-                }
-            }
-        });
+
+        // Only disable back button on step 2 (which goes to step 1) when OTP is verified
+        if (backButton2 && this.otpVerified && step >= 2) {
+            backButton2.disabled = true;
+            backButton2.style.opacity = '0.5';
+            backButton2.style.cursor = 'not-allowed';
+            backButton2.title = 'Cannot go back - Step 1 is locked after OTP verification';
+        } else if (backButton2) {
+            backButton2.disabled = false;
+            backButton2.style.opacity = '1';
+            backButton2.style.cursor = 'pointer';
+            backButton2.title = '';
+        }
+
+        // Back buttons on steps 3 and 4 should always be enabled (they go to steps 2 and 3, not step 1)
+        if (backButton3) {
+            backButton3.disabled = false;
+            backButton3.style.opacity = '1';
+            backButton3.style.cursor = 'pointer';
+            backButton3.title = '';
+        }
+        if (backButton4) {
+            backButton4.disabled = false;
+            backButton4.style.opacity = '1';
+            backButton4.style.cursor = 'pointer';
+            backButton4.title = '';
+        }
         
         // Reset loading states
         this.isLoading = false;
