@@ -32,12 +32,22 @@ const ensureAuth = (req, res, next) => {
   next();
 };
 
-router.post('/product-image', ensureAuth, productUpload.single('image'), (req, res) => {
+router.post('/product-image', ensureAuth, productUpload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Image is required' });
   }
-  const imageUrl = `/images/uploads/products/${path.basename(path.dirname(req.file.path))}/${req.file.filename}`;
-  res.json({ imageUrl });
+
+  try {
+    const result = await cloudinary.uploader.upload(req.file.buffer, {
+      folder: 'products',
+      public_id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      resource_type: 'auto'
+    });
+    res.json({ imageUrl: result.secure_url });
+  } catch (error) {
+    console.error('Cloudinary upload error:', error);
+    res.status(500).json({ message: 'Failed to upload image' });
+  }
 });
 
 router.post('/shop-banner', ensureAuth, bannerUpload.single('image'), async (req, res) => {
