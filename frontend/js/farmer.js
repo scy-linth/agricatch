@@ -617,6 +617,21 @@ class FarmerDashboard {
     }
 
 
+    async uploadProductImage(file) {
+        const formData = new FormData();
+        formData.append('image', file);
+        const response = await fetch(`${this.apiBase}/upload/product-image`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${this.token}` },
+            body: formData
+        });
+        if (!response.ok) {
+            throw new Error('Upload failed');
+        }
+        const data = await response.json();
+        return data.imageUrl;
+    }
+
     async uploadShopImage(type, file) {
         const formData = new FormData();
         formData.append('image', file);
@@ -693,34 +708,46 @@ class FarmerDashboard {
     async handleAddProduct(e) {
         e.preventDefault();
 
-        const formData = new FormData();
-        formData.append('name', document.getElementById('product-name').value);
-        formData.append('description', document.getElementById('product-description').value);
-        formData.append('price', document.getElementById('product-price').value);
-        formData.append('category_id', document.getElementById('product-category').value);
-        formData.append('stock_quantity', document.getElementById('product-stock').value);
-        formData.append('unit', document.getElementById('product-unit').value);
-        formData.append('location', document.getElementById('product-location').value);
+        // Handle image upload first if there's an image
+        let imageUrl = null;
+        const imageFile = document.getElementById('product-image').files[0];
+        if (imageFile) {
+            try {
+                this.showMessage('Uploading image...', 'info');
+                imageUrl = await this.uploadProductImage(imageFile);
+                this.showMessage('Image uploaded successfully!', 'success');
+            } catch (error) {
+                console.error('Image upload error:', error);
+                this.showMessage('Failed to upload image. Please try again.', 'error');
+                return;
+            }
+        }
+
+        const payload = {
+            name: document.getElementById('product-name').value,
+            description: document.getElementById('product-description').value,
+            price: document.getElementById('product-price').value,
+            category_id: document.getElementById('product-category').value,
+            stock_quantity: document.getElementById('product-stock').value,
+            unit: document.getElementById('product-unit').value,
+            location: document.getElementById('product-location').value,
+            image_url: imageUrl
+        };
 
         const harvestDate = document.getElementById('harvest-date').value;
         const expiryDate = document.getElementById('expiry-date').value;
 
-        if (harvestDate) formData.append('harvest_date', harvestDate);
-        if (expiryDate) formData.append('expiry_date', expiryDate);
-
-        // Handle image upload
-        const imageFile = document.getElementById('product-image').files[0];
-        if (imageFile) {
-            formData.append('image', imageFile);
-        }
+        if (harvestDate) payload.harvest_date = harvestDate;
+        if (expiryDate) payload.expiry_date = expiryDate;
 
         try {
             const response = await fetch(`${this.apiBase}/products`, {
                 method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: formData
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
@@ -750,32 +777,49 @@ class FarmerDashboard {
             return;
         }
 
-        const formData = new FormData();
-        formData.append('name', document.getElementById('edit-product-name').value);
-        formData.append('description', document.getElementById('edit-product-description').value);
-        formData.append('price', document.getElementById('edit-product-price').value);
-        formData.append('category_id', document.getElementById('edit-product-category').value);
-        formData.append('stock_quantity', document.getElementById('edit-product-stock').value);
-        formData.append('unit', document.getElementById('edit-product-unit').value);
-        formData.append('location', document.getElementById('edit-product-location').value);
+        // Handle image upload first if there's a new image
+        let imageUrl = null;
+        const imageFile = document.getElementById('edit-product-image').files[0];
+        if (imageFile) {
+            try {
+                this.showMessage('Uploading image...', 'info');
+                imageUrl = await this.uploadProductImage(imageFile);
+                this.showMessage('Image uploaded successfully!', 'success');
+            } catch (error) {
+                console.error('Image upload error:', error);
+                this.showMessage('Failed to upload image. Please try again.', 'error');
+                return;
+            }
+        }
+
+        const payload = {
+            name: document.getElementById('edit-product-name').value,
+            description: document.getElementById('edit-product-description').value,
+            price: document.getElementById('edit-product-price').value,
+            category_id: document.getElementById('edit-product-category').value,
+            stock_quantity: document.getElementById('edit-product-stock').value,
+            unit: document.getElementById('edit-product-unit').value,
+            location: document.getElementById('edit-product-location').value
+        };
+
+        // Only include image_url if a new image was uploaded
+        if (imageUrl) {
+            payload.image_url = imageUrl;
+        }
 
         const harvestDate = document.getElementById('edit-harvest-date').value;
         const expiryDate = document.getElementById('edit-expiry-date').value;
-        if (harvestDate) formData.append('harvest_date', harvestDate);
-        if (expiryDate) formData.append('expiry_date', expiryDate);
-
-        const imageFile = document.getElementById('edit-product-image').files[0];
-        if (imageFile) {
-            formData.append('image', imageFile);
-        }
+        if (harvestDate) payload.harvest_date = harvestDate;
+        if (expiryDate) payload.expiry_date = expiryDate;
 
         try {
             const response = await fetch(`${this.apiBase}/products/${productId}`, {
                 method: 'PUT',
                 headers: {
+                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: formData
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json().catch(() => ({}));
