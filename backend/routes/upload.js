@@ -1,17 +1,12 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const path = require('path');
-const cloudinary = require('cloudinary').v2;
+
 const { productUpload, bannerUpload, avatarUpload } = require('../middleware/upload');
+const fs = require('fs');
+const cloudinary = require('../utils/cloudinary');
 
 const router = express.Router();
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 const getUserFromToken = (req) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -33,93 +28,40 @@ const ensureAuth = (req, res, next) => {
 };
 
 
-
 router.post('/product-image', ensureAuth, productUpload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Image is required' });
   }
-
   try {
-    const result = await cloudinary.uploader.upload(req.file.buffer, {
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'products',
-      public_id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      resource_type: 'auto'
+      use_filename: true,
+      unique_filename: false,
+      resource_type: 'image',
     });
-    res.json({ imageUrl: result.secure_url });
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    res.status(500).json({
-      message: 'Failed to upload image',
-      error: error && error.message ? error.message : error
-    });
-  }
-});
-
-=======
-  try {
-    const result = await uploadToCloudinary(req.file.buffer, 'products');
+    // Optionally, delete local file after upload
+    // fs.unlinkSync(req.file.path);
     res.json({ imageUrl: result.secure_url });
   } catch (err) {
     res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
   }
 });
 
-
->>>>>>> b3ab180 (cloudinary image by copilot)
-router.post('/shop-banner', ensureAuth, bannerUpload.single('image'), async (req, res) => {
+router.post('/shop-banner', ensureAuth, bannerUpload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Image is required' });
   }
-<<<<<<< HEAD
-
-  try {
-    const result = await cloudinary.uploader.upload(req.file.buffer, {
-      folder: 'shops/banners',
-      public_id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      resource_type: 'auto'
-    });
-    res.json({ imageUrl: result.secure_url });
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    res.status(500).json({ message: 'Failed to upload image' });
-  }
+  const imageUrl = `/images/uploads/shops/banners/${req.file.filename}`;
+  res.json({ imageUrl });
 });
 
-=======
-  try {
-    const result = await uploadToCloudinary(req.file.buffer, 'shops/banners');
-    res.json({ imageUrl: result.secure_url });
-  } catch (err) {
-    res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
-  }
-});
-
-
->>>>>>> b3ab180 (cloudinary image by copilot)
-router.post('/shop-avatar', ensureAuth, avatarUpload.single('image'), async (req, res) => {
+router.post('/shop-avatar', ensureAuth, avatarUpload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Image is required' });
   }
-<<<<<<< HEAD
-
-  try {
-    const result = await cloudinary.uploader.upload(req.file.buffer, {
-      folder: 'shops/avatars',
-      public_id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      resource_type: 'auto'
-    });
-    res.json({ imageUrl: result.secure_url });
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    res.status(500).json({ message: 'Failed to upload image' });
-=======
-  try {
-    const result = await uploadToCloudinary(req.file.buffer, 'shops/avatars');
-    res.json({ imageUrl: result.secure_url });
-  } catch (err) {
-    res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
->>>>>>> b3ab180 (cloudinary image by copilot)
-  }
+  const imageUrl = `/images/uploads/shops/avatars/${req.file.filename}`;
+  res.json({ imageUrl });
 });
 
 module.exports = router;

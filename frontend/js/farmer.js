@@ -617,21 +617,6 @@ class FarmerDashboard {
     }
 
 
-    async uploadProductImage(file) {
-        const formData = new FormData();
-        formData.append('image', file);
-        const response = await fetch(`${this.apiBase}/upload/product-image`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${this.token}` },
-            body: formData
-        });
-        if (!response.ok) {
-            throw new Error('Upload failed');
-        }
-        const data = await response.json();
-        return data.imageUrl;
-    }
-
     async uploadShopImage(type, file) {
         const formData = new FormData();
         formData.append('image', file);
@@ -708,46 +693,62 @@ class FarmerDashboard {
     async handleAddProduct(e) {
         e.preventDefault();
 
-        // Handle image upload first if there's an image
-        let imageUrl = null;
+        const name = document.getElementById('product-name').value;
+        const description = document.getElementById('product-description').value;
+        const price = document.getElementById('product-price').value;
+        const category_id = document.getElementById('product-category').value;
+        const stock_quantity = document.getElementById('product-stock').value;
+        const unit = document.getElementById('product-unit').value;
+        const location = document.getElementById('product-location').value;
+        const harvestDate = document.getElementById('harvest-date').value;
+        const expiryDate = document.getElementById('expiry-date').value;
+
+        // Handle image upload to Cloudinary
+        let imageUrl = '';
         const imageFile = document.getElementById('product-image').files[0];
         if (imageFile) {
+            const cloudData = new FormData();
+            cloudData.append('file', imageFile);
+            cloudData.append('upload_preset', 'agricatch');
+            cloudData.append('folder', 'products');
             try {
-                this.showMessage('Uploading image...', 'info');
-                imageUrl = await this.uploadProductImage(imageFile);
-                this.showMessage('Image uploaded successfully!', 'success');
-            } catch (error) {
-                console.error('Image upload error:', error);
-                this.showMessage('Failed to upload image. Please try again.', 'error');
+                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dwv7lhgvm/image/upload', {
+                    method: 'POST',
+                    body: cloudData
+                });
+                const cloudJson = await cloudRes.json();
+                if (cloudJson.secure_url) {
+                    imageUrl = cloudJson.secure_url;
+                } else {
+                    this.showMessage('Image upload failed: ' + (cloudJson.error?.message || 'Unknown error'), 'error');
+                    return;
+                }
+            } catch (err) {
+                this.showMessage('Image upload failed: ' + err.message, 'error');
                 return;
             }
         }
 
-        const payload = {
-            name: document.getElementById('product-name').value,
-            description: document.getElementById('product-description').value,
-            price: document.getElementById('product-price').value,
-            category_id: document.getElementById('product-category').value,
-            stock_quantity: document.getElementById('product-stock').value,
-            unit: document.getElementById('product-unit').value,
-            location: document.getElementById('product-location').value,
-            image_url: imageUrl
-        };
-
-        const harvestDate = document.getElementById('harvest-date').value;
-        const expiryDate = document.getElementById('expiry-date').value;
-
-        if (harvestDate) payload.harvest_date = harvestDate;
-        if (expiryDate) payload.expiry_date = expiryDate;
+        // Now send product data to backend
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('description', description);
+        formData.append('price', price);
+        formData.append('category_id', category_id);
+        formData.append('stock_quantity', stock_quantity);
+        formData.append('unit', unit);
+        formData.append('location', location);
+        if (harvestDate) formData.append('harvest_date', harvestDate);
+        if (expiryDate) formData.append('expiry_date', expiryDate);
+        if (imageUrl) formData.append('image_url', imageUrl);
 
         try {
             const response = await fetch(`${this.apiBase}/products`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify(payload)
+                body: formData
             });
 
             const data = await response.json();
@@ -777,49 +778,32 @@ class FarmerDashboard {
             return;
         }
 
-        // Handle image upload first if there's a new image
-        let imageUrl = null;
-        const imageFile = document.getElementById('edit-product-image').files[0];
-        if (imageFile) {
-            try {
-                this.showMessage('Uploading image...', 'info');
-                imageUrl = await this.uploadProductImage(imageFile);
-                this.showMessage('Image uploaded successfully!', 'success');
-            } catch (error) {
-                console.error('Image upload error:', error);
-                this.showMessage('Failed to upload image. Please try again.', 'error');
-                return;
-            }
-        }
-
-        const payload = {
-            name: document.getElementById('edit-product-name').value,
-            description: document.getElementById('edit-product-description').value,
-            price: document.getElementById('edit-product-price').value,
-            category_id: document.getElementById('edit-product-category').value,
-            stock_quantity: document.getElementById('edit-product-stock').value,
-            unit: document.getElementById('edit-product-unit').value,
-            location: document.getElementById('edit-product-location').value
-        };
-
-        // Only include image_url if a new image was uploaded
-        if (imageUrl) {
-            payload.image_url = imageUrl;
-        }
+        const formData = new FormData();
+        formData.append('name', document.getElementById('edit-product-name').value);
+        formData.append('description', document.getElementById('edit-product-description').value);
+        formData.append('price', document.getElementById('edit-product-price').value);
+        formData.append('category_id', document.getElementById('edit-product-category').value);
+        formData.append('stock_quantity', document.getElementById('edit-product-stock').value);
+        formData.append('unit', document.getElementById('edit-product-unit').value);
+        formData.append('location', document.getElementById('edit-product-location').value);
 
         const harvestDate = document.getElementById('edit-harvest-date').value;
         const expiryDate = document.getElementById('edit-expiry-date').value;
-        if (harvestDate) payload.harvest_date = harvestDate;
-        if (expiryDate) payload.expiry_date = expiryDate;
+        if (harvestDate) formData.append('harvest_date', harvestDate);
+        if (expiryDate) formData.append('expiry_date', expiryDate);
+
+        const imageFile = document.getElementById('edit-product-image').files[0];
+        if (imageFile) {
+            formData.append('image', imageFile);
+        }
 
         try {
             const response = await fetch(`${this.apiBase}/products/${productId}`, {
                 method: 'PUT',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify(payload)
+                body: formData
             });
 
             const data = await response.json().catch(() => ({}));

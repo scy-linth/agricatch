@@ -1,10 +1,34 @@
-
-
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
+
+const ensureDir = (dirPath) => {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+};
+
+const createStorage = (baseDir, withDateFolder = false) => {
+  return multer.diskStorage({
+    destination: (req, file, cb) => {
+      let dest = baseDir;
+      if (withDateFolder) {
+        const dateFolder = new Date().toISOString().split('T')[0];
+        dest = path.join(baseDir, dateFolder);
+      }
+      ensureDir(dest);
+      cb(null, dest);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+      cb(null, uniqueName);
+    }
+  });
+};
 
 const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
@@ -14,42 +38,33 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
-<<<<<<< HEAD
+// Static assets now live under /frontend (Netlify publish folder).
+// Keep uploads inside that folder so they are served at /images/uploads/...
+const productStorage = createStorage(path.join(__dirname, '..', '..', 'frontend', 'images', 'uploads', 'products'), true);
+const bannerStorage = createStorage(path.join(__dirname, '..', '..', 'frontend', 'images', 'uploads', 'shops', 'banners'));
+const avatarStorage = createStorage(path.join(__dirname, '..', '..', 'frontend', 'images', 'uploads', 'shops', 'avatars'));
+
 const productUpload = multer({
-  storage: multer.memoryStorage(),
+  storage: productStorage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter
 });
+
 const bannerUpload = multer({
-  storage: multer.memoryStorage(),
+  storage: bannerStorage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter
 });
+
 const avatarUpload = multer({
-  storage: multer.memoryStorage(),
+  storage: avatarStorage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter
 });
-  return new Promise((resolve, reject) => {
-    cloudinary.uploader.upload_stream(
-      {
-        folder,
-        public_id: filename ? filename.split('.')[0] : undefined,
-        resource_type: 'image'
-      },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result);
-      }
-    ).end(buffer);
-  });
-};
->>>>>>> b3ab180 (cloudinary image by copilot)
 
 module.exports = {
   productUpload,
   bannerUpload,
   avatarUpload,
-  fileFilter,
-  uploadToCloudinary
+  fileFilter
 };

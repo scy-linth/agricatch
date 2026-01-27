@@ -176,7 +176,7 @@ router.get('/farmer/:farmerId', async (req, res) => {
 });
 
 // Add new product (for farmers)
-router.post('/', async (req, res) => {
+router.post('/', productUpload.single('image'), async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
 
@@ -206,8 +206,10 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     let imageUrl = image_url || null;
-    // Note: Image uploads are now handled separately via /api/upload/product-image
-    // The image_url should be passed directly from the frontend after uploading to Cloudinary
+    if (req.file) {
+      const relativePath = req.file.path.split('frontend')[1].replace(/\\/g, '/');
+      imageUrl = relativePath;
+    }
 
     // Auto-populate location with shop address if not provided
     let productLocation = location;
@@ -242,7 +244,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update product (for farmers)
-router.put('/:id', async (req, res) => {
+router.put('/:id', productUpload.single('image'), async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
 
@@ -291,8 +293,14 @@ router.put('/:id', async (req, res) => {
     const nextIsAvailable = typeof is_available === 'undefined' ? current.is_available : is_available;
 
     let imageUrl = typeof image_url === 'undefined' ? current.image_url : image_url;
-    // Note: Image uploads are now handled separately via /api/upload/product-image
-    // The image_url should be passed directly from the frontend after uploading to Cloudinary
+    if (req.file) {
+      const relativePath = req.file.path.split('frontend')[1].replace(/\\/g, '/');
+      imageUrl = relativePath;
+      const oldPath = resolvePublicPath(current.image_url);
+      if (oldPath) {
+        deleteFileIfExists(oldPath);
+      }
+    }
 
     await pool.query(`
       UPDATE products SET
