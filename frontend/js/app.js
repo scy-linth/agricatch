@@ -7,12 +7,18 @@ window.__PLACEHOLDER_IMAGE__ = '/images/resendlogo.png';
 class AgriFisheryMarket {
     // ...existing code...
     constructor() {
-        // Use direct Render URL for Cloudflare Pages domains and Render frontend, relative path for localhost
-        const isCloudflarePages = window.location.hostname === 'agricatch.page.dev' ||
-                                 window.location.hostname === 'agricatch.store' ||
-                                 window.location.hostname.includes('agricatch.store') ||
-                                 window.location.hostname === 'agricatch.onrender.com';
-        this.apiBase = isCloudflarePages ? 'https://agricatch.onrender.com/api' : '/api';
+        // Determine environment and API base
+        const isProduction = window.location.hostname === 'agricatch.store' ||
+                     window.location.hostname === 'www.agricatch.store' ||
+                     window.location.hostname === 'agricatch.onrender.com' ||
+                     window.location.hostname.includes('agricatch.store') ||
+                     window.location.hostname === 'agricatch.page.dev';
+
+        // Prefer a single canonical API hostname in production to avoid cross-origin issues
+        this.apiBase = isProduction ? 'https://api.agricatch.store/api' : '/api';
+
+        // Dev host detection for local-only debug endpoints
+        this.isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         this.token = localStorage.getItem('token');
         this.sessionId = this.getOrCreateSessionId();
         this.currentPage = 1;
@@ -38,8 +44,10 @@ class AgriFisheryMarket {
     init() {
         try {
             console.log('AgriCatch app initialized');
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:15',message:'App initialization started',data:{apiBase:this.apiBase,hasToken:!!this.token},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+            // #region agent log (dev only)
+            if (this.isDevHost) {
+                fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:15',message:'App initialization started',data:{apiBase:this.apiBase,hasToken:!!this.token},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+            }
             // #endregion
 
             // Wake up the Render server immediately when user lands on the site
@@ -98,8 +106,10 @@ class AgriFisheryMarket {
             window.history.replaceState({}, '', newUrl);
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:21',message:'App initialization completed',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+        // #region agent log (dev only)
+        if (this.isDevHost) {
+            fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:21',message:'App initialization completed',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+        }
         // #endregion
 
         // Mobile bug fix: always remove loading class and hide loading screen after init
@@ -1190,8 +1200,19 @@ class AgriFisheryMarket {
                     },
                     body: JSON.stringify({ email, password, requestedRole })
                 });
-
-                const data = await response.json();
+                let data;
+                const ct = response.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    if (!response.ok) {
+                        this.showMessage(text || 'Login failed', 'error');
+                        return;
+                    }
+                    this.showMessage('Unexpected non-JSON login response', 'error');
+                    return;
+                }
 
                 if (response.ok) {
                     const userRole = data.user.role;
@@ -1232,8 +1253,19 @@ class AgriFisheryMarket {
                 },
                 body: JSON.stringify({ email, password, requestedRole })
             });
-
-            const data = await response.json();
+            let data;
+            const ct = response.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                if (!response.ok) {
+                    this.showMessage(text || 'Login failed', 'error');
+                    return;
+                }
+                this.showMessage('Unexpected non-JSON login response', 'error');
+                return;
+            }
 
             if (response.ok) {
                 const userRole = data.user.role;
