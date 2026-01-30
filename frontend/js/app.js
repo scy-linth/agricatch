@@ -530,6 +530,24 @@ class AgriFisheryMarket {
             });
         }
 
+        // Password toggle for login
+        const toggleLoginPassword = document.getElementById('toggle-login-password');
+        const loginPasswordInput = document.getElementById('auth-password');
+        if (toggleLoginPassword && loginPasswordInput) {
+            toggleLoginPassword.addEventListener('click', () => {
+                const icon = toggleLoginPassword.querySelector('i');
+                if (loginPasswordInput.type === 'password') {
+                    loginPasswordInput.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    loginPasswordInput.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            });
+        }
+
         // Save form data as user types (for persistence)
         this.setupFormPersistence();
 
