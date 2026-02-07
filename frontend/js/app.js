@@ -1,10 +1,10 @@
-// AgriFishery Market Frontend JavaScript
+// Agriculture Market Frontend JavaScript
 
 // Use a tiny inlined 1x1 GIF as a lightweight placeholder to avoid external requests
 // Use the project's resend logo as the default placeholder so Cloudinary or external services aren't called
 window.__PLACEHOLDER_IMAGE__ = '/images/resendlogo.png';
 
-class AgriFisheryMarket {
+class AgricultureMarket {
     // ...existing code...
     constructor() {
         // Determine environment and API base
@@ -20,6 +20,11 @@ class AgriFisheryMarket {
         // Dev host detection for local-only debug endpoints
         this.isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         this.token = localStorage.getItem('token');
+        // Sanitize token values stored as literal strings 'null' or 'undefined'
+        if (!this.token || this.token === 'null' || this.token === 'undefined') {
+            this.token = null;
+            try { localStorage.removeItem('token'); } catch (e) {}
+        }
         this.sessionId = this.getOrCreateSessionId();
         this.currentPage = 1;
         this.currentCategory = '';
@@ -41,14 +46,50 @@ class AgriFisheryMarket {
         this.init();
     }
 
+    openForgotPasswordModal() {
+        const modal = document.getElementById('forgot-password-modal');
+        const authModal = document.getElementById('auth-modal');
+        if (modal) {
+            try { if (authModal) authModal.classList.remove('open'); } catch (e) {}
+            try { if (modal.parentElement !== document.body) document.body.appendChild(modal); } catch (e) {}
+            modal.classList.add('open');
+            this.showForgotStep(0);
+        }
+    }
+
+    showForgotStep(stepIdx) {
+        const steps = [
+            document.getElementById('forgot-step-1'),
+            document.getElementById('forgot-step-2'),
+            document.getElementById('forgot-step-3')
+        ];
+        steps.forEach((step, idx) => {
+            if (step) step.style.display = idx === stepIdx ? 'block' : 'none';
+        });
+    }
+
+    validateForgotPasswordMatch() {
+        const newPass = document.getElementById('forgot-new-password');
+        const confirmPass = document.getElementById('forgot-confirm-password');
+        const hint = document.getElementById('forgot-password-match-hint');
+        if (newPass && confirmPass && hint) {
+            if (newPass.value && confirmPass.value) {
+                if (newPass.value === confirmPass.value) {
+                    hint.textContent = 'Passwords match';
+                    hint.style.color = '#28a745';
+                } else {
+                    hint.textContent = 'Passwords do not match';
+                    hint.style.color = '#dc3545';
+                }
+            } else {
+                hint.textContent = '';
+            }
+        }
+    }
+
     init() {
         try {
-            console.log('AgriCatch app initialized');
-            // #region agent log (dev only)
-            if (this.isDevHost) {
-                fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:15',message:'App initialization started',data:{apiBase:this.apiBase,hasToken:!!this.token},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
-            }
-            // #endregion
+            // App initialization (dev logs removed)
 
             // Wake up the Render server immediately when user lands on the site
             try {
@@ -72,6 +113,20 @@ class AgriFisheryMarket {
             if (this.token) {
                 this.updateOrdersCount();
             }
+
+            // Ensure active nav link is calculated after layout and media load.
+            // Some elements (hero video/image) can change section heights after initial JS runs,
+            // so re-run active link detection after a short delay and on window load/resize.
+            setTimeout(() => this.updateActiveNavLink(), 300);
+            requestAnimationFrame(() => this.updateActiveNavLink());
+            window.addEventListener('load', () => this.updateActiveNavLink());
+            window.addEventListener('resize', () => {
+                // Debounce resize
+                clearTimeout(this._resizeNavTimeout);
+                this._resizeNavTimeout = setTimeout(() => this.updateActiveNavLink(), 150);
+            });
+            // Update when hash changes (clicking footer links or manual hash changes)
+            window.addEventListener('hashchange', () => this.updateActiveNavLink());
         } catch (error) {
             console.error('Error during app initialization:', error);
             // Try to at least load products even if other things fail
@@ -106,11 +161,7 @@ class AgriFisheryMarket {
             window.history.replaceState({}, '', newUrl);
         }
 
-        // #region agent log (dev only)
-        if (this.isDevHost) {
-            fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:21',message:'App initialization completed',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
-        }
-        // #endregion
+        // Dev ingest disabled in source
 
         // Mobile bug fix: always remove loading class and hide loading screen after init
         document.body.classList.remove('loading');
@@ -274,6 +325,146 @@ class AgriFisheryMarket {
 
     // Setup all event listeners
     setupEventListeners() {
+                // Forgot Password modal logic
+                const forgotPasswordLink = document.getElementById('forgot-password-link');
+                const forgotPasswordModal = document.getElementById('forgot-password-modal');
+                const forgotCloseBtn = document.getElementById('forgot-close-btn');
+                const forgotSteps = [
+                    document.getElementById('forgot-step-1'),
+                    document.getElementById('forgot-step-2'),
+                    document.getElementById('forgot-step-3')
+                ];
+                let forgotStepIndex = 0;
+                if (forgotPasswordLink) {
+                    forgotPasswordLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        // Open the top-level forgot modal (not inline)
+                        this.openForgotPasswordModal();
+                    });
+                }
+                if (forgotCloseBtn && forgotPasswordModal) {
+                    forgotCloseBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        try { forgotPasswordModal.classList.remove('open'); } catch (err) {}
+                        try { const authModal = document.getElementById('auth-modal'); if (authModal) authModal.classList.add('open'); } catch (err) {}
+                    });
+                }
+                // Step navigation
+                const forgotNext1 = document.getElementById('forgot-next-1');
+                const forgotNext2 = document.getElementById('forgot-next-2');
+                const forgotBack2 = document.getElementById('forgot-back-2');
+                const forgotBack3 = document.getElementById('forgot-back-3');
+                if (forgotNext1) {
+                    forgotNext1.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.showForgotStep(1);
+                    });
+                }
+                if (forgotNext2) {
+                    forgotNext2.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.showForgotStep(2);
+                    });
+                }
+                if (forgotBack2) {
+                    forgotBack2.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.showForgotStep(0);
+                    });
+                }
+                if (forgotBack3) {
+                    forgotBack3.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.showForgotStep(1);
+                    });
+                }
+                    // Back to auth modal from forgot flow (top-level)
+                    const forgotBackToAuth = document.getElementById('forgot-back-to-auth');
+                    if (forgotBackToAuth) {
+                        forgotBackToAuth.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            const modal = document.getElementById('forgot-password-modal');
+                            try { if (modal) modal.classList.remove('open'); } catch (err) {}
+                            // Re-open auth modal (login)
+                            try { this.openAuthFlow({ mode: 'login' }); } catch (err) { const authModal = document.getElementById('auth-modal'); if (authModal) authModal.classList.add('open'); }
+                        });
+                    }
+                // Password toggle for forgot modal
+                const toggleForgotNewPassword = document.getElementById('toggle-forgot-new-password');
+                const forgotNewPasswordInput = document.getElementById('forgot-new-password');
+                if (toggleForgotNewPassword && forgotNewPasswordInput) {
+                    toggleForgotNewPassword.addEventListener('click', () => {
+                        const icon = toggleForgotNewPassword.querySelector('i');
+                        if (forgotNewPasswordInput.type === 'password') {
+                            forgotNewPasswordInput.type = 'text';
+                            icon.classList.remove('fa-eye');
+                            icon.classList.add('fa-eye-slash');
+                        } else {
+                            forgotNewPasswordInput.type = 'password';
+                            icon.classList.remove('fa-eye-slash');
+                            icon.classList.add('fa-eye');
+                        }
+                    });
+                }
+                const toggleForgotConfirmPassword = document.getElementById('toggle-forgot-confirm-password');
+                const forgotConfirmPasswordInput = document.getElementById('forgot-confirm-password');
+                if (toggleForgotConfirmPassword && forgotConfirmPasswordInput) {
+                    toggleForgotConfirmPassword.addEventListener('click', () => {
+                        const icon = toggleForgotConfirmPassword.querySelector('i');
+                        if (forgotConfirmPasswordInput.type === 'password') {
+                            forgotConfirmPasswordInput.type = 'text';
+                            icon.classList.remove('fa-eye');
+                            icon.classList.add('fa-eye-slash');
+                        } else {
+                            forgotConfirmPasswordInput.type = 'password';
+                            icon.classList.remove('fa-eye-slash');
+                            icon.classList.add('fa-eye');
+                        }
+                    });
+                }
+                // Password match validation for forgot modal
+                if (forgotNewPasswordInput && forgotConfirmPasswordInput) {
+                    forgotNewPasswordInput.addEventListener('input', () => this.validateForgotPasswordMatch());
+                    forgotConfirmPasswordInput.addEventListener('input', () => this.validateForgotPasswordMatch());
+                }
+                // Inline auth-forgot panel buttons
+                const authForgotSend = document.getElementById('auth-forgot-send');
+                const authForgotCancel = document.getElementById('auth-forgot-cancel');
+                if (authForgotCancel) {
+                    authForgotCancel.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const inlinePanel = document.getElementById('auth-forgot-panel');
+                        if (inlinePanel) inlinePanel.style.display = 'none';
+                    });
+                }
+                if (authForgotSend) {
+                    authForgotSend.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        const emailInput = document.getElementById('auth-forgot-email');
+                        if (!emailInput || !emailInput.value.trim()) {
+                            this.showMessage('Please enter your email address', 'error');
+                            return;
+                        }
+                        const email = emailInput.value.trim();
+                        try {
+                            const response = await fetch(`${this.apiBase}/auth/forgot-password/send-otp`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ email })
+                            });
+                            const data = await response.json();
+                            if (response.ok) {
+                                this.showMessage(data.message || 'OTP sent to your email', 'success');
+                                // Optionally open floating modal for full flow, or keep inline for next steps
+                            } else {
+                                this.showMessage(data.message || 'Failed to send OTP', 'error');
+                            }
+                        } catch (err) {
+                            console.error('Auth forgot send error:', err);
+                            this.showMessage('Failed to send OTP. Please try again.', 'error');
+                        }
+                    });
+                }
         // Mobile menu toggle
         const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
         const mainNav = document.getElementById('main-nav');
@@ -300,16 +491,45 @@ class AgriFisheryMarket {
         }
 
         // Navigation - handle clicks on links and child elements (icons/spans)
+        // Helper to normalize hrefs like "/#products" -> "#products"
+        const normalizeHash = (href) => {
+            if (!href) return null;
+            const hashIndex = href.indexOf('#');
+            if (hashIndex === -1) return null;
+            return href.slice(hashIndex);
+        };
+
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
-                e.preventDefault();
                 // Get href from the link element (not the clicked child)
-                const href = link.getAttribute('href') || e.target.closest('.nav-link')?.getAttribute('href');
+                const rawHref = link.getAttribute('href') || e.target.closest('.nav-link')?.getAttribute('href');
+                const href = normalizeHash(rawHref);
                 if (href) {
-                    this.scrollToSection(href);
-                    // Update active state
-                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                    link.classList.add('active');
+                    // Only intercept and smooth-scroll if the section exists on this page
+                    const targetEl = document.querySelector(href);
+                    if (targetEl) {
+                        // Use native hash navigation (same as footer quick links)
+                        // This keeps scrolling behavior identical to Quick Links and ensures correct landing
+                        // Do not prevent default; set the hash so browser jumps
+                        try {
+                            window.location.hash = href;
+                        } catch (e) {
+                            // Fallback: use smooth scroll if setting hash fails
+                            e.preventDefault();
+                            this.scrollToSection(href);
+                        }
+                        // Update active state immediately
+                        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                        link.classList.add('active');
+                    } else {
+                        // Let the browser follow the link (useful when on other pages)
+                        // If it's a path like '/#products', navigate there to let server/client routing handle it
+                        if (rawHref && (rawHref.startsWith('/') || rawHref.startsWith(window.location.origin))) {
+                            window.location.href = rawHref;
+                        }
+                    }
+                } else if (rawHref) {
+                    // No hash present - allow normal navigation (e.g., go to / or /product.html)
                 }
             });
         });
@@ -329,7 +549,69 @@ class AgriFisheryMarket {
         // Cart
         const cartBtn = document.getElementById('cart-btn');
         if (cartBtn) {
+            // Ensure floating behavior even if CSS is overridden elsewhere
+            try {
+                cartBtn.style.position = 'fixed';
+                cartBtn.style.right = '22px';
+                cartBtn.style.bottom = '22px';
+                cartBtn.style.zIndex = '2000';
+                // Ensure the button is a direct child of <body> so fixed positioning works
+                if (cartBtn.parentElement && cartBtn.parentElement !== document.body) {
+                    document.body.appendChild(cartBtn);
+                }
+            } catch (e) {}
             cartBtn.addEventListener('click', () => this.openCart());
+        }
+        // Ensure cart sidebar is a direct child of body to avoid transformed ancestor issues
+        const cartSidebarEl = document.getElementById('cart-sidebar');
+        if (cartSidebarEl && cartSidebarEl.parentElement !== document.body) {
+            try {
+                document.body.appendChild(cartSidebarEl);
+            } catch (e) {
+                console.warn('Could not move cart sidebar to body:', e);
+            }
+        }
+        // Also ensure cart overlay is moved to body so it covers the full viewport
+        const cartOverlayEl = document.getElementById('cart-overlay');
+        if (cartOverlayEl && cartOverlayEl.parentElement !== document.body) {
+            try {
+                document.body.appendChild(cartOverlayEl);
+            } catch (e) {
+                console.warn('Could not move cart overlay to body:', e);
+            }
+        }
+        // Ensure checkout modal is a direct child of body so it can float above other UI
+        const checkoutModalEl = document.getElementById('checkout-modal');
+        if (checkoutModalEl && checkoutModalEl.parentElement !== document.body) {
+            try {
+                document.body.appendChild(checkoutModalEl);
+                // Force fixed positioning and high z-index to guarantee it floats above cart/sidebar
+                checkoutModalEl.style.position = 'fixed';
+                checkoutModalEl.style.zIndex = '100005';
+                const modalContent = checkoutModalEl.querySelector('.modal-content');
+                if (modalContent) {
+                    modalContent.style.zIndex = '100006';
+                    modalContent.style.position = 'relative';
+                }
+            } catch (e) {
+                console.warn('Could not move checkout modal to body:', e);
+            }
+        }
+        // Ensure add-address modal is a direct child of body and floats above checkout
+        const addAddressModalEl = document.getElementById('add-address-modal');
+        if (addAddressModalEl && addAddressModalEl.parentElement !== document.body) {
+            try {
+                document.body.appendChild(addAddressModalEl);
+                addAddressModalEl.style.position = 'fixed';
+                addAddressModalEl.style.zIndex = '100007';
+                const addModalContent = addAddressModalEl.querySelector('.modal-content');
+                if (addModalContent) {
+                    addModalContent.style.position = 'relative';
+                    addModalContent.style.zIndex = '100008';
+                }
+            } catch (e) {
+                console.warn('Could not move add-address-modal to body:', e);
+            }
         }
         const closeCartBtn = document.getElementById('close-cart');
         if (closeCartBtn) {
@@ -372,6 +654,13 @@ class AgriFisheryMarket {
         const loginRegisterBtn = document.getElementById('login-register-btn');
         if (loginRegisterBtn) {
             loginRegisterBtn.addEventListener('click', () => this.openAuthFlow());
+        }
+        const authRegisterBtn = document.getElementById('auth-register-btn');
+        if (authRegisterBtn) {
+            authRegisterBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                try { this.switchAuthMode('register'); } catch (err) { this.openAuthFlow({ mode: 'register' }); }
+            });
         }
         const superAdminPanelBtn = document.getElementById('super-admin-panel-btn');
         if (superAdminPanelBtn) {
@@ -726,6 +1015,22 @@ class AgriFisheryMarket {
             }
         });
 
+        // Shop More button inside checkout modal: close checkout and cart so user can browse more
+        const shopMoreBtn = document.getElementById('shop-more-btn');
+        if (shopMoreBtn) {
+            shopMoreBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Only close the checkout modal and shopping cart; do not navigate or scroll.
+                try { this.closeModals(); } catch (err) {}
+                try { this.closeCart(); } catch (err) {}
+                // Provide a subtle UX cue: focus the products grid if present so user can continue browsing
+                try {
+                    const productsGrid = document.getElementById('products-grid');
+                    if (productsGrid) productsGrid.focus && productsGrid.focus();
+                } catch (err) {}
+            });
+        }
+
         // Auth mode toggle (will be set up dynamically in auth modal)
 
         // Search and filters
@@ -812,6 +1117,14 @@ class AgriFisheryMarket {
         if (myOrdersBtn) {
             myOrdersBtn.style.display = 'flex';
         }
+        const notificationsWrapper = document.querySelector('.notifications-wrapper') || document.getElementById('notifications-wrapper');
+        if (notificationsWrapper) {
+            notificationsWrapper.style.display = 'block';
+        }
+        const notificationsBtn = document.getElementById('notifications-btn');
+        if (notificationsBtn) {
+            notificationsBtn.style.display = 'inline-flex';
+        }
         this.loadUserProfile();
         this.updateOrdersCount();
     }
@@ -822,6 +1135,14 @@ class AgriFisheryMarket {
         const myOrdersBtn = document.getElementById('my-orders-btn');
         if (myOrdersBtn) {
             myOrdersBtn.style.display = 'none';
+        }
+        const notificationsWrapper = document.querySelector('.notifications-wrapper') || document.getElementById('notifications-wrapper');
+        if (notificationsWrapper) {
+            notificationsWrapper.style.display = 'none';
+        }
+        const notificationsBtn = document.getElementById('notifications-btn');
+        if (notificationsBtn) {
+            notificationsBtn.style.display = 'none';
         }
     }
 
@@ -1116,15 +1437,21 @@ class AgriFisheryMarket {
     updateSubmitButtonText() {
         const mode = this.authMode || (document.getElementById('auth-login-fields').style.display !== 'none' ? 'login' : 'register');
         const submitBtn = document.getElementById('auth-submit-btn');
+        const registerBtn = document.getElementById('auth-register-btn');
         if (submitBtn) {
             // Hide submit button during registration (we use step navigation instead)
             if (mode === 'register') {
                 submitBtn.style.display = 'none';
+                if (registerBtn) registerBtn.style.display = 'none';
                 return;
             }
             // For login mode, show and update button text (no OTP required)
             submitBtn.style.display = 'block';
             submitBtn.textContent = 'Login';
+            if (registerBtn) {
+                registerBtn.style.display = 'block';
+                registerBtn.textContent = 'Register';
+            }
         }
     }
 
@@ -2816,9 +3143,15 @@ class AgriFisheryMarket {
                 const data = await response.json();
                 this.renderCart(data);
                 const cartSidebar = document.getElementById('cart-sidebar');
+                const cartOverlay = document.getElementById('cart-overlay');
                 if (cartSidebar) {
                     cartSidebar.classList.add('open');
                 }
+                if (cartOverlay) {
+                    cartOverlay.classList.add('active');
+                }
+                // Prevent background scrolling when cart is open
+                document.body.style.overflow = 'hidden';
             } else {
                 console.error('Cart API error:', response.status);
                 const errorData = await response.json().catch(() => ({}));
@@ -3003,12 +3336,7 @@ class AgriFisheryMarket {
                     return;
                 }
 
-                // Set minimum date to today for delivery date
-                const deliveryDateInput = document.getElementById('delivery-date');
-                if (deliveryDateInput) {
-                    const today = new Date().toISOString().split('T')[0];
-                    deliveryDateInput.setAttribute('min', today);
-                }
+                // Delivery date input was removed from the UI; skip min-date setup.
 
                 this.renderCheckout(data);
                 // Always reload saved addresses to get the latest list
@@ -3155,7 +3483,8 @@ class AgriFisheryMarket {
         const fullName = document.getElementById('checkout-fullname').value.trim();
         const phone = document.getElementById('checkout-phone').value.trim();
         const deliveryAddress = document.getElementById('delivery-address').value.trim();
-        const deliveryDate = document.getElementById('delivery-date').value;
+        // Delivery date removed from UI; send today's date to satisfy backend requirement
+        const deliveryDate = (new Date()).toISOString().split('T')[0];
         const specialInstructions = document.getElementById('special-instructions').value.trim();
 
         // Validate required fields
@@ -3177,10 +3506,7 @@ class AgriFisheryMarket {
             return;
         }
 
-        if (!deliveryDate) {
-            this.showMessage('Please select a delivery date', 'error');
-            return;
-        }
+        // Delivery date no longer required.
 
         // Format phone with +63 prefix
         const phoneWithPrefix = phone.startsWith('+63') ? phone : '+63' + phone;
@@ -3226,6 +3552,8 @@ class AgriFisheryMarket {
     openAuthFlow(options = {}) {
         // If no mode specified, restore the last used mode
         let { mode, role, returnUrl = null } = options;
+        // If caller requests customer-only (e.g., from checkout), honor it
+        const customerOnly = !!options.customerOnly || !!this.pendingCheckout;
         
         if (!mode) {
             mode = localStorage.getItem('last_auth_mode') || 'login';
@@ -3241,6 +3569,33 @@ class AgriFisheryMarket {
         // Always open auth modal first (login form with role selector on it)
         this.selectedRole = role;
         this.authMode = mode;
+        // Before opening, adjust role selector visibility when customer-only
+        try {
+            const loginSel = document.getElementById('role-selector-login');
+            const regSel = document.getElementById('role-selector-register');
+            if (customerOnly) {
+                if (loginSel) {
+                    loginSel.querySelectorAll('.role-box, .role-box-enhanced').forEach(btn => {
+                        if (btn.getAttribute('data-role') !== 'customer') btn.style.display = 'none';
+                    });
+                }
+                if (regSel) {
+                    regSel.querySelectorAll('.role-box-enhanced').forEach(btn => {
+                        if (btn.getAttribute('data-role') !== 'customer') btn.style.display = 'none';
+                    });
+                }
+                // force role to customer
+                role = 'customer';
+                this.selectedRole = 'customer';
+            } else {
+                // restore visibility
+                if (loginSel) loginSel.querySelectorAll('.role-box, .role-box-enhanced').forEach(btn => btn.style.display = 'inline-flex');
+                if (regSel) regSel.querySelectorAll('.role-box-enhanced').forEach(btn => btn.style.display = 'inline-flex');
+            }
+        } catch (e) {
+            console.warn('Error adjusting role selector visibility:', e);
+        }
+
         this.openAuthModal(role, mode);
     }
 
@@ -3285,6 +3640,8 @@ class AgriFisheryMarket {
     }
 
     openAuthModal(role, mode) {
+        // If cart is open, close it so auth modal is not covered
+        try { this.closeCart(); } catch (e) {}
         const authModal = document.getElementById('auth-modal');
         const authTitle = document.getElementById('auth-modal-title');
         const authRoleInput = document.getElementById('auth-role');
@@ -3429,6 +3786,10 @@ class AgriFisheryMarket {
             this.restoreFormData(mode);
         }
         
+        // Ensure auth modal is attached to body so fixed positioning and z-index work
+        try {
+            if (authModal && authModal.parentElement !== document.body) document.body.appendChild(authModal);
+        } catch (e) {}
         authModal.classList.add('open');
     }
 
@@ -3953,26 +4314,38 @@ class AgriFisheryMarket {
 
     updateActiveNavLink() {
         const sections = ['home', 'products', 'about', 'contact'];
-        const scrollPosition = window.scrollY + 150; // Offset for header
-        
-        // Find which section is currently in view
+        const headerEl = document.querySelector('.header');
+        const headerOffset = headerEl ? headerEl.offsetHeight : 100;
+        const scrollY = window.scrollY || window.pageYOffset;
+
+        // If very near top prefer 'home'
         let activeSection = 'home';
-        sections.forEach(sectionId => {
-            const section = document.getElementById(sectionId);
-            if (section) {
-                const sectionTop = section.offsetTop;
-                const sectionBottom = sectionTop + section.offsetHeight;
-                
-                if (scrollPosition >= sectionTop && scrollPosition < sectionBottom) {
+        if (scrollY > headerOffset + 10) {
+            // Find section whose top is nearest to the header offset area
+            let minDistance = Infinity;
+            const referenceTop = headerOffset + 10; // px from viewport top
+            sections.forEach(sectionId => {
+                const section = document.getElementById(sectionId);
+                if (!section) return;
+                const rect = section.getBoundingClientRect();
+                const distance = Math.abs(rect.top - referenceTop);
+                if (distance < minDistance) {
+                    minDistance = distance;
                     activeSection = sectionId;
                 }
-            }
-        });
-        
-        // Update nav links
+            });
+        }
+
+        // Update nav links (normalize hrefs so /#products and #products both match)
+        const normalizeHash = (href) => {
+            if (!href) return null;
+            const hashIndex = href.indexOf('#');
+            if (hashIndex === -1) return null;
+            return href.slice(hashIndex);
+        };
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
-            const href = link.getAttribute('href');
+            const href = normalizeHash(link.getAttribute('href'));
             if (href === `#${activeSection}`) {
                 link.classList.add('active');
             }
@@ -4044,7 +4417,7 @@ function initializeApp() {
             console.log('App already initialized');
             return;
         }
-        app = new AgriFisheryMarket();
+        app = new AgricultureMarket();
         // Make app globally accessible for onclick handlers
         window.app = app;
         console.log('App initialized successfully');

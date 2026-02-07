@@ -12,15 +12,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Local ingest logger helper (disabled in production by default)
+// Ingest/debug posts are disabled in source by default to avoid local external calls
 const _INGEST_URL = 'http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c';
-const shouldSendIngest = process.env.NODE_ENV !== 'production' && process.env.ENABLE_INGEST !== 'false';
-function sendIngest(payload) {
-  if (!shouldSendIngest) return;
-  try {
-    fetch(_INGEST_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => {});
-  } catch (e) {
-    // swallow errors - this is best-effort local logging
-  }
+const shouldSendIngest = false;
+function sendIngest(/* payload */) {
+  // no-op in source; enable via environment changes if needed
+  return;
 }
 
 // Render Postgres requires SSL for external connections.
@@ -99,7 +96,7 @@ app.use(session({
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agri_fishery_marketplace',
+  database: process.env.DB_NAME || 'agriculture_marketplace',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
@@ -156,10 +153,12 @@ sendIngest({location:'server.js:47',message:'Loading routes',data:{},timestamp:D
 
 try {
   app.use('/api/auth', require('./routes/auth'));
+  console.log('✅ /api/auth mounted');
   // #region agent log
   sendIngest({location:'server.js:49',message:'Auth route loaded successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion
 } catch (error) {
+  console.error('❌ Failed to mount /api/auth:', error);
   // #region agent log
   sendIngest({location:'server.js:49',message:'Auth route failed to load',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion
@@ -452,7 +451,7 @@ app.get('/', (req, res) => {
         <h2>Available Features:</h2>
         <ul>
           <li>✅ Browse Agricultural Products (Vegetables, Fruits, Grains)</li>
-          <li>✅ Browse Fishery Products (Fish, Seafood)</li>
+          <!-- Fishery/Seafood category removed -->
           <li>✅ Guest shopping cart</li>
           <li>✅ User registration and login</li>
           <li>✅ Cash on delivery payment</li>
@@ -460,7 +459,7 @@ app.get('/', (req, res) => {
         <h2>Test Accounts:</h2>
         <ul>
           <li>Email: juan@farm.ph | Password: password123 (Farmer)</li>
-          <li>Email: maria@seafood.ph | Password: password123 (Fishery)</li>
+          <!-- Fishery/Seafood user removed -->
         </ul>
         <p><strong>Note:</strong> If you see this page, the frontend file couldn't be found. Please check the file path.</p>
       </body>
