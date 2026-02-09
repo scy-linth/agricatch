@@ -41,15 +41,7 @@ const sampleUsers = [
     address: '123 Farm Road, Laguna, Philippines',
     role: 'farmer'
   },
-  {
-    username: 'farmer_maria',
-    email: 'maria@seafood.ph',
-    password: 'password123', // Plain text for demonstration (NOT SECURE!)
-    full_name: 'Maria Santos',
-    phone: '+63 918 234 5678',
-    address: '456 Coastal Road, Batangas, Philippines',
-    role: 'farmer'
-  }
+  // Removed fishery/seafood farmer Maria
 ];
 
 const sampleProducts = [
@@ -159,46 +151,7 @@ const sampleProducts = [
     expiry_date: '2024-02-05'
   },
 
-  // Fishery Products - Farmer Maria (farmer_id: 4)
-  {
-    name: 'Fresh Bangus',
-    description: 'Freshly caught bangus from local fish farms. Cleaned and ready for cooking.',
-    price: 180.00,
-    category_id: 2,
-    farmer_id: 4,
-    stock_quantity: 50,
-    unit: 'kg',
-    image_url: '/images/bangus.jpg',
-    location: 'Batangas, Philippines',
-    harvest_date: '2024-01-19',
-    expiry_date: '2024-01-22'
-  },
-  {
-    name: 'Fresh Shark',
-    description: 'Fresh shark meat from sustainable fishing. Perfect for grilling or frying.',
-    price: 160.00,
-    category_id: 2,
-    farmer_id: 4,
-    stock_quantity: 75,
-    unit: 'kg',
-    image_url: '/images/shark.jpg',
-    location: 'Rizal, Philippines',
-    harvest_date: '2024-01-19',
-    expiry_date: '2024-01-21'
-  },
-  {
-    name: 'Fresh Squid',
-    description: 'Premium quality squid, perfect for calamares or grilling. Fresh from the sea.',
-    price: 220.00,
-    category_id: 2,
-    farmer_id: 4,
-    stock_quantity: 30,
-    unit: 'kg',
-    image_url: '/images/squid.jpg',
-    location: 'Palawan, Philippines',
-    harvest_date: '2024-01-18',
-    expiry_date: '2024-01-23'
-  },
+  // Removed all fishery/seafood/aquaculture products
   {
     name: 'Fresh Tuna',
     description: 'Premium tuna belly for sashimi or grilling. Rich in omega-3 fatty acids.',
@@ -259,17 +212,11 @@ async function seedDatabase() {
 
     // Get farmer IDs
     const juanResult = await pool.query('SELECT id FROM users WHERE email = $1', ['juan@farm.ph']);
-    const mariaResult = await pool.query('SELECT id FROM users WHERE email = $1', ['maria@seafood.ph']);
-    
     const juanId = juanResult.rows[0]?.id || 3;
-    const mariaId = mariaResult.rows[0]?.id || 4;
-
-    console.log(`Farmer Juan ID: ${juanId}, Farmer Maria ID: ${mariaId}`);
-
+    console.log(`Farmer Juan ID: ${juanId}`);
     // Update farmer_id in products array based on actual IDs
     const productsToInsert = sampleProducts.map(p => {
       if (p.farmer_id === 3) p.farmer_id = juanId;
-      if (p.farmer_id === 4) p.farmer_id = mariaId;
       return p;
     });
 
@@ -288,7 +235,7 @@ async function seedDatabase() {
     console.log(`Database seeding completed successfully!`);
     console.log(`Inserted ${productsToInsert.length} products`);
     console.log(`- Agricultural products (Farmer Juan): ${productsToInsert.filter(p => p.category_id === 1).length}`);
-    console.log(`- Fishery products (Farmer Maria): ${productsToInsert.filter(p => p.category_id === 2).length}`);
+    // Fishery/seafood products removed
   } catch (error) {
     console.error('Error seeding database:', error);
   } finally {

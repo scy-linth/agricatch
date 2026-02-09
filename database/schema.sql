@@ -1,5 +1,6 @@
--- Agricultural and Fishery Products Marketplace Database Schema
--- Note: Make sure you are connected to the 'agri_fishery_marketplace' database before running this script
+
+-- Agricultural Products Marketplace Database Schema
+-- Note: Make sure you are connected to the 'agriculture_marketplace' database before running this script
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -207,10 +208,30 @@ CREATE TABLE IF NOT EXISTS otps (
 CREATE INDEX IF NOT EXISTS idx_otps_email_purpose ON otps(email, purpose);
 CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps(expires_at);
 
+-- Password reset OTP table (stores hashed OTP; single-use)
+CREATE TABLE IF NOT EXISTS password_resets (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    email VARCHAR(100) NOT NULL,
+    otp_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT false,
+    attempts INTEGER DEFAULT 0,
+    sent_count INTEGER DEFAULT 1,
+    last_sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    used_at TIMESTAMP,
+    request_ip VARCHAR(64),
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_resets_user_created ON password_resets(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_password_resets_expires ON password_resets(expires_at);
+
 -- Insert default categories
+
 INSERT INTO categories (name, description) VALUES
-('Agricultural Products', 'Fresh vegetables, fruits, grains, and other farm products'),
-('Fishery Products', 'Fresh fish, seafood, and aquaculture products')
+('Agricultural Products', 'Fresh vegetables, fruits, grains, and other farm products')
 ON CONFLICT (name) DO NOTHING;
 
 -- Create indexes for better performance

@@ -9,7 +9,7 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agri_fishery_marketplace',
+  database: process.env.DB_NAME || 'agriculture_marketplace',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
@@ -85,7 +85,16 @@ router.get('/', async (req, res) => {
 // Add item to cart
 router.post('/', async (req, res) => {
   try {
-    const { productId, quantity = 1 } = req.body;
+    // Dev logging: show incoming payload and minimal headers to aid debugging
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        console.debug('[DEV] Add to cart request body:', req.body);
+        console.debug('[DEV] Add to cart auth header present:', !!req.headers.authorization);
+      } catch (e) {}
+    }
+    let { productId, quantity = 1 } = req.body;
+    productId = parseInt(productId, 10);
+    quantity = parseInt(quantity, 10) || 1;
     const token = req.headers.authorization?.split(' ')[1];
     const sessionId = req.body.sessionId;
 
@@ -141,11 +150,27 @@ router.post('/', async (req, res) => {
           [newQuantity, existingItem.rows[0].id]
         );
       } else {
-        // Add new item
-        await pool.query(
-          'INSERT INTO cart (user_id, product_id, quantity) VALUES ($1, $2, $3)',
-          [userId, productId, quantity]
-        );
+        // Add new item - handle possible race condition using upsert fallback
+        try {
+          await pool.query(
+            'INSERT INTO cart (user_id, product_id, quantity) VALUES ($1, $2, $3)',
+            [userId, productId, quantity]
+          );
+        } catch (err) {
+          // If another request inserted the same row concurrently, update quantity instead
+          if (err && err.code === '23505') {
+            const existing = await pool.query('SELECT id, quantity FROM cart WHERE user_id = $1 AND product_id = $2', [userId, productId]);
+            if (existing.rows.length > 0) {
+              const newQuantity = existing.rows[0].quantity + quantity;
+              if (newQuantity > product.stock_quantity) {
+                return res.status(400).json({ message: 'Not enough stock available' });
+              }
+              await pool.query('UPDATE cart SET quantity = $1 WHERE id = $2', [newQuantity, existing.rows[0].id]);
+            }
+          } else {
+            throw err;
+          }
+        }
       }
     } else if (sessionId) {
       // Guest user - check if item already in cart
@@ -166,11 +191,26 @@ router.post('/', async (req, res) => {
           [newQuantity, existingItem.rows[0].id]
         );
       } else {
-        // Add new item
-        await pool.query(
-          'INSERT INTO cart (session_id, product_id, quantity) VALUES ($1, $2, $3)',
-          [sessionId, productId, quantity]
-        );
+        // Add new item - handle race with upsert fallback
+        try {
+          await pool.query(
+            'INSERT INTO cart (session_id, product_id, quantity) VALUES ($1, $2, $3)',
+            [sessionId, productId, quantity]
+          );
+        } catch (err) {
+          if (err && err.code === '23505') {
+            const existing = await pool.query('SELECT id, quantity FROM cart WHERE session_id = $1 AND product_id = $2', [sessionId, productId]);
+            if (existing.rows.length > 0) {
+              const newQuantity = existing.rows[0].quantity + quantity;
+              if (newQuantity > product.stock_quantity) {
+                return res.status(400).json({ message: 'Not enough stock available' });
+              }
+              await pool.query('UPDATE cart SET quantity = $1 WHERE id = $2', [newQuantity, existing.rows[0].id]);
+            }
+          } else {
+            throw err;
+          }
+        }
       }
     } else {
       return res.status(400).json({ message: 'Session ID required for guest users' });
@@ -180,6 +220,9 @@ router.post('/', async (req, res) => {
 
   } catch (error) {
     console.error('Add to cart error:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      return res.status(500).json({ message: error.message || 'Server error adding item to cart', stack: error.stack });
+    }
     res.status(500).json({ message: 'Server error adding item to cart' });
   }
 });
