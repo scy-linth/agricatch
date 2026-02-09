@@ -101,8 +101,8 @@
         <div class="hero-overlay"></div>
         <div class="container">
             <div class="hero-content">
-                <h2>Freshly Caught! Pre-ordered for you!</h2>
-                <p>Discover the finest agricultural and fishery products directly from local farmers. Quality guaranteed, farm-fresh delivery.</p>
+                <h2>Fresh Harvest, Direct from Farms!</h2>
+                <p>Discover the finest agricultural products directly from local farmers. Quality guaranteed, farm-fresh delivery.</p>
                 <div class="hero-buttons">
                     <button id="shop-now-btn" class="btn btn-primary btn-large">Shop Now</button>
                 </div>
@@ -110,28 +110,10 @@
         </div>
     </section>
 
-    <!-- Categories Section -->
+    <!-- Fresh Harvest Navigation -->
     <section class="categories">
         <div class="container">
-            <h2 class="section-title">Our Categories</h2>
-            <div class="categories-grid">
-                <div class="category-card" data-category="Agricultural Products">
-                    <div class="category-icon">
-                        <i class="fas fa-carrot"></i>
-                    </div>
-                    <h3>Agricultural Products</h3>
-                    <p>Fresh vegetables, fruits, grains, and more from local farms</p>
-                </div>
-                <div class="category-card" data-category="Fishery Products">
-                    <div class="category-icon">
-                        <i class="fas fa-fish"></i>
-                    </div>
-                    <h3>Fishery Products</h3>
-                    <p>Premium seafood and aquaculture products, caught fresh daily</p>
-                </div>
-            </div>
-        </div>
-    </section>
+            <!-- Fresh Harvest section removed: direct product feed shown below -->
 
     <!-- Products Section -->
     <section id="products" class="products">
@@ -142,13 +124,7 @@
                     <div class="search-input-wrapper">
                         <input type="text" id="search-input" placeholder="Search products..." class="search-input">
                     </div>
-                    <div class="filter-select-wrapper">
-                        <select id="category-filter" class="filter-select">
-                            <option value="">All Categories</option>
-                            <option value="Agricultural Products">Agricultural Products</option>
-                            <option value="Fishery Products">Fishery Products</option>
-                        </select>
-                    </div>
+                    <!-- Category filter removed: product feed defaults to Agriculture -->
                 </div>
             </div>
             <div id="products-grid" class="products-grid">
@@ -287,6 +263,10 @@
                             </button>
                         </div>
                     </div>
+
+                    <div class="form-group" style="margin-top: -0.35rem;">
+                        <a href="#" id="forgot-password-link" style="font-size: 0.95em;">Forgot password?</a>
+                    </div>
                     
                     <!-- Role selector box: choose Farmer, Customer, or Admin (login) -->
                     <div class="form-group role-selector-group">
@@ -396,12 +376,7 @@
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
-                            <div id="password-strength" class="password-strength" style="display: none;">
-                                <div class="strength-bar">
-                                    <div class="strength-fill" id="strength-fill"></div>
-                                </div>
-                                <small class="strength-text" id="strength-text"></small>
-                            </div>
+                            <!-- Password strength UI removed -->
                             <small class="field-hint">At least 6 characters recommended</small>
                         </div>
                         <div class="form-group">
@@ -483,7 +458,7 @@
                                     </div>
                                     <div class="role-content">
                                         <div class="role-title">Customer</div>
-                                        <div class="role-description">Browse and purchase fresh agricultural and fishery products</div>
+                                        <div class="role-description">Browse and purchase fresh agricultural products</div>
                                     </div>
                                     <div class="role-check">
                                         <i class="fas fa-check-circle"></i>
@@ -495,7 +470,7 @@
                                     </div>
                                     <div class="role-content">
                                         <div class="role-title">Farmer</div>
-                                        <div class="role-description">Sell your agricultural and fishery products to customers</div>
+                                        <div class="role-description">Sell your agricultural products to customers</div>
                                     </div>
                                     <div class="role-check">
                                         <i class="fas fa-check-circle"></i>
@@ -575,6 +550,85 @@
         </div>
     </div>
 
+    <!-- Forgot Password Modal -->
+    <div id="forgot-password-modal" class="modal">
+        <div class="modal-content modal-medium">
+            <div class="modal-header">
+                <h3>Forgot Password</h3>
+                <button class="close-btn" id="forgot-password-close-btn">&times;</button>
+            </div>
+
+            <div class="auth-form">
+                <!-- Step 1: Email -->
+                <div id="forgot-step-email">
+                    <div class="form-group">
+                        <label for="forgot-email">Email Address</label>
+                        <input type="email" id="forgot-email" placeholder="your.email@example.com" autocomplete="email">
+                        <small class="field-hint">We’ll send a 6-digit verification code to your email.</small>
+                    </div>
+                    <div class="step-actions">
+                        <button type="button" class="btn btn-outline" id="forgot-back-to-login">Back</button>
+                        <button type="button" class="btn btn-primary btn-full" id="forgot-send-btn">Send Code</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Verify OTP -->
+                <div id="forgot-step-otp" style="display: none;">
+                    <div class="form-group">
+                        <label for="forgot-otp">Verification Code</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                            <input type="text" id="forgot-otp" placeholder="000000" maxlength="6" pattern="[0-9]{6}" style="flex: 1;">
+                            <button type="button" id="forgot-resend-btn" class="btn btn-outline" style="white-space: nowrap;">Resend</button>
+                            <span id="forgot-resend-cooldown" style="min-width: 60px; color: #888; font-size: 0.95em; display: none; align-self: center;"></span>
+                        </div>
+                        <small class="field-hint">Enter the code we sent. Then click Verify.</small>
+                    </div>
+                    <div class="step-actions">
+                        <button type="button" class="btn btn-outline" id="forgot-back-to-email">Back</button>
+                        <button type="button" class="btn btn-primary btn-full" id="forgot-verify-otp-btn">Verify Code</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: New Password -->
+                <div id="forgot-step-password" style="display: none;">
+                    <div class="form-group">
+                        <label for="forgot-new-password">New Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="forgot-new-password" minlength="6" autocomplete="new-password">
+                            <button type="button" class="password-toggle" id="toggle-forgot-password" aria-label="Show password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="forgot-new-password-confirm">Confirm New Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="forgot-new-password-confirm" minlength="6" autocomplete="new-password">
+                            <button type="button" class="password-toggle" id="toggle-forgot-confirm-password" aria-label="Show password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small class="field-hint" id="forgot-password-match-hint"></small>
+                    </div>
+
+                    <div class="step-actions">
+                        <button type="button" class="btn btn-outline" id="forgot-back-to-otp">Back</button>
+                        <button type="button" class="btn btn-primary btn-full" id="forgot-reset-btn">Reset Password</button>
+                    </div>
+                </div>
+
+                <!-- Step 4: Success -->
+                <div id="forgot-step-success" style="display: none;">
+                    <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 0.9rem; border-radius: var(--border-radius); margin-bottom: 1rem;">
+                        <i class="fas fa-check-circle"></i> Your password has been reset.
+                    </div>
+                    <button type="button" class="btn btn-primary btn-full" id="forgot-back-to-login-btn">Back to Login</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Checkout Modal -->
     <div id="checkout-modal" class="modal">
@@ -596,10 +650,6 @@
                             </div>
                         </div>
                         <div class="checkout-summary-total">
-                            <div class="summary-row">
-                                <span>Subtotal:</span>
-                                <span>₱<span id="checkout-subtotal">0.00</span></span>
-                            </div>
                             <div class="summary-row total-row">
                                 <strong>Total:</strong>
                                 <strong>₱<span id="checkout-total">0.00</span></strong>
@@ -654,13 +704,7 @@
                             <textarea id="delivery-address" class="form-textarea" rows="3" placeholder="Enter your complete delivery address (street, barangay, city, province)" required></textarea>
                         </div>
 
-                        <div class="form-group">
-                            <label for="delivery-date">
-                                <i class="fas fa-calendar-alt"></i> Preferred Delivery Date <span class="required">*</span>
-                            </label>
-                            <input type="date" id="delivery-date" class="form-input" required>
-                            <small class="form-hint">Select your preferred delivery date</small>
-                        </div>
+                        <!-- Preferred delivery date removed per request -->
 
                         <div class="form-group">
                             <label for="special-instructions">
@@ -689,7 +733,7 @@
                                 </div>
                                 <div class="policy-content">
                                     <strong>Important Policy Notice</strong>
-                                    <p>Due to the perishable nature of our fresh products (fish, meat, vegetables, fruits), we have a <strong>strict no refund, no exchange policy</strong> to ensure product freshness and quality. All sales are final.</p>
+                                    <p>Due to the perishable nature of our fresh products (meat, vegetables, fruits), we have a <strong>strict no refund, no exchange policy</strong> to ensure product freshness and quality. All sales are final.</p>
                                 </div>
                             </div>
                         </div>
@@ -699,14 +743,23 @@
                 <!-- Checkout Footer -->
                 <div class="checkout-footer">
                     <div class="checkout-footer-content">
-                        <div class="checkout-total-display">
-                            <span class="total-label">Total Amount:</span>
-                            <span class="total-amount">₱<span id="checkout-total-footer">0.00</span></span>
+                            <div class="checkout-total-display">
+                                <span class="total-label">Total Amount:</span>
+                                <span class="total-amount">₱<span id="checkout-total-footer">0.00</span></span>
+                            </div>
+
+                            <div class="shop-more-wrapper">
+                                <button type="button" class="btn btn-secondary btn-large shop-more-btn" id="shop-more-btn" aria-label="Shop more products">
+                                    <i class="fas fa-store"></i> Shop More
+                                </button>
+                            </div>
+
+                            <div class="checkout-submit-wrapper">
+                                <button type="submit" class="btn btn-primary btn-large checkout-submit-btn">
+                                    <i class="fas fa-check-circle"></i> Place Order
+                                </button>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-large checkout-submit-btn">
-                            <i class="fas fa-check-circle"></i> Place Order
-                        </button>
-                    </div>
                 </div>
             </form>
         </div>
@@ -771,7 +824,7 @@
             <div class="about-content">
                 <div class="about-text">
                     <h2>About AgriCatch</h2>
-                    <p>We connect local farmers and fishermen directly with consumers, ensuring you get the freshest agricultural and fishery products at fair prices. Our platform supports sustainable farming practices and helps local communities thrive.</p>
+                    <p>We connect local farmers directly with consumers, ensuring you get the freshest agricultural products at fair prices. Our platform supports sustainable farming practices and helps local communities thrive.</p>
                     <ul class="about-features">
                         <li><i class="fas fa-check-circle"></i> Farm-fresh products guaranteed</li>
                         <li><i class="fas fa-check-circle"></i> Direct from local farmers</li>
@@ -837,7 +890,7 @@
             <div class="footer-content">
                 <div class="footer-section">
                 <h3>AgriCatch</h3>
-                <p>Freshly Caught! Pre-ordered for you! Your trusted source for fresh agricultural and fishery products.</p>
+                <p>Fresh from the farm! Pre-ordered for you! Your trusted source for fresh agricultural products.</p>
                 </div>
                 <div class="footer-section">
                     <h3>Quick Links</h3>

@@ -12,12 +12,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Local ingest logger helper (disabled in production by default)
-// Ingest/debug posts are disabled in source by default to avoid local external calls
 const _INGEST_URL = 'http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c';
-const shouldSendIngest = false;
-function sendIngest(/* payload */) {
-  // no-op in source; enable via environment changes if needed
-  return;
+const shouldSendIngest = process.env.NODE_ENV !== 'production' && process.env.ENABLE_INGEST !== 'false';
+function sendIngest(payload) {
+  if (!shouldSendIngest) return;
+  try {
+    fetch(_INGEST_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => {});
+  } catch (e) {
+    // swallow errors - this is best-effort local logging
+  }
 }
 
 // Render Postgres requires SSL for external connections.
@@ -121,6 +124,28 @@ const pool = new Pool({
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_otps_email_purpose ON otps(email, purpose)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps(expires_at)`);
     console.log('✅ OTP table verified/created');
+
+    // Ensure password reset OTP table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        email VARCHAR(100) NOT NULL,
+        otp_hash VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT false,
+        attempts INTEGER DEFAULT 0,
+        sent_count INTEGER DEFAULT 1,
+        last_sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        used_at TIMESTAMP,
+        request_ip VARCHAR(64),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_user_created ON password_resets(user_id, created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_expires ON password_resets(expires_at)`);
+    console.log('✅ Password reset table verified/created');
   } catch (error) {
     console.error('⚠️ OTP table creation check failed:', error.message);
   }
@@ -153,12 +178,10 @@ sendIngest({location:'server.js:47',message:'Loading routes',data:{},timestamp:D
 
 try {
   app.use('/api/auth', require('./routes/auth'));
-  console.log('✅ /api/auth mounted');
   // #region agent log
   sendIngest({location:'server.js:49',message:'Auth route loaded successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion
 } catch (error) {
-  console.error('❌ Failed to mount /api/auth:', error);
   // #region agent log
   sendIngest({location:'server.js:49',message:'Auth route failed to load',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion

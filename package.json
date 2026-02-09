@@ -1,6 +1,8 @@
 {
   "dependencies": {
     "cloudinary": "^2.9.0",
-    "pg": "^8.17.2"
+    "express": "^5.2.1",
+    "pg": "^8.17.2",
+    "puppeteer": "^24.37.2"
   }
 }

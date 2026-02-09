@@ -2,6 +2,9 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
+const crypto = require('crypto');
+
+const { sendOtpEmail } = require('../utils/emailService');
 
 const router = express.Router();
 const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
@@ -10,11 +13,93 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agri_fishery_marketplace',
+  database: process.env.DB_NAME || 'agriculture_marketplace',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
 });
+
+const BCRYPT_ROUNDS = Number.parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
+const PASSWORD_RESET_OTP_TTL_MINUTES = Number.parseInt(process.env.PASSWORD_RESET_OTP_TTL_MINUTES || '15', 10);
+const PASSWORD_RESET_MAX_VERIFY_ATTEMPTS = Number.parseInt(process.env.PASSWORD_RESET_MAX_VERIFY_ATTEMPTS || '5', 10);
+const PASSWORD_RESET_COOLDOWN_SECONDS = Number.parseInt(process.env.PASSWORD_RESET_COOLDOWN_SECONDS || '60', 10);
+const PASSWORD_RESET_MAX_REQUESTS_PER_HOUR = Number.parseInt(process.env.PASSWORD_RESET_MAX_REQUESTS_PER_HOUR || '5', 10);
+
+// Dev-only OTP surfacing toggle (do NOT enable in production)
+const DEV_SHOW_PASSWORD_RESET_OTP = (process.env.DEV_SHOW_PASSWORD_RESET_OTP === 'true') && process.env.NODE_ENV !== 'production';
+
+function isBcryptHash(value) {
+  return typeof value === 'string' && value.startsWith('$2') && value.length > 20;
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+function generateNumericOtp() {
+  // cryptographically stronger than Math.random
+  const n = crypto.randomInt(0, 1_000_000);
+  return String(n).padStart(6, '0');
+}
+
+function getClientIp(req) {
+  const xf = req.headers['x-forwarded-for'];
+  if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
+  return req.ip || req.connection?.remoteAddress || 'unknown';
+}
+
+// Very small in-memory rate limiter to avoid account enumeration via different responses.
+// Applies equally whether or not the account exists.
+const _forgotLimiter = new Map();
+function checkForgotRateLimit(key, { maxPerHour, minIntervalSeconds }) {
+  const now = Date.now();
+  const hourAgo = now - 60 * 60 * 1000;
+  const existing = _forgotLimiter.get(key) || { timestamps: [], lastAt: 0 };
+  existing.timestamps = existing.timestamps.filter(ts => ts > hourAgo);
+
+  const secondsSinceLast = existing.lastAt ? Math.floor((now - existing.lastAt) / 1000) : Infinity;
+  if (secondsSinceLast < minIntervalSeconds) {
+    return { allowed: false, retryAfterSeconds: minIntervalSeconds - secondsSinceLast, reason: 'cooldown' };
+  }
+  if (existing.timestamps.length >= maxPerHour) {
+    const oldest = existing.timestamps[0];
+    const retryAfterSeconds = Math.max(1, Math.ceil((oldest + 60 * 60 * 1000 - now) / 1000));
+    return { allowed: false, retryAfterSeconds, reason: 'hourly' };
+  }
+
+  existing.timestamps.push(now);
+  existing.lastAt = now;
+  _forgotLimiter.set(key, existing);
+  return { allowed: true };
+}
+
+async function ensurePasswordResetsTable() {
+  // best-effort and idempotent
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      email VARCHAR(100) NOT NULL,
+      otp_hash VARCHAR(255) NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      used BOOLEAN DEFAULT false,
+      attempts INTEGER DEFAULT 0,
+      sent_count INTEGER DEFAULT 1,
+      last_sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      used_at TIMESTAMP,
+      request_ip VARCHAR(64),
+      user_agent TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_user_created ON password_resets(user_id, created_at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_expires ON password_resets(expires_at)`);
+}
 
 // Check username availability
 router.get('/check-username/:username', async (req, res) => {
@@ -103,8 +188,8 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Store password as plain text for demonstration (NOT SECURE!)
-    const hashedPassword = password;
+    // Store password as bcrypt hash (existing plaintext accounts are still supported at login).
+    const hashedPassword = await bcrypt.hash(String(password || ''), BCRYPT_ROUNDS);
 
     // Role rules:
     // - If password matches ADMIN_SECRET (default: 'admin123') -> admin
@@ -197,8 +282,18 @@ router.post('/login', async (req, res) => {
 
     const user = result.rows[0];
 
-    // Check password (plain text for demonstration - NOT SECURE!)
-    if (password !== user.password) {
+    // Check password (backward-compatible):
+    // - If stored password is bcrypt hash, use bcrypt compare
+    // - Else fall back to plaintext compare for legacy accounts
+    const storedPassword = user.password;
+    const providedPassword = String(password || '');
+    let passwordOk = false;
+    if (isBcryptHash(storedPassword)) {
+      passwordOk = await bcrypt.compare(providedPassword, storedPassword);
+    } else {
+      passwordOk = providedPassword === String(storedPassword || '');
+    }
+    if (!passwordOk) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -320,6 +415,240 @@ router.put('/profile', async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ message: 'Server error updating profile' });
+  }
+});
+
+// Forgot Password (OTP) flow
+
+router.post('/forgot', async (req, res) => {
+  const genericMessage = "If that email exists, we've sent a verification code.";
+  try {
+    await ensurePasswordResetsTable();
+
+    const email = normalizeEmail(req.body?.email);
+    const ip = getClientIp(req);
+    const limiterKey = `${ip}:${email || 'noemail'}`;
+    const rl = checkForgotRateLimit(limiterKey, {
+      maxPerHour: PASSWORD_RESET_MAX_REQUESTS_PER_HOUR,
+      minIntervalSeconds: PASSWORD_RESET_COOLDOWN_SECONDS
+    });
+
+    if (!rl.allowed) {
+      return res.status(429).json({ message: genericMessage, retryAfter: rl.retryAfterSeconds, cooldownSeconds: rl.retryAfterSeconds });
+    }
+
+    if (!email || !isValidEmail(email)) {
+      return res.json({ message: genericMessage });
+    }
+
+    const userRes = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (userRes.rows.length === 0) {
+      return res.json({ message: genericMessage });
+    }
+
+    const userId = userRes.rows[0].id;
+    const otp = generateNumericOtp();
+    const otpHash = await bcrypt.hash(otp, BCRYPT_ROUNDS);
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_OTP_TTL_MINUTES * 60 * 1000);
+    const userAgent = String(req.headers['user-agent'] || '').slice(0, 500);
+
+    // Invalidate prior unused reset requests for this user
+    await pool.query('UPDATE password_resets SET used = true, used_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND used = false', [userId]);
+
+    await pool.query(
+      `INSERT INTO password_resets (user_id, email, otp_hash, expires_at, request_ip, user_agent, sent_count, last_sent_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 1, CURRENT_TIMESTAMP)`,
+      [userId, email, otpHash, expiresAt, ip, userAgent]
+    );
+
+    // Best-effort cleanup
+    await pool.query('DELETE FROM password_resets WHERE expires_at < NOW() - INTERVAL \'7 days\'');
+
+    const emailResult = await sendOtpEmail(email, otp, 'reset_password');
+    if (!emailResult?.success) {
+      console.error('Forgot password email send failed:', emailResult?.error);
+    }
+
+    if (DEV_SHOW_PASSWORD_RESET_OTP) {
+      return res.json({ message: genericMessage, debugOtp: otp, expiresIn: PASSWORD_RESET_OTP_TTL_MINUTES * 60 });
+    }
+
+    return res.json({ message: genericMessage });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.json({ message: genericMessage });
+  }
+});
+
+router.post('/forgot/resend', async (req, res) => {
+  const genericMessage = "If that email exists, we've sent a verification code.";
+  try {
+    await ensurePasswordResetsTable();
+
+    const email = normalizeEmail(req.body?.email);
+    const ip = getClientIp(req);
+    const limiterKey = `${ip}:${email || 'noemail'}`;
+    const rl = checkForgotRateLimit(limiterKey, {
+      maxPerHour: PASSWORD_RESET_MAX_REQUESTS_PER_HOUR,
+      minIntervalSeconds: PASSWORD_RESET_COOLDOWN_SECONDS
+    });
+
+    if (!rl.allowed) {
+      return res.status(429).json({ message: genericMessage, retryAfter: rl.retryAfterSeconds, cooldownSeconds: rl.retryAfterSeconds });
+    }
+
+    if (!email || !isValidEmail(email)) {
+      return res.json({ message: genericMessage });
+    }
+
+    const userRes = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (userRes.rows.length === 0) {
+      return res.json({ message: genericMessage });
+    }
+
+    const userId = userRes.rows[0].id;
+    const otp = generateNumericOtp();
+    const otpHash = await bcrypt.hash(otp, BCRYPT_ROUNDS);
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_OTP_TTL_MINUTES * 60 * 1000);
+    const userAgent = String(req.headers['user-agent'] || '').slice(0, 500);
+
+    await pool.query('UPDATE password_resets SET used = true, used_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND used = false', [userId]);
+    await pool.query(
+      `INSERT INTO password_resets (user_id, email, otp_hash, expires_at, request_ip, user_agent, sent_count, last_sent_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 1, CURRENT_TIMESTAMP)`,
+      [userId, email, otpHash, expiresAt, ip, userAgent]
+    );
+
+    const emailResult = await sendOtpEmail(email, otp, 'reset_password');
+    if (!emailResult?.success) {
+      console.error('Forgot password resend email send failed:', emailResult?.error);
+    }
+
+    if (DEV_SHOW_PASSWORD_RESET_OTP) {
+      return res.json({ message: genericMessage, debugOtp: otp, expiresIn: PASSWORD_RESET_OTP_TTL_MINUTES * 60 });
+    }
+
+    return res.json({ message: genericMessage });
+  } catch (error) {
+    console.error('Forgot password resend error:', error);
+    return res.json({ message: genericMessage });
+  }
+});
+
+router.post('/forgot/verify-otp', async (req, res) => {
+  try {
+    await ensurePasswordResetsTable();
+
+    const email = normalizeEmail(req.body?.email);
+    const otp = String(req.body?.otp || '').trim();
+
+    if (!email || !isValidEmail(email) || !otp) {
+      return res.status(400).json({ message: 'Invalid or expired code.' });
+    }
+
+    const userRes = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (userRes.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired code.' });
+    }
+    const userId = userRes.rows[0].id;
+
+    const resetRes = await pool.query(
+      `SELECT id, otp_hash, expires_at, attempts
+       FROM password_resets
+       WHERE user_id = $1 AND used = false
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (resetRes.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired code.' });
+    }
+
+    const record = resetRes.rows[0];
+    if (new Date(record.expires_at) < new Date()) {
+      await pool.query('UPDATE password_resets SET used = true, used_at = CURRENT_TIMESTAMP WHERE id = $1', [record.id]);
+      return res.status(400).json({ message: 'Invalid or expired code.' });
+    }
+
+    if (Number(record.attempts || 0) >= PASSWORD_RESET_MAX_VERIFY_ATTEMPTS) {
+      await pool.query('UPDATE password_resets SET used = true, used_at = CURRENT_TIMESTAMP WHERE id = $1', [record.id]);
+      return res.status(400).json({ message: 'Too many failed attempts. Please request a new code.' });
+    }
+
+    const otpOk = await bcrypt.compare(otp, record.otp_hash);
+    if (!otpOk) {
+      await pool.query('UPDATE password_resets SET attempts = attempts + 1 WHERE id = $1', [record.id]);
+      const attemptsLeft = Math.max(0, PASSWORD_RESET_MAX_VERIFY_ATTEMPTS - (Number(record.attempts || 0) + 1));
+      return res.status(400).json({ message: 'Invalid or expired code.', attemptsLeft });
+    }
+
+    return res.json({ message: 'Code verified.', verified: true });
+  } catch (error) {
+    console.error('Forgot password verify-otp error:', error);
+    return res.status(500).json({ message: 'Server error verifying code.' });
+  }
+});
+
+router.post('/forgot/reset', async (req, res) => {
+  try {
+    await ensurePasswordResetsTable();
+
+    const email = normalizeEmail(req.body?.email);
+    const otp = String(req.body?.otp || '').trim();
+    const newPassword = String(req.body?.newPassword || '');
+
+    if (!email || !isValidEmail(email) || !otp || !newPassword) {
+      return res.status(400).json({ message: 'Invalid request.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+    }
+
+    const userRes = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (userRes.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired code.' });
+    }
+    const userId = userRes.rows[0].id;
+
+    const resetRes = await pool.query(
+      `SELECT id, otp_hash, expires_at, attempts
+       FROM password_resets
+       WHERE user_id = $1 AND used = false
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (resetRes.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired code.' });
+    }
+
+    const record = resetRes.rows[0];
+    if (new Date(record.expires_at) < new Date()) {
+      await pool.query('UPDATE password_resets SET used = true, used_at = CURRENT_TIMESTAMP WHERE id = $1', [record.id]);
+      return res.status(400).json({ message: 'Invalid or expired code.' });
+    }
+    if (Number(record.attempts || 0) >= PASSWORD_RESET_MAX_VERIFY_ATTEMPTS) {
+      await pool.query('UPDATE password_resets SET used = true, used_at = CURRENT_TIMESTAMP WHERE id = $1', [record.id]);
+      return res.status(400).json({ message: 'Too many failed attempts. Please request a new code.' });
+    }
+
+    const otpOk = await bcrypt.compare(otp, record.otp_hash);
+    if (!otpOk) {
+      await pool.query('UPDATE password_resets SET attempts = attempts + 1 WHERE id = $1', [record.id]);
+      const attemptsLeft = Math.max(0, PASSWORD_RESET_MAX_VERIFY_ATTEMPTS - (Number(record.attempts || 0) + 1));
+      return res.status(400).json({ message: 'Invalid or expired code.', attemptsLeft });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await pool.query('UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [newHash, userId]);
+    await pool.query('UPDATE password_resets SET used = true, used_at = CURRENT_TIMESTAMP WHERE id = $1', [record.id]);
+
+    return res.json({ message: 'Password reset successful.' });
+  } catch (error) {
+    console.error('Forgot password reset error:', error);
+    return res.status(500).json({ message: 'Server error resetting password.' });
   }
 });
 

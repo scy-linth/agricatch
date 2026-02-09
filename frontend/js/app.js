@@ -19,6 +19,8 @@ class AgricultureMarket {
 
         // Dev host detection for local-only debug endpoints
         this.isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        // Set to true if you run a local dev agent on port 7242
+        this.enableDevAgent = false;
         this.token = localStorage.getItem('token');
         // Sanitize token values stored as literal strings 'null' or 'undefined'
         if (!this.token || this.token === 'null' || this.token === 'undefined') {
@@ -38,6 +40,12 @@ class AgricultureMarket {
         this.otpSent = false;
         this.otpVerified = false;
         this.otpEmail = null;
+
+        // Forgot password state
+        this.forgotEmail = null;
+        this.forgotOtp = null;
+        this.forgotCooldownTimer = null;
+        this.forgotCooldownRemaining = 0;
         // Registration step state
         this.registrationStep = 1;
         this.maxRegistrationSteps = 4;
@@ -46,50 +54,14 @@ class AgricultureMarket {
         this.init();
     }
 
-    openForgotPasswordModal() {
-        const modal = document.getElementById('forgot-password-modal');
-        const authModal = document.getElementById('auth-modal');
-        if (modal) {
-            try { if (authModal) authModal.classList.remove('open'); } catch (e) {}
-            try { if (modal.parentElement !== document.body) document.body.appendChild(modal); } catch (e) {}
-            modal.classList.add('open');
-            this.showForgotStep(0);
-        }
-    }
-
-    showForgotStep(stepIdx) {
-        const steps = [
-            document.getElementById('forgot-step-1'),
-            document.getElementById('forgot-step-2'),
-            document.getElementById('forgot-step-3')
-        ];
-        steps.forEach((step, idx) => {
-            if (step) step.style.display = idx === stepIdx ? 'block' : 'none';
-        });
-    }
-
-    validateForgotPasswordMatch() {
-        const newPass = document.getElementById('forgot-new-password');
-        const confirmPass = document.getElementById('forgot-confirm-password');
-        const hint = document.getElementById('forgot-password-match-hint');
-        if (newPass && confirmPass && hint) {
-            if (newPass.value && confirmPass.value) {
-                if (newPass.value === confirmPass.value) {
-                    hint.textContent = 'Passwords match';
-                    hint.style.color = '#28a745';
-                } else {
-                    hint.textContent = 'Passwords do not match';
-                    hint.style.color = '#dc3545';
-                }
-            } else {
-                hint.textContent = '';
-            }
-        }
-    }
-
     init() {
         try {
-            // App initialization (dev logs removed)
+            console.log('AgriCatch app initialized');
+            // #region agent log (dev only)
+            if (this.isDevHost && this.enableDevAgent) {
+                fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:15',message:'App initialization started',data:{apiBase:this.apiBase,hasToken:!!this.token},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+            }
+            // #endregion
 
             // Wake up the Render server immediately when user lands on the site
             try {
@@ -161,7 +133,11 @@ class AgricultureMarket {
             window.history.replaceState({}, '', newUrl);
         }
 
-        // Dev ingest disabled in source
+        // #region agent log (dev only)
+        if (this.isDevHost && this.enableDevAgent) {
+            fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:21',message:'App initialization completed',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+        }
+        // #endregion
 
         // Mobile bug fix: always remove loading class and hide loading screen after init
         document.body.classList.remove('loading');
@@ -325,146 +301,6 @@ class AgricultureMarket {
 
     // Setup all event listeners
     setupEventListeners() {
-                // Forgot Password modal logic
-                const forgotPasswordLink = document.getElementById('forgot-password-link');
-                const forgotPasswordModal = document.getElementById('forgot-password-modal');
-                const forgotCloseBtn = document.getElementById('forgot-close-btn');
-                const forgotSteps = [
-                    document.getElementById('forgot-step-1'),
-                    document.getElementById('forgot-step-2'),
-                    document.getElementById('forgot-step-3')
-                ];
-                let forgotStepIndex = 0;
-                if (forgotPasswordLink) {
-                    forgotPasswordLink.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        // Open the top-level forgot modal (not inline)
-                        this.openForgotPasswordModal();
-                    });
-                }
-                if (forgotCloseBtn && forgotPasswordModal) {
-                    forgotCloseBtn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        try { forgotPasswordModal.classList.remove('open'); } catch (err) {}
-                        try { const authModal = document.getElementById('auth-modal'); if (authModal) authModal.classList.add('open'); } catch (err) {}
-                    });
-                }
-                // Step navigation
-                const forgotNext1 = document.getElementById('forgot-next-1');
-                const forgotNext2 = document.getElementById('forgot-next-2');
-                const forgotBack2 = document.getElementById('forgot-back-2');
-                const forgotBack3 = document.getElementById('forgot-back-3');
-                if (forgotNext1) {
-                    forgotNext1.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        this.showForgotStep(1);
-                    });
-                }
-                if (forgotNext2) {
-                    forgotNext2.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        this.showForgotStep(2);
-                    });
-                }
-                if (forgotBack2) {
-                    forgotBack2.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        this.showForgotStep(0);
-                    });
-                }
-                if (forgotBack3) {
-                    forgotBack3.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        this.showForgotStep(1);
-                    });
-                }
-                    // Back to auth modal from forgot flow (top-level)
-                    const forgotBackToAuth = document.getElementById('forgot-back-to-auth');
-                    if (forgotBackToAuth) {
-                        forgotBackToAuth.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            const modal = document.getElementById('forgot-password-modal');
-                            try { if (modal) modal.classList.remove('open'); } catch (err) {}
-                            // Re-open auth modal (login)
-                            try { this.openAuthFlow({ mode: 'login' }); } catch (err) { const authModal = document.getElementById('auth-modal'); if (authModal) authModal.classList.add('open'); }
-                        });
-                    }
-                // Password toggle for forgot modal
-                const toggleForgotNewPassword = document.getElementById('toggle-forgot-new-password');
-                const forgotNewPasswordInput = document.getElementById('forgot-new-password');
-                if (toggleForgotNewPassword && forgotNewPasswordInput) {
-                    toggleForgotNewPassword.addEventListener('click', () => {
-                        const icon = toggleForgotNewPassword.querySelector('i');
-                        if (forgotNewPasswordInput.type === 'password') {
-                            forgotNewPasswordInput.type = 'text';
-                            icon.classList.remove('fa-eye');
-                            icon.classList.add('fa-eye-slash');
-                        } else {
-                            forgotNewPasswordInput.type = 'password';
-                            icon.classList.remove('fa-eye-slash');
-                            icon.classList.add('fa-eye');
-                        }
-                    });
-                }
-                const toggleForgotConfirmPassword = document.getElementById('toggle-forgot-confirm-password');
-                const forgotConfirmPasswordInput = document.getElementById('forgot-confirm-password');
-                if (toggleForgotConfirmPassword && forgotConfirmPasswordInput) {
-                    toggleForgotConfirmPassword.addEventListener('click', () => {
-                        const icon = toggleForgotConfirmPassword.querySelector('i');
-                        if (forgotConfirmPasswordInput.type === 'password') {
-                            forgotConfirmPasswordInput.type = 'text';
-                            icon.classList.remove('fa-eye');
-                            icon.classList.add('fa-eye-slash');
-                        } else {
-                            forgotConfirmPasswordInput.type = 'password';
-                            icon.classList.remove('fa-eye-slash');
-                            icon.classList.add('fa-eye');
-                        }
-                    });
-                }
-                // Password match validation for forgot modal
-                if (forgotNewPasswordInput && forgotConfirmPasswordInput) {
-                    forgotNewPasswordInput.addEventListener('input', () => this.validateForgotPasswordMatch());
-                    forgotConfirmPasswordInput.addEventListener('input', () => this.validateForgotPasswordMatch());
-                }
-                // Inline auth-forgot panel buttons
-                const authForgotSend = document.getElementById('auth-forgot-send');
-                const authForgotCancel = document.getElementById('auth-forgot-cancel');
-                if (authForgotCancel) {
-                    authForgotCancel.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        const inlinePanel = document.getElementById('auth-forgot-panel');
-                        if (inlinePanel) inlinePanel.style.display = 'none';
-                    });
-                }
-                if (authForgotSend) {
-                    authForgotSend.addEventListener('click', async (e) => {
-                        e.preventDefault();
-                        const emailInput = document.getElementById('auth-forgot-email');
-                        if (!emailInput || !emailInput.value.trim()) {
-                            this.showMessage('Please enter your email address', 'error');
-                            return;
-                        }
-                        const email = emailInput.value.trim();
-                        try {
-                            const response = await fetch(`${this.apiBase}/auth/forgot-password/send-otp`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ email })
-                            });
-                            const data = await response.json();
-                            if (response.ok) {
-                                this.showMessage(data.message || 'OTP sent to your email', 'success');
-                                // Optionally open floating modal for full flow, or keep inline for next steps
-                            } else {
-                                this.showMessage(data.message || 'Failed to send OTP', 'error');
-                            }
-                        } catch (err) {
-                            console.error('Auth forgot send error:', err);
-                            this.showMessage('Failed to send OTP. Please try again.', 'error');
-                        }
-                    });
-                }
         // Mobile menu toggle
         const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
         const mainNav = document.getElementById('main-nav');
@@ -654,13 +490,6 @@ class AgricultureMarket {
         const loginRegisterBtn = document.getElementById('login-register-btn');
         if (loginRegisterBtn) {
             loginRegisterBtn.addEventListener('click', () => this.openAuthFlow());
-        }
-        const authRegisterBtn = document.getElementById('auth-register-btn');
-        if (authRegisterBtn) {
-            authRegisterBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                try { this.switchAuthMode('register'); } catch (err) { this.openAuthFlow({ mode: 'register' }); }
-            });
         }
         const superAdminPanelBtn = document.getElementById('super-admin-panel-btn');
         if (superAdminPanelBtn) {
@@ -858,13 +687,7 @@ class AgricultureMarket {
             });
         }
 
-        // Password strength indicator
-        const registerPasswordInput = document.getElementById('auth-password-register');
-        if (registerPasswordInput) {
-            registerPasswordInput.addEventListener('input', (e) => {
-                this.checkPasswordStrength(e.target.value);
-            });
-        }
+        // Password strength indicator removed
 
         // Dynamic fullname hint based on role
         document.addEventListener('click', (e) => {
@@ -902,6 +725,117 @@ class AgricultureMarket {
         const authCloseBtn = document.getElementById('auth-close-btn');
         if (authCloseBtn) {
             authCloseBtn.addEventListener('click', () => this.closeAuthFlow());
+        }
+
+        // Forgot password link
+        const forgotLink = document.getElementById('forgot-password-link');
+        if (forgotLink) {
+            forgotLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.openForgotPasswordModal();
+            });
+        }
+
+        // Forgot password modal buttons
+        const forgotCloseBtn = document.getElementById('forgot-password-close-btn');
+        if (forgotCloseBtn) {
+            forgotCloseBtn.addEventListener('click', () => this.closeForgotPasswordModal());
+        }
+        const forgotSendBtn = document.getElementById('forgot-send-btn');
+        if (forgotSendBtn) {
+            forgotSendBtn.addEventListener('click', () => this.sendForgotPasswordCode());
+        }
+        const forgotResendBtn = document.getElementById('forgot-resend-btn');
+        if (forgotResendBtn) {
+            forgotResendBtn.addEventListener('click', () => this.resendForgotPasswordCode());
+        }
+        const forgotBackToLogin = document.getElementById('forgot-back-to-login');
+        if (forgotBackToLogin) {
+            forgotBackToLogin.addEventListener('click', () => {
+                this.closeForgotPasswordModal();
+                this.openAuthFlow({ mode: 'login', role: localStorage.getItem('last_auth_role') || 'customer' });
+            });
+        }
+        const forgotBackToEmail = document.getElementById('forgot-back-to-email');
+        if (forgotBackToEmail) {
+            forgotBackToEmail.addEventListener('click', () => {
+                const stepEmail = document.getElementById('forgot-step-email');
+                const stepOtp = document.getElementById('forgot-step-otp');
+                if (stepOtp) stepOtp.style.display = 'none';
+                if (stepEmail) stepEmail.style.display = 'block';
+            });
+        }
+        const forgotBackToOtp = document.getElementById('forgot-back-to-otp');
+        if (forgotBackToOtp) {
+            forgotBackToOtp.addEventListener('click', () => {
+                const stepPassword = document.getElementById('forgot-step-password');
+                const stepOtp = document.getElementById('forgot-step-otp');
+                if (stepPassword) stepPassword.style.display = 'none';
+                if (stepOtp) stepOtp.style.display = 'block';
+            });
+        }
+        const forgotVerifyOtpBtn = document.getElementById('forgot-verify-otp-btn');
+        if (forgotVerifyOtpBtn) {
+            forgotVerifyOtpBtn.addEventListener('click', () => this.verifyForgotOtp());
+        }
+        const forgotResetBtn = document.getElementById('forgot-reset-btn');
+        if (forgotResetBtn) {
+            forgotResetBtn.addEventListener('click', () => this.resetForgotPassword());
+        }
+        const backToLoginBtn = document.getElementById('forgot-back-to-login-btn');
+        if (backToLoginBtn) {
+            backToLoginBtn.addEventListener('click', () => {
+                this.closeForgotPasswordModal();
+                this.openAuthFlow({ mode: 'login', role: localStorage.getItem('last_auth_role') || 'customer' });
+            });
+        }
+
+        // Forgot password OTP input: numbers only
+        const forgotOtpInput = document.getElementById('forgot-otp');
+        if (forgotOtpInput) {
+            forgotOtpInput.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+            });
+        }
+
+        // Forgot password match validation
+        const forgotPass = document.getElementById('forgot-new-password');
+        const forgotPassConfirm = document.getElementById('forgot-new-password-confirm');
+        if (forgotPass && forgotPassConfirm) {
+            forgotPass.addEventListener('input', () => this.validateForgotPasswordMatch());
+            forgotPassConfirm.addEventListener('input', () => this.validateForgotPasswordMatch());
+        }
+
+        // Password toggles (forgot)
+        const toggleForgotPassword = document.getElementById('toggle-forgot-password');
+        if (toggleForgotPassword && forgotPass) {
+            toggleForgotPassword.addEventListener('click', () => {
+                const icon = toggleForgotPassword.querySelector('i');
+                if (forgotPass.type === 'password') {
+                    forgotPass.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    forgotPass.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            });
+        }
+        const toggleForgotConfirmPassword = document.getElementById('toggle-forgot-confirm-password');
+        if (toggleForgotConfirmPassword && forgotPassConfirm) {
+            toggleForgotConfirmPassword.addEventListener('click', () => {
+                const icon = toggleForgotConfirmPassword.querySelector('i');
+                if (forgotPassConfirm.type === 'password') {
+                    forgotPassConfirm.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    forgotPassConfirm.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            });
         }
 
         // Forms
@@ -1034,17 +968,23 @@ class AgricultureMarket {
         // Auth mode toggle (will be set up dynamically in auth modal)
 
         // Search and filters
-        document.getElementById('search-input').addEventListener('input', (e) => {
-            this.currentSearch = e.target.value;
-            this.currentPage = 1; // Reset to first page on search
-            this.loadProducts();
-        });
+        const searchInputEl = document.getElementById('search-input');
+        if (searchInputEl) {
+            searchInputEl.addEventListener('input', (e) => {
+                this.currentSearch = e.target.value;
+                this.currentPage = 1; // Reset to first page on search
+                this.loadProducts();
+            });
+        }
 
-        document.getElementById('category-filter').addEventListener('change', (e) => {
-            this.currentCategory = e.target.value === '' ? '' : e.target.value;
-            this.currentPage = 1; // Reset to first page on category change
-            this.loadProducts();
-        });
+        const categoryFilterEl = document.getElementById('category-filter');
+        if (categoryFilterEl) {
+            categoryFilterEl.addEventListener('change', (e) => {
+                this.currentCategory = e.target.value === '' ? '' : e.target.value;
+                this.currentPage = 1; // Reset to first page on category change
+                this.loadProducts();
+            });
+        }
 
         // Pagination removed - now showing all products on one page
 
@@ -1060,9 +1000,12 @@ class AgricultureMarket {
         });
 
         // Shop now button
-        document.getElementById('shop-now-btn').addEventListener('click', () => {
-            this.scrollToSection('#products');
-        });
+        const shopNowBtn = document.getElementById('shop-now-btn');
+        if (shopNowBtn) {
+            shopNowBtn.addEventListener('click', () => {
+                this.scrollToSection('#products');
+            });
+        }
 
         // Modal close functionality (only via X button)
         // Additional modal close handlers (but exclude add address modal)
@@ -1100,6 +1043,346 @@ class AgricultureMarket {
         }
     }
 
+    openForgotPasswordModal() {
+        // Keep UX clean: close auth modal if open
+        try { this.closeAuthFlow(); } catch (e) {}
+
+        const modal = document.getElementById('forgot-password-modal');
+        if (!modal) return;
+
+        // Reset state
+        this.forgotEmail = null;
+        this.forgotOtp = null;
+        this.stopForgotCooldown();
+
+        const stepEmail = document.getElementById('forgot-step-email');
+        const stepOtp = document.getElementById('forgot-step-otp');
+        const stepPassword = document.getElementById('forgot-step-password');
+        const stepSuccess = document.getElementById('forgot-step-success');
+        if (stepEmail) stepEmail.style.display = 'block';
+        if (stepOtp) stepOtp.style.display = 'none';
+        if (stepPassword) stepPassword.style.display = 'none';
+        if (stepSuccess) stepSuccess.style.display = 'none';
+
+        const emailInput = document.getElementById('forgot-email');
+        const otpInput = document.getElementById('forgot-otp');
+        const np = document.getElementById('forgot-new-password');
+        const npc = document.getElementById('forgot-new-password-confirm');
+        if (otpInput) otpInput.value = '';
+        if (np) np.value = '';
+        if (npc) npc.value = '';
+        this.validateForgotPasswordMatch();
+
+        // Prefill email from login field if it looks like an email
+        try {
+            const loginEmail = document.getElementById('auth-email')?.value?.trim();
+            if (emailInput && loginEmail && loginEmail.includes('@')) {
+                emailInput.value = loginEmail;
+            }
+        } catch (e) {}
+
+        try {
+            if (modal.parentElement !== document.body) document.body.appendChild(modal);
+        } catch (e) {}
+        // Disable floating cart button while modal is open to avoid accidental clicks
+        try {
+            const cartBtn = document.getElementById('cart-btn');
+            if (cartBtn) {
+                cartBtn.classList.add('disabled-while-modal');
+                cartBtn.setAttribute('aria-hidden', 'true');
+            }
+        } catch (e) {}
+        modal.classList.add('open');
+        if (emailInput) emailInput.focus();
+    }
+
+    closeForgotPasswordModal() {
+        const modal = document.getElementById('forgot-password-modal');
+        if (modal) modal.classList.remove('open');
+        // Re-enable floating cart button
+        try {
+            const cartBtn = document.getElementById('cart-btn');
+            if (cartBtn) {
+                cartBtn.classList.remove('disabled-while-modal');
+                cartBtn.removeAttribute('aria-hidden');
+            }
+        } catch (e) {}
+        this.stopForgotCooldown();
+        this.forgotEmail = null;
+        this.forgotOtp = null;
+    }
+
+    startForgotCooldown(seconds) {
+        this.stopForgotCooldown();
+        this.forgotCooldownRemaining = seconds;
+
+        const cooldownEl = document.getElementById('forgot-resend-cooldown');
+        const resendBtn = document.getElementById('forgot-resend-btn');
+        if (cooldownEl) cooldownEl.style.display = 'inline';
+        if (resendBtn) resendBtn.disabled = true;
+
+        const tick = () => {
+            const cd = document.getElementById('forgot-resend-cooldown');
+            const btn = document.getElementById('forgot-resend-btn');
+            if (this.forgotCooldownRemaining <= 0) {
+                if (cd) cd.style.display = 'none';
+                if (btn) btn.disabled = false;
+                this.stopForgotCooldown();
+                return;
+            }
+            if (cd) cd.textContent = `${this.forgotCooldownRemaining}s`;
+            this.forgotCooldownRemaining -= 1;
+        };
+
+        tick();
+        this.forgotCooldownTimer = setInterval(tick, 1000);
+    }
+
+    stopForgotCooldown() {
+        if (this.forgotCooldownTimer) {
+            clearInterval(this.forgotCooldownTimer);
+            this.forgotCooldownTimer = null;
+        }
+        const cooldownEl = document.getElementById('forgot-resend-cooldown');
+        const resendBtn = document.getElementById('forgot-resend-btn');
+        if (cooldownEl) {
+            cooldownEl.style.display = 'none';
+            cooldownEl.textContent = '';
+        }
+        if (resendBtn) resendBtn.disabled = false;
+    }
+
+    validateForgotPasswordMatch() {
+        const p1 = document.getElementById('forgot-new-password');
+        const p2 = document.getElementById('forgot-new-password-confirm');
+        const hint = document.getElementById('forgot-password-match-hint');
+        if (!p1 || !p2 || !hint) return true;
+
+        const a = (p1.value || '').trim();
+        const b = (p2.value || '').trim();
+        if (!a && !b) {
+            hint.textContent = '';
+            return true;
+        }
+        if (a.length > 0 && a.length < 6) {
+            hint.textContent = 'Password must be at least 6 characters.';
+            hint.style.color = '#d32f2f';
+            return false;
+        }
+        if (a !== b) {
+            hint.textContent = 'Passwords do not match.';
+            hint.style.color = '#d32f2f';
+            return false;
+        }
+        hint.textContent = 'Passwords match.';
+        hint.style.color = '#2e7d32';
+        return true;
+    }
+
+    async sendForgotPasswordCode() {
+        const emailInput = document.getElementById('forgot-email');
+        const sendBtn = document.getElementById('forgot-send-btn');
+        if (!emailInput) return;
+
+        const email = (emailInput.value || '').trim();
+        if (!email || !email.includes('@')) {
+            this.showMessage('Please enter a valid email address.', 'error');
+            emailInput.focus();
+            return;
+        }
+
+        if (sendBtn) {
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = '0.7';
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/auth/forgot`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (response.status === 429) {
+                const retryAfter = Number(data.retryAfter || data.cooldownSeconds || 60);
+                this.startForgotCooldown(retryAfter);
+            } else {
+                this.startForgotCooldown(60);
+            }
+
+            // Keep message generic
+            this.showMessage(data.message || "If that email exists, we've sent a verification code.", 'info');
+
+            this.forgotEmail = email;
+
+            const stepEmail = document.getElementById('forgot-step-email');
+            const stepOtp = document.getElementById('forgot-step-otp');
+            if (stepEmail) stepEmail.style.display = 'none';
+            if (stepOtp) stepOtp.style.display = 'block';
+
+            const otpInput = document.getElementById('forgot-otp');
+            if (otpInput) otpInput.focus();
+
+            if (data.debugOtp) {
+                console.log('DEBUG forgot password OTP:', data.debugOtp);
+            }
+        } catch (error) {
+            console.error('Forgot password send error:', error);
+            this.showMessage('Failed to send code. Please try again.', 'error');
+        } finally {
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = '1';
+            }
+        }
+    }
+
+    async resendForgotPasswordCode() {
+        const email = this.forgotEmail || (document.getElementById('forgot-email')?.value || '').trim();
+        if (!email) {
+            this.showMessage('Enter your email first.', 'error');
+            return;
+        }
+
+        const resendBtn = document.getElementById('forgot-resend-btn');
+        if (resendBtn && resendBtn.disabled) return;
+
+        try {
+            const response = await fetch(`${this.apiBase}/auth/forgot/resend`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (response.status === 429) {
+                const retryAfter = Number(data.retryAfter || data.cooldownSeconds || 60);
+                this.startForgotCooldown(retryAfter);
+            } else {
+                this.startForgotCooldown(60);
+            }
+
+            this.showMessage(data.message || "If that email exists, we've sent a verification code.", 'info');
+            if (data.debugOtp) {
+                console.log('DEBUG forgot password OTP:', data.debugOtp);
+            }
+        } catch (error) {
+            console.error('Forgot password resend error:', error);
+            this.showMessage('Failed to resend code. Please try again.', 'error');
+        }
+    }
+
+    async verifyForgotOtp() {
+        const email = this.forgotEmail || (document.getElementById('forgot-email')?.value || '').trim();
+        const otp = (document.getElementById('forgot-otp')?.value || '').trim();
+        const btn = document.getElementById('forgot-verify-otp-btn');
+
+        if (!email || !email.includes('@')) {
+            this.showMessage('Please enter a valid email.', 'error');
+            return;
+        }
+        if (!otp || otp.length !== 6) {
+            this.showMessage('Please enter the 6-digit code.', 'error');
+            return;
+        }
+
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/auth/forgot/verify-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, otp })
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (response.ok && data.verified) {
+                this.forgotEmail = email;
+                this.forgotOtp = otp;
+
+                const stepOtp = document.getElementById('forgot-step-otp');
+                const stepPassword = document.getElementById('forgot-step-password');
+                if (stepOtp) stepOtp.style.display = 'none';
+                if (stepPassword) stepPassword.style.display = 'block';
+
+                const p1 = document.getElementById('forgot-new-password');
+                if (p1) p1.focus();
+                this.showMessage('Code verified. Please set a new password.', 'success');
+            } else {
+                this.showMessage(data.message || 'Invalid or expired code.', 'error');
+            }
+        } catch (error) {
+            console.error('Forgot password verify otp error:', error);
+            this.showMessage('Failed to verify code. Please try again.', 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
+    }
+
+    async resetForgotPassword() {
+        const email = this.forgotEmail || (document.getElementById('forgot-email')?.value || '').trim();
+        const otp = this.forgotOtp || (document.getElementById('forgot-otp')?.value || '').trim();
+        const p1 = (document.getElementById('forgot-new-password')?.value || '').trim();
+        const p2 = (document.getElementById('forgot-new-password-confirm')?.value || '').trim();
+        const btn = document.getElementById('forgot-reset-btn');
+
+        if (!email || !email.includes('@') || !otp || otp.length !== 6) {
+            this.showMessage('Please verify your code first.', 'error');
+            return;
+        }
+        if (!this.validateForgotPasswordMatch()) {
+            this.showMessage('Please fix the password fields.', 'error');
+            return;
+        }
+        if (!p1 || p1.length < 6) {
+            this.showMessage('Password must be at least 6 characters.', 'error');
+            return;
+        }
+        if (p1 !== p2) {
+            this.showMessage('Passwords do not match.', 'error');
+            return;
+        }
+
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/auth/forgot/reset`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, otp, newPassword: p1 })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok) {
+                const stepPassword = document.getElementById('forgot-step-password');
+                const stepSuccess = document.getElementById('forgot-step-success');
+                if (stepPassword) stepPassword.style.display = 'none';
+                if (stepSuccess) stepSuccess.style.display = 'block';
+                this.showMessage('Password reset successful. You can log in now.', 'success');
+                this.stopForgotCooldown();
+            } else {
+                this.showMessage(data.message || 'Failed to reset password.', 'error');
+            }
+        } catch (error) {
+            console.error('Forgot password reset error:', error);
+            this.showMessage('Failed to reset password. Please try again.', 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
+    }
+
     // Authentication
     checkAuthStatus() {
         if (this.token) {
@@ -1117,10 +1400,11 @@ class AgricultureMarket {
         if (myOrdersBtn) {
             myOrdersBtn.style.display = 'flex';
         }
-        const notificationsWrapper = document.querySelector('.notifications-wrapper') || document.getElementById('notifications-wrapper');
+        const notificationsWrapper = document.getElementById('notifications-wrapper');
         if (notificationsWrapper) {
             notificationsWrapper.style.display = 'block';
         }
+        // Show the notification icon/button when user is logged in
         const notificationsBtn = document.getElementById('notifications-btn');
         if (notificationsBtn) {
             notificationsBtn.style.display = 'inline-flex';
@@ -1136,10 +1420,11 @@ class AgricultureMarket {
         if (myOrdersBtn) {
             myOrdersBtn.style.display = 'none';
         }
-        const notificationsWrapper = document.querySelector('.notifications-wrapper') || document.getElementById('notifications-wrapper');
+        const notificationsWrapper = document.getElementById('notifications-wrapper');
         if (notificationsWrapper) {
             notificationsWrapper.style.display = 'none';
         }
+        // Hide the notification icon/button in guest mode (keep logic intact)
         const notificationsBtn = document.getElementById('notifications-btn');
         if (notificationsBtn) {
             notificationsBtn.style.display = 'none';
@@ -1437,69 +1722,19 @@ class AgricultureMarket {
     updateSubmitButtonText() {
         const mode = this.authMode || (document.getElementById('auth-login-fields').style.display !== 'none' ? 'login' : 'register');
         const submitBtn = document.getElementById('auth-submit-btn');
-        const registerBtn = document.getElementById('auth-register-btn');
         if (submitBtn) {
             // Hide submit button during registration (we use step navigation instead)
             if (mode === 'register') {
                 submitBtn.style.display = 'none';
-                if (registerBtn) registerBtn.style.display = 'none';
                 return;
             }
             // For login mode, show and update button text (no OTP required)
             submitBtn.style.display = 'block';
             submitBtn.textContent = 'Login';
-            if (registerBtn) {
-                registerBtn.style.display = 'block';
-                registerBtn.textContent = 'Register';
-            }
         }
     }
 
-    checkPasswordStrength(password) {
-        const strengthDiv = document.getElementById('password-strength');
-        const strengthFill = document.getElementById('strength-fill');
-        const strengthText = document.getElementById('strength-text');
-
-        if (!strengthDiv || !strengthFill || !strengthText) return;
-
-        if (!password || password.length === 0) {
-            strengthDiv.style.display = 'none';
-            return;
-        }
-
-        strengthDiv.style.display = 'block';
-
-        let strength = 0;
-        let text = '';
-        let className = '';
-
-        // Length check
-        if (password.length >= 6) strength++;
-        if (password.length >= 8) strength++;
-        if (password.length >= 12) strength++;
-
-        // Character variety checks
-        if (/[a-z]/.test(password)) strength++;
-        if (/[A-Z]/.test(password)) strength++;
-        if (/[0-9]/.test(password)) strength++;
-        if (/[^a-zA-Z0-9]/.test(password)) strength++;
-
-        // Determine strength level
-        if (strength <= 2) {
-            className = 'weak';
-            text = 'Weak password';
-        } else if (strength <= 4) {
-            className = 'medium';
-            text = 'Medium strength';
-        } else {
-            className = 'strong';
-            text = 'Strong password';
-        }
-
-        strengthFill.className = `strength-fill ${className}`;
-        strengthText.className = `strength-text ${className}`;
-        strengthText.textContent = text;
-    }
+    // Password strength feature removed
 
     validateField(field) {
         if (!field) return;
@@ -2847,18 +3082,35 @@ class AgricultureMarket {
     // Show product details in floating modal
     async showProductDetails(productId) {
         try {
+            // Open modal immediately with a lightweight loading placeholder
+            const modal = document.getElementById('product-details-modal');
+            try { if (modal && modal.parentElement !== document.body) document.body.appendChild(modal); } catch (e) {}
+            if (modal) {
+                // Minimal placeholder so UI responds instantly
+                const nameEl = document.getElementById('product-details-name');
+                const descEl = document.getElementById('product-details-description');
+                const imgEl = document.getElementById('product-details-image');
+                if (nameEl) nameEl.textContent = 'Loading...';
+                if (descEl) descEl.textContent = '';
+                if (imgEl) {
+                    imgEl.src = window.__PLACEHOLDER_IMAGE__;
+                    imgEl.style.opacity = '0.6';
+                }
+                modal.classList.add('active', 'open');
+                document.body.style.overflow = 'hidden';
+            }
+
             const response = await fetch(`${this.apiBase}/products/${productId}`, {
                 headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
             });
-            
+
             if (!response.ok) {
                 throw new Error('Failed to load product details');
             }
-            
+
             const data = await response.json();
             // API returns { product: {...} }, so extract the product object
             const product = data.product || data;
-            
             console.log('Product data received:', product); // Debug log
             
             // Format dates from farmer's input
@@ -2950,13 +3202,16 @@ class AgricultureMarket {
             // Update add to cart button
             const addCartBtn = document.getElementById('product-details-add-cart');
             if (addCartBtn) {
-                addCartBtn.onclick = () => {
+                addCartBtn.onclick = async () => {
                     const quantity = parseInt(document.getElementById('product-details-quantity').value) || 1;
-                    // Add to cart with quantity
-                    for (let i = 0; i < quantity; i++) {
-                        this.addToCart(productId);
+                    // Disable button to avoid duplicate requests
+                    addCartBtn.disabled = true;
+                    try {
+                        await this.addToCart(productId, quantity);
+                        this.closeProductDetails();
+                    } finally {
+                        addCartBtn.disabled = false;
                     }
-                    this.closeProductDetails();
                 };
                 addCartBtn.disabled = (product.stock_quantity || 0) === 0;
                 addCartBtn.innerHTML = (product.stock_quantity || 0) === 0 
@@ -2968,10 +3223,20 @@ class AgricultureMarket {
             this.updateQuantityButtons();
             
             // Show modal
-            const modal = document.getElementById('product-details-modal');
-            if (modal) {
-                modal.classList.add('active');
+            const modalEl = document.getElementById('product-details-modal');
+            if (modalEl) {
+                // Ensure modal is attached to body so fixed positioning and z-index work like auth modal
+                try { if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl); } catch (e) {}
+                modalEl.classList.add('active', 'open');
                 document.body.style.overflow = 'hidden';
+
+                // Add Escape key handler to close modal like auth modal
+                try {
+                    this._productModalKeydown = (ev) => {
+                        if (ev.key === 'Escape') this.closeProductDetails();
+                    };
+                    document.addEventListener('keydown', this._productModalKeydown);
+                } catch (e) {}
             }
         } catch (error) {
             console.error('Error loading product details:', error);
@@ -2981,8 +3246,16 @@ class AgricultureMarket {
     
     closeProductDetails() {
         const modal = document.getElementById('product-details-modal');
-        modal.classList.remove('active');
+        if (modal) {
+            modal.classList.remove('active', 'open');
+        }
         document.body.style.overflow = '';
+        try {
+            if (this._productModalKeydown) {
+                document.removeEventListener('keydown', this._productModalKeydown);
+                this._productModalKeydown = null;
+            }
+        } catch (e) {}
         this.currentProductDetails = null;
         this.currentProductId = null;
     }
@@ -3044,7 +3317,7 @@ class AgricultureMarket {
     }
 
     // Cart functionality
-    async addToCart(productId) {
+    async addToCart(productId, quantity = 1) {
         try {
             const response = await fetch(`${this.apiBase}/cart`, {
                 method: 'POST',
@@ -3054,6 +3327,7 @@ class AgricultureMarket {
                 },
                 body: JSON.stringify({
                     productId,
+                    quantity,
                     sessionId: this.sessionId
                 })
             });
@@ -3681,11 +3955,7 @@ class AgricultureMarket {
             this.registrationStep = 1;
         }
 
-        // Reset password strength indicator
-        const strengthDiv = document.getElementById('password-strength');
-        if (strengthDiv) {
-            strengthDiv.style.display = 'none';
-        }
+        // Password strength UI removed - nothing to reset
 
         // Ensure valid role for mode
         if (mode === 'register' && !['farmer', 'customer'].includes(role)) {
