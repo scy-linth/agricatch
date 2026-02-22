@@ -23,13 +23,44 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agriculture_marketplace',
+  database: process.env.DB_NAME || 'agricatch',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
 });
 
-// Middleware to check admin role
+const ensureCategoryAdminSchema = async () => {
+  await pool.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS type VARCHAR(50)`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS product_name_catalog (
+      id SERIAL PRIMARY KEY,
+      category_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
+      name VARCHAR(120) UNIQUE NOT NULL,
+      source VARCHAR(30) DEFAULT 'system',
+      is_approved BOOLEAN DEFAULT true,
+      requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at TIMESTAMP
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS product_name_requests (
+      id SERIAL PRIMARY KEY,
+      category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
+      name VARCHAR(120) NOT NULL,
+      notes TEXT,
+      requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      review_notes TEXT,
+      reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reviewed_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+};
+
+// Middleware to check staff/admin role
 const requireAdmin = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -40,7 +71,7 @@ const requireAdmin = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
 
-    // Check if user is admin or super_admin
+    // Check if user is staff or super_admin
     let userRole;
     if (decoded.id === -1 && decoded.role === 'super_admin') {
       // Virtual super admin user
@@ -48,13 +79,13 @@ const requireAdmin = async (req, res, next) => {
     } else {
       const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
       if (!userResult.rows[0]) {
-        return res.status(403).json({ message: 'Admin access required' });
+        return res.status(403).json({ message: 'Staff access required' });
       }
       userRole = userResult.rows[0].role;
     }
 
-    if (!['admin', 'super_admin'].includes(userRole)) {
-      return res.status(403).json({ message: 'Admin access required' });
+    if (!['staff', 'super_admin'].includes(userRole)) {
+      return res.status(403).json({ message: 'Staff access required' });
     }
 
     req.user = decoded;
@@ -152,7 +183,7 @@ router.get('/logs', requireAdmin, async (req, res) => {
   }
 });
 
-// Update user login/profile details (admin) - non-admin targets only
+// Update user login/profile details (staff) - non-staff targets only
 router.put('/users/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -189,9 +220,9 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Regular admins cannot edit admin users, but super admin can
-    if (req.user.role !== 'super_admin' && targetResult.rows[0].role === 'admin') {
-      return res.status(403).json({ message: 'Cannot edit admin users' });
+    // Regular staff users cannot edit staff users, but super admin can
+    if (req.user.role !== 'super_admin' && targetResult.rows[0].role === 'staff') {
+      return res.status(403).json({ message: 'Cannot edit staff users' });
     }
 
     const updates = [];
@@ -606,7 +637,7 @@ router.put('/users/:id/role', requireAdmin, async (req, res) => {
     const { role } = req.body;
     const targetUserId = parseInt(id, 10);
 
-    if (!['customer', 'farmer', 'admin'].includes(role)) {
+    if (!['customer', 'farmer', 'staff'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
@@ -620,14 +651,14 @@ router.put('/users/:id/role', requireAdmin, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Prevent an admin from demoting themselves (locks you out of admin panel)
-    if (targetUserId === req.user.id && targetResult.rows[0].role === 'admin' && role !== 'admin') {
-      return res.status(400).json({ message: 'You cannot change your own admin role' });
+    // Prevent a staff user from demoting themselves (locks you out of staff panel)
+    if (targetUserId === req.user.id && targetResult.rows[0].role === 'staff' && role !== 'staff') {
+      return res.status(400).json({ message: 'You cannot change your own staff role' });
     }
 
-    // Regular admins cannot change other admin roles, but super admin can
-    if (req.user.role !== 'super_admin' && targetResult.rows[0].role === 'admin' && targetUserId !== req.user.id) {
-      return res.status(403).json({ message: 'Cannot change role of another admin' });
+    // Regular staff users cannot change other staff roles, but super admin can
+    if (req.user.role !== 'super_admin' && targetResult.rows[0].role === 'staff' && targetUserId !== req.user.id) {
+      return res.status(403).json({ message: 'Cannot change role of another staff account' });
     }
 
     const beforeRes = await pool.query('SELECT id, role FROM users WHERE id = $1', [targetUserId]);
@@ -767,8 +798,8 @@ router.delete('/users/:id', requireAdmin, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    if (userResult.rows[0].role === 'admin') {
-      return res.status(403).json({ message: 'Cannot delete another admin account' });
+    if (userResult.rows[0].role === 'staff') {
+      return res.status(403).json({ message: 'Cannot delete another staff account' });
     }
 
     // Delete user (cascade will handle related records if foreign keys are set up)
@@ -911,6 +942,239 @@ router.put('/products/:id/status', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('Toggle product status error:', error);
     res.status(500).json({ message: 'Server error updating product status' });
+  }
+});
+
+// Category management (staff/super_admin)
+router.get('/categories', requireAdmin, async (_req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const result = await pool.query(
+      `SELECT id, name, description, COALESCE(type, 'agricultural') AS type, created_at
+       FROM categories
+       ORDER BY name ASC`
+    );
+    return res.json({ categories: result.rows });
+  } catch (error) {
+    console.error('Admin get categories error:', error);
+    return res.status(500).json({ message: 'Server error fetching categories' });
+  }
+});
+
+router.post('/categories', requireAdmin, async (req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const name = String(req.body?.name || '').trim();
+    const description = String(req.body?.description || '').trim();
+    const type = String(req.body?.type || 'agricultural').trim().toLowerCase();
+
+    if (!name) return res.status(400).json({ message: 'Category name is required' });
+
+    const inserted = await pool.query(
+      `INSERT INTO categories (name, description, type)
+       VALUES ($1, $2, $3)
+       RETURNING id, name, description, COALESCE(type, 'agricultural') AS type, created_at`,
+      [name, description || null, type || 'agricultural']
+    );
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'category.create',
+      entity: 'categories',
+      entity_id: inserted.rows[0].id,
+      before: null,
+      after: inserted.rows[0]
+    });
+    broadcastEvent('admin.audit', { action: 'category.create', entity: 'categories', entity_id: inserted.rows[0].id, actor_admin_id: req.user.id });
+
+    return res.status(201).json({ message: 'Category created', category: inserted.rows[0] });
+  } catch (error) {
+    console.error('Admin create category error:', error);
+    if (error?.code === '23505') {
+      return res.status(409).json({ message: 'Category already exists' });
+    }
+    return res.status(500).json({ message: 'Server error creating category' });
+  }
+});
+
+router.put('/categories/:id', requireAdmin, async (req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const id = Number(req.params.id || 0);
+    if (!id) return res.status(400).json({ message: 'Invalid category id' });
+
+    const beforeRes = await pool.query('SELECT id, name, description, COALESCE(type, \'' + 'agricultural' + '\') AS type FROM categories WHERE id = $1', [id]);
+    if (!beforeRes.rows.length) return res.status(404).json({ message: 'Category not found' });
+
+    const name = req.body?.name;
+    const description = req.body?.description;
+    const type = req.body?.type;
+
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    if (typeof name !== 'undefined') {
+      updates.push(`name = $${idx++}`);
+      values.push(String(name).trim());
+    }
+    if (typeof description !== 'undefined') {
+      updates.push(`description = $${idx++}`);
+      values.push(String(description || '').trim() || null);
+    }
+    if (typeof type !== 'undefined') {
+      updates.push(`type = $${idx++}`);
+      values.push(String(type || 'agricultural').trim().toLowerCase());
+    }
+
+    if (!updates.length) return res.status(400).json({ message: 'No fields to update' });
+
+    values.push(id);
+    const updated = await pool.query(
+      `UPDATE categories SET ${updates.join(', ')} WHERE id = $${idx}
+       RETURNING id, name, description, COALESCE(type, 'agricultural') AS type, created_at`,
+      values
+    );
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'category.update',
+      entity: 'categories',
+      entity_id: id,
+      before: beforeRes.rows[0],
+      after: updated.rows[0]
+    });
+    broadcastEvent('admin.audit', { action: 'category.update', entity: 'categories', entity_id: id, actor_admin_id: req.user.id });
+
+    return res.json({ message: 'Category updated', category: updated.rows[0] });
+  } catch (error) {
+    console.error('Admin update category error:', error);
+    if (error?.code === '23505') return res.status(409).json({ message: 'Category name already exists' });
+    return res.status(500).json({ message: 'Server error updating category' });
+  }
+});
+
+router.delete('/categories/:id', requireAdmin, async (req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const id = Number(req.params.id || 0);
+    if (!id) return res.status(400).json({ message: 'Invalid category id' });
+
+    const inUse = await pool.query('SELECT COUNT(*)::int AS count FROM products WHERE category_id = $1', [id]);
+    if (Number(inUse.rows[0]?.count || 0) > 0) {
+      return res.status(400).json({ message: 'Cannot delete category with existing products' });
+    }
+
+    const deleted = await pool.query('DELETE FROM categories WHERE id = $1 RETURNING id, name', [id]);
+    if (!deleted.rows.length) return res.status(404).json({ message: 'Category not found' });
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'category.delete',
+      entity: 'categories',
+      entity_id: id,
+      before: deleted.rows[0],
+      after: null
+    });
+    broadcastEvent('admin.audit', { action: 'category.delete', entity: 'categories', entity_id: id, actor_admin_id: req.user.id });
+
+    return res.json({ message: 'Category deleted' });
+  } catch (error) {
+    console.error('Admin delete category error:', error);
+    return res.status(500).json({ message: 'Server error deleting category' });
+  }
+});
+
+// Staff review queue for farmer custom product names
+router.get('/category-requests', requireAdmin, async (req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const status = String(req.query?.status || 'pending').trim().toLowerCase();
+    const includeAll = status === 'all';
+
+    const result = await pool.query(
+      `SELECT r.id, r.name, r.notes, r.status, r.review_notes, r.created_at, r.reviewed_at,
+              r.category_id, c.name AS category_name,
+              r.requested_by, u.username AS requested_by_username,
+              r.reviewed_by, rv.username AS reviewed_by_username
+       FROM product_name_requests r
+       LEFT JOIN categories c ON c.id = r.category_id
+       LEFT JOIN users u ON u.id = r.requested_by
+       LEFT JOIN users rv ON rv.id = r.reviewed_by
+       WHERE ($1::boolean OR r.status = $2)
+       ORDER BY CASE WHEN r.status = 'pending' THEN 0 ELSE 1 END, r.created_at DESC`,
+      [includeAll, status]
+    );
+
+    return res.json({ requests: result.rows });
+  } catch (error) {
+    console.error('Admin get category requests error:', error);
+    return res.status(500).json({ message: 'Server error fetching requests' });
+  }
+});
+
+router.put('/category-requests/:id/review', requireAdmin, async (req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const id = Number(req.params.id || 0);
+    if (!id) return res.status(400).json({ message: 'Invalid request id' });
+
+    const status = String(req.body?.status || '').trim().toLowerCase();
+    const approvedStatus = ['approved', 'rejected'].includes(status) ? status : null;
+    if (!approvedStatus) return res.status(400).json({ message: 'Status must be approved or rejected' });
+
+    const rowRes = await pool.query('SELECT * FROM product_name_requests WHERE id = $1', [id]);
+    if (!rowRes.rows.length) return res.status(404).json({ message: 'Request not found' });
+    const requestRow = rowRes.rows[0];
+    if (String(requestRow.status) !== 'pending') {
+      return res.status(400).json({ message: 'Request already reviewed' });
+    }
+
+    const nextName = String(req.body?.name || requestRow.name).trim();
+    const nextCategoryId = Number(req.body?.category_id || requestRow.category_id || 0);
+    const reviewNotes = String(req.body?.review_notes || '').trim();
+    const reviewerId = Number(req.user?.id || 0) > 0 ? Number(req.user.id) : null;
+
+    if (approvedStatus === 'approved') {
+      if (!nextName) return res.status(400).json({ message: 'Approved name is required' });
+      if (!nextCategoryId) return res.status(400).json({ message: 'Approved category is required' });
+
+      await pool.query(
+        `INSERT INTO product_name_catalog (category_id, name, source, is_approved, requested_by, reviewed_by, reviewed_at)
+         VALUES ($1, $2, 'request', true, $3, $4, CURRENT_TIMESTAMP)
+         ON CONFLICT (name)
+         DO UPDATE SET category_id = EXCLUDED.category_id, is_approved = true, reviewed_by = EXCLUDED.reviewed_by, reviewed_at = EXCLUDED.reviewed_at`,
+        [nextCategoryId, nextName, requestRow.requested_by || null, reviewerId]
+      );
+    }
+
+    const updated = await pool.query(
+      `UPDATE product_name_requests
+       SET status = $1,
+           name = $2,
+           category_id = $3,
+           review_notes = $4,
+           reviewed_by = $5,
+           reviewed_at = CURRENT_TIMESTAMP
+       WHERE id = $6
+       RETURNING *`,
+      [approvedStatus, nextName, nextCategoryId || null, reviewNotes || null, reviewerId, id]
+    );
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'category.request.review',
+      entity: 'category_requests',
+      entity_id: id,
+      before: requestRow,
+      after: updated.rows[0]
+    });
+    broadcastEvent('admin.audit', { action: 'category.request.review', entity: 'category_requests', entity_id: id, actor_admin_id: req.user.id });
+
+    return res.json({ message: `Request ${approvedStatus}`, request: updated.rows[0] });
+  } catch (error) {
+    console.error('Admin review category request error:', error);
+    return res.status(500).json({ message: 'Server error reviewing request' });
   }
 });
 

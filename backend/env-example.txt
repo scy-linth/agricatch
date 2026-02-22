@@ -1,11 +1,11 @@
-# Environment Configuration for AgriFishery Market Backend
+# Environment Configuration for AgriCatch Backend
 
 # Database Configuration
 DB_USER=postgres
 DB_PASSWORD=your_postgres_password
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=agri_fishery_marketplace
+DB_NAME=agricatch
 
 # JWT Configuration
 JWT_SECRET=your_super_secret_jwt_key_here_make_it_long_and_random

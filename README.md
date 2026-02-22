@@ -1,13 +1,13 @@
 # Agricatch: “A Web Application for Pre-Ordering Fresh Produce from Farmers for Trabajo Market”
 
 
-A modern e-commerce platform connecting farmers directly with consumers for fresh agricultural and fishery products. Features guest browsing, cart functionality, and user authentication for ordering.
+A modern e-commerce platform connecting farmers directly with consumers for fresh farm products. Features guest browsing, cart functionality, and user authentication for ordering.
 
 ## Features
 
 - **Guest Mode**: Browse products and add to cart without registration
 - **User Authentication**: Register and login for placing orders
-- **Product Categories**: Agricultural Products and Fishery Products
+- **Product Categories**: Agricultural Products (farm products only)
 - **Shopping Cart**: Persistent cart for both guest and logged-in users
 - **Cash on Delivery**: Philippine payment method
 - **Responsive Design**: Works on desktop and mobile devices
@@ -25,7 +25,7 @@ A modern e-commerce platform connecting farmers directly with consumers for fres
 ## Project Structure
 
 ```
-agri-fishery-marketplace/
+agricatch/
 ├── backend/                 # Node.js backend
 │   ├── routes/             # API route handlers
 │   ├── middleware/         # Custom middleware
@@ -60,7 +60,7 @@ Before running this application, make sure you have the following installed:
 If you have git installed:
 ```bash
 git clone <repository-url>
-cd agri-fishery-marketplace
+cd agricatch
 ```
 
 Or simply download and extract the ZIP file to your desired location.
@@ -79,7 +79,7 @@ npm install
 1. **Start PostgreSQL**: Make sure PostgreSQL is running on your system
 2. **Create Database**: Open PostgreSQL command line or pgAdmin and create a database:
    ```sql
-   CREATE DATABASE agri_fishery_marketplace;
+   CREATE DATABASE agricatch;
    ```
 3. **Update Database Credentials**: Create a `.env` file in the backend folder:
    ```
@@ -87,7 +87,7 @@ npm install
    DB_PASSWORD=your_password_here
    DB_HOST=localhost
    DB_PORT=5432
-   DB_NAME=agri_fishery_marketplace
+   DB_NAME=agricatch
    JWT_SECRET=your_jwt_secret_key_here
    SESSION_SECRET=your_session_secret_here
    PORT=3000
@@ -99,10 +99,11 @@ Run the schema script to create tables:
 
 ```bash
 # Using psql command line
-psql -U postgres -d agri_fishery_marketplace -f ../database/schema.sql
+psql -U postgres -d agricatch -f ../database/schema.sql
 
 # Or run the seed script to populate with sample data
 cd ../database
+npm install
 node seed.js
 ```
 
@@ -141,7 +142,6 @@ http://localhost:3000
 
 The database includes sample farmer accounts:
 - **Email**: juan@farm.ph / **Password**: password123 (Farmer)
-- **Email**: maria@seafood.ph / **Password**: password123 (Fishery)
 
 ## API Endpoints
 
@@ -173,7 +173,6 @@ The database includes sample farmer accounts:
 
 ### Product Catalog
 - **Agricultural Products**: Vegetables, fruits, grains, eggs
-- **Fishery Products**: Fish, seafood, aquaculture products
 - Product details include farmer info, location, and freshness dates
 
 ### Order Process
@@ -216,14 +215,15 @@ If you encounter database issues:
 
 ```bash
 # Drop and recreate database
-DROP DATABASE IF EXISTS agri_fishery_marketplace;
-CREATE DATABASE agri_fishery_marketplace;
+DROP DATABASE IF EXISTS agricatch;
+CREATE DATABASE agricatch;
 
 # Re-run schema
-psql -U postgres -d agri_fishery_marketplace -f database/schema.sql
+psql -U postgres -d agricatch -f database/schema.sql
 
 # Re-seed data
 cd database
+npm install
 node seed.js
 ```
 
@@ -236,7 +236,7 @@ node seed.js
 
 ### Running in Development Mode:
 ```bash
-cd backend
+npm run install:backend
 npm run dev  # Uses nodemon for auto-restart
 ```
 
@@ -261,4 +261,4 @@ For questions or issues:
 
 ---
 
-**Happy shopping with AgriFishery Market! 🛒**
+**Happy shopping with AgriCatch! 🛒**

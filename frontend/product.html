@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Product Details - AgriCatch</title>
-    <link rel="stylesheet" href="../public/css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
@@ -19,7 +19,7 @@
                         <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
                         <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
                     </div>
-                    <p class="tagline">Freshly Caught! Pre-ordered for you!</p>
+                    <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
                 </div>
                 <nav class="nav" id="main-nav">
                     <a href="/" class="nav-link">Home</a>
@@ -37,6 +37,10 @@
         <div class="container">
             <div id="product-detail" class="product-detail">
                 <!-- Product details will be loaded here -->
+            </div>
+            <div class="reviews-section">
+                <h3>Similar Farmer Shops</h3>
+                <div id="similar-sellers-list" class="reviews-list"></div>
             </div>
             <div class="reviews-section">
                 <h3>Reviews</h3>
@@ -61,7 +65,7 @@
             <div class="footer-content">
                 <div class="footer-section">
                     <h3>AgriCatch</h3>
-                    <p>Freshly Caught! Pre-ordered for you! Your trusted source for fresh agricultural and fishery products.</p>
+                    <p>Freshly Harvested! Pre-ordered for you! Your trusted source for fresh farm products.</p>
                 </div>
             </div>
             <div class="footer-bottom">
@@ -70,7 +74,8 @@
         </div>
     </footer>
 
-    <script src="../public/js/product.js"></script>
+    <script src="/js/format.js"></script>
+    <script src="/js/product.js"></script>
     <script>
         // Mobile menu toggle
         const mobileMenuToggle = document.getElementById('mobile-menu-toggle');

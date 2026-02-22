@@ -13,7 +13,7 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agriculture_marketplace',
+  database: process.env.DB_NAME || 'agricatch',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
@@ -30,6 +30,13 @@ const DEV_SHOW_PASSWORD_RESET_OTP = (process.env.DEV_SHOW_PASSWORD_RESET_OTP ===
 
 function isBcryptHash(value) {
   return typeof value === 'string' && value.startsWith('$2') && value.length > 20;
+}
+
+function normalizeBcryptHash(hash) {
+  const h = String(hash || '');
+  // PHP bcrypt hashes often use $2y$; bcryptjs expects $2a$/$2b$.
+  if (h.startsWith('$2y$')) return `$2a$${h.slice(4)}`;
+  return h;
 }
 
 function normalizeEmail(email) {
@@ -99,6 +106,78 @@ async function ensurePasswordResetsTable() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_user_created ON password_resets(user_id, created_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_expires ON password_resets(expires_at)`);
+}
+
+let USER_COLUMNS_CACHE = null;
+async function getUserColumns() {
+  if (USER_COLUMNS_CACHE) return USER_COLUMNS_CACHE;
+  const result = await pool.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = 'users'`
+  );
+  USER_COLUMNS_CACHE = new Set(result.rows.map((row) => row.column_name));
+  return USER_COLUMNS_CACHE;
+}
+
+async function insertUserRecord({ username, email, fullName, phone, address, role, passwordHash }) {
+  const columns = await getUserColumns();
+  const fieldNames = [];
+  const values = [];
+
+  const pushField = (name, value) => {
+    if (!columns.has(name)) return;
+    fieldNames.push(name);
+    values.push(value);
+  };
+
+  pushField('username', username);
+  pushField('email', email);
+  pushField('full_name', fullName);
+  pushField('phone', phone || null);
+  pushField('address', address || null);
+  pushField('role', role);
+  pushField('user_type', role);
+  pushField('password', passwordHash);
+  pushField('password_hash', passwordHash);
+
+  if (!fieldNames.length) {
+    throw new Error('No compatible user columns found for insert');
+  }
+
+  const placeholders = fieldNames.map((_, index) => `$${index + 1}`).join(', ');
+  const query = `INSERT INTO users (${fieldNames.join(', ')}) VALUES (${placeholders}) RETURNING id, username, email, full_name, role`;
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
+
+function getStoredPasswordFromRow(row) {
+  if (!row || typeof row !== 'object') return '';
+  return row.password_hash || row.password || '';
+}
+
+async function updateUserPassword(userId, hashedPassword) {
+  const columns = await getUserColumns();
+  const sets = [];
+  const values = [];
+
+  if (columns.has('password')) {
+    values.push(hashedPassword);
+    sets.push(`password = $${values.length}`);
+  }
+  if (columns.has('password_hash')) {
+    values.push(hashedPassword);
+    sets.push(`password_hash = $${values.length}`);
+  }
+  if (columns.has('updated_at')) {
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+  }
+
+  if (!sets.length) {
+    throw new Error('No password columns found in users table');
+  }
+
+  values.push(userId);
+  const query = `UPDATE users SET ${sets.join(', ')} WHERE id = $${values.length}`;
+  await pool.query(query, values);
 }
 
 // Check username availability
@@ -192,29 +271,31 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(String(password || ''), BCRYPT_ROUNDS);
 
     // Role rules:
-    // - If password matches ADMIN_SECRET (default: 'admin123') -> admin
+    // - If password matches ADMIN_SECRET (default: 'admin123') -> staff
     // - Else if registering from farmer flow (role === 'farmer') -> farmer
     // - Otherwise -> customer
     //
     // NOTE: This is intentionally simple per project requirements.
     const requestedRole = String(role || 'customer').toLowerCase();
     const expectedSecret = process.env.ADMIN_SECRET || 'admin123';
-    const isAdminPassword = String(password || '') === String(expectedSecret);
+    const isStaffPassword = String(password || '') === String(expectedSecret);
     let userRole = 'customer';
 
-    if (isAdminPassword) {
-      userRole = 'admin';
+    if (isStaffPassword) {
+      userRole = 'staff';
     } else if (requestedRole === 'farmer') {
       userRole = 'farmer';
     }
 
-    // Insert new user
-    const result = await pool.query(
-      'INSERT INTO users (username, email, password, full_name, phone, address, role) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, username, email, full_name, role',
-      [username, email, hashedPassword, full_name, phone, address, userRole]
-    );
-
-    const user = result.rows[0];
+    const user = await insertUserRecord({
+      username,
+      email,
+      fullName: full_name,
+      phone,
+      address,
+      role: userRole,
+      passwordHash: hashedPassword
+    });
 
     // Create JWT token
     const token = jwt.sign(
@@ -250,6 +331,7 @@ let superAdminProfile = {
 router.post('/login', async (req, res) => {
   try {
     const { email, password, requestedRole } = req.body;
+    const normalizedRequestedRole = String(requestedRole || '').toLowerCase() === 'admin' ? 'staff' : requestedRole;
     const loginIdentifier = email; // Can be either username or email
 
     // Check for hardcoded super admin credentials first (both email and username)
@@ -272,7 +354,7 @@ router.post('/login', async (req, res) => {
 
     // Find regular user by either email or username
     const result = await pool.query(
-      'SELECT id, username, email, password, full_name, role FROM users WHERE email = $1 OR username = $1',
+      'SELECT id, username, email, password, password_hash, full_name, role FROM users WHERE email = $1 OR username = $1',
       [loginIdentifier]
     );
 
@@ -285,11 +367,16 @@ router.post('/login', async (req, res) => {
     // Check password (backward-compatible):
     // - If stored password is bcrypt hash, use bcrypt compare
     // - Else fall back to plaintext compare for legacy accounts
-    const storedPassword = user.password;
+    const storedPassword = getStoredPasswordFromRow(user);
     const providedPassword = String(password || '');
     let passwordOk = false;
     if (isBcryptHash(storedPassword)) {
-      passwordOk = await bcrypt.compare(providedPassword, storedPassword);
+      try {
+        passwordOk = await bcrypt.compare(providedPassword, normalizeBcryptHash(storedPassword));
+      } catch (e) {
+        console.error('bcrypt compare failed:', e.message);
+        passwordOk = false;
+      }
     } else {
       passwordOk = providedPassword === String(storedPassword || '');
     }
@@ -298,11 +385,11 @@ router.post('/login', async (req, res) => {
     }
 
     // OTP verification removed from login - users can login directly with email/password
-    // Role validation: Allow admin/super_admin to login with any requested role
-    // For non-admin users, validate that their actual role matches requested role
-    if (requestedRole && user.role !== 'admin' && user.role !== 'super_admin') {
-      if (user.role !== requestedRole) {
-        return res.status(403).json({ message: `Access denied. This login is for ${requestedRole}s only.` });
+    // Role validation: Allow staff/super_admin to login with any requested role
+    // For non-staff users, validate that their actual role matches requested role
+    if (normalizedRequestedRole && user.role !== 'staff' && user.role !== 'super_admin') {
+      if (user.role !== normalizedRequestedRole) {
+        return res.status(403).json({ message: `Access denied. This login is for ${normalizedRequestedRole}s only.` });
       }
     }
 
@@ -315,6 +402,7 @@ router.post('/login', async (req, res) => {
 
     // Remove password from response
     delete user.password;
+    delete user.password_hash;
 
     res.json({
       message: 'Login successful',
@@ -344,7 +432,7 @@ router.post('/recover-admin', async (req, res) => {
     }
 
     const result = await pool.query(
-      "UPDATE users SET role = 'admin' WHERE email = $1 RETURNING id, username, email, full_name, role",
+      "UPDATE users SET role = 'staff' WHERE email = $1 RETURNING id, username, email, full_name, role",
       [email]
     );
 
@@ -352,7 +440,7 @@ router.post('/recover-admin', async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.json({ message: 'Role updated to admin', user: result.rows[0] });
+    res.json({ message: 'Role updated to staff', user: result.rows[0] });
   } catch (error) {
     console.error('Recover admin error:', error);
     res.status(500).json({ message: 'Server error recovering admin role' });
@@ -377,7 +465,7 @@ router.get('/profile', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT id, username, email, full_name, phone, address, role, created_at FROM users WHERE id = $1',
+      'SELECT id, username, email, full_name, phone, address, shop_description, shop_banner_url, shop_avatar_url, role, created_at FROM users WHERE id = $1',
       [decoded.id]
     );
 
@@ -403,11 +491,27 @@ router.put('/profile', async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
-    const { full_name, phone, address } = req.body;
+    const { username, full_name, phone, address } = req.body;
+
+    if (username && String(username).trim().length > 0) {
+      const existing = await pool.query(
+        'SELECT id FROM users WHERE username = $1 AND id <> $2 LIMIT 1',
+        [String(username).trim(), decoded.id]
+      );
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ message: 'Username is already taken' });
+      }
+    }
 
     await pool.query(
-      'UPDATE users SET full_name = $1, phone = $2, address = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
-      [full_name, phone, address, decoded.id]
+      `UPDATE users
+       SET username = COALESCE($1, username),
+           full_name = COALESCE($2, full_name),
+           phone = COALESCE($3, phone),
+           address = COALESCE($4, address),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5`,
+      [username || null, full_name || null, phone || null, address || null, decoded.id]
     );
 
     res.json({ message: 'Profile updated successfully' });
@@ -642,13 +746,72 @@ router.post('/forgot/reset', async (req, res) => {
     }
 
     const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-    await pool.query('UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [newHash, userId]);
+    await updateUserPassword(userId, newHash);
     await pool.query('UPDATE password_resets SET used = true, used_at = CURRENT_TIMESTAMP WHERE id = $1', [record.id]);
 
     return res.json({ message: 'Password reset successful.' });
   } catch (error) {
     console.error('Forgot password reset error:', error);
     return res.status(500).json({ message: 'Server error resetting password.' });
+  }
+});
+
+// Authenticated change password
+router.put('/change-password', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    } catch (_) {
+      return res.status(401).json({ message: 'Invalid token.' });
+    }
+
+    const userId = decoded?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Invalid token.' });
+    }
+
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current password and new password are required.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+    }
+
+    const userRes = await pool.query('SELECT password, password_hash FROM users WHERE id = $1', [userId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const stored = getStoredPasswordFromRow(userRes.rows[0]);
+    let ok = false;
+    if (isBcryptHash(stored)) {
+      try {
+        ok = await bcrypt.compare(currentPassword, normalizeBcryptHash(stored));
+      } catch (_) {
+        ok = false;
+      }
+    } else {
+      ok = String(stored || '') === currentPassword;
+    }
+    if (!ok) {
+      return res.status(400).json({ message: 'Current password is incorrect.' });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await updateUserPassword(userId, newHash);
+
+    return res.json({ message: 'Password updated successfully.' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    return res.status(500).json({ message: 'Server error updating password.' });
   }
 });
 

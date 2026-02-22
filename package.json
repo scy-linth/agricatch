@@ -1,8 +1,11 @@
 {
-  "dependencies": {
-    "cloudinary": "^2.9.0",
-    "express": "^5.2.1",
-    "pg": "^8.17.2",
-    "puppeteer": "^24.37.2"
+  "name": "agricatch",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix backend run dev",
+    "start": "npm --prefix backend run start",
+    "install:backend": "npm --prefix backend install",
+    "purge:fishery:dry": "node backend/scripts/purge-fishery.js --dry-run --verbose",
+    "purge:fishery": "node backend/scripts/purge-fishery.js --apply --verbose"
   }
 }

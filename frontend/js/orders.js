@@ -1,3 +1,6 @@
+// Ensure placeholder image is defined on pages that don't load app.js
+window.__PLACEHOLDER_IMAGE__ = window.__PLACEHOLDER_IMAGE__ || '/images/resendlogo.png';
+
 class OrdersPage {
     constructor() {
         // Use relative /api so Netlify can proxy to Render.
@@ -5,8 +8,54 @@ class OrdersPage {
         this.token = localStorage.getItem('token');
         this.userId = this.getUserId();
         this.currentStatus = 'pending';
+        const params = new URLSearchParams(window.location.search);
+        this.highlightOrderId = Number(params.get('highlightOrderId') || 0);
+        this.returnTo = '#home';
+        this.returnPath = '/';
+        this.resumeScrollY = Number(
+            params.get('resumeScrollY') ||
+            sessionStorage.getItem('ordersReturnScrollY') ||
+            NaN
+        );
         this.ordersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
+        this.ratingDraft = {
+            productId: null,
+            reviewId: null,
+            rating: 0,
+            productName: ''
+        };
+        this.cancelDraftOrderId = null;
         this.init();
+    }
+
+    escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    fmtNumber(value, options) {
+        try {
+            if (window.FormatUtil && typeof window.FormatUtil.number === 'function') {
+                return window.FormatUtil.number(value, options);
+            }
+        } catch (_) {}
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '0';
+        return String(n);
+    }
+
+    fmtCurrency(value, options) {
+        try {
+            if (window.FormatUtil && typeof window.FormatUtil.currency === 'function') {
+                return window.FormatUtil.currency(value, options);
+            }
+        } catch (_) {}
+        const n = Number(value);
+        return `₱${(Number.isFinite(n) ? n : 0).toFixed(2)}`;
     }
 
     init() {
@@ -14,9 +63,32 @@ class OrdersPage {
             window.location.href = '/?login=1';
             return;
         }
+        localStorage.setItem('ordersReturnTo', this.returnTo);
         this.setupEventListeners();
+        this.configureBackButton();
         this.loadOrders();
         this.setupRealtime();
+    }
+
+    normalizeReturnTo(value) {
+        const fallback = '#products';
+        const allowed = new Set(['#home', '#featured', '#products', '#about', '#contact']);
+        const raw = String(value || '').trim();
+        if (!raw) return fallback;
+        const hash = raw.startsWith('#') ? raw : `#${raw.replace(/^\/+/, '')}`;
+        return allowed.has(hash) ? hash : fallback;
+    }
+
+    normalizeReturnPath(value) {
+        const raw = String(value || '').trim();
+        if (raw === '/index.html') return '/index.html';
+        return '/';
+    }
+
+    configureBackButton() {
+        const backBtn = document.getElementById('back-to-origin-btn');
+        if (!backBtn) return;
+        backBtn.setAttribute('href', '/#home');
     }
 
     setupEventListeners() {
@@ -27,6 +99,47 @@ class OrdersPage {
         document.getElementById('out_for_delivery-orders-tab')?.addEventListener('click', () => this.switchOrderTab('out_for_delivery'));
         document.getElementById('delivered-orders-tab')?.addEventListener('click', () => this.switchOrderTab('delivered'));
         document.getElementById('cancelled-orders-tab')?.addEventListener('click', () => this.switchOrderTab('cancelled'));
+
+        document.getElementById('close-order-rating-modal')?.addEventListener('click', () => this.closeRatingModal());
+        document.getElementById('cancel-order-rating-btn')?.addEventListener('click', () => this.closeRatingModal());
+        document.getElementById('order-rating-form')?.addEventListener('submit', (e) => this.submitRatingForm(e));
+        document.getElementById('order-rating-modal')?.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'order-rating-modal') {
+                this.closeRatingModal();
+            }
+        });
+
+        document.getElementById('close-order-cancel-modal')?.addEventListener('click', () => this.closeCancelReasonModal());
+        document.getElementById('cancel-order-cancel-btn')?.addEventListener('click', () => this.closeCancelReasonModal());
+        document.getElementById('order-cancel-form')?.addEventListener('submit', (e) => this.submitCancelReason(e));
+        document.getElementById('order-cancel-modal')?.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'order-cancel-modal') {
+                this.closeCancelReasonModal();
+            }
+        });
+
+        document.getElementById('close-order-reason-view-modal')?.addEventListener('click', () => this.closeReasonViewer());
+        document.getElementById('close-order-reason-view-btn')?.addEventListener('click', () => this.closeReasonViewer());
+        document.getElementById('order-reason-view-modal')?.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'order-reason-view-modal') {
+                this.closeReasonViewer();
+            }
+        });
+
+        document.querySelectorAll('.order-rating-star-btn').forEach((button) => {
+            button.addEventListener('click', () => {
+                const value = Number(button.getAttribute('data-rating') || 0);
+                this.setRatingValue(value);
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeRatingModal();
+                this.closeCancelReasonModal();
+                this.closeReasonViewer();
+            }
+        });
     }
 
     switchOrderTab(status) {
@@ -97,10 +210,41 @@ class OrdersPage {
                 const data = await response.json();
                 this.groupOrdersByStatus(data.orders || []);
                 this.renderAllOrders();
+                this.applyHighlightFromQuery();
             }
         } catch (error) {
             console.error('Error loading orders:', error);
         }
+    }
+
+    applyHighlightFromQuery() {
+        if (!this.highlightOrderId || Number.isNaN(this.highlightOrderId)) return;
+
+        let foundStatus = null;
+        for (const [status, orders] of Object.entries(this.ordersByStatus)) {
+            if ((orders || []).some((order) => Number(order.id) === this.highlightOrderId)) {
+                foundStatus = status;
+                break;
+            }
+        }
+
+        if (!foundStatus) return;
+
+        this.switchOrderTab(foundStatus);
+        setTimeout(() => {
+            const target = document.querySelector(`.order-card[data-order-id="${this.highlightOrderId}"]`);
+            if (target) {
+                target.classList.add('order-card-highlight');
+                target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                setTimeout(() => target.classList.remove('order-card-highlight'), 2200);
+            }
+        }, 120);
+
+        const params = new URLSearchParams(window.location.search);
+        params.delete('highlightOrderId');
+        const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}${window.location.hash || ''}`;
+        window.history.replaceState({}, '', next);
+        this.highlightOrderId = 0;
     }
 
     groupOrdersByStatus(orders) {
@@ -142,44 +286,337 @@ class OrdersPage {
         container.innerHTML = orders.map(order => {
             const item = (order.items && order.items[0]) || order;
             const canCancel = (item.status || order.status || 'pending') === 'pending';
-            
+            const deliveredAtRaw = item.delivered_at || order.delivered_at || null;
+            const isDelivered = (item.status || order.status || 'pending') === 'delivered';
+            const deliveredAt = deliveredAtRaw ? new Date(deliveredAtRaw) : null;
+            const ratingDeadline = deliveredAt && !Number.isNaN(deliveredAt.getTime()) ? new Date(deliveredAt.getTime()) : null;
+            if (ratingDeadline) ratingDeadline.setMonth(ratingDeadline.getMonth() + 1);
+            const canRateNow = isDelivered && ratingDeadline && new Date() <= ratingDeadline;
+            const canRateExpired = isDelivered && (!ratingDeadline || new Date() > ratingDeadline);
+
+            const currentStatus = item.status || order.status || 'pending';
+            const createdAt = new Date(order.created_at);
+            const displayDate = Number.isNaN(createdAt.getTime()) ? '—' : createdAt.toLocaleDateString();
+            const displayTime = Number.isNaN(createdAt.getTime()) ? '' : createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const cancellationReason = item.cancellation_reason || order.cancellation_reason || 'No reason provided.';
+            const encodedReason = encodeURIComponent(cancellationReason);
+            const encodedProductName = encodeURIComponent(item.product_name || 'Product');
+            const quantity = Number(item.quantity || order.quantity || 1) || 1;
+
             return `
-            <div class="order-card">
+            <div class="order-card" data-order-id="${order.id}">
                 <div class="order-header">
-                    <div class="order-id">Order #${order.id}</div>
-                    <div class="order-date">${new Date(order.created_at).toLocaleDateString()}</div>
-                </div>
-                <div class="order-details">
-                    <div class="order-item-meta">
-                        <strong>Order Status:</strong> <span style="font-weight: 600; color: ${this.getStatusColor(item.status || order.status || 'pending')};">${this.formatStatusLabel(item.status || order.status || 'pending')}</span>
+                    <div class="order-head-left">
+                        <div class="order-date">
+                            <div>${displayDate}</div>
+                            <small>${displayTime}</small>
+                        </div>
+                        <div class="order-id">Order #${order.id}</div>
+                    </div>
+                    <div class="order-status-line">
+                        <strong>Order Status:</strong>
+                        <span style="font-weight: 600; color: ${this.getStatusColor(currentStatus)};">${this.formatStatusLabel(currentStatus)}</span>
                     </div>
                 </div>
-                <div class="order-details">
-                    <div class="order-item">
-                        <img src="${item.image_url || window.__PLACEHOLDER_IMAGE__}" alt="${item.product_name || 'Product'}">
-                        <div class="order-item-info">
-                            <div class="order-item-name">${item.product_name || 'Product'}</div>
-                            <div class="order-item-meta">${item.quantity || order.quantity || 1} x ₱${parseFloat(item.price || order.price || 0).toFixed(2)} ${item.unit || ''}</div>
-                            <div class="order-item-meta"><strong>Status:</strong> <span style="font-weight: 600; color: ${this.getStatusColor(item.status || order.status || 'pending')};">${this.formatStatusLabel(item.status || order.status || 'pending')}</span></div>
-                            <div class="order-actions">
-                                ${item.farmer_id ? `
-                                    <button class="btn btn-small btn-primary" onclick="ordersPage.openChat(${order.id}, ${item.farmer_id})">
-                                        <i class="fas fa-comments"></i> Chat Vendor
-                                    </button>
-                                ` : ''}
+                <div class="order-item">
+                    <img src="${item.image_url || window.__PLACEHOLDER_IMAGE__}" alt="${item.product_name || 'Product'}">
+                    <div class="order-item-info">
+                        <div class="order-item-name">${item.product_name || 'Product'}</div>
+                        <div class="order-item-meta">${this.fmtNumber(quantity)} x ${this.fmtCurrency(item.price || order.price || 0)} ${item.unit || ''}</div>
+                        <div class="order-item-meta"><strong>From:</strong> ${item.farmer_name || 'Local Farmer'}</div>
+                        ${(currentStatus === 'cancelled') ? `
+                            <div class="order-item-meta">
+                                <button class="btn btn-small btn-secondary" onclick="ordersPage.openReasonViewer('${encodedReason}')">
+                                    <i class="fas fa-circle-info"></i> View Reason
+                                </button>
                             </div>
+                        ` : ''}
+                    </div>
+                    <div class="order-item-side">
+                        <span class="order-total">${this.fmtCurrency(order.total_amount)}</span>
+                        <div class="order-actions">
+                            ${item.farmer_id ? `
+                                <button class="btn btn-small btn-primary" onclick="ordersPage.openChat(${order.id}, ${item.farmer_id}, '${encodedProductName}', ${quantity})">
+                                    <i class="fas fa-comments"></i> Chat Vendor
+                                </button>
+                            ` : ''}
+                            ${canRateNow ? `
+                                <button class="btn btn-small btn-secondary" onclick="ordersPage.rateOrderProduct(${item.product_id})">
+                                    <i class="fas fa-star"></i> Rate Product
+                                </button>
+                            ` : ''}
+                            ${canRateExpired ? `
+                                <button class="btn btn-small" disabled title="Rating is available only for 1 month after delivery.">
+                                    <i class="fas fa-clock"></i> Rating Closed
+                                </button>
+                            ` : ''}
+                            ${canCancel ? `
+                                <button class="btn btn-small btn-danger" onclick="ordersPage.openCancelReasonModal(${order.id})">Cancel</button>
+                            ` : ''}
                         </div>
                     </div>
-                </div>
-                <div class="order-actions">
-                    <span class="order-total">₱${parseFloat(order.total_amount).toFixed(2)}</span>
-                    ${canCancel ? `
-                        <button class="btn btn-small btn-danger" onclick="ordersPage.cancelOrder(${order.id})">Cancel</button>
-                    ` : ''}
                 </div>
             </div>
         `;
         }).join('');
+    }
+
+    openCancelReasonModal(orderId) {
+        this.cancelDraftOrderId = Number(orderId || 0);
+        if (!this.cancelDraftOrderId) return;
+
+        const modal = document.getElementById('order-cancel-modal');
+        const reasonInput = document.getElementById('order-cancel-reason-input');
+        if (reasonInput) reasonInput.value = '';
+
+        if (modal) {
+            modal.classList.add('open');
+            this.setModalLock(true);
+            setTimeout(() => reasonInput?.focus(), 0);
+        }
+    }
+
+    closeCancelReasonModal() {
+        const modal = document.getElementById('order-cancel-modal');
+        if (modal && modal.classList.contains('open')) {
+            modal.classList.remove('open');
+        }
+        this.cancelDraftOrderId = null;
+        this.syncModalLockState();
+    }
+
+    openReasonViewer(encodedReason = '') {
+        const reason = decodeURIComponent(String(encodedReason || '')).trim() || 'No reason provided.';
+        const textEl = document.getElementById('order-reason-view-text');
+        const modal = document.getElementById('order-reason-view-modal');
+
+        if (textEl) textEl.textContent = reason;
+        if (modal) {
+            modal.classList.add('open');
+            this.setModalLock(true);
+        }
+    }
+
+    closeReasonViewer() {
+        const modal = document.getElementById('order-reason-view-modal');
+        if (modal && modal.classList.contains('open')) {
+            modal.classList.remove('open');
+        }
+        this.syncModalLockState();
+    }
+
+    syncModalLockState() {
+        const hasOpenModal = ['order-rating-modal', 'order-cancel-modal', 'order-reason-view-modal']
+            .some((id) => document.getElementById(id)?.classList.contains('open'));
+        this.setModalLock(hasOpenModal);
+    }
+
+    async submitCancelReason(e) {
+        e.preventDefault();
+        const orderId = Number(this.cancelDraftOrderId || 0);
+        if (!orderId) return;
+
+        const reasonInput = document.getElementById('order-cancel-reason-input');
+        const submitBtn = document.getElementById('submit-order-cancel-btn');
+        const reason = String(reasonInput?.value || '').trim();
+
+        try {
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Cancelling...';
+            }
+
+            const ok = await this.cancelOrder(orderId, reason);
+            if (ok) {
+                this.closeCancelReasonModal();
+                this.loadOrders();
+            }
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Confirm Cancel';
+            }
+        }
+    }
+
+    getOrderItemByProductId(productId) {
+        const statuses = Object.keys(this.ordersByStatus);
+        for (const status of statuses) {
+            const orders = this.ordersByStatus[status] || [];
+            for (const order of orders) {
+                const item = (order.items && order.items[0]) || order;
+                if (Number(item.product_id) === Number(productId)) {
+                    return item;
+                }
+            }
+        }
+        return null;
+    }
+
+    setModalLock(locked) {
+        const html = document.documentElement;
+        const body = document.body;
+        if (!html || !body) return;
+
+        if (locked) {
+            html.classList.add('modal-open');
+            body.classList.add('modal-open');
+        } else {
+            html.classList.remove('modal-open');
+            body.classList.remove('modal-open');
+        }
+    }
+
+    setRatingValue(value) {
+        this.ratingDraft.rating = Number(value || 0);
+        const normalized = Math.max(0, Math.min(5, this.ratingDraft.rating));
+
+        document.querySelectorAll('.order-rating-star-btn').forEach((button) => {
+            const starValue = Number(button.getAttribute('data-rating') || 0);
+            button.classList.toggle('active', starValue <= normalized);
+        });
+
+        const textEl = document.getElementById('order-rating-value');
+        if (textEl) {
+            textEl.textContent = normalized > 0 ? `${normalized} star${normalized > 1 ? 's' : ''}` : 'Select a rating';
+        }
+    }
+
+    openRatingModal({ productId, productName, reviewId, currentRating, currentComment }) {
+        this.ratingDraft.productId = Number(productId);
+        this.ratingDraft.reviewId = reviewId ? Number(reviewId) : null;
+        this.ratingDraft.productName = productName || 'Product';
+
+        const modal = document.getElementById('order-rating-modal');
+        const nameEl = document.getElementById('order-rating-product-name');
+        const commentEl = document.getElementById('order-rating-comment');
+        const submitBtn = document.getElementById('submit-order-rating-btn');
+
+        if (nameEl) nameEl.textContent = this.ratingDraft.productName;
+        if (commentEl) commentEl.value = String(currentComment || '');
+        if (submitBtn) submitBtn.textContent = this.ratingDraft.reviewId ? 'Update Rating' : 'Save Rating';
+
+        this.setRatingValue(Number(currentRating || 0));
+
+        if (modal) {
+            modal.classList.add('open');
+            this.setModalLock(true);
+        }
+    }
+
+    closeRatingModal() {
+        const modal = document.getElementById('order-rating-modal');
+        if (modal && modal.classList.contains('open')) {
+            modal.classList.remove('open');
+            this.setModalLock(false);
+        }
+
+        this.ratingDraft = {
+            productId: null,
+            reviewId: null,
+            rating: 0,
+            productName: ''
+        };
+    }
+
+    async rateOrderProduct(productId) {
+        if (!productId) return;
+
+        try {
+            const eligibilityRes = await fetch(`${this.apiBase}/products/${productId}/reviews/eligibility`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            let eligibility = null;
+            if (eligibilityRes.ok) {
+                eligibility = await eligibilityRes.json();
+            }
+
+            if (!eligibilityRes.ok || !eligibility?.can_rate) {
+                alert((eligibility && eligibility.reason) || 'You can rate only delivered items within 1 month of delivery.');
+                return;
+            }
+
+            const item = this.getOrderItemByProductId(productId);
+            this.openRatingModal({
+                productId,
+                productName: item?.product_name || 'Product',
+                reviewId: eligibility?.my_review?.id || null,
+                currentRating: eligibility?.my_review?.rating || 0,
+                currentComment: eligibility?.my_review?.comment || ''
+            });
+        } catch (error) {
+            console.error('Rate product error:', error);
+            alert('Unable to submit rating right now.');
+        }
+    }
+
+    async submitRatingForm(e) {
+        e.preventDefault();
+
+        const productId = Number(this.ratingDraft.productId || 0);
+        const rating = Number(this.ratingDraft.rating || 0);
+        const reviewId = Number(this.ratingDraft.reviewId || 0) || null;
+        const comment = String(document.getElementById('order-rating-comment')?.value || '').trim();
+
+        if (!productId) {
+            alert('Unable to submit rating right now.');
+            return;
+        }
+
+        if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+            alert('Please select a rating from 1 to 5 stars.');
+            return;
+        }
+
+        const submitBtn = document.getElementById('submit-order-rating-btn');
+        const originalText = submitBtn ? submitBtn.textContent : '';
+
+        try {
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Saving...';
+            }
+
+            let response;
+            if (reviewId) {
+                response = await fetch(`${this.apiBase}/reviews/${reviewId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`
+                    },
+                    body: JSON.stringify({ rating, comment })
+                });
+            } else {
+                response = await fetch(`${this.apiBase}/products/${productId}/reviews`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`
+                    },
+                    body: JSON.stringify({ rating, comment })
+                });
+            }
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                alert(payload?.message || 'Unable to submit rating right now.');
+                return;
+            }
+
+            alert('Your rating was saved successfully.');
+            this.closeRatingModal();
+            this.loadOrders();
+        } catch (error) {
+            console.error('Submit rating error:', error);
+            alert('Unable to submit rating right now.');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText || 'Save Rating';
+            }
+        }
     }
 
     clearOrders() {
@@ -197,8 +634,7 @@ class OrdersPage {
         this.loadOrders();
     }
 
-    async cancelOrder(orderId) {
-        const reason = prompt('Reason for cancellation (optional):') || '';
+    async cancelOrder(orderId, reason = '') {
         try {
             const response = await fetch(`${this.apiBase}/orders/${orderId}/cancel`, {
                 method: 'PUT',
@@ -209,21 +645,30 @@ class OrdersPage {
                 body: JSON.stringify({ reason })
             });
             if (response.ok) {
-                this.loadOrders();
+                return true;
             }
+            const payload = await response.json().catch(() => ({}));
+            alert(payload?.message || 'Unable to cancel order.');
+            return false;
         } catch (error) {
             console.error('Cancel order error:', error);
+            alert('Unable to cancel order right now.');
+            return false;
         }
     }
 
 
-    async openChat(orderId, farmerId) {
+    async openChat(orderId, farmerId, encodedProductName = '', quantity = 1) {
         if (!farmerId) {
             alert('Farmer information not available');
             return;
         }
-        // Open chat page with farmer ID
-        window.location.href = `/chat.html?farmerId=${farmerId}&orderId=${orderId}`;
+        const params = new URLSearchParams(window.location.search);
+        const returnTo = this.normalizeReturnTo(params.get('returnTo') || this.returnTo);
+        const returnUrl = `${window.location.pathname}?highlightOrderId=${orderId}&returnTo=${encodeURIComponent(returnTo)}`;
+        const productName = decodeURIComponent(String(encodedProductName || 'Product'));
+        const safeQty = Number(quantity || 1) || 1;
+        window.location.href = `/chat.html?farmerId=${farmerId}&orderId=${orderId}&productName=${encodeURIComponent(productName)}&quantity=${safeQty}&returnUrl=${encodeURIComponent(returnUrl)}`;
     }
 
     getStatusColor(status) {

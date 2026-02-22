@@ -9,7 +9,7 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agriculture_marketplace',
+  database: process.env.DB_NAME || 'agricatch',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
@@ -41,7 +41,9 @@ router.get('/', async (req, res) => {
         FROM cart c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN users f ON p.farmer_id = f.id
-        WHERE c.user_id = $1 AND p.is_available = true
+        WHERE c.user_id = $1
+          AND p.is_available = true
+          AND (p.expiry_date IS NULL OR p.expiry_date >= CURRENT_DATE)
         ORDER BY c.added_at DESC
       `;
       params = [userId];
@@ -54,7 +56,9 @@ router.get('/', async (req, res) => {
         FROM cart c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN users f ON p.farmer_id = f.id
-        WHERE c.session_id = $1 AND p.is_available = true
+        WHERE c.session_id = $1
+          AND p.is_available = true
+          AND (p.expiry_date IS NULL OR p.expiry_date >= CURRENT_DATE)
         ORDER BY c.added_at DESC
       `;
       params = [sessionId];
@@ -72,7 +76,8 @@ router.get('/', async (req, res) => {
       cartItems,
       summary: {
         subtotal: subtotal.toFixed(2),
-        itemCount: cartItems.reduce((sum, item) => sum + item.quantity, 0)
+        itemCount: cartItems.length,
+        totalQuantity: cartItems.reduce((sum, item) => sum + item.quantity, 0)
       }
     });
 
@@ -104,7 +109,7 @@ router.post('/', async (req, res) => {
 
     // Check if product exists and is available
     const productResult = await pool.query(
-      'SELECT id, stock_quantity, is_available FROM products WHERE id = $1',
+      'SELECT id, stock_quantity, is_available, expiry_date FROM products WHERE id = $1',
       [productId]
     );
 
@@ -115,6 +120,10 @@ router.post('/', async (req, res) => {
     const product = productResult.rows[0];
     if (!product.is_available) {
       return res.status(400).json({ message: 'Product is not available' });
+    }
+
+    if (product.expiry_date && new Date(product.expiry_date) < new Date(new Date().toDateString())) {
+      return res.status(400).json({ message: 'Product is already expired' });
     }
 
     if (quantity > product.stock_quantity) {

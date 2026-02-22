@@ -1,5 +1,8 @@
 // Admin Dashboard JavaScript
 
+// Ensure placeholder image is defined on pages that don't load app.js
+window.__PLACEHOLDER_IMAGE__ = window.__PLACEHOLDER_IMAGE__ || '/images/resendlogo.png';
+
 class AdminDashboard {
     constructor() {
         // Use relative /api so Netlify can proxy to Render.
@@ -17,6 +20,27 @@ class AdminDashboard {
         }
 
         this.init();
+    }
+
+    fmtNumber(value, options) {
+        try {
+            if (window.FormatUtil && typeof window.FormatUtil.number === 'function') {
+                return window.FormatUtil.number(value, options);
+            }
+        } catch (_) {}
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '0';
+        return String(n);
+    }
+
+    fmtCurrency(value, options) {
+        try {
+            if (window.FormatUtil && typeof window.FormatUtil.currency === 'function') {
+                return window.FormatUtil.currency(value, options);
+            }
+        } catch (_) {}
+        const n = Number(value);
+        return `₱${(Number.isFinite(n) ? n : 0).toFixed(2)}`;
     }
 
     showAccessOverlay({ title, message, userEmail }) {
@@ -117,6 +141,8 @@ class AdminDashboard {
         this.loadUsers();
         this.loadOrders();
         this.loadProducts();
+        this.loadCategories();
+        this.loadCategoryRequests();
         this.setupEventListeners();
         this.setupRealtime();
         this.startUnreadPolling();
@@ -222,6 +248,7 @@ class AdminDashboard {
                 'orders': 'Orders Management',
                 'users': 'Customer Management',
                 'products': 'Product Management',
+                'categories': 'Category Management',
                 'logs': 'Audit Logs',
                 'reports': 'Reports',
                 'stats': 'Dashboard Statistics',
@@ -252,6 +279,10 @@ class AdminDashboard {
         if (sectionId === 'logs') {
             this.loadAuditLogs();
         }
+        if (sectionId === 'categories') {
+            this.loadCategories();
+            this.loadCategoryRequests();
+        }
     }
 
     async checkAdminAuth() {
@@ -264,7 +295,7 @@ class AdminDashboard {
 
             if (response.ok) {
                 const data = await response.json();
-                if (!['admin', 'super_admin'].includes(data.user.role)) {
+                if (!['staff', 'super_admin'].includes(data.user.role)) {
                     // Access denied -> redirect non-admin away from admin panel
                     if (data.user.role === 'farmer') {
                         window.location.href = '/farmer.html?denied=admin';
@@ -278,7 +309,7 @@ class AdminDashboard {
                 const userNameEl = document.getElementById('user-name');
                 const userEmailEl = document.getElementById('user-email');
                 if (userNameEl) {
-                    userNameEl.textContent = data.user.full_name || data.user.username || 'Admin';
+                    userNameEl.textContent = data.user.full_name || data.user.username || 'Staff';
                 }
                 if (userEmailEl) {
                     userEmailEl.textContent = data.user.email || '';
@@ -341,6 +372,7 @@ class AdminDashboard {
         const priceFilter = document.getElementById('order-price-filter');
         const sortFilter = document.getElementById('order-sort-filter');
         const closePanel = document.getElementById('close-order-panel');
+        const closeCategoryPanel = document.getElementById('close-category-panel');
         const chatClose = document.getElementById('close-chat-drawer');
         const floatChatBtn = document.getElementById('admin-float-chat-btn');
         const searchToggle = document.getElementById('admin-search-toggle');
@@ -350,6 +382,7 @@ class AdminDashboard {
         if (priceFilter) priceFilter.addEventListener('change', () => this.applyOrderFilters());
         if (sortFilter) sortFilter.addEventListener('change', () => this.applyOrderFilters());
         if (closePanel) closePanel.addEventListener('click', () => this.closeOrderDetails());
+        if (closeCategoryPanel) closeCategoryPanel.addEventListener('click', () => this.closeCategoryDetails());
         if (chatClose) chatClose.addEventListener('click', () => this.toggleChatDrawer(false));
         if (floatChatBtn) floatChatBtn.addEventListener('click', () => this.toggleChatDrawer(true));
 
@@ -383,6 +416,8 @@ class AdminDashboard {
         if (logsRefreshBtn) {
             logsRefreshBtn.addEventListener('click', () => this.loadAuditLogs());
         }
+
+        document.getElementById('create-category-btn')?.addEventListener('click', () => this.createCategory());
     }
 
     async loadAuditLogs() {
@@ -453,10 +488,10 @@ class AdminDashboard {
 
             if (response.ok) {
                 const data = await response.json();
-                document.getElementById('total-users').textContent = data.stats.totalUsers;
-                document.getElementById('total-products').textContent = data.stats.totalProducts;
-                document.getElementById('total-orders').textContent = data.stats.totalOrders;
-                document.getElementById('total-revenue').textContent = `₱${data.stats.totalRevenue.toFixed(2)}`;
+                document.getElementById('total-users').textContent = this.fmtNumber(data.stats.totalUsers);
+                document.getElementById('total-products').textContent = this.fmtNumber(data.stats.totalProducts);
+                document.getElementById('total-orders').textContent = this.fmtNumber(data.stats.totalOrders);
+                document.getElementById('total-revenue').textContent = this.fmtCurrency(data.stats.totalRevenue);
             }
         } catch (error) {
             console.error('Error loading stats:', error);
@@ -486,8 +521,8 @@ class AdminDashboard {
         tbody.innerHTML = users.map(user => {
             // Handle super admin (virtual user with id -1)
             const isSuperAdmin = user.id === -1 && user.role === 'super_admin';
-            const canEditThisUser = this.currentUserRole === 'super_admin' || user.role !== 'admin';
-            const canDeleteThisUser = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId && !['admin', 'super_admin'].includes(user.role);
+            const canEditThisUser = this.currentUserRole === 'super_admin' || user.role !== 'staff';
+            const canDeleteThisUser = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId && !['staff', 'super_admin'].includes(user.role);
 
             return `
                 <tr>
@@ -498,11 +533,11 @@ class AdminDashboard {
                     <td>${isSuperAdmin ? '••••••••' : (user.password ?? '')}</td>
                     <td>
                         ${isSuperAdmin ? 
-                            '<span class="status-pill" style="background: #f59e0b; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">Super Admin</span>' :
+                            '<span class="status-pill" style="background: #f59e0b; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">Admin</span>' :
                             `<select onchange="adminDashboard.updateUserRole(${user.id}, this.value)" ${user.id === this.currentUserId ? 'disabled' : ''}>
                                 <option value="customer" ${user.role === 'customer' ? 'selected' : ''}>Customer</option>
                                 <option value="farmer" ${user.role === 'farmer' ? 'selected' : ''}>Farmer</option>
-                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                <option value="staff" ${user.role === 'staff' ? 'selected' : ''}>Staff</option>
                             </select>`
                         }
                     </td>
@@ -599,7 +634,7 @@ class AdminDashboard {
                 <td>#${order.id}</td>
                 <td>${order.username || order.email}</td>
                 <td><span class="status-pill ${this.getStatusClass(order.status)}">${this.formatStatus(order.status)}</span></td>
-                <td>₱${parseFloat(order.total_amount).toFixed(2)}</td>
+                <td>${this.fmtCurrency(order.total_amount)}</td>
                 <td>${new Date(order.created_at).toLocaleDateString()}</td>
                 <td>
                     <button onclick="adminDashboard.viewOrderDetails(${order.id})" class="btn btn-small">View</button>
@@ -633,8 +668,8 @@ class AdminDashboard {
             <tr>
                 <td>${product.id}</td>
                 <td>${product.name}</td>
-                <td>₱${parseFloat(product.price).toFixed(2)}</td>
-                <td>${product.stock_quantity}</td>
+                <td>${this.fmtCurrency(product.price)}</td>
+                <td>${this.fmtNumber(product.stock_quantity ?? 0)}</td>
                 <td>
                     <div>${product.farmer_name || 'Unassigned'}</div>
                     ${product.farmer_email ? `<div style="color:#64748b;font-size:0.85rem;">${product.farmer_email}</div>` : ''}
@@ -649,6 +684,249 @@ class AdminDashboard {
                 </td>
             </tr>
         `).join('');
+    }
+
+    async loadCategories() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/categories`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            this.lastCategories = data.categories || [];
+            this.renderCategories(this.lastCategories);
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    }
+
+    renderCategories(categories) {
+        const tbody = document.getElementById('categories-tbody');
+        if (!tbody) return;
+
+        tbody.innerHTML = (categories || []).map((category) => `
+            <tr>
+                <td>${category.id}</td>
+                <td>${this.escapeHtml(category.name || '')}</td>
+                <td>${this.escapeHtml(category.description || '—')}</td>
+                <td>
+                    <button class="btn btn-small" onclick="adminDashboard.editCategory(${category.id})">Edit</button>
+                    <button class="btn btn-small btn-danger" onclick="adminDashboard.deleteCategory(${category.id})">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async createCategory() {
+        const nameEl = document.getElementById('new-category-name');
+        const descEl = document.getElementById('new-category-description');
+        const name = String(nameEl?.value || '').trim();
+        const description = String(descEl?.value || '').trim();
+
+        if (!name) {
+            this.showMessage('Category name is required', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/categories`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ name, description, type: 'agricultural' })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to create category', 'error');
+                return;
+            }
+
+            this.showMessage('Category created', 'success');
+            if (nameEl) nameEl.value = '';
+            if (descEl) descEl.value = '';
+            this.loadCategories();
+        } catch (error) {
+            console.error('Create category error:', error);
+            this.showMessage('Failed to create category', 'error');
+        }
+    }
+
+    async editCategory(categoryId) {
+        const category = (this.lastCategories || []).find((item) => Number(item.id) === Number(categoryId));
+        if (!category) return;
+
+        const nextName = prompt('Edit category name:', category.name || '');
+        if (nextName === null) return;
+        const trimmedName = String(nextName || '').trim();
+        if (!trimmedName) {
+            this.showMessage('Category name cannot be empty', 'error');
+            return;
+        }
+
+        const nextDescription = prompt('Edit category description:', category.description || '');
+        if (nextDescription === null) return;
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ name: trimmedName, description: String(nextDescription || '').trim(), type: 'agricultural' })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to update category', 'error');
+                return;
+            }
+
+            this.showMessage('Category updated', 'success');
+            this.loadCategories();
+        } catch (error) {
+            console.error('Update category error:', error);
+            this.showMessage('Failed to update category', 'error');
+        }
+    }
+
+    async deleteCategory(categoryId) {
+        if (!confirm('Delete this category?')) return;
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to delete category', 'error');
+                return;
+            }
+            this.showMessage('Category deleted', 'success');
+            this.loadCategories();
+        } catch (error) {
+            console.error('Delete category error:', error);
+            this.showMessage('Failed to delete category', 'error');
+        }
+    }
+
+    async loadCategoryRequests() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/category-requests?status=pending`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            if (!response.ok) return;
+
+            const data = await response.json();
+            this.lastCategoryRequests = data.requests || [];
+            this.renderCategoryRequests(this.lastCategoryRequests);
+        } catch (error) {
+            console.error('Error loading category requests:', error);
+        }
+    }
+
+    renderCategoryRequests(requests) {
+        const tbody = document.getElementById('category-requests-tbody');
+        if (!tbody) return;
+
+        if (!(requests || []).length) {
+            tbody.innerHTML = `<tr><td colspan="5" style="color:#64748b;">No pending requests.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = requests.map((request) => `
+            <tr>
+                <td>${request.id}</td>
+                <td>${this.escapeHtml(request.name || '')}</td>
+                <td>${this.escapeHtml(request.category_name || '')}</td>
+                <td>${this.escapeHtml(request.requested_by_username || 'Farmer')}</td>
+                <td>
+                    <button class="btn btn-small" onclick="adminDashboard.openCategoryRequestPanel(${request.id})">Review</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    openCategoryRequestPanel(requestId) {
+        const request = (this.lastCategoryRequests || []).find((item) => Number(item.id) === Number(requestId));
+        if (!request) return;
+
+        const panel = document.getElementById('category-detail-panel');
+        const content = document.getElementById('category-detail-content');
+        if (!panel || !content) return;
+
+        const categoryOptions = (this.lastCategories || []).map((category) => {
+            const selected = Number(category.id) === Number(request.category_id) ? 'selected' : '';
+            return `<option value="${category.id}" ${selected}>${this.escapeHtml(category.name)}</option>`;
+        }).join('');
+
+        content.innerHTML = `
+            <div class="panel-header">
+                <h3>Request #${request.id}</h3>
+            </div>
+            <div class="panel-section" style="display:flex; flex-direction:column; gap:0.6rem;">
+                <label>Name</label>
+                <input id="category-request-name" class="search-input" value="${this.escapeHtml(request.name || '')}">
+                <label>Category</label>
+                <select id="category-request-category" class="filter-select">${categoryOptions}</select>
+                <label>Request Notes</label>
+                <textarea class="search-input" rows="3" disabled>${this.escapeHtml(request.notes || '')}</textarea>
+                <label>Review Notes</label>
+                <textarea id="category-request-review-notes" class="search-input" rows="3" placeholder="Optional review notes"></textarea>
+                <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+                    <button class="btn btn-primary btn-small" onclick="adminDashboard.reviewCategoryRequest(${request.id}, 'approved')">Approve</button>
+                    <button class="btn btn-danger btn-small" onclick="adminDashboard.reviewCategoryRequest(${request.id}, 'rejected')">Reject</button>
+                </div>
+            </div>
+        `;
+
+        panel.classList.add('active');
+    }
+
+    closeCategoryDetails() {
+        document.getElementById('category-detail-panel')?.classList.remove('active');
+    }
+
+    async reviewCategoryRequest(requestId, status) {
+        const name = String(document.getElementById('category-request-name')?.value || '').trim();
+        const category_id = Number(document.getElementById('category-request-category')?.value || 0);
+        const review_notes = String(document.getElementById('category-request-review-notes')?.value || '').trim();
+
+        if (status === 'approved' && (!name || !category_id)) {
+            this.showMessage('Name and category are required for approval', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/category-requests/${requestId}/review`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ status, name, category_id, review_notes })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to review request', 'error');
+                return;
+            }
+
+            this.showMessage(`Request ${status}`, 'success');
+            this.closeCategoryDetails();
+            this.loadCategoryRequests();
+        } catch (error) {
+            console.error('Review category request error:', error);
+            this.showMessage('Failed to review request', 'error');
+        }
     }
 
     async toggleFarmerVerification(userId, isVerified) {
@@ -946,7 +1224,7 @@ class AdminDashboard {
             </div>
             <div class="panel-section">
                 <h4>Order Info</h4>
-                <p>Total: ₱${parseFloat(order.total_amount).toFixed(2)}</p>
+                <p>Total: ${this.fmtCurrency(order.total_amount)}</p>
                 <p>Date: ${new Date(order.created_at).toLocaleString()}</p>
                 ${order.delivery_address ? `<p>Address: ${order.delivery_address}</p>` : ''}
             </div>
@@ -955,7 +1233,7 @@ class AdminDashboard {
                 ${(order.items || []).map(item => `
                     <div class="panel-item">
                         <div>${item.product_name || 'N/A'}</div>
-                        <div>${item.quantity} ${item.unit || ''} • ₱${parseFloat(item.price).toFixed(2)}</div>
+                        <div>${this.fmtNumber(item.quantity)} ${item.unit || ''} • ${this.fmtCurrency(item.price)}</div>
                     </div>
                 `).join('')}
             </div>
@@ -1240,7 +1518,7 @@ class AdminDashboard {
             if (this.currentUserRole === 'super_admin') {
                 banner.classList.add('super-admin');
                 sidebar.classList.add('super-admin-sidebar');
-                titleEl.innerHTML = '<i class="fas fa-crown"></i> SUPER ADMIN';
+                titleEl.innerHTML = '<i class="fas fa-crown"></i> ADMIN';
                 // Show visit site button for super admin
                 if (visitSiteBtn) {
                     visitSiteBtn.style.display = 'block';
@@ -1252,8 +1530,8 @@ class AdminDashboard {
             } else {
                 banner.classList.remove('super-admin');
                 sidebar.classList.remove('super-admin-sidebar');
-                titleEl.innerHTML = '<i class="fas fa-crown"></i> Admin Dashboard';
-                // Hide visit site button for regular admin
+                titleEl.innerHTML = '<i class="fas fa-crown"></i> Staff Dashboard';
+                // Hide visit site button for regular staff
                 if (visitSiteBtn) {
                     visitSiteBtn.style.display = 'none';
                 }

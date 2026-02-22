@@ -8,7 +8,7 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agriculture_marketplace',
+  database: process.env.DB_NAME || 'agricatch',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
@@ -25,6 +25,48 @@ const getUserFromToken = (req) => {
   } catch (error) {
     return null;
   }
+};
+
+const requireFarmer = async (req, res) => {
+  const user = getUserFromToken(req);
+  if (!user) {
+    res.status(401).json({ message: 'Authentication required' });
+    return null;
+  }
+
+  const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [user.id]);
+  if (userResult.rows[0]?.role !== 'farmer') {
+    res.status(403).json({ message: 'Farmer access required' });
+    return null;
+  }
+
+  return user;
+};
+
+const parseRangeDays = (range) => {
+  if (range === null || range === undefined || range === '') return 30;
+  const str = String(range).trim().toLowerCase();
+  if (str === 'all' || str === 'alltime' || str === 'all-time') return null;
+  const m = str.match(/^(\d{1,4})\s*d?$/);
+  if (m) {
+    const days = Number(m[1]);
+    if (Number.isFinite(days) && days > 0 && days <= 365) return days;
+  }
+  return 30;
+};
+
+const csvEscape = (value) => {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (/[\r\n",]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+  return str;
+};
+
+const parseIsoDateOnly = (value) => {
+  if (!value) return null;
+  const s = String(value).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  return s;
 };
 
 // Public: get farmers listing
@@ -53,11 +95,18 @@ router.get('/:id/profile', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(`
-      SELECT id, username, full_name, email, phone, address as location, is_verified,
-             shop_description, shop_banner_url, shop_avatar_url,
-             total_sales, total_revenue, average_rating, total_reviews, created_at
-      FROM users
-      WHERE id = $1 AND role = 'farmer'
+      SELECT u.id, u.username, u.full_name, u.email, u.phone, u.address as location, u.is_verified,
+             u.shop_description, u.shop_banner_url, u.shop_avatar_url, u.created_at,
+             -- Aggregate: total orders (all statuses) for farmer's products
+             (SELECT COUNT(*) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.farmer_id = u.id)::int AS total_sales,
+             -- Aggregate: total revenue from delivered orders
+             COALESCE((SELECT SUM(o.total_amount) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.farmer_id = u.id AND o.status = 'delivered'), 0)::numeric AS total_revenue,
+             -- Aggregate: average rating across this farmer's products
+             COALESCE((SELECT AVG(r.rating) FROM reviews r JOIN products p2 ON r.product_id = p2.id WHERE p2.farmer_id = u.id), 0)::numeric AS average_rating,
+             -- Aggregate: total reviews across this farmer's products
+             (SELECT COUNT(*) FROM reviews r JOIN products p3 ON r.product_id = p3.id WHERE p3.farmer_id = u.id)::int AS total_reviews
+      FROM users u
+      WHERE u.id = $1 AND u.role = 'farmer'
     `, [id]);
 
     if (result.rows.length === 0) {
@@ -74,36 +123,56 @@ router.get('/:id/profile', async (req, res) => {
 // Farmer: get dashboard stats
 router.get('/me/stats', async (req, res) => {
   try {
-    const user = getUserFromToken(req);
-    if (!user) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
+    const user = await requireFarmer(req, res);
+    if (!user) return;
 
-    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [user.id]);
-    if (userResult.rows[0]?.role !== 'farmer') {
-      return res.status(403).json({ message: 'Farmer access required' });
+    const from = parseIsoDateOnly(req.query.from);
+    const to = parseIsoDateOnly(req.query.to);
+    const rangeDays = parseRangeDays(req.query.rangeDays || req.query.range || '');
+    const isAllTime = rangeDays === null;
+    const hasCustom = !!(from && to);
+
+    let whereSql = '';
+    let params = [user.id];
+
+    if (hasCustom) {
+      whereSql = `AND o.created_at >= $2::date AND o.created_at < ($3::date + INTERVAL '1 day')`;
+      params = [user.id, from, to];
+    } else if (!isAllTime) {
+      // Default last 30 days only when client explicitly asks by passing rangeDays.
+      // If no range param is provided, keep lifetime stats.
+      const clientAskedRange = req.query.rangeDays !== undefined || req.query.range !== undefined;
+      if (clientAskedRange) {
+        whereSql = `AND o.created_at >= (NOW() - ($2::int * INTERVAL '1 day'))`;
+        params = [user.id, Number(rangeDays || 30)];
+      }
     }
 
     const totalOrdersResult = await pool.query(`
       SELECT COUNT(*)::int AS total_orders
-      FROM order_items oi
-      JOIN products p ON oi.product_id = p.id
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
       WHERE p.farmer_id = $1
-    `, [user.id]);
+      ${whereSql}
+    `, params);
 
     const totalSoldResult = await pool.query(`
       SELECT COUNT(*)::int AS total_sold
-      FROM order_items oi
-      JOIN products p ON oi.product_id = p.id
-      WHERE p.farmer_id = $1 AND oi.status = 'delivered'
-    `, [user.id]);
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        AND o.status = 'delivered'
+      ${whereSql}
+    `, params);
 
     const totalRevenueResult = await pool.query(`
-      SELECT COALESCE(SUM(oi.quantity * oi.price), 0)::numeric AS total_revenue
-      FROM order_items oi
-      JOIN products p ON oi.product_id = p.id
-      WHERE p.farmer_id = $1 AND oi.status = 'delivered'
-    `, [user.id]);
+      SELECT COALESCE(SUM(o.total_amount), 0)::numeric AS total_revenue
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        AND o.status = 'delivered'
+      ${whereSql}
+    `, params);
 
     const unreadCustomersResult = await pool.query(`
       SELECT COUNT(DISTINCT m.sender_id)::int AS unread_customers
@@ -124,18 +193,318 @@ router.get('/me/stats', async (req, res) => {
   }
 });
 
+// Farmer: overview metrics (charts-ready)
+router.get('/me/metrics', async (req, res) => {
+  try {
+    const user = await requireFarmer(req, res);
+    if (!user) return;
+
+    const from = parseIsoDateOnly(req.query.from);
+    const to = parseIsoDateOnly(req.query.to);
+    const hasCustom = !!(from && to);
+
+    const rangeDays = parseRangeDays(req.query.rangeDays || req.query.range || '30');
+    const isAllTime = !hasCustom && rangeDays === null;
+
+    if (hasCustom) {
+      // Basic validation: from must be <= to, limit range to 366 days
+      const fromDt = new Date(`${from}T00:00:00Z`);
+      const toDt = new Date(`${to}T00:00:00Z`);
+      if (Number.isNaN(fromDt.getTime()) || Number.isNaN(toDt.getTime())) {
+        return res.status(400).json({ message: 'Invalid from/to dates' });
+      }
+      if (fromDt.getTime() > toDt.getTime()) {
+        return res.status(400).json({ message: 'From date must be before To date' });
+      }
+      const daysSpan = Math.floor((toDt.getTime() - fromDt.getTime()) / 86400000) + 1;
+      if (daysSpan > 366) {
+        return res.status(400).json({ message: 'Date range too large (max 366 days)' });
+      }
+    }
+
+    const dateSelect = isAllTime
+      ? `DATE_TRUNC('month', o.created_at)::date`
+      : `DATE(o.created_at)`;
+
+    let rangeWhere = '';
+    let paramsRange = [];
+    if (hasCustom) {
+      rangeWhere = `AND o.created_at >= $2::date AND o.created_at < ($3::date + INTERVAL '1 day')`;
+      paramsRange = [user.id, from, to];
+    } else if (isAllTime) {
+      rangeWhere = '';
+      paramsRange = [user.id];
+    } else {
+      rangeWhere = `AND o.created_at >= (NOW() - ($2::int * INTERVAL '1 day'))`;
+      paramsRange = [user.id, Number(rangeDays || 30)];
+    }
+
+    // Revenue by day (delivered orders only)
+    const revenueByDayResult = await pool.query(`
+      SELECT ${dateSelect} AS day,
+             COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+        AND o.status = 'delivered'
+      GROUP BY ${dateSelect}
+      ORDER BY day ASC
+    `, paramsRange);
+
+    // Orders by status (all statuses)
+    const ordersByStatusResult = await pool.query(`
+      SELECT o.status, COUNT(*)::int AS count
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+      GROUP BY o.status
+    `, paramsRange);
+
+    const ordersByStatus = {
+      pending: 0,
+      confirmed: 0,
+      preparing: 0,
+      out_for_delivery: 0,
+      delivered: 0,
+      cancelled: 0
+    };
+    for (const row of ordersByStatusResult.rows) {
+      if (row?.status && Object.prototype.hasOwnProperty.call(ordersByStatus, row.status)) {
+        ordersByStatus[row.status] = Number(row.count) || 0;
+      }
+    }
+
+    // Top products by delivered quantity (and revenue)
+    const topProductsResult = await pool.query(`
+      SELECT p.id AS product_id,
+             p.name AS product_name,
+             COALESCE(SUM(o.quantity), 0)::int AS sold_qty,
+             COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+        AND o.status = 'delivered'
+      GROUP BY p.id, p.name
+      ORDER BY sold_qty DESC, revenue DESC
+      LIMIT 5
+    `, paramsRange);
+
+    // Recent orders (for Overview list)
+    const recentOrdersResult = await pool.query(`
+      SELECT o.id,
+             o.status,
+             o.total_amount,
+             o.created_at,
+             u.full_name AS customer_name,
+             p.name AS product_name
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+      ORDER BY o.created_at DESC
+      LIMIT 8
+    `, paramsRange);
+
+    res.json({
+      range: hasCustom ? 'custom' : (isAllTime ? 'all' : 'days'),
+      rangeDays: (hasCustom || isAllTime) ? null : Number(rangeDays || 30),
+      from: hasCustom ? from : null,
+      to: hasCustom ? to : null,
+      revenueByDay: revenueByDayResult.rows.map(r => ({
+        date: r.day,
+        revenue: Number(r.revenue) || 0
+      })),
+      ordersByStatus,
+      topProducts: topProductsResult.rows.map(r => ({
+        product_id: r.product_id,
+        product_name: r.product_name,
+        sold_qty: Number(r.sold_qty) || 0,
+        revenue: Number(r.revenue) || 0
+      })),
+      recentOrders: recentOrdersResult.rows.map(r => ({
+        id: r.id,
+        status: r.status,
+        total_amount: Number(r.total_amount) || 0,
+        created_at: r.created_at,
+        customer_name: r.customer_name,
+        product_name: r.product_name
+      }))
+    });
+  } catch (error) {
+    console.error('Get farmer metrics error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Farmer: export overview metrics as CSV
+router.get('/me/metrics/export.csv', async (req, res) => {
+  try {
+    const user = await requireFarmer(req, res);
+    if (!user) return;
+
+    const from = parseIsoDateOnly(req.query.from);
+    const to = parseIsoDateOnly(req.query.to);
+    const hasCustom = !!(from && to);
+
+    const rangeDays = parseRangeDays(req.query.rangeDays || req.query.range || '30');
+    const isAllTime = !hasCustom && rangeDays === null;
+
+    if (hasCustom) {
+      const fromDt = new Date(`${from}T00:00:00Z`);
+      const toDt = new Date(`${to}T00:00:00Z`);
+      if (Number.isNaN(fromDt.getTime()) || Number.isNaN(toDt.getTime())) {
+        return res.status(400).json({ message: 'Invalid from/to dates' });
+      }
+      if (fromDt.getTime() > toDt.getTime()) {
+        return res.status(400).json({ message: 'From date must be before To date' });
+      }
+      const daysSpan = Math.floor((toDt.getTime() - fromDt.getTime()) / 86400000) + 1;
+      if (daysSpan > 366) {
+        return res.status(400).json({ message: 'Date range too large (max 366 days)' });
+      }
+    }
+
+    const dateSelect = isAllTime
+      ? `DATE_TRUNC('month', o.created_at)::date`
+      : `DATE(o.created_at)`;
+    const rangeWhere = isAllTime
+      ? ''
+      : (hasCustom
+        ? `AND o.created_at >= $2::date AND o.created_at < ($3::date + INTERVAL '1 day')`
+        : `AND o.created_at >= (NOW() - ($2::int * INTERVAL '1 day'))`);
+
+    const paramsRange = hasCustom
+      ? [user.id, from, to]
+      : (isAllTime ? [user.id] : [user.id, Number(rangeDays || 30)]);
+
+    // Summary totals for the same timeframe
+    const summary = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total_orders,
+        COALESCE(SUM(CASE WHEN o.status = 'delivered' THEN 1 ELSE 0 END), 0)::int AS total_sold,
+        COALESCE(SUM(CASE WHEN o.status = 'delivered' THEN o.total_amount ELSE 0 END), 0)::numeric AS total_revenue
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+    `, paramsRange);
+
+    // Fetch blocks separately (clear + simple for CSV generation)
+    const revenue = await pool.query(`
+      SELECT ${dateSelect} AS day,
+             COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+        AND o.status = 'delivered'
+      GROUP BY ${dateSelect}
+      ORDER BY day ASC
+    `, paramsRange);
+
+    const byStatus = await pool.query(`
+      SELECT o.status, COUNT(*)::int AS count
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+      GROUP BY o.status
+      ORDER BY o.status ASC
+    `, paramsRange);
+
+    const topProducts = await pool.query(`
+      SELECT p.name AS product_name,
+             COALESCE(SUM(o.quantity), 0)::int AS sold_qty,
+             COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+        AND o.status = 'delivered'
+      GROUP BY p.name
+      ORDER BY sold_qty DESC, revenue DESC
+      LIMIT 10
+    `, paramsRange);
+
+    const recentOrders = await pool.query(`
+      SELECT o.id,
+             o.created_at,
+             o.status,
+             o.total_amount,
+             u.full_name AS customer_name,
+             p.name AS product_name
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+      ORDER BY o.created_at DESC
+      LIMIT 20
+    `, paramsRange);
+
+    const lines = [];
+    if (hasCustom) {
+      lines.push(`Overview Report (${from} to ${to})`);
+    } else {
+      lines.push(isAllTime ? 'Overview Report (All time)' : `Overview Report (Last ${rangeDays} days)`);
+    }
+    lines.push(`Generated At,${csvEscape(new Date().toISOString())}`);
+    lines.push('');
+
+    const s = summary.rows[0] || {};
+    lines.push('Summary');
+    lines.push('Total Orders,Total Sold (Delivered),Total Revenue (Delivered)');
+    lines.push(`${csvEscape(s.total_orders || 0)},${csvEscape(s.total_sold || 0)},${csvEscape(s.total_revenue || 0)}`);
+    lines.push('');
+
+    lines.push(isAllTime ? 'Revenue By Month' : 'Revenue By Day');
+    lines.push('Date,Revenue');
+    for (const row of revenue.rows) {
+      lines.push(`${csvEscape(row.day)},${csvEscape(row.revenue)}`);
+    }
+    lines.push('');
+
+    lines.push('Orders By Status');
+    lines.push('Status,Count');
+    for (const row of byStatus.rows) {
+      lines.push(`${csvEscape(row.status)},${csvEscape(row.count)}`);
+    }
+    lines.push('');
+
+    lines.push('Top Products (Delivered)');
+    lines.push('Product,Sold Qty,Revenue');
+    for (const row of topProducts.rows) {
+      lines.push(`${csvEscape(row.product_name)},${csvEscape(row.sold_qty)},${csvEscape(row.revenue)}`);
+    }
+    lines.push('');
+
+    lines.push('Recent Orders');
+    lines.push('Order ID,Date,Customer,Product,Status,Total Amount');
+    for (const row of recentOrders.rows) {
+      lines.push(`${csvEscape(row.id)},${csvEscape(row.created_at)},${csvEscape(row.customer_name || '')},${csvEscape(row.product_name || '')},${csvEscape(row.status)},${csvEscape(row.total_amount)}`);
+    }
+
+    const csv = lines.join('\n');
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const rangeTag = hasCustom ? `${from}_to_${to}` : (isAllTime ? 'all' : `${rangeDays}d`);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="farmer_overview_${dateStamp}_${rangeTag}.csv"`);
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error('Export farmer metrics CSV error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Farmer: update shop profile
 router.put('/profile', async (req, res) => {
   try {
-    const user = getUserFromToken(req);
-    if (!user) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [user.id]);
-    if (userResult.rows[0]?.role !== 'farmer') {
-      return res.status(403).json({ message: 'Farmer access required' });
-    }
+    const user = await requireFarmer(req, res);
+    if (!user) return;
 
     const { shop_description, shop_banner_url, shop_avatar_url, full_name, address } = req.body;
 

@@ -9,7 +9,7 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agriculture_marketplace',
+  database: process.env.DB_NAME || 'agricatch',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
@@ -38,7 +38,13 @@ router.get('/conversations', async (req, res) => {
     const result = await pool.query(`
       SELECT c.*,
              u.full_name as other_name,
-             u.username as other_username
+             u.username as other_username,
+             (
+               SELECT COUNT(*) FROM messages m
+               WHERE m.conversation_id = c.conversation_id
+                 AND m.receiver_id = $1
+                 AND m.is_read = false
+             )::int AS unread_count
       FROM conversations c
       LEFT JOIN users u ON u.id = CASE
         WHEN c.farmer_id = $1 THEN c.customer_id
@@ -76,6 +82,28 @@ router.get('/conversation/:conversationId', async (req, res) => {
   }
 });
 
+// Mark all messages in a conversation as read (for the current user)
+router.put('/conversation/:conversationId/read', async (req, res) => {
+  try {
+    const user = getUserFromToken(req);
+    if (!user) return res.status(401).json({ message: 'Authentication required' });
+
+    const { conversationId } = req.params;
+
+    const update = await pool.query(
+      `UPDATE messages
+       SET is_read = true
+       WHERE conversation_id = $1 AND receiver_id = $2 AND is_read = false`,
+      [conversationId, user.id]
+    );
+
+    res.json({ message: 'Conversation marked as read', updated: update.rowCount || 0 });
+  } catch (error) {
+    console.error('Read conversation error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Send a message
 router.post('/send', async (req, res) => {
   try {
@@ -100,15 +128,15 @@ router.post('/send', async (req, res) => {
     let farmerId;
     let customerId;
 
-    if (role === 'admin') {
+    if (role === 'staff') {
       if (receiverRole !== 'farmer') {
-        return res.status(403).json({ message: 'Admin can only chat with farmers' });
+        return res.status(403).json({ message: 'Staff can only chat with farmers' });
       }
       farmerId = receiver_id;
       customerId = user.id;
     } else if (role === 'farmer') {
-      if (!['customer', 'admin'].includes(receiverRole)) {
-        return res.status(403).json({ message: 'Farmer can only chat with customers or admin' });
+      if (!['customer', 'staff'].includes(receiverRole)) {
+        return res.status(403).json({ message: 'Farmer can only chat with customers or staff' });
       }
       farmerId = user.id;
       customerId = receiver_id;

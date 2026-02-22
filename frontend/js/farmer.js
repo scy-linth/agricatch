@@ -12,6 +12,20 @@ class FarmerDashboard {
         this.currentShopProfile = null;
         this.isShopProfileEditing = false;
 
+        this.overviewRangeDays = 30;
+        this.overviewRangeMode = 'days'; // 'days' | 'all' | 'custom'
+        this.overviewCustomFrom = null; // YYYY-MM-DD
+        this.overviewCustomTo = null;   // YYYY-MM-DD
+        this.overviewCharts = { sales: null, status: null, topProducts: null };
+        this.overviewMetrics = null;
+        this.overviewRecentOrdersCache = [];
+        this.recentOrdersPage = 1;
+        this.recentOrdersPerPage = 8;
+        this.overviewLastFetchAt = 0;
+        this.overviewFetchInFlight = null;
+        this.overviewRefreshTimer = null;
+        this.myProductsCache = [];
+
         if (!this.token) {
             window.location.href = '/?login=1';
             return;
@@ -20,10 +34,38 @@ class FarmerDashboard {
         this.init();
     }
 
+    fmtNumber(value, options) {
+        try {
+            if (window.FormatUtil && typeof window.FormatUtil.number === 'function') {
+                return window.FormatUtil.number(value, options);
+            }
+        } catch (_) {
+            // ignore
+        }
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '0';
+        return String(n);
+    }
+
+    fmtCurrency(value, options) {
+        try {
+            if (window.FormatUtil && typeof window.FormatUtil.currency === 'function') {
+                return window.FormatUtil.currency(value, options);
+            }
+        } catch (_) {
+            // ignore
+        }
+        const n = Number(value);
+        return `₱${(Number.isFinite(n) ? n : 0).toFixed(2)}`;
+    }
+
     init() {
         this.showDeniedBanner();
         this.checkFarmerAuth();
         this.setupEventListeners();
+        this.loadCategories();
+        this.loadProductCatalogNames();
+        this.setupProductSuggestionListeners();
         this.setupSidebarNavigation();
         this.setupDetailPanel();
         this.setupRealtime();
@@ -54,6 +96,7 @@ class FarmerDashboard {
                         if (newStatus) {
                             // Reload all tabs first (so order disappears from old tab and appears in new tab)
                             this.loadMyOrders().then(() => {
+                                this.refreshOverviewMetricsSoon();
                                 // Switch to the tab showing the new status
                                 setTimeout(() => {
                                     if (newStatus === 'pending') this.switchOrderTab('pending', true);
@@ -67,6 +110,7 @@ class FarmerDashboard {
                         } else {
                             // Fallback: reload all orders if status not provided
                             this.loadMyOrders();
+                            this.refreshOverviewMetricsSoon();
                         }
                     }
                 } catch (_) {
@@ -115,7 +159,7 @@ class FarmerDashboard {
                         <span style="font-size:18px;">⛔</span>
                         <div>
                             <div style="font-weight:700;">Access denied</div>
-                            <div style="font-size:13px;">You tried to open the Admin Panel. Only admins can access it.</div>
+                            <div style="font-size:13px;">You tried to open the Staff Panel. Only staff can access it.</div>
                         </div>
                     </div>
                     <button id="dismiss-denied-banner" style="border:1px solid #fecaca;background:#fff;padding:8px 10px;border-radius:10px;cursor:pointer;">
@@ -157,8 +201,9 @@ class FarmerDashboard {
 
             if (response.ok) {
                 const data = await response.json();
-                // If an admin opens farmer page, send them back to admin panel
-                if (data.user.role === 'admin') {
+                this.authProfile = data?.user || null;
+                // If a staff user opens farmer page, send them back to staff panel
+                if (data.user.role === 'staff') {
                     this.showAdminDeniedBannerAndRedirect();
                     return;
                 }
@@ -175,6 +220,7 @@ class FarmerDashboard {
                 this.loadMyProducts();
                 this.loadMyOrders();
                 this.loadShopProfile();
+                this.loadOverviewMetrics({ force: true });
             } else {
                 window.location.href = '/';
             }
@@ -206,7 +252,7 @@ class FarmerDashboard {
                         <span style="font-size:18px;">⛔</span>
                         <div>
                             <div style="font-weight:700;">Access denied</div>
-                            <div style="font-size:13px;">Admins cannot access the Farmer Dashboard. Redirecting to Admin Panel...</div>
+                            <div style="font-size:13px;">Staff users cannot access the Farmer Dashboard. Redirecting to Staff Panel...</div>
                         </div>
                     </div>
                 </div>
@@ -262,10 +308,11 @@ class FarmerDashboard {
             });
         }
 
-        document.getElementById('logout-btn').addEventListener('click', () => this.logout());
-        document.getElementById('add-product-form').addEventListener('submit', (e) => this.handleAddProduct(e));
-        document.getElementById('edit-product-form').addEventListener('submit', (e) => this.handleEditProduct(e));
-        document.getElementById('save-shop-profile-btn').addEventListener('click', (e) => this.handleShopProfileUpdate(e));
+        document.getElementById('logout-btn')?.addEventListener('click', () => this.logout());
+        document.getElementById('add-product-form')?.addEventListener('submit', (e) => this.handleAddProduct(e));
+        document.getElementById('edit-product-form')?.addEventListener('submit', (e) => this.handleEditProduct(e));
+        document.getElementById('save-shop-profile-btn')?.addEventListener('click', (e) => this.handleShopProfileUpdate(e));
+        document.getElementById('submit-custom-product-request')?.addEventListener('click', () => this.submitCustomProductRequest());
 
         const editShopBtn = document.getElementById('edit-shop-profile-btn');
         if (editShopBtn) {
@@ -275,28 +322,74 @@ class FarmerDashboard {
         if (cancelShopBtn) {
             cancelShopBtn.addEventListener('click', () => this.cancelShopProfileEdit());
         }
-        
-        // Back to Top button
-        const backToTopBtn = document.getElementById('back-to-top-btn');
-        if (backToTopBtn) {
-            backToTopBtn.addEventListener('click', (e) => {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
-        }
 
-        // Topbar search focus
-        const searchToggle = document.getElementById('farmer-search-toggle');
         const searchInput = document.getElementById('farmer-search-input');
-        if (searchToggle && searchInput) {
-            searchToggle.addEventListener('click', () => searchInput.focus());
-        }
         if (searchInput) {
             searchInput.addEventListener('input', () => this.applyTopSearch());
         }
 
+        const exportBtn = document.getElementById('overview-export-csv-btn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => this.exportOverviewCsv());
+        }
+
+        const accountBtn = document.getElementById('farmer-account-btn');
+        if (accountBtn) {
+            accountBtn.addEventListener('click', () => this.openAccountPanel());
+        }
+
+        const recentPrev = document.getElementById('overview-recent-prev');
+        if (recentPrev) {
+            recentPrev.addEventListener('click', () => {
+                this.recentOrdersPage = Math.max(1, Number(this.recentOrdersPage || 1) - 1);
+                this.renderOverviewRecentOrders(this.overviewRecentOrdersCache);
+            });
+        }
+        const recentNext = document.getElementById('overview-recent-next');
+        if (recentNext) {
+            recentNext.addEventListener('click', () => {
+                const totalPages = Math.max(1, Math.ceil((this.overviewRecentOrdersCache?.length || 0) / this.recentOrdersPerPage));
+                this.recentOrdersPage = Math.min(totalPages, Number(this.recentOrdersPage || 1) + 1);
+                this.renderOverviewRecentOrders(this.overviewRecentOrdersCache);
+            });
+        }
+
+        document.querySelectorAll('.overview-range-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const range = btn.getAttribute('data-range');
+                this.setOverviewRange(range);
+            });
+        });
+
+        const customApplyBtn = document.getElementById('overview-custom-apply');
+        if (customApplyBtn) {
+            customApplyBtn.addEventListener('click', () => {
+                const fromInput = document.getElementById('overview-from');
+                const toInput = document.getElementById('overview-to');
+                const from = String(fromInput?.value || '').trim();
+                const to = String(toInput?.value || '').trim();
+                if (!from || !to) {
+                    this.showMessage('Please choose both From and To dates.', 'error');
+                    return;
+                }
+                if (from > to) {
+                    this.showMessage('From date must be before To date.', 'error');
+                    return;
+                }
+                this.setOverviewCustomRange(from, to);
+            });
+        }
+
+        const customCancelBtn = document.getElementById('overview-custom-cancel');
+        if (customCancelBtn) {
+            customCancelBtn.addEventListener('click', () => {
+                this.hideOverviewCustomPanel();
+            });
+        }
+
         // Tab switching
-        document.getElementById('list-products-tab').addEventListener('click', () => this.switchTab('list-products'));
-        document.getElementById('add-product-tab').addEventListener('click', () => this.switchTab('add-product'));
+        document.getElementById('list-products-tab')?.addEventListener('click', () => this.switchTab('list-products'));
+        document.getElementById('add-product-tab')?.addEventListener('click', () => this.switchTab('add-product'));
 
         // Order status tabs - all 6 statuses
         document.getElementById('pending-orders-tab')?.addEventListener('click', () => this.switchOrderTab('pending'));
@@ -307,14 +400,12 @@ class FarmerDashboard {
         document.getElementById('cancelled-orders-tab')?.addEventListener('click', () => this.switchOrderTab('cancelled'));
 
         // Product filters
-        document.getElementById('product-search').addEventListener('input', () => this.filterProducts());
-        document.getElementById('product-status-filter').addEventListener('change', () => this.filterProducts());
+        const productStatusFilter = document.getElementById('product-status-filter');
+        if (productStatusFilter) {
+            productStatusFilter.addEventListener('change', () => this.filterProducts());
+        }
         
         // Optional refresh buttons (check if they exist)
-        const refreshProductsBtn = document.getElementById('refresh-products-btn');
-        if (refreshProductsBtn) {
-            refreshProductsBtn.addEventListener('click', () => this.loadMyProducts());
-        }
         const refreshOrdersBtn = document.getElementById('refresh-orders-btn');
         if (refreshOrdersBtn) {
             refreshOrdersBtn.addEventListener('click', () => this.loadMyOrders());
@@ -367,6 +458,179 @@ class FarmerDashboard {
                 this.openChatWithCustomer(customerId, orderId || null);
             }
         });
+
+        // Initialize date rules for product forms
+        this.setupProductDateConstraints();
+    }
+
+    async loadProductCatalogNames(categoryId = null) {
+        try {
+            const params = new URLSearchParams();
+            if (categoryId) params.set('category_id', String(categoryId));
+            const response = await fetch(`${this.apiBase}/products/catalog/names${params.toString() ? `?${params.toString()}` : ''}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+
+            const data = await response.json();
+            const names = Array.isArray(data.names) ? data.names : [];
+            const addList = document.getElementById('product-name-suggestions');
+            const editList = document.getElementById('edit-product-name-suggestions');
+
+            const optionsHtml = names.map((name) => `<option value="${this.escapeAttr(name)}"></option>`).join('');
+            if (addList) addList.innerHTML = optionsHtml;
+            if (editList) editList.innerHTML = optionsHtml;
+        } catch (error) {
+            console.error('Error loading product catalog names:', error);
+        }
+    }
+
+    async loadCategories() {
+        try {
+            const response = await fetch(`${this.apiBase}/products/categories`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+
+            const data = await response.json();
+            const categories = Array.isArray(data.categories) ? data.categories : [];
+
+            const renderOptions = (selected = '') => {
+                return ['<option value="">Select category</option>']
+                    .concat(categories.map((category) => {
+                        const value = String(category.id);
+                        const isSelected = String(selected) === value ? 'selected' : '';
+                        return `<option value="${this.escapeAttr(value)}" ${isSelected}>${this.escapeHtml(category.name || 'Category')}</option>`;
+                    }))
+                    .join('');
+            };
+
+            const addSelect = document.getElementById('product-category');
+            const editSelect = document.getElementById('edit-product-category');
+
+            if (addSelect) addSelect.innerHTML = renderOptions(addSelect.value || '');
+            if (editSelect) editSelect.innerHTML = renderOptions(editSelect.value || '');
+
+            const defaultCategoryId = categories[0]?.id || '';
+            if (addSelect && !addSelect.value) addSelect.value = String(defaultCategoryId || '');
+
+            await this.loadProductCatalogNames(addSelect?.value || null);
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    }
+
+    setupProductSuggestionListeners() {
+        const addName = document.getElementById('product-name');
+        const editName = document.getElementById('edit-product-name');
+        const addCategory = document.getElementById('product-category');
+        const editCategory = document.getElementById('edit-product-category');
+
+        if (addName) {
+            addName.addEventListener('change', () => this.updatePriceSuggestion('add'));
+            addName.addEventListener('blur', () => this.updatePriceSuggestion('add'));
+        }
+        if (editName) {
+            editName.addEventListener('change', () => this.updatePriceSuggestion('edit'));
+            editName.addEventListener('blur', () => this.updatePriceSuggestion('edit'));
+        }
+        if (addCategory) addCategory.addEventListener('change', async () => {
+            await this.loadProductCatalogNames(addCategory.value || null);
+            this.updatePriceSuggestion('add');
+        });
+        if (editCategory) editCategory.addEventListener('change', async () => {
+            await this.loadProductCatalogNames(editCategory.value || null);
+            this.updatePriceSuggestion('edit');
+        });
+    }
+
+    async submitCustomProductRequest() {
+        const categoryId = String(document.getElementById('product-category')?.value || '').trim();
+        const name = String(document.getElementById('custom-product-name-request')?.value || '').trim();
+        const notes = String(document.getElementById('custom-product-request-notes')?.value || '').trim();
+
+        if (!categoryId) {
+            this.showMessage('Please choose a category first.', 'error');
+            return;
+        }
+        if (!name) {
+            this.showMessage('Please enter the product name you want to request.', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/products/category-requests`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ category_id: Number(categoryId), name, notes })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Unable to submit request', 'error');
+                return;
+            }
+
+            this.showMessage('Request submitted for staff approval.', 'success');
+            const requestNameEl = document.getElementById('custom-product-name-request');
+            const requestNotesEl = document.getElementById('custom-product-request-notes');
+            if (requestNameEl) requestNameEl.value = '';
+            if (requestNotesEl) requestNotesEl.value = '';
+        } catch (error) {
+            console.error('Submit custom product request error:', error);
+            this.showMessage('Unable to submit request right now.', 'error');
+        }
+    }
+
+    async updatePriceSuggestion(mode = 'add') {
+        const isEdit = mode === 'edit';
+        const nameInput = document.getElementById(isEdit ? 'edit-product-name' : 'product-name');
+        const categoryInput = document.getElementById(isEdit ? 'edit-product-category' : 'product-category');
+        const priceInput = document.getElementById(isEdit ? 'edit-product-price' : 'product-price');
+        const hint = document.getElementById(isEdit ? 'edit-product-price-suggestion' : 'product-price-suggestion');
+
+        if (!nameInput || !hint) return;
+
+        const name = String(nameInput.value || '').trim();
+        const categoryId = String(categoryInput?.value || '').trim();
+        if (!name) {
+            hint.textContent = 'Choose a catalog item to see suggested lowest and average selling price.';
+            return;
+        }
+
+        try {
+            hint.textContent = 'Checking suggested price...';
+            const params = new URLSearchParams({ name });
+            if (categoryId) params.set('category_id', categoryId);
+
+            const response = await fetch(`${this.apiBase}/products/pricing/suggestion?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) {
+                hint.textContent = 'No pricing suggestion available yet for this product name.';
+                return;
+            }
+
+            const data = await response.json();
+            if (!data || !data.sample_count) {
+                hint.textContent = 'No delivered sales history yet for this item. You can set your own introductory price.';
+                return;
+            }
+
+            const lowest = Number(data.suggested_lowest_price || 0);
+            const average = Number(data.average_price || 0);
+            hint.textContent = `Suggested lowest: ${this.fmtCurrency(lowest)} • Market average: ${this.fmtCurrency(average)} • Based on ${this.fmtNumber(data.sample_count)} delivered sales.`;
+
+            if (priceInput && (!priceInput.value || Number(priceInput.value) <= 0) && lowest > 0) {
+                priceInput.value = lowest.toFixed(2);
+            }
+        } catch (error) {
+            console.error('Error updating price suggestion:', error);
+            hint.textContent = 'Unable to fetch pricing suggestion right now.';
+        }
     }
 
     setupSidebarNavigation() {
@@ -381,22 +645,134 @@ class FarmerDashboard {
         });
 
         // Initial section based on saved state, hash, or default
-        const savedSection = localStorage.getItem('farmerActiveSection');
-        const hash = (window.location.hash || '').replace('#', '');
-        const initialSection = savedSection || hash || 'dashboard';
+        const validSections = new Set(['overview', 'products', 'orders', 'chat']);
+        const savedSectionRaw = localStorage.getItem('farmerActiveSection');
+        const savedSection = String(savedSectionRaw || '').trim();
+        const hash = String((window.location.hash || '')).replace('#', '').trim();
+
+        const initialSection = validSections.has(savedSection)
+            ? savedSection
+            : (validSections.has(hash) ? hash : 'overview');
+
         this.showSection(initialSection);
     }
 
+    todayDateOnly() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    setInputError(el, on) {
+        if (!el) return;
+        el.classList.toggle('input-error', !!on);
+    }
+
+    setupProductDateConstraints() {
+        const harvest = document.getElementById('harvest-date');
+        const expiry = document.getElementById('expiry-date');
+        const editHarvest = document.getElementById('edit-harvest-date');
+        const editExpiry = document.getElementById('edit-expiry-date');
+
+        const applyMin = (harvestEl, expiryEl) => {
+            if (!harvestEl || !expiryEl) return;
+            const today = this.todayDateOnly();
+            harvestEl.min = today;
+
+            const harvestVal = String(harvestEl.value || '').trim();
+            if (harvestVal) {
+                // Expiry must be after harvest (next day or later)
+                const dt = new Date(`${harvestVal}T00:00:00`);
+                if (!Number.isNaN(dt.getTime())) {
+                    dt.setDate(dt.getDate() + 1);
+                    const y = dt.getFullYear();
+                    const m = String(dt.getMonth() + 1).padStart(2, '0');
+                    const d = String(dt.getDate()).padStart(2, '0');
+                    expiryEl.min = `${y}-${m}-${d}`;
+                } else {
+                    expiryEl.min = today;
+                }
+            } else {
+                expiryEl.min = today;
+            }
+        };
+
+        const attach = (harvestEl, expiryEl) => {
+            if (!harvestEl || !expiryEl) return;
+            applyMin(harvestEl, expiryEl);
+            harvestEl.addEventListener('change', () => {
+                applyMin(harvestEl, expiryEl);
+                this.setInputError(harvestEl, false);
+                this.setInputError(expiryEl, false);
+            });
+            expiryEl.addEventListener('change', () => {
+                applyMin(harvestEl, expiryEl);
+                this.setInputError(harvestEl, false);
+                this.setInputError(expiryEl, false);
+            });
+        };
+
+        attach(harvest, expiry);
+        attach(editHarvest, editExpiry);
+    }
+
+    validateProductDates({ harvestEl, expiryEl }) {
+        const harvestVal = String(harvestEl?.value || '').trim();
+        const expiryVal = String(expiryEl?.value || '').trim();
+        const today = this.todayDateOnly();
+
+        this.setInputError(harvestEl, false);
+        this.setInputError(expiryEl, false);
+        // Dates are optional now. If neither provided, it's valid.
+        if (!harvestVal && !expiryVal) return true;
+
+        // If harvest provided, it cannot be in the past
+        if (harvestVal) {
+            if (harvestVal < today) {
+                this.setInputError(harvestEl, true);
+                this.showMessage('Harvest Date cannot be in the past.', 'error');
+                return false;
+            }
+        }
+
+        // If expiry provided and harvest provided, expiry must be after harvest
+        if (expiryVal && harvestVal) {
+            if (expiryVal <= harvestVal) {
+                this.setInputError(harvestEl, true);
+                this.setInputError(expiryEl, true);
+                this.showMessage('Expiry Date must be after the Harvest Date.', 'error');
+                return false;
+            }
+        }
+
+        // If expiry provided alone, require it be in the future
+        if (expiryVal && !harvestVal) {
+            if (expiryVal <= today) {
+                this.setInputError(expiryEl, true);
+                this.showMessage('Expiry Date must be in the future.', 'error');
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     showSection(section) {
-        this.activeSection = section;
+        const validSections = new Set(['overview', 'products', 'orders', 'chat']);
+        const normalized = String(section || '').trim();
+        const safeSection = validSections.has(normalized) ? normalized : 'overview';
+
+        this.activeSection = safeSection;
         // Save current section to localStorage
-        localStorage.setItem('farmerActiveSection', section);
+        localStorage.setItem('farmerActiveSection', safeSection);
 
         document.querySelectorAll('.admin-sidebar .sidebar-link[data-section]').forEach(a => {
-            a.classList.toggle('active', a.getAttribute('data-section') === section);
+            a.classList.toggle('active', a.getAttribute('data-section') === safeSection);
         });
         document.querySelectorAll('main.admin-main .admin-section-card').forEach(sec => {
-            sec.classList.toggle('active', sec.id === section);
+            sec.classList.toggle('active', sec.id === safeSection);
         });
 
         const titles = {
@@ -406,18 +782,22 @@ class FarmerDashboard {
             chat: 'Chat'
         };
         const titleEl = document.getElementById('farmer-page-title');
-        if (titleEl) titleEl.textContent = titles[section] || 'Dashboard';
+        if (titleEl) titleEl.textContent = titles[safeSection] || 'Overview';
 
         // Load data when switching to specific sections
-        if (section === 'orders') {
+        if (safeSection === 'orders') {
             this.loadMyOrders();
-        } else if (section === 'products') {
+        } else if (safeSection === 'products') {
             this.loadMyProducts();
+        } else if (safeSection === 'overview') {
+            this.loadOverviewMetrics();
+        } else if (safeSection === 'chat') {
+            this.loadFarmerStats({ skipProducts: true });
         }
 
         // Update hash (non-destructive)
         try {
-            window.history.replaceState({}, '', `#${section}`);
+            window.history.replaceState({}, '', `#${safeSection}`);
         } catch (_) {
             // ignore
         }
@@ -446,26 +826,31 @@ class FarmerDashboard {
         panel.classList.remove('active');
     }
 
-    async loadFarmerStats() {
+    async loadFarmerStats({ skipProducts = false } = {}) {
         try {
-            // Load my products count
-            const productsResponse = await fetch(`${this.apiBase}/products/farmer/${this.farmerId}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
+            if (!skipProducts) {
+                // Load my products count
+                const productsResponse = await fetch(`${this.apiBase}/products/farmer/${this.farmerId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${this.token}`
+                    }
+                });
 
-            if (productsResponse.ok) {
-                const productsData = await productsResponse.json();
-                document.getElementById('my-products').textContent = productsData.products.length;
-                const shopTotalProducts = document.getElementById('shop-total-products');
-                if (shopTotalProducts) {
-                    shopTotalProducts.textContent = productsData.products.length;
+                if (productsResponse.ok) {
+                    const productsData = await productsResponse.json();
+                    const myProductsEl = document.getElementById('my-products');
+                    if (myProductsEl) myProductsEl.textContent = this.fmtNumber(productsData.products.length);
+                    const shopTotalProducts = document.getElementById('shop-total-products');
+                    if (shopTotalProducts) {
+                        shopTotalProducts.textContent = this.fmtNumber(productsData.products.length);
+                    }
                 }
             }
 
             // Load farmer stats
-            const statsResponse = await fetch(`${this.apiBase}/farmers/me/stats`, {
+            const params = this.buildOverviewRangeSearchParams();
+            const statsUrl = `${this.apiBase}/farmers/me/stats?${params.toString()}`;
+            const statsResponse = await fetch(statsUrl, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
                 }
@@ -477,10 +862,17 @@ class FarmerDashboard {
                 const totalRevenueEl = document.getElementById('total-revenue');
                 const unreadMessagesEl = document.getElementById('unread-messages');
 
-                if (totalOrdersEl) totalOrdersEl.textContent = stats.total_orders ?? 0;
-                if (totalSoldEl) totalSoldEl.textContent = stats.total_sold ?? 0;
-                if (totalRevenueEl) totalRevenueEl.textContent = `₱${parseFloat(stats.total_revenue || 0).toFixed(2)}`;
-                if (unreadMessagesEl) unreadMessagesEl.textContent = stats.unread_customers ?? 0;
+                if (totalOrdersEl) totalOrdersEl.textContent = this.fmtNumber(stats.total_orders ?? 0);
+                if (totalSoldEl) totalSoldEl.textContent = this.fmtNumber(stats.total_sold ?? 0);
+                if (totalRevenueEl) totalRevenueEl.textContent = this.fmtCurrency(stats.total_revenue || 0);
+                const unread = stats.unread_customers ?? 0;
+                if (unreadMessagesEl) unreadMessagesEl.textContent = this.fmtNumber(unread);
+
+                const chatBadge = document.getElementById('chat-unread-badge');
+                if (chatBadge) {
+                    chatBadge.textContent = this.fmtNumber(unread);
+                    chatBadge.style.display = Number(unread) > 0 ? 'inline-flex' : 'none';
+                }
             }
 
         } catch (error) {
@@ -490,25 +882,37 @@ class FarmerDashboard {
 
     async loadShopProfile() {
         try {
-            const response = await fetch(`${this.apiBase}/farmers/${this.farmerId}/profile`);
+            const response = await fetch(`${this.apiBase}/farmers/${this.farmerId}/profile`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            const fallbackUser = this.authProfile || {};
+
+            const getName = (p) => String((p?.full_name || p?.username || '')).trim();
+            const getLocation = (p) => String((p?.location || p?.address || '')).trim();
+            const getDesc = (p) => String((p?.shop_description || p?.shopDescription || p?.description || '')).trim();
+
             if (response.ok) {
                 const data = await response.json();
-                const profile = data.profile;
+                const profile = data.profile || {};
                 this.currentShopProfile = profile;
+
+                const displayName = getName(profile) || getName(fallbackUser) || '—';
+                const displayLocation = getLocation(profile) || getLocation(fallbackUser) || 'Farm location not set';
+                const displayDesc = getDesc(profile) || getDesc(fallbackUser) || 'No description yet.';
                 
                 // Populate read-only display fields
                 const shopNameDisplay = document.getElementById('shop-name-display');
                 if (shopNameDisplay) {
-                    shopNameDisplay.textContent = profile.full_name || profile.username || '—';
+                    shopNameDisplay.textContent = displayName;
                 }
                 const shopLocationDisplay = document.getElementById('shop-location-display');
                 if (shopLocationDisplay) {
-                    const loc = profile.location || 'Farm location not set';
-                    shopLocationDisplay.innerHTML = `<i class="fas fa-location-dot"></i> <span>${this.escapeHtml(loc)}</span>`;
+                    shopLocationDisplay.innerHTML = `<i class="fas fa-location-dot"></i> <span>${this.escapeHtml(displayLocation)}</span>`;
                 }
                 const shopDescDisplay = document.getElementById('shop-description-display');
                 if (shopDescDisplay) {
-                    shopDescDisplay.textContent = profile.shop_description || 'No description yet.';
+                    shopDescDisplay.textContent = displayDesc;
                 }
 
                 // Populate editable fields
@@ -517,17 +921,54 @@ class FarmerDashboard {
                 const shopDescriptionInput = document.getElementById('shop-description-input');
                 
                 if (shopNameInput) {
-                    shopNameInput.value = profile.full_name || profile.username || '';
+                    const v = getName(profile) || getName(fallbackUser) || '';
+                    shopNameInput.value = v;
+                    shopNameInput.placeholder = v || displayName;
                 }
                 if (shopLocationInput) {
-                    shopLocationInput.value = profile.location || '';
+                    const v = getLocation(profile) || getLocation(fallbackUser) || '';
+                    shopLocationInput.value = v;
+                    shopLocationInput.placeholder = v || displayLocation;
                 }
                 if (shopDescriptionInput) {
-                    shopDescriptionInput.value = profile.shop_description || '';
+                    const v = getDesc(profile) || getDesc(fallbackUser) || '';
+                    shopDescriptionInput.value = v;
+                    shopDescriptionInput.placeholder = v || displayDesc;
                 }
 
                 // Always default to view mode after loading
                 this.setShopProfileEditMode(false);
+            } else {
+                // Fallback: show at least auth profile details
+                const shopNameDisplay = document.getElementById('shop-name-display');
+                if (shopNameDisplay) shopNameDisplay.textContent = fallbackUser.full_name || fallbackUser.username || '—';
+                const shopLocationDisplay = document.getElementById('shop-location-display');
+                if (shopLocationDisplay) {
+                    const loc = fallbackUser.address || 'Farm location not set';
+                    shopLocationDisplay.innerHTML = `<i class="fas fa-location-dot"></i> <span>${this.escapeHtml(loc)}</span>`;
+                }
+                const shopDescDisplay = document.getElementById('shop-description-display');
+                if (shopDescDisplay) shopDescDisplay.textContent = (getDesc(fallbackUser) || 'No description yet.');
+
+                // Ensure edit fields still reflect fallback
+                const shopNameInput = document.getElementById('shop-name-input');
+                const shopLocationInput = document.getElementById('shop-location-input');
+                const shopDescriptionInput = document.getElementById('shop-description-input');
+                if (shopNameInput) {
+                    const v = getName(fallbackUser);
+                    shopNameInput.value = v;
+                    shopNameInput.placeholder = v || 'My Farm Shop';
+                }
+                if (shopLocationInput) {
+                    const v = getLocation(fallbackUser);
+                    shopLocationInput.value = v;
+                    shopLocationInput.placeholder = v || 'Farm location not set';
+                }
+                if (shopDescriptionInput) {
+                    const v = getDesc(fallbackUser);
+                    shopDescriptionInput.value = v;
+                    shopDescriptionInput.placeholder = v || 'Add a short description about your farm and products.';
+                }
             }
         } catch (error) {
             console.error('Error loading shop profile:', error);
@@ -547,19 +988,62 @@ class FarmerDashboard {
         if (nameDisplay) nameDisplay.style.display = this.isShopProfileEditing ? 'none' : '';
         if (locDisplay) locDisplay.style.display = this.isShopProfileEditing ? 'none' : '';
         if (descDisplay) descDisplay.style.display = this.isShopProfileEditing ? 'none' : '';
+
+        if (this.isShopProfileEditing) {
+            // Re-sync inputs/placeholders every time Edit is opened
+            try {
+                const profile = this.currentShopProfile || {};
+                const fallbackUser = this.authProfile || {};
+                const name = String((profile.full_name || fallbackUser.full_name || profile.username || fallbackUser.username || '')).trim();
+                const loc = String((profile.location || fallbackUser.address || '')).trim();
+                const desc = String((profile.shop_description || fallbackUser.shop_description || '')).trim();
+
+                const nameInput = document.getElementById('shop-name-input');
+                const locInput = document.getElementById('shop-location-input');
+                const descInput = document.getElementById('shop-description-input');
+
+                if (nameInput) {
+                    nameInput.value = name;
+                    nameInput.placeholder = name || 'My Farm Shop';
+                }
+                if (locInput) {
+                    locInput.value = loc;
+                    locInput.placeholder = loc || 'Farm location not set';
+                }
+                if (descInput) {
+                    descInput.value = desc;
+                    descInput.placeholder = desc || 'Add a short description about your farm and products.';
+                }
+            } catch (_) {
+                // ignore
+            }
+        }
     }
 
     cancelShopProfileEdit() {
         try {
             // Reset inputs to last loaded profile
             const profile = this.currentShopProfile || {};
+            const fallbackUser = this.authProfile || {};
             const shopNameInput = document.getElementById('shop-name-input');
             const shopLocationInput = document.getElementById('shop-location-input');
             const shopDescriptionInput = document.getElementById('shop-description-input');
 
-            if (shopNameInput) shopNameInput.value = profile.full_name || profile.username || '';
-            if (shopLocationInput) shopLocationInput.value = profile.location || '';
-            if (shopDescriptionInput) shopDescriptionInput.value = profile.shop_description || '';
+            if (shopNameInput) {
+                const v = profile.full_name || fallbackUser.full_name || profile.username || fallbackUser.username || '';
+                shopNameInput.value = v;
+                shopNameInput.placeholder = v || 'My Farm Shop';
+            }
+            if (shopLocationInput) {
+                const v = profile.location || fallbackUser.address || '';
+                shopLocationInput.value = v;
+                shopLocationInput.placeholder = v || 'Farm location not set';
+            }
+            if (shopDescriptionInput) {
+                const v = profile.shop_description || '';
+                shopDescriptionInput.value = v;
+                shopDescriptionInput.placeholder = v || 'Add a short description about your farm and products.';
+            }
         } catch (_) {
             // ignore
         }
@@ -652,10 +1136,592 @@ class FarmerDashboard {
 
             if (response.ok) {
                 const data = await response.json();
+                this.myProductsCache = Array.isArray(data.products) ? data.products : [];
                 this.renderMyProducts(data.products);
+                this.renderOverviewLowStock();
             }
         } catch (error) {
             console.error('Error loading products:', error);
+        }
+    }
+
+    refreshOverviewMetricsSoon() {
+        if (this.overviewRefreshTimer) clearTimeout(this.overviewRefreshTimer);
+        this.overviewRefreshTimer = setTimeout(() => {
+            this.loadOverviewMetrics({ force: true });
+        }, 600);
+    }
+
+    formatLocalDateInputValue(dt) {
+        try {
+            const d = dt instanceof Date ? dt : new Date(dt);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        } catch (_) {
+            return '';
+        }
+    }
+
+    showOverviewCustomPanel() {
+        const panel = document.getElementById('overview-custom-panel');
+        if (!panel) return;
+
+        const fromInput = document.getElementById('overview-from');
+        const toInput = document.getElementById('overview-to');
+
+        // Prefill: keep previous custom selection if available, otherwise default to last 30 days.
+        if (fromInput && !String(fromInput.value || '').trim()) {
+            if (this.overviewCustomFrom) {
+                fromInput.value = this.overviewCustomFrom;
+            } else {
+                const today = new Date();
+                const start = new Date(today);
+                start.setDate(start.getDate() - 29);
+                fromInput.value = this.formatLocalDateInputValue(start);
+            }
+        }
+        if (toInput && !String(toInput.value || '').trim()) {
+            if (this.overviewCustomTo) {
+                toInput.value = this.overviewCustomTo;
+            } else {
+                toInput.value = this.formatLocalDateInputValue(new Date());
+            }
+        }
+
+        panel.style.display = 'block';
+    }
+
+    hideOverviewCustomPanel() {
+        const panel = document.getElementById('overview-custom-panel');
+        if (panel) panel.style.display = 'none';
+    }
+
+    buildOverviewRangeSearchParams() {
+        const params = new URLSearchParams();
+        if (this.overviewRangeMode === 'custom' && this.overviewCustomFrom && this.overviewCustomTo) {
+            params.set('from', this.overviewCustomFrom);
+            params.set('to', this.overviewCustomTo);
+        } else {
+            const rangeParam = this.overviewRangeMode === 'all' ? 'all' : String(this.overviewRangeDays);
+            params.set('rangeDays', rangeParam);
+        }
+        return params;
+    }
+
+    setOverviewRange(range) {
+        const value = String(range || '').trim().toLowerCase();
+
+        if (value === 'custom') {
+            this.showOverviewCustomPanel();
+            return;
+        }
+
+        this.hideOverviewCustomPanel();
+        this.overviewCustomFrom = null;
+        this.overviewCustomTo = null;
+
+        if (value === 'all') {
+            this.overviewRangeMode = 'all';
+        } else {
+            const days = Number(value);
+            if (!Number.isFinite(days) || days <= 0) return;
+            this.overviewRangeMode = 'days';
+            this.overviewRangeDays = days;
+        }
+
+        document.querySelectorAll('.overview-range-btn').forEach(b => {
+            const r = String(b.getAttribute('data-range') || '').trim().toLowerCase();
+            const isActive = (this.overviewRangeMode === 'all' && r === 'all')
+                || (this.overviewRangeMode === 'days' && r === String(this.overviewRangeDays));
+            b.classList.toggle('active', isActive);
+        });
+
+        this.loadOverviewMetrics({ force: true });
+        this.loadFarmerStats({ skipProducts: true });
+    }
+
+    setOverviewCustomRange(from, to) {
+        this.overviewRangeMode = 'custom';
+        this.overviewCustomFrom = from;
+        this.overviewCustomTo = to;
+        this.hideOverviewCustomPanel();
+
+        document.querySelectorAll('.overview-range-btn').forEach(b => {
+            const r = String(b.getAttribute('data-range') || '').trim().toLowerCase();
+            b.classList.toggle('active', r === 'custom');
+        });
+
+        this.loadOverviewMetrics({ force: true });
+        this.loadFarmerStats({ skipProducts: true });
+    }
+
+    async loadOverviewMetrics({ force = false } = {}) {
+        try {
+            if (!this.token) return;
+            if (!document.getElementById('overview-sales-chart')) return;
+
+            const now = Date.now();
+            if (!force && now - this.overviewLastFetchAt < 5000) return;
+            if (this.overviewFetchInFlight) return this.overviewFetchInFlight;
+
+            this.overviewLastFetchAt = now;
+            const lastUpdatedEl = document.getElementById('overview-last-updated');
+            if (lastUpdatedEl) lastUpdatedEl.textContent = 'Refreshing report…';
+
+            const params = this.buildOverviewRangeSearchParams();
+            const url = `${this.apiBase}/farmers/me/metrics?${params.toString()}`;
+            this.overviewFetchInFlight = fetch(url, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            })
+                .then(async (res) => {
+                    const json = await res.json().catch(() => null);
+                    if (!res.ok) throw new Error(json?.message || 'Failed to load metrics');
+                    return json;
+                })
+                .then((metrics) => {
+                    this.overviewMetrics = metrics;
+                    this.recentOrdersPage = 1;
+                    this.renderOverview(metrics);
+                })
+                .catch((err) => {
+                    const el = document.getElementById('overview-last-updated');
+                    if (el) el.textContent = 'Could not load report.';
+                    console.error('Overview metrics error:', err);
+                })
+                .finally(() => {
+                    this.overviewFetchInFlight = null;
+                });
+
+            return this.overviewFetchInFlight;
+        } catch (error) {
+            console.error('Error loading overview metrics:', error);
+        }
+    }
+
+    renderOverview(metrics) {
+        const lastUpdatedEl = document.getElementById('overview-last-updated');
+        if (lastUpdatedEl) {
+            const ts = new Date();
+            const rangeLabel = (metrics?.range === 'all')
+                ? 'All time'
+                : (metrics?.range === 'custom' && metrics?.from && metrics?.to)
+                    ? `Custom: ${metrics.from} to ${metrics.to}`
+                    : `Last ${metrics?.rangeDays || this.overviewRangeDays} days`;
+            lastUpdatedEl.textContent = `${rangeLabel} • Updated: ${ts.toLocaleString()}`;
+        }
+
+        this.renderOverviewCharts(metrics);
+        this.renderOverviewRecentOrders(metrics.recentOrders || []);
+        this.renderOverviewTopProductsList(metrics.topProducts || []);
+        this.renderOverviewDownloads();
+        this.renderOverviewLowStock();
+    }
+
+    renderOverviewTopProductsList(topProducts) {
+        const wrap = document.getElementById('overview-top-products-list');
+        if (!wrap) return;
+
+        const list = Array.isArray(topProducts) ? topProducts : [];
+        if (list.length === 0) {
+            wrap.innerHTML = '<div class="empty-state"><p>No sales yet.</p></div>';
+            return;
+        }
+
+        wrap.innerHTML = list.map((p, idx) => {
+            const sold = Number(p.sold_qty || 0);
+            const revenue = this.fmtCurrency(p.revenue || 0);
+            const searchText = `${p.product_name} ${sold} ${revenue}`.toLowerCase();
+            return `
+                <div class="overview-row" data-search-text="${this.escapeAttr(searchText)}">
+                    <div class="overview-row-main">
+                        <div class="overview-row-title">${idx + 1}. ${this.escapeHtml(p.product_name || 'Product')}</div>
+                        <div class="overview-row-sub">Sold: ${this.fmtNumber(sold)}</div>
+                    </div>
+                    <div class="overview-row-meta">
+                        <span class="overview-amount">${revenue}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    buildLastNDaysLabels(revenueByDay, days) {
+        const toKey = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+        const labels = [];
+        const values = [];
+        const map = new Map();
+        for (const row of (Array.isArray(revenueByDay) ? revenueByDay : [])) {
+            const key = String(row.date).slice(0, 10);
+            map.set(key, Number(row.revenue) || 0);
+        }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            const key = toKey(d);
+            labels.push(key);
+            values.push(map.get(key) || 0);
+        }
+        return { labels, values };
+    }
+
+    buildDateSpanLabels(revenueByDay, from, to) {
+        const toKey = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+        const labels = [];
+        const values = [];
+        const map = new Map();
+        for (const row of (Array.isArray(revenueByDay) ? revenueByDay : [])) {
+            const key = String(row.date).slice(0, 10);
+            map.set(key, Number(row.revenue) || 0);
+        }
+
+        const start = new Date(`${from}T00:00:00`);
+        const end = new Date(`${to}T00:00:00`);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start.getTime() > end.getTime()) {
+            return { labels: [], values: [] };
+        }
+
+        const d = new Date(start);
+        while (d.getTime() <= end.getTime()) {
+            const key = toKey(d);
+            labels.push(key);
+            values.push(map.get(key) || 0);
+            d.setDate(d.getDate() + 1);
+        }
+        return { labels, values };
+    }
+
+    renderOverviewCharts(metrics) {
+        if (typeof Chart === 'undefined') return;
+
+        // Sales (delivered) trend
+        const salesCanvas = document.getElementById('overview-sales-chart');
+        if (salesCanvas) {
+            let labels = [];
+            let values = [];
+            if (metrics?.range === 'all') {
+                const rows = Array.isArray(metrics.revenueByDay) ? metrics.revenueByDay : [];
+                labels = rows.map(r => String(r.date).slice(0, 10));
+                values = rows.map(r => Number(r.revenue) || 0);
+            } else if (metrics?.range === 'custom' && metrics?.from && metrics?.to) {
+                const filled = this.buildDateSpanLabels(metrics.revenueByDay, metrics.from, metrics.to);
+                labels = filled.labels;
+                values = filled.values;
+            } else {
+                const days = Number(metrics.rangeDays) || this.overviewRangeDays;
+                const filled = this.buildLastNDaysLabels(metrics.revenueByDay, days);
+                labels = filled.labels;
+                values = filled.values;
+            }
+            const cfg = {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Revenue',
+                        data: values,
+                        tension: 0.35,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => this.fmtCurrency(ctx.parsed.y || 0)
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 6 } },
+                        y: {
+                            ticks: {
+                                callback: (v) => this.fmtCurrency(v, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+                            }
+                        }
+                    }
+                }
+            };
+
+            if (this.overviewCharts.sales) {
+                this.overviewCharts.sales.data.labels = cfg.data.labels;
+                this.overviewCharts.sales.data.datasets[0].data = cfg.data.datasets[0].data;
+                this.overviewCharts.sales.update();
+            } else {
+                this.overviewCharts.sales = new Chart(salesCanvas, cfg);
+            }
+        }
+
+        // Orders by status
+        const statusCanvas = document.getElementById('overview-status-chart');
+        if (statusCanvas) {
+            const statusKeys = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+            const data = statusKeys.map(k => Number(metrics.ordersByStatus?.[k] || 0));
+            const cfg = {
+                type: 'doughnut',
+                data: {
+                    labels: statusKeys.map(k => this.formatStatusLabel(k)),
+                    datasets: [{
+                        data,
+                        backgroundColor: statusKeys.map(k => this.getStatusColor(k))
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            };
+
+            if (this.overviewCharts.status) {
+                this.overviewCharts.status.data.labels = cfg.data.labels;
+                this.overviewCharts.status.data.datasets[0].data = cfg.data.datasets[0].data;
+                this.overviewCharts.status.update();
+            } else {
+                this.overviewCharts.status = new Chart(statusCanvas, cfg);
+            }
+        }
+
+        // Top products (bar)
+        const topCanvas = document.getElementById('overview-top-products-chart');
+        if (topCanvas) {
+            const top = Array.isArray(metrics.topProducts) ? metrics.topProducts : [];
+            const labels = top.map(p => p.product_name);
+            const values = top.map(p => Number(p.sold_qty || 0));
+            const cfg = {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Sold Qty',
+                        data: values
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { ticks: { maxRotation: 0, autoSkip: true } },
+                        y: { beginAtZero: true }
+                    }
+                }
+            };
+
+            if (this.overviewCharts.topProducts) {
+                this.overviewCharts.topProducts.data.labels = cfg.data.labels;
+                this.overviewCharts.topProducts.data.datasets[0].data = cfg.data.datasets[0].data;
+                this.overviewCharts.topProducts.update();
+            } else {
+                this.overviewCharts.topProducts = new Chart(topCanvas, cfg);
+            }
+        }
+    }
+
+    renderOverviewRecentOrders(orders) {
+        const wrap = document.getElementById('overview-recent-orders');
+        if (!wrap) return;
+
+        const list = Array.isArray(orders) ? orders : [];
+        this.overviewRecentOrdersCache = list;
+
+        const totalPages = Math.max(1, Math.ceil(list.length / this.recentOrdersPerPage));
+        this.recentOrdersPage = Math.min(Math.max(1, Number(this.recentOrdersPage || 1)), totalPages);
+
+        const pageLabel = document.getElementById('overview-recent-page');
+        if (pageLabel) pageLabel.textContent = `${this.recentOrdersPage}/${totalPages}`;
+
+        const prevBtn = document.getElementById('overview-recent-prev');
+        if (prevBtn) prevBtn.disabled = this.recentOrdersPage <= 1;
+        const nextBtn = document.getElementById('overview-recent-next');
+        if (nextBtn) nextBtn.disabled = this.recentOrdersPage >= totalPages;
+
+        if (list.length === 0) {
+            wrap.innerHTML = '<div class="empty-state"><p>No recent orders.</p></div>';
+            return;
+        }
+
+        const start = (this.recentOrdersPage - 1) * this.recentOrdersPerPage;
+        const pageItems = list.slice(start, start + this.recentOrdersPerPage);
+
+        wrap.innerHTML = pageItems.map(o => {
+            const date = o.created_at ? new Date(o.created_at).toLocaleDateString() : '';
+            const amount = this.fmtCurrency(o.total_amount || 0);
+            const status = this.formatStatusLabel(o.status);
+            const searchText = `${o.id} ${o.customer_name || ''} ${o.product_name || ''} ${status}`.toLowerCase();
+            return `
+                <div class="overview-row" data-search-text="${this.escapeAttr(searchText)}">
+                    <div class="overview-row-main">
+                        <div class="overview-row-title">#${o.id} • ${this.escapeHtml(o.product_name || 'Product')}</div>
+                        <div class="overview-row-sub">${this.escapeHtml(o.customer_name || 'Customer')} • ${date}</div>
+                    </div>
+                    <div class="overview-row-meta">
+                        <span class="overview-pill" data-status="${this.escapeAttr(o.status)}">${status}</span>
+                        <span class="overview-amount">${amount}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderOverviewLowStock() {
+        const wrap = document.getElementById('overview-low-stock');
+        if (!wrap) return;
+
+        const threshold = 5;
+        const products = Array.isArray(this.myProductsCache) ? this.myProductsCache : [];
+        const low = products
+            .filter(p => Number(p.stock_quantity) <= threshold)
+            .sort((a, b) => Number(a.stock_quantity) - Number(b.stock_quantity))
+            .slice(0, 8);
+
+        if (low.length === 0) {
+            wrap.innerHTML = '<div class="empty-state"><p>No low stock items.</p></div>';
+            return;
+        }
+
+        wrap.innerHTML = low.map(p => {
+            const stock = Number(p.stock_quantity) || 0;
+            const searchText = `${p.name} ${stock}`.toLowerCase();
+            return `
+                <div class="overview-row" data-search-text="${this.escapeAttr(searchText)}">
+                    <div class="overview-row-main">
+                        <div class="overview-row-title">${this.escapeHtml(p.name || 'Product')}</div>
+                        <div class="overview-row-sub">Stock left: ${this.fmtNumber(stock)}</div>
+                    </div>
+                    <div class="overview-row-meta">
+                        <span class="overview-pill" data-status="low">Low</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    getDownloadsKey() {
+        return `farmerOverviewDownloads:${this.userId || 'me'}`;
+    }
+
+    readDownloads() {
+        try {
+            const raw = localStorage.getItem(this.getDownloadsKey());
+            const arr = JSON.parse(raw || '[]');
+            return Array.isArray(arr) ? arr : [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    writeDownloads(items) {
+        try {
+            localStorage.setItem(this.getDownloadsKey(), JSON.stringify(items.slice(0, 10)));
+        } catch (_) {
+            // ignore
+        }
+    }
+
+    renderOverviewDownloads() {
+        const wrap = document.getElementById('overview-downloads');
+        if (!wrap) return;
+        const items = this.readDownloads();
+        if (items.length === 0) {
+            wrap.innerHTML = '<div class="empty-state"><p>No downloads yet.</p></div>';
+            return;
+        }
+
+        wrap.innerHTML = items.map(it => {
+            const when = it.ts ? new Date(it.ts).toLocaleString() : '';
+            const searchText = `${it.name || ''} ${when}`.toLowerCase();
+            return `
+                <div class="overview-row" data-search-text="${this.escapeAttr(searchText)}">
+                    <div class="overview-row-main">
+                        <div class="overview-row-title">${this.escapeHtml(it.name || 'report.csv')}</div>
+                        <div class="overview-row-sub">${this.escapeHtml(when)}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    parseFilenameFromDisposition(disposition) {
+        try {
+            const m = String(disposition || '').match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+            const raw = decodeURIComponent(m?.[1] || m?.[2] || '');
+            return raw || null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    async exportOverviewCsv() {
+        try {
+            const btn = document.getElementById('overview-export-csv-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting…';
+            }
+
+            const params = this.buildOverviewRangeSearchParams();
+            const url = `${this.apiBase}/farmers/me/metrics/export.csv?${params.toString()}`;
+            const res = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                throw new Error(json.message || 'Export failed');
+            }
+
+            const blob = await res.blob();
+            const fallbackSuffix = this.overviewRangeMode === 'custom'
+                ? `${this.overviewCustomFrom || 'from'}_to_${this.overviewCustomTo || 'to'}`
+                : (this.overviewRangeMode === 'all' ? 'all' : `${this.overviewRangeDays}d`);
+            const filename = this.parseFilenameFromDisposition(res.headers.get('Content-Disposition'))
+                || `farmer_overview_${new Date().toISOString().slice(0, 10)}_${fallbackSuffix}.csv`;
+
+            const urlObj = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = urlObj;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(urlObj);
+
+            const items = [{ name: filename, ts: Date.now() }, ...this.readDownloads()]
+                .filter((v, idx, arr) => arr.findIndex(x => x.name === v.name && x.ts === v.ts) === idx);
+            this.writeDownloads(items);
+            this.renderOverviewDownloads();
+
+            this.showMessage('Export downloaded!', 'success');
+        } catch (error) {
+            console.error('Export CSV error:', error);
+            this.showMessage(error.message || 'Export failed', 'error');
+        } finally {
+            const btn = document.getElementById('overview-export-csv-btn');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-file-arrow-down"></i> Export CSV';
+            }
         }
     }
 
@@ -667,27 +1733,38 @@ class FarmerDashboard {
             return;
         }
 
-        container.innerHTML = products.map(product => `
-            <div class="product-card">
+        container.innerHTML = products.map(product => {
+            const stock = Number(product.stock_quantity ?? 0);
+            const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+            const status = !isAvailable ? 'disabled' : (stock <= 0 ? 'no_stock' : 'available');
+            const displayStatus = isAvailable ? 'Available' : 'Disabled';
+            const toggleLabel = isAvailable ? 'Disable' : 'Enable';
+            const toggleArg = !isAvailable;
+            return `
+            <div class="product-card" data-status="${status}" data-stock-quantity="${stock}">
                 <img src="${product.image_url || '/images/logo.png'}"
                      alt="${product.name}" class="product-image" onerror="this.src='/images/logo.png'">
                 <div class="product-info">
                     <h3 class="product-name">${product.name}</h3>
-                    <div class="product-price">₱${parseFloat(product.price).toFixed(2)} per ${product.unit}</div>
+                    <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit}</div>
                     <div class="product-details">
-                        <span class="product-status">${product.is_available ? 'Available' : 'Unavailable'}</span> |
+                        <span class="product-status">${displayStatus}</span> |
                         Stock: ${product.stock_quantity}
                     </div>
                     <div class="product-actions">
                         <button onclick="farmerDashboard.editProduct(${product.id})" class="btn btn-small">Edit</button>
-                        <button onclick="farmerDashboard.toggleProductStatus(${product.id}, ${!product.is_available})" class="btn btn-small">
-                            ${product.is_available ? 'Disable' : 'Enable'}
+                        <button onclick="farmerDashboard.toggleProductStatus(${product.id}, ${toggleArg})" class="btn btn-small">
+                            ${toggleLabel}
                         </button>
                         <button onclick="farmerDashboard.deleteProduct(${product.id})" class="btn btn-small btn-danger">Delete</button>
                     </div>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
+
+        // Apply current filters after re-render
+        this.filterProducts();
     }
 
     async handleAddProduct(e) {
@@ -702,6 +1779,13 @@ class FarmerDashboard {
         const location = document.getElementById('product-location').value;
         const harvestDate = document.getElementById('harvest-date').value;
         const expiryDate = document.getElementById('expiry-date').value;
+
+        if (!this.validateProductDates({
+            harvestEl: document.getElementById('harvest-date'),
+            expiryEl: document.getElementById('expiry-date')
+        })) {
+            return;
+        }
 
         // Handle image upload to Cloudinary
         let imageUrl = '';
@@ -738,8 +1822,8 @@ class FarmerDashboard {
         formData.append('stock_quantity', stock_quantity);
         formData.append('unit', unit);
         formData.append('location', location);
-        if (harvestDate) formData.append('harvest_date', harvestDate);
-        if (expiryDate) formData.append('expiry_date', expiryDate);
+        formData.append('harvest_date', harvestDate);
+        formData.append('expiry_date', expiryDate);
         if (imageUrl) formData.append('image_url', imageUrl);
 
         try {
@@ -789,8 +1873,16 @@ class FarmerDashboard {
 
         const harvestDate = document.getElementById('edit-harvest-date').value;
         const expiryDate = document.getElementById('edit-expiry-date').value;
-        if (harvestDate) formData.append('harvest_date', harvestDate);
-        if (expiryDate) formData.append('expiry_date', expiryDate);
+
+        if (!this.validateProductDates({
+            harvestEl: document.getElementById('edit-harvest-date'),
+            expiryEl: document.getElementById('edit-expiry-date')
+        })) {
+            return;
+        }
+
+        formData.append('harvest_date', harvestDate);
+        formData.append('expiry_date', expiryDate);
 
         const imageFile = document.getElementById('edit-product-image').files[0];
         if (imageFile) {
@@ -934,6 +2026,33 @@ class FarmerDashboard {
                     document.getElementById('edit-expiry-date').value = product.expiry_date;
                 }
 
+                // Apply date constraints for edit form
+                try {
+                    const today = this.todayDateOnly();
+                    const hEl = document.getElementById('edit-harvest-date');
+                    const eEl = document.getElementById('edit-expiry-date');
+                    if (hEl) hEl.min = today;
+                    const harvestVal = String(hEl?.value || '').trim();
+                    if (eEl) {
+                        if (harvestVal) {
+                            const dt = new Date(`${harvestVal}T00:00:00`);
+                            if (!Number.isNaN(dt.getTime())) {
+                                dt.setDate(dt.getDate() + 1);
+                                const y = dt.getFullYear();
+                                const m = String(dt.getMonth() + 1).padStart(2, '0');
+                                const d = String(dt.getDate()).padStart(2, '0');
+                                eEl.min = `${y}-${m}-${d}`;
+                            } else {
+                                eEl.min = today;
+                            }
+                        } else {
+                            eEl.min = today;
+                        }
+                    }
+                } catch (_) {
+                    // ignore
+                }
+
                 // Show current image
                 const preview = document.getElementById('edit-product-image-preview');
                 if (product.image_url) {
@@ -969,26 +2088,141 @@ class FarmerDashboard {
     }
 
     filterProducts() {
-        const searchTerm = document.getElementById('product-search').value.toLowerCase();
-        const statusFilter = document.getElementById('product-status-filter').value;
+        const searchTerm = (document.getElementById('farmer-search-input')?.value || '').toLowerCase().trim();
+        const statusFilter = document.getElementById('product-status-filter')?.value || 'available';
 
-        const productCards = document.querySelectorAll('.product-card');
+        const productCards = document.querySelectorAll('#my-products-grid .product-card');
 
         productCards.forEach(card => {
             const name = card.querySelector('.product-name').textContent.toLowerCase();
-            const status = card.querySelector('.product-status').textContent.toLowerCase();
+            const cardStatus = String(card.getAttribute('data-status') || '').toLowerCase();
+            const stockQty = Number(card.getAttribute('data-stock-quantity') || 0);
 
-            const matchesSearch = name.includes(searchTerm);
-            const matchesStatus = statusFilter === 'all' ||
-                                (statusFilter === 'available' && status.includes('available')) ||
-                                (statusFilter === 'unavailable' && status.includes('unavailable'));
+            const matchesSearch = !searchTerm || name.includes(searchTerm);
+            const matchesStatus = (
+                                (statusFilter === 'available' && cardStatus === 'available') ||
+                                (statusFilter === 'no_stock' && cardStatus === 'no_stock') ||
+                                (statusFilter === 'disabled' && cardStatus === 'disabled')
+                                );
 
             if (matchesSearch && matchesStatus) {
-                card.style.display = 'block';
+                card.style.display = '';
             } else {
                 card.style.display = 'none';
             }
         });
+    }
+
+    openAccountPanel() {
+        const profile = this.currentShopProfile || {};
+        const fallbackUser = this.authProfile || {};
+
+        const name = String((profile.full_name || fallbackUser.full_name || profile.username || fallbackUser.username || '')).trim();
+        const location = String((profile.location || fallbackUser.address || '')).trim();
+        const desc = String((profile.shop_description || fallbackUser.shop_description || '')).trim();
+        const email = String((fallbackUser.email || profile.email || '')).trim();
+
+        const html = `
+            <div class="panel-section">
+                <h3 style="margin:0 0 6px 0;">Account</h3>
+                <div style="color: var(--text-secondary); font-size: 0.9rem;">${this.escapeHtml(email || '—')}</div>
+            </div>
+
+            <div class="panel-section">
+                <h4 style="margin:0 0 10px 0;">Shop Profile</h4>
+                <form id="account-shop-form" class="product-form">
+                    <div class="form-group">
+                        <label for="shop-name-input">Farm Name</label>
+                        <input type="text" id="shop-name-input" class="editable-field" value="${this.escapeAttr(name)}" placeholder="My Farm Shop">
+                    </div>
+                    <div class="form-group">
+                        <label for="shop-location-input"><i class="fas fa-location-dot"></i> Farm Location</label>
+                        <input type="text" id="shop-location-input" class="editable-field" value="${this.escapeAttr(location)}" placeholder="Farm location not set">
+                    </div>
+                    <div class="form-group">
+                        <label for="shop-description-input">Farm Description</label>
+                        <textarea id="shop-description-input" class="editable-field" rows="3" placeholder="Add a short description about your farm and products.">${this.escapeHtml(desc)}</textarea>
+                    </div>
+                    <div style="display:flex; gap:10px; justify-content:flex-end;">
+                        <button type="submit" class="btn btn-primary btn-small">Save Shop Profile</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="panel-section">
+                <h4 style="margin:0 0 10px 0;">Change Password</h4>
+                <form id="account-password-form" class="product-form">
+                    <div class="form-group">
+                        <label for="account-current-password">Current Password</label>
+                        <input type="password" id="account-current-password" class="editable-field" autocomplete="current-password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-new-password">New Password</label>
+                        <input type="password" id="account-new-password" class="editable-field" autocomplete="new-password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="account-confirm-password">Confirm New Password</label>
+                        <input type="password" id="account-confirm-password" class="editable-field" autocomplete="new-password" required>
+                    </div>
+                    <div style="display:flex; gap:10px; justify-content:flex-end;">
+                        <button type="submit" class="btn btn-primary btn-small">Update Password</button>
+                    </div>
+                </form>
+            </div>
+        `;
+
+        this.openDetailPanel(html);
+
+        document.getElementById('account-shop-form')?.addEventListener('submit', (e) => this.handleShopProfileUpdate(e));
+        document.getElementById('account-password-form')?.addEventListener('submit', (e) => this.handleChangePassword(e));
+    }
+
+    async handleChangePassword(e) {
+        e.preventDefault();
+
+        const currentPassword = String(document.getElementById('account-current-password')?.value || '');
+        const newPassword = String(document.getElementById('account-new-password')?.value || '');
+        const confirmPassword = String(document.getElementById('account-confirm-password')?.value || '');
+
+        if (!currentPassword || !newPassword) {
+            this.showMessage('Please fill in all password fields.', 'error');
+            return;
+        }
+        if (newPassword.length < 6) {
+            this.showMessage('New password must be at least 6 characters.', 'error');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            this.showMessage('New password and confirmation do not match.', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/auth/change-password`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ currentPassword, newPassword })
+            });
+
+            if (response.ok) {
+                this.showMessage('Password updated!', 'success');
+                const curEl = document.getElementById('account-current-password');
+                const newEl = document.getElementById('account-new-password');
+                const confEl = document.getElementById('account-confirm-password');
+                if (curEl) curEl.value = '';
+                if (newEl) newEl.value = '';
+                if (confEl) confEl.value = '';
+            } else {
+                const err = await response.json().catch(() => ({}));
+                this.showMessage(err.message || 'Failed to update password', 'error');
+            }
+        } catch (error) {
+            console.error('Change password error:', error);
+            this.showMessage('Error updating password', 'error');
+        }
     }
 
     async loadOrdersByStatus(status) {
@@ -1117,8 +2351,8 @@ class FarmerDashboard {
                     <div style="flex: 1;">
                         <div style="font-weight: 700; margin-bottom: 8px; font-size: 16px;">${this.escapeHtml(productName)}</div>
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Customer:</strong> ${this.escapeHtml(order.customer_name || '—')}</div>
-                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Quantity:</strong> ${quantity} x ₱${parseFloat(price).toFixed(2)} ${item.unit || order.unit || ''}</div>
-                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Total:</strong> ₱${parseFloat(totalAmount).toFixed(2)}</div>
+                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Quantity:</strong> ${this.fmtNumber(quantity)} x ${this.fmtCurrency(price)} ${item.unit || order.unit || ''}</div>
+                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Total:</strong> ${this.fmtCurrency(totalAmount)}</div>
                         <div style="color: #64748b; font-size: 14px;"><strong>Status:</strong> <span style="font-weight: 600; color: ${this.getStatusColor(currentStatus)};">${this.escapeHtml(this.formatStatusLabel(currentStatus))}</span></div>
                     </div>
                 </div>
@@ -1189,20 +2423,21 @@ class FarmerDashboard {
 
     applyTopSearch() {
         const q = (document.getElementById('farmer-search-input')?.value || '').trim().toLowerCase();
-        if (!q) {
-            // reset simple visibility for common lists
-            document.querySelectorAll('#my-products-grid .product-card').forEach(el => (el.style.display = ''));
-            document.querySelectorAll('.orders-list .order-card').forEach(el => (el.style.display = ''));
-            document.querySelectorAll('#conversation-list .conversation-item').forEach(el => (el.style.display = ''));
+
+        if (this.activeSection === 'products') {
+            this.filterProducts();
             return;
         }
 
-        if (this.activeSection === 'products') {
-            document.querySelectorAll('#my-products-grid .product-card').forEach(card => {
-                const name = (card.querySelector('.product-name')?.textContent || '').toLowerCase();
-                card.style.display = name.includes(q) ? '' : 'none';
-            });
-        } else if (this.activeSection === 'orders') {
+        if (!q) {
+            // reset simple visibility for common lists
+            document.querySelectorAll('.orders-list .order-card').forEach(el => (el.style.display = ''));
+            document.querySelectorAll('#conversation-list .conversation-item').forEach(el => (el.style.display = ''));
+            document.querySelectorAll('#overview .overview-row').forEach(el => (el.style.display = ''));
+            return;
+        }
+
+        if (this.activeSection === 'orders') {
             document.querySelectorAll('.orders-list .order-card').forEach(card => {
                 const text = (card.textContent || '').toLowerCase();
                 card.style.display = text.includes(q) ? '' : 'none';
@@ -1211,6 +2446,11 @@ class FarmerDashboard {
             document.querySelectorAll('#conversation-list .conversation-item').forEach(item => {
                 const text = (item.textContent || '').toLowerCase();
                 item.style.display = text.includes(q) ? '' : 'none';
+            });
+        } else if (this.activeSection === 'overview') {
+            document.querySelectorAll('#overview .overview-row').forEach(row => {
+                const text = (row.getAttribute('data-search-text') || row.textContent || '').toLowerCase();
+                row.style.display = text.includes(q) ? '' : 'none';
             });
         }
     }
@@ -1296,7 +2536,11 @@ class FarmerDashboard {
             this.showMessage('Customer information not available', 'error');
             return;
         }
-        window.location.href = `/chat.html?customerId=${customerId}&orderId=${orderId}`;
+        const order = this.lastOrdersById?.get(Number(orderId));
+        const productName = order?.product_name || order?.name || '';
+        const quantity = Number(order?.quantity || 0) || 1;
+        const returnUrl = window.location.pathname + window.location.search + window.location.hash;
+        window.location.href = `/chat.html?customerId=${customerId}&orderId=${orderId}&productName=${encodeURIComponent(productName)}&quantity=${quantity}&returnUrl=${encodeURIComponent(returnUrl)}`;
     }
 
     viewOrderDetails(orderId) {

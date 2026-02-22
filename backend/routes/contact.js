@@ -1,5 +1,4 @@
 const express = require('express');
-const { sendOtpEmail } = require('../utils/emailService');
 require('dotenv').config();
 
 const router = express.Router();
@@ -28,7 +27,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Prepare email content
+    // Prepare internal notification email content
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -91,6 +90,58 @@ ${message}
 ---
 This message was sent from the AgriCatch contact form
 © ${new Date().getFullYear()} AgriCatch. All rights reserved.
+    `;
+
+    const ackHtmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #2e7d32; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9f9f9; padding: 24px; border-radius: 0 0 8px 8px; }
+          .summary { background: white; border-left: 4px solid #2e7d32; padding: 12px 14px; border-radius: 6px; margin-top: 14px; }
+          .muted { color: #6b7280; font-size: 13px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Thank you for contacting AgriCatch</h1>
+            <p>We received your message successfully.</p>
+          </div>
+          <div class="content">
+            <p>Hello ${name},</p>
+            <p>Thank you for reaching out. We have received your message and our team will review it as soon as possible.</p>
+            <div class="summary">
+              <strong>Your submitted details</strong><br>
+              Name: ${name}<br>
+              Email: ${email}<br>
+              Subject: ${subject}<br>
+              Message: ${message}
+            </div>
+            <p class="muted">If you need urgent assistance, you may also contact us at agricatchph@gmail.com.</p>
+            <p>Best regards,<br>AgriCatch Team</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const ackTextContent = `
+Hello ${name},
+
+Thank you for contacting AgriCatch. We received your message and will review it soon.
+
+Your submitted details:
+Name: ${name}
+Email: ${email}
+Subject: ${subject}
+Message: ${message}
+
+Best regards,
+AgriCatch Team
     `;
 
     // Send email to agricatchph@gmail.com
@@ -165,6 +216,48 @@ This message was sent from the AgriCatch contact form
         message: 'Failed to send contact form message. Please try again later.',
         error: emailError || 'No email service configured'
       });
+    }
+
+    // Send acknowledgment email to the user (best effort)
+    try {
+      const nodemailer = require('nodemailer');
+      const { Resend } = require('resend');
+      let ackSent = false;
+
+      if (process.env.RESEND_API_KEY) {
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const fromEmail = process.env.RESEND_FROM_EMAIL || 'AgriCatch <onboarding@resend.dev>';
+        const { error } = await resend.emails.send({
+          from: fromEmail,
+          to: [email],
+          subject: `We received your message: ${subject}`,
+          html: ackHtmlContent,
+          text: ackTextContent,
+        });
+        if (!error) ackSent = true;
+      }
+
+      if (!ackSent && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || 'smtp.gmail.com',
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASSWORD,
+          },
+        });
+
+        await transporter.sendMail({
+          from: `"AgriCatch" <${process.env.SMTP_USER}>`,
+          to: email,
+          subject: `We received your message: ${subject}`,
+          html: ackHtmlContent,
+          text: ackTextContent,
+        });
+      }
+    } catch (ackError) {
+      console.warn('⚠️ Contact acknowledgment email failed:', ackError?.message || ackError);
     }
 
     res.json({

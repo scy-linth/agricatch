@@ -30,6 +30,7 @@
                 <a class="sidebar-link active" href="#orders" data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</a>
                 <a id="users-link" class="sidebar-link" href="#users" data-section="users"><i class="fas fa-users"></i> Customers</a>
                 <a class="sidebar-link" href="#products" data-section="products"><i class="fas fa-box"></i> Products</a>
+                <a class="sidebar-link" href="#categories" data-section="categories"><i class="fas fa-tags"></i> Categories</a>
                 <a class="sidebar-link" href="#logs" data-section="logs"><i class="fas fa-clipboard-check"></i> Logs</a>
                 <button id="logout-btn" class="sidebar-link logout-link"><i class="fas fa-sign-out-alt"></i> Log out</button>
             </nav>
@@ -216,12 +217,64 @@
                     </table>
                 </div>
             </section>
+
+            <section id="categories" class="admin-section-card">
+                <div class="section-header">
+                    <h2>Categories & Product Name Requests</h2>
+                </div>
+                <div class="section-content">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <h3 style="margin-bottom:0.75rem;">Category List</h3>
+                            <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap: wrap;">
+                                <input id="new-category-name" class="search-input" placeholder="New category name">
+                                <input id="new-category-description" class="search-input" placeholder="Description (optional)">
+                                <button id="create-category-btn" class="btn btn-primary btn-small" type="button">Add Category</button>
+                            </div>
+                            <table class="admin-table" id="categories-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="categories-tbody"></tbody>
+                            </table>
+                        </div>
+
+                        <div>
+                            <h3 style="margin-bottom:0.75rem;">Pending Product Name Requests</h3>
+                            <table class="admin-table" id="category-requests-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Category</th>
+                                        <th>Requested By</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="category-requests-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
 
         <aside id="order-detail-panel" class="admin-detail-panel">
             <button class="panel-close" id="close-order-panel" aria-label="Close order details">&times;</button>
             <div id="order-detail-content" class="panel-content">
                 <div class="panel-placeholder">Select an order to view details</div>
+            </div>
+        </aside>
+
+        <aside id="category-detail-panel" class="admin-detail-panel">
+            <button class="panel-close" id="close-category-panel" aria-label="Close category details">&times;</button>
+            <div id="category-detail-content" class="panel-content">
+                <div class="panel-placeholder">Select a request to review details</div>
             </div>
         </aside>
     </div>
@@ -330,6 +383,7 @@
         </div>
     </div>
 
+    <script src="/js/format.js"></script>
     <script src="/js/admin.js"></script>
     <script src="/js/chat.js"></script>
 </body>

@@ -11,23 +11,15 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle menu">
-                    <i class="fas fa-bars"></i>
-                </button>
                 <div class="logo">
                     <div class="logo-and-title">
                         <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
                         <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
                     </div>
-                    <p class="tagline">Freshly Caught! Pre-ordered for you!</p>
+                    <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
                 </div>
-                <nav class="nav" id="main-nav">
-                    <a href="/" class="nav-link">Home</a>
-                    <a href="/#products" class="nav-link">Products</a>
-                    <a href="/orders.html" class="nav-link active">My Orders</a>
-                </nav>
                 <div class="header-actions">
-                    <a href="/" class="btn btn-secondary">Back to Shop</a>
+                    <a href="/#products" id="back-to-origin-btn" class="btn btn-secondary">Back</a>
                 </div>
             </div>
         </div>
@@ -74,12 +66,80 @@
         </div>
     </main>
 
+    <div id="order-rating-modal" class="modal">
+        <div class="modal-content modal-medium order-rating-modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-star"></i> Rate Product</h3>
+                <button type="button" class="close-btn" id="close-order-rating-modal">&times;</button>
+            </div>
+            <form id="order-rating-form" class="order-rating-form">
+                <div class="form-group">
+                    <label>Product</label>
+                    <div id="order-rating-product-name" class="order-rating-product-name">—</div>
+                </div>
+                <div class="form-group">
+                    <label>Your Rating</label>
+                    <div id="order-rating-stars" class="order-rating-stars">
+                        <button type="button" class="order-rating-star-btn" data-rating="1" aria-label="1 star"><i class="fas fa-star"></i></button>
+                        <button type="button" class="order-rating-star-btn" data-rating="2" aria-label="2 stars"><i class="fas fa-star"></i></button>
+                        <button type="button" class="order-rating-star-btn" data-rating="3" aria-label="3 stars"><i class="fas fa-star"></i></button>
+                        <button type="button" class="order-rating-star-btn" data-rating="4" aria-label="4 stars"><i class="fas fa-star"></i></button>
+                        <button type="button" class="order-rating-star-btn" data-rating="5" aria-label="5 stars"><i class="fas fa-star"></i></button>
+                    </div>
+                    <small id="order-rating-value" class="order-rating-value">Select a rating</small>
+                </div>
+                <div class="form-group">
+                    <label for="order-rating-comment">Comment (optional)</label>
+                    <textarea id="order-rating-comment" rows="4" maxlength="500" placeholder="Share your experience with this product..."></textarea>
+                </div>
+                <div class="form-actions order-rating-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-order-rating-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submit-order-rating-btn">Save Rating</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="order-cancel-modal" class="modal">
+        <div class="modal-content modal-medium order-cancel-modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-ban"></i> Cancel Order</h3>
+                <button type="button" class="close-btn" id="close-order-cancel-modal">&times;</button>
+            </div>
+            <form id="order-cancel-form" class="order-cancel-form">
+                <div class="form-group">
+                    <label for="order-cancel-reason-input">Reason for cancellation</label>
+                    <textarea id="order-cancel-reason-input" rows="4" maxlength="500" placeholder="Tell us why you are cancelling this order..."></textarea>
+                </div>
+                <div class="form-actions order-cancel-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-order-cancel-btn">Close</button>
+                    <button type="submit" class="btn btn-danger" id="submit-order-cancel-btn">Confirm Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="order-reason-view-modal" class="modal">
+        <div class="modal-content modal-medium order-cancel-modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-circle-info"></i> Cancellation Reason</h3>
+                <button type="button" class="close-btn" id="close-order-reason-view-modal">&times;</button>
+            </div>
+            <div class="order-reason-view-body">
+                <p id="order-reason-view-text">No reason provided.</p>
+            </div>
+            <div class="form-actions order-cancel-actions">
+                <button type="button" class="btn btn-secondary" id="close-order-reason-view-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
                     <h3>AgriCatch</h3>
-                    <p>Freshly Caught! Pre-ordered for you! Your trusted source for fresh agricultural and fishery products.</p>
+                    <p>Freshly Harvested! Pre-ordered for you! Your trusted source for fresh farm products.</p>
                 </div>
             </div>
             <div class="footer-bottom">
@@ -88,21 +148,7 @@
         </div>
     </footer>
 
+    <script src="/js/format.js"></script>
     <script src="/js/orders.js"></script>
-    <script>
-        // Mobile menu toggle
-        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-        const mainNav = document.getElementById('main-nav');
-        if (mobileMenuToggle && mainNav) {
-            mobileMenuToggle.addEventListener('click', () => {
-                mainNav.classList.toggle('open');
-                const icon = mobileMenuToggle.querySelector('i');
-                if (icon) {
-                    icon.classList.toggle('fa-bars');
-                    icon.classList.toggle('fa-times');
-                }
-            });
-        }
-    </script>
 </body>
 </html>

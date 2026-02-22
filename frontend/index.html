@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AgriCatch - Freshly Caught! Pre-ordered for you!</title>
+    <title>AgriCatch - Freshly Harvested! Pre-ordered for you!</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -37,12 +37,16 @@
                         <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
                         <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
                     </div>
-                    <p class="tagline">Freshly Caught! Pre-ordered for you!</p>
+                    <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
                 </div>
                 <nav class="nav" id="main-nav">
                     <a href="#home" class="nav-link active" data-section="home">
                         <i class="fas fa-home"></i>
                         <span>Home</span>
+                    </a>
+                    <a href="#featured" class="nav-link" data-section="featured">
+                        <i class="fas fa-star"></i>
+                        <span>Featured</span>
                     </a>
                     <a href="#products" class="nav-link" data-section="products">
                         <i class="fas fa-shopping-bag"></i>
@@ -70,7 +74,10 @@
                         <div id="notifications-dropdown" class="notifications-dropdown">
                             <div class="notifications-header">
                                 <span>Notifications</span>
-                                <button id="mark-all-read" class="btn btn-small btn-secondary">Mark all read</button>
+                                <div class="notifications-header-actions">
+                                    <button id="notifications-toggle-view" class="btn btn-small btn-secondary" type="button">Full</button>
+                                    <button id="mark-all-read" class="btn btn-small btn-secondary" type="button">Mark all read</button>
+                                </div>
                             </div>
                             <div id="notifications-list" class="notifications-list">
                                 <!-- Notifications will be loaded here -->
@@ -81,9 +88,16 @@
                         <button id="login-register-btn" class="btn btn-primary">Login/Register</button>
                     </div>
                     <div id="user-profile" class="user-profile" style="display: none;">
-                        <span id="user-name"></span>
-                        <button id="super-admin-panel-btn" class="btn btn-primary" style="display: none;">Admin Panel</button>
-                        <button id="logout-btn" class="btn btn-secondary">Logout</button>
+                        <button id="user-account-btn" class="user-account-btn" type="button" aria-haspopup="true" aria-expanded="false">
+                            <span id="user-initial" class="user-initial">U</span>
+                            <span id="user-name"></span>
+                            <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                        </button>
+                        <div id="user-dropdown-menu" class="user-dropdown-menu" style="display: none;">
+                            <button id="my-account-btn" class="user-dropdown-item" type="button">My Account</button>
+                            <button id="super-admin-panel-btn" class="user-dropdown-item" style="display: none;" type="button">Admin Panel</button>
+                            <button id="logout-btn" class="user-dropdown-item" type="button">Logout</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -110,23 +124,39 @@
         </div>
     </section>
 
-    <!-- Fresh Harvest Navigation -->
-    <section class="categories">
+    <section id="featured" class="products">
         <div class="container">
-            <!-- Fresh Harvest section removed: direct product feed shown below -->
+            <div class="products-header">
+                <h2 class="section-title">Best Selling Low Price</h2>
+            </div>
+            <div id="featured-grid" class="products-grid">
+                <!-- Featured products will be loaded here -->
+            </div>
+        </div>
+    </section>
 
     <!-- Products Section -->
     <section id="products" class="products">
         <div class="container">
             <div class="products-header">
-                <h2 class="section-title">Featured Products</h2>
+                <h2 class="section-title">Products</h2>
                 <div class="products-filters">
                     <div class="search-input-wrapper">
                         <input type="text" id="search-input" placeholder="Search products..." class="search-input">
                     </div>
-                    <!-- Category filter removed: product feed defaults to Agriculture -->
+                    <div class="filter-select-wrapper">
+                        <select id="products-sort" class="filter-select" aria-label="Sort products">
+                            <option value="latest">Latest</option>
+                            <option value="harvest_date">Harvest Date</option>
+                            <option value="ratings">Ratings</option>
+                            <option value="top_sales">Top Sales</option>
+                            <option value="price_low_high">Price: Low to High</option>
+                            <option value="price_high_low">Price: High to Low</option>
+                        </select>
+                    </div>
                 </div>
             </div>
+            <div class="products-category-tabs" id="products-category-tabs" aria-label="Product categories"></div>
             <div id="products-grid" class="products-grid">
                 <!-- Products will be loaded here -->
             </div>
@@ -137,12 +167,17 @@
     <div id="product-details-modal" class="product-details-modal">
         <div class="product-details-overlay"></div>
         <div class="product-details-content">
+            <div class="product-details-topbar">
+                <h3>Product Details</h3>
+            </div>
             <button class="product-details-close" id="close-product-details">&times;</button>
             <div class="product-details-container">
                 <div class="product-details-image-section">
                     <h2 id="product-details-name" class="product-details-name"></h2>
+                    <div id="product-details-name-rating" class="product-details-name-rating"></div>
                     <img id="product-details-image" src="" alt="Product Image" class="product-details-image">
                     <div class="product-details-description" id="product-details-description"></div>
+                    <div id="similar-sellers" class="reviews-section"></div>
                 </div>
                 <div class="product-details-info-section">
                     <div class="product-details-info-list">
@@ -151,6 +186,7 @@
                             <div class="info-content">
                                 <span class="info-label">Farmer</span>
                                 <span class="info-value" id="product-details-farmer"></span>
+                                <div id="product-details-farmer-actions" class="product-details-farmer-actions"></div>
                             </div>
                         </div>
                         
@@ -197,7 +233,7 @@
                             <span class="quantity-label">Quantity:</span>
                             <div class="quantity-controls">
                                 <button class="quantity-btn" id="product-details-decrease" onclick="app.decreaseQuantity()">-</button>
-                                <input type="number" id="product-details-quantity" class="quantity-input" value="1" min="1" readonly>
+                                <input type="number" id="product-details-quantity" class="quantity-input" value="1" min="1">
                                 <button class="quantity-btn" id="product-details-increase" onclick="app.increaseQuantity()">+</button>
                             </div>
                         </div>
@@ -214,6 +250,95 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="my-account-modal" class="modal">
+        <div class="modal-content modal-medium">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-circle"></i> My Account</h3>
+                <button class="close-btn" id="close-my-account-modal">&times;</button>
+            </div>
+            <div class="auth-form">
+                <div class="form-group">
+                    <label for="my-account-username">Username</label>
+                    <input type="text" id="my-account-username" maxlength="30" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="my-account-fullname">Full Name</label>
+                    <input type="text" id="my-account-fullname" required>
+                </div>
+                <div class="form-group">
+                    <label for="my-account-email">Email</label>
+                    <input type="email" id="my-account-email" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="my-account-phone">Phone Number</label>
+                    <div class="phone-input-wrapper">
+                        <span class="phone-prefix">+63</span>
+                        <input type="tel" id="my-account-phone" maxlength="12" placeholder="929 819 6629" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="my-account-address">Address</label>
+                    <textarea id="my-account-address" rows="3" required></textarea>
+                </div>
+                <div class="my-account-password-section">
+                    <button type="button" class="btn btn-outline btn-full" id="toggle-my-password-section" aria-expanded="false" aria-controls="my-account-password-fields">
+                        <i class="fas fa-key"></i> Change Password
+                    </button>
+                    <div id="my-account-password-fields" class="my-account-password-fields" hidden>
+                        <div class="form-group">
+                            <label for="my-account-current-password">Current Password</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="my-account-current-password" autocomplete="current-password">
+                                <button type="button" class="password-toggle" id="toggle-my-account-current-password" aria-label="Show current password">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="my-account-new-password">New Password</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="my-account-new-password" autocomplete="new-password">
+                                <button type="button" class="password-toggle" id="toggle-my-account-new-password" aria-label="Show new password">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="my-account-confirm-password">Confirm New Password</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="my-account-confirm-password" autocomplete="new-password">
+                                <button type="button" class="password-toggle" id="toggle-my-account-confirm-password" aria-label="Show confirm password">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="step-actions my-account-password-actions">
+                            <button type="button" class="btn btn-secondary btn-full" id="change-my-password-btn">Change Password</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="step-actions">
+                    <button type="button" class="btn btn-primary btn-full" id="save-my-account-btn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="shop-details-modal" class="modal">
+        <div class="modal-content modal-medium">
+            <div class="modal-header">
+                <h3 id="shop-details-title"><i class="fas fa-store"></i> Shop Details</h3>
+                <button class="close-btn" id="close-shop-details-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="shop-details-body">
+                <div class="loading">Loading shop details...</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="close-shop-details-footer-btn">Close</button>
             </div>
         </div>
     </div>
@@ -264,17 +389,17 @@
                         </div>
                     </div>
 
-                    <div class="form-group" style="margin-top: -0.35rem;">
-                        <a href="#" id="forgot-password-link" style="font-size: 0.95em;">Forgot password?</a>
+                    <div class="form-group forgot-password-group" style="margin-top: -0.35rem;">
+                        <a href="#" id="forgot-password-link">Forgot password?</a>
                     </div>
                     
-                    <!-- Role selector box: choose Farmer, Customer, or Admin (login) -->
+                    <!-- Role selector box: choose Farmer, Customer, or Staff (login) -->
                     <div class="form-group role-selector-group">
                         <label>I am</label>
                         <div id="role-selector-login" class="role-selector-box">
                             <button type="button" class="role-box" data-role="customer">Customer</button>
                             <button type="button" class="role-box" data-role="farmer">Farmer</button>
-                            <button type="button" class="role-box" data-role="admin">Admin</button>
+                            <button type="button" class="role-box" data-role="staff">Staff</button>
                         </div>
                     </div>
                     
@@ -649,12 +774,6 @@
                                 <!-- Checkout items will be loaded here -->
                             </div>
                         </div>
-                        <div class="checkout-summary-total">
-                            <div class="summary-row total-row">
-                                <strong>Total:</strong>
-                                <strong>₱<span id="checkout-total">0.00</span></strong>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Delivery Information Section -->
@@ -692,9 +811,9 @@
                             </label>
                             <div class="phone-input-wrapper">
                                 <span class="phone-prefix">+63</span>
-                                <input type="tel" id="checkout-phone" class="form-input" placeholder="9123456789" maxlength="10" required>
+                                <input type="tel" id="checkout-phone" class="form-input" placeholder="929 819 6629" maxlength="12" required>
                             </div>
-                            <small class="form-hint">Enter 10 digits without the +63 prefix</small>
+                            <small class="form-hint">Enter 10-digit mobile number (e.g., 929 819 6629)</small>
                         </div>
 
                         <div class="form-group">
@@ -786,9 +905,9 @@
                     </label>
                     <div class="phone-input-wrapper">
                         <span class="phone-prefix">+63</span>
-                        <input type="tel" id="floating-address-phone" class="form-input" placeholder="9123456789" maxlength="10" required>
+                        <input type="tel" id="floating-address-phone" class="form-input" placeholder="929 819 6629" maxlength="12" required>
                     </div>
-                    <small class="form-hint">Enter 10 digits without the +63 prefix</small>
+                    <small class="form-hint">Enter 10-digit mobile number (e.g., 929 819 6629)</small>
                 </div>
 
                 <div class="form-group">
@@ -896,6 +1015,7 @@
                     <h3>Quick Links</h3>
                     <ul>
                         <li><a href="#home">Home</a></li>
+                        <li><a href="#featured">Featured</a></li>
                         <li><a href="#products">Products</a></li>
                         <li><a href="#about">About</a></li>
                         <li><a href="#contact">Contact</a></li>
@@ -915,6 +1035,7 @@
     </button>
 
     <!-- Scripts -->
+    <script src="/js/format.js"></script>
     <script src="/js/app.js"></script>
     <script>
         // Handle hero video loading - ensure full video loads before playing

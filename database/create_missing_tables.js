@@ -5,7 +5,7 @@ const path = require('path');
 const pool = new Pool({
   user: 'postgres',
   host: 'localhost',
-  database: 'agri_fishery_marketplace',
+  database: 'agricatch',
   password: 'password',
   port: 5432,
 });
