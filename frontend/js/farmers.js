@@ -3,10 +3,16 @@ class FarmersPage {
         // Use relative /api so Netlify can proxy to Render.
         this.apiBase = '/api';
         this.farmers = [];
+        this.selectedFarmerId = null;
         this.init();
     }
 
     init() {
+        try {
+            this.selectedFarmerId = Number(sessionStorage.getItem('selectedFarmerId') || 0) || null;
+        } catch (_) {
+            this.selectedFarmerId = null;
+        }
         this.loadFarmers();
         this.setupEventListeners();
     }
@@ -53,7 +59,7 @@ class FarmersPage {
         }
 
         grid.innerHTML = farmers.map((farmer) => `
-            <div class="farmer-card">
+            <div class="farmer-card ${Number(farmer.id) === Number(this.selectedFarmerId) ? 'selected' : ''}" id="farmer-card-${farmer.id}">
                 <div class="farmer-card-header">
                     <div class="farmer-avatar">
                         <i class="fas fa-user"></i>
@@ -81,6 +87,15 @@ class FarmersPage {
                 sessionStorage.setItem('selectedFarmerId', farmerId);
             });
         });
+
+        if (this.selectedFarmerId) {
+            const selectedCard = document.getElementById(`farmer-card-${this.selectedFarmerId}`);
+            if (selectedCard) {
+                setTimeout(() => {
+                    selectedCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 120);
+            }
+        }
     }
 }
 

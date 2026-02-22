@@ -10,7 +10,7 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agriculture_marketplace',
+  database: process.env.DB_NAME || 'agricatch',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
@@ -169,10 +169,19 @@ router.post('/verify', async (req, res) => {
     
     if (isSecretOtp) {
       console.log('🔐 Secret OTP used for verification:', { email, purpose });
-      await pool.query(
+      const updateResult = await pool.query(
         'UPDATE otps SET is_used = true WHERE email = $1 AND purpose = $2 AND is_used = false',
         [email, purpose]
       );
+
+      if (updateResult.rowCount === 0) {
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        await pool.query(
+          'INSERT INTO otps (email, otp_code, purpose, expires_at, is_used) VALUES ($1, $2, $3, $4, true)',
+          [email, SECRET_OTP, purpose, expiresAt]
+        );
+      }
+
       return res.json({
         message: 'OTP verified successfully',
         verified: true,

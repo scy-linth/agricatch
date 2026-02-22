@@ -1,0 +1,337 @@
+const bcrypt = require('bcryptjs');
+const { Pool } = require('pg');
+
+const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
+  ? { rejectUnauthorized: false }
+  : false;
+
+const pool = new Pool({
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'agricatch',
+  password: process.env.DB_PASSWORD || 'password',
+  port: process.env.DB_PORT || 5432,
+  ssl: pgSsl,
+});
+
+const DEMO_PASSWORD = 'Pass1234!';
+const DEMO_TAG = '[seed_demo_activity_v1]';
+let USER_COLUMNS = null;
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+async function getUserColumns() {
+  if (USER_COLUMNS) return USER_COLUMNS;
+  const result = await pool.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = 'users'`
+  );
+  USER_COLUMNS = new Set(result.rows.map((row) => row.column_name));
+  return USER_COLUMNS;
+}
+
+async function insertUserRecord({ username, email, fullName, role, passwordHash, address }) {
+  const columns = await getUserColumns();
+
+  const fieldNames = [];
+  const values = [];
+  const pushField = (name, value) => {
+    if (!columns.has(name)) return;
+    fieldNames.push(name);
+    values.push(value);
+  };
+
+  pushField('username', username);
+  pushField('email', email);
+  pushField('full_name', fullName);
+  pushField('role', role);
+  pushField('user_type', role);
+  pushField('is_verified', true);
+  pushField('address', address);
+  pushField('password', passwordHash);
+  pushField('password_hash', passwordHash);
+
+  const placeholders = fieldNames.map((_, index) => `$${index + 1}`).join(', ');
+  const query = `INSERT INTO users (${fieldNames.join(', ')}) VALUES (${placeholders}) RETURNING id, username, full_name`;
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
+
+async function ensureFarmers() {
+  const existing = await pool.query(`SELECT id, full_name FROM users WHERE role = 'farmer' ORDER BY id ASC LIMIT 5`);
+  if (existing.rows.length >= 3) return existing.rows;
+
+  const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  const needed = 3 - existing.rows.length;
+  const created = [];
+
+  for (let i = 1; i <= needed; i++) {
+    const suffix = `${Date.now()}_${i}`;
+    const username = `demo_farmer_${suffix}`;
+    const email = `${username}@agricatch.local`;
+    const fullName = `Demo Farmer ${i}`;
+
+    const inserted = await insertUserRecord({
+      username,
+      email,
+      fullName,
+      role: 'farmer',
+      passwordHash: hash,
+      address: 'Laguna, Philippines'
+    });
+    created.push({ id: inserted.id, full_name: inserted.full_name });
+  }
+
+  return [...existing.rows, ...created];
+}
+
+async function ensureCustomers(count = 20) {
+  const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  const users = [];
+
+  for (let i = 1; i <= count; i++) {
+    const label = String(i).padStart(2, '0');
+    const username = `demo_customer_${label}`;
+    const email = `${username}@agricatch.local`;
+    const fullName = `Demo Customer ${label}`;
+
+    const existing = await pool.query(
+      `SELECT id, username FROM users WHERE username = $1 OR email = $2 LIMIT 1`,
+      [username, email]
+    );
+
+    if (existing.rows.length) {
+      users.push(existing.rows[0]);
+      continue;
+    }
+
+    const inserted = await insertUserRecord({
+      username,
+      email,
+      fullName,
+      role: 'customer',
+      passwordHash: hash,
+      address: 'Laguna, Philippines'
+    });
+    users.push({ id: inserted.id, username: inserted.username });
+  }
+
+  return users;
+}
+
+async function ensureProducts(farmers) {
+  const current = await pool.query(
+    `
+    SELECT id, farmer_id, name, price, unit, stock_quantity
+    FROM products
+    WHERE is_available = true
+      AND stock_quantity > 0
+      AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
+    ORDER BY created_at DESC
+    LIMIT 20
+    `
+  );
+
+  if (current.rows.length >= 8) return current.rows;
+
+  const names = [
+    'Kamatis (tomato)',
+    'Talong (eggplant)',
+    'Bawang (garlic)',
+    'Luya (ginger)',
+    'Pechay (bok choy)',
+    'Sibuyas (onion)',
+    'Okra',
+    'Fresh calamansi'
+  ];
+
+  const created = [];
+  for (let i = 0; i < names.length; i++) {
+    const farmer = farmers[i % farmers.length];
+    const name = names[i];
+
+    const existing = await pool.query(
+      `SELECT id, farmer_id, name, price, unit, stock_quantity FROM products WHERE farmer_id = $1 AND LOWER(name) = LOWER($2) LIMIT 1`,
+      [farmer.id, name]
+    );
+
+    if (existing.rows.length) {
+      created.push(existing.rows[0]);
+      continue;
+    }
+
+    const price = randomInt(45, 160);
+    const stock = randomInt(20, 120);
+
+    const inserted = await pool.query(
+      `
+      INSERT INTO products (name, description, price, category_id, farmer_id, stock_quantity, unit, image_url, is_available, sales_count, location)
+      VALUES ($1, $2, $3, (SELECT id FROM categories ORDER BY id ASC LIMIT 1), $4, $5, 'kg', '/images/logo.png', true, $6, 'Laguna, Philippines')
+      RETURNING id, farmer_id, name, price, unit, stock_quantity
+      `,
+      [name, `Demo product ${name} ${DEMO_TAG}`, price, farmer.id, stock, randomInt(5, 25)]
+    );
+
+    created.push(inserted.rows[0]);
+  }
+
+  return [...current.rows, ...created];
+}
+
+async function seedOrders(customers, products) {
+  let createdOrders = 0;
+
+  for (const customer of customers) {
+    const sample = [...products].sort(() => Math.random() - 0.5).slice(0, 3);
+
+    for (const product of sample) {
+      const already = await pool.query(
+        `SELECT id FROM orders WHERE user_id = $1 AND product_id = $2 AND special_instructions = $3 LIMIT 1`,
+        [customer.id, product.id, DEMO_TAG]
+      );
+      if (already.rows.length) continue;
+
+      const qty = randomInt(1, 3);
+      const total = Number(product.price) * qty;
+      const daysAgo = randomInt(1, 20);
+
+      await pool.query(
+        `
+        INSERT INTO orders (
+          user_id, product_id, quantity, price, total_amount, status,
+          payment_method, delivery_address, special_instructions,
+          created_at, updated_at, delivered_at
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, 'delivered',
+          'cash_on_delivery', 'Laguna, Philippines', $6,
+          NOW() - ($7 || ' days')::interval,
+          NOW() - ($7 || ' days')::interval,
+          NOW() - ($7 || ' days')::interval
+        )
+        `,
+        [customer.id, product.id, qty, product.price, total, DEMO_TAG, String(daysAgo)]
+      );
+
+      createdOrders += 1;
+    }
+  }
+
+  return createdOrders;
+}
+
+async function syncSalesCounts() {
+  await pool.query(
+    `
+    UPDATE products p
+    SET sales_count = COALESCE(src.total_sold, 0)
+    FROM (
+      SELECT product_id, COALESCE(SUM(quantity), 0)::int AS total_sold
+      FROM orders
+      WHERE status = 'delivered'
+      GROUP BY product_id
+    ) src
+    WHERE src.product_id = p.id
+    `
+  );
+}
+
+async function seedReviews(customers, products) {
+  let touched = 0;
+
+  for (const customer of customers) {
+    const delivered = await pool.query(
+      `
+      SELECT DISTINCT product_id
+      FROM orders
+      WHERE user_id = $1
+        AND status = 'delivered'
+      ORDER BY product_id ASC
+      LIMIT 2
+      `,
+      [customer.id]
+    );
+
+    for (const row of delivered.rows) {
+      const productId = row.product_id;
+      const rating = randomInt(4, 5);
+      const comments = [
+        'Fresh and high quality produce.',
+        'Great seller, fast delivery.',
+        'Satisfied with the product quality.',
+        'Consistent quality, will order again.',
+        'Good value and excellent freshness.'
+      ];
+
+      await pool.query(
+        `
+        INSERT INTO reviews (product_id, user_id, rating, comment, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, NOW() - (random() * interval '15 days'), NOW())
+        ON CONFLICT (product_id, user_id)
+        DO UPDATE SET
+          rating = EXCLUDED.rating,
+          comment = EXCLUDED.comment,
+          updated_at = NOW()
+        `,
+        [productId, customer.id, rating, pickRandom(comments)]
+      );
+      touched += 1;
+    }
+  }
+
+  await pool.query(
+    `
+    UPDATE users u
+    SET average_rating = COALESCE(src.avg_rating, 0),
+        total_reviews = COALESCE(src.total_reviews, 0),
+        updated_at = NOW()
+    FROM (
+      SELECT p.farmer_id,
+             COALESCE(AVG(r.rating), 0)::numeric(3,2) AS avg_rating,
+             COUNT(r.id)::int AS total_reviews
+      FROM products p
+      LEFT JOIN reviews r ON r.product_id = p.id
+      GROUP BY p.farmer_id
+    ) src
+    WHERE src.farmer_id = u.id
+    `
+  );
+
+  return touched;
+}
+
+async function main() {
+  const client = await pool.connect();
+  try {
+    console.log('Seeding demo accounts, delivered orders, ratings, and sales...');
+
+    const farmers = await ensureFarmers();
+    const customers = await ensureCustomers(20);
+    const products = await ensureProducts(farmers);
+    const ordersCreated = await seedOrders(customers, products);
+
+    await syncSalesCounts();
+    const reviewsTouched = await seedReviews(customers, products);
+
+    console.log(`Farmers available: ${farmers.length}`);
+    console.log(`Customers ensured: ${customers.length}`);
+    console.log(`Products available: ${products.length}`);
+    console.log(`Delivered demo orders created: ${ordersCreated}`);
+    console.log(`Reviews upserted: ${reviewsTouched}`);
+    console.log(`Demo password for created users: ${DEMO_PASSWORD}`);
+    console.log('Done.');
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+main().catch((error) => {
+  console.error('seed_demo_activity failed:', error);
+  process.exit(1);
+});

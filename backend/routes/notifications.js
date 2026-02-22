@@ -9,7 +9,7 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agriculture_marketplace',
+  database: process.env.DB_NAME || 'agricatch',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
@@ -34,7 +34,16 @@ router.get('/', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC',
+      `SELECT n.*,
+              COALESCE(p_direct.name, p_order.name) AS product_name,
+              COALESCE(p_direct.image_url, p_order.image_url) AS product_image_url,
+              o.status AS order_status
+       FROM notifications n
+       LEFT JOIN orders o ON o.id = n.order_id
+       LEFT JOIN products p_direct ON p_direct.id = n.product_id
+       LEFT JOIN products p_order ON p_order.id = o.product_id
+       WHERE n.user_id = $1
+       ORDER BY n.created_at DESC`,
       [user.id]
     );
     res.json({ notifications: result.rows });

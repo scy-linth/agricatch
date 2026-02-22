@@ -1,4 +1,4 @@
-// Seed script for AgriFishery Market database
+// Seed script for AgriCatch (farm products only) database
 
 const { Pool } = require('pg');
 const path = require('path');
@@ -7,7 +7,7 @@ require('dotenv').config({ path: path.join(__dirname, '../backend/.env') });
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agri_fishery_marketplace',
+  database: process.env.DB_NAME || 'agricatch',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
 });
@@ -41,7 +41,7 @@ const sampleUsers = [
     address: '123 Farm Road, Laguna, Philippines',
     role: 'farmer'
   },
-  // Removed fishery/seafood farmer Maria
+  // Farm-only system
 ];
 
 const sampleProducts = [
@@ -149,34 +149,6 @@ const sampleProducts = [
     location: 'Benguet, Philippines',
     harvest_date: '2024-01-21',
     expiry_date: '2024-02-05'
-  },
-
-  // Removed all fishery/seafood/aquaculture products
-  {
-    name: 'Fresh Tuna',
-    description: 'Premium tuna belly for sashimi or grilling. Rich in omega-3 fatty acids.',
-    price: 450.00,
-    category_id: 2,
-    farmer_id: 4,
-    stock_quantity: 25,
-    unit: 'kg',
-    image_url: '/images/tuna.jpg',
-    location: 'General Santos, Philippines',
-    harvest_date: '2024-01-17',
-    expiry_date: '2024-01-24'
-  },
-  {
-    name: 'Fresh Prawns',
-    description: 'Large freshwater prawns. Perfect for special occasions and celebrations.',
-    price: 380.00,
-    category_id: 2,
-    farmer_id: 4,
-    stock_quantity: 40,
-    unit: 'kg',
-    image_url: '/images/prawns.jpg',
-    location: 'Pampanga, Philippines',
-    harvest_date: '2024-01-18',
-    expiry_date: '2024-01-22'
   }
 ];
 
@@ -235,7 +207,6 @@ async function seedDatabase() {
     console.log(`Database seeding completed successfully!`);
     console.log(`Inserted ${productsToInsert.length} products`);
     console.log(`- Agricultural products (Farmer Juan): ${productsToInsert.filter(p => p.category_id === 1).length}`);
-    // Fishery/seafood products removed
   } catch (error) {
     console.error('Error seeding database:', error);
   } finally {

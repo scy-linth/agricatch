@@ -1,9 +1,33 @@
+// Ensure placeholder image is defined on pages that don't load app.js
+window.__PLACEHOLDER_IMAGE__ = window.__PLACEHOLDER_IMAGE__ || '/images/resendlogo.png';
+
 class WishlistPage {
     constructor() {
         // Use relative /api so Netlify can proxy to Render.
         this.apiBase = '/api';
         this.token = localStorage.getItem('token');
         this.init();
+    }
+
+    fmtNumber(value, options) {
+        try {
+            if (window.FormatUtil && typeof window.FormatUtil.number === 'function') {
+                return window.FormatUtil.number(value, options);
+            }
+        } catch (_) {}
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '0';
+        return String(n);
+    }
+
+    fmtCurrency(value, options) {
+        try {
+            if (window.FormatUtil && typeof window.FormatUtil.currency === 'function') {
+                return window.FormatUtil.currency(value, options);
+            }
+        } catch (_) {}
+        const n = Number(value);
+        return `₱${(Number.isFinite(n) ? n : 0).toFixed(2)}`;
     }
 
     init() {
@@ -43,10 +67,10 @@ class WishlistPage {
                      alt="${item.name}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
                 <div class="product-info">
                     <h3 class="product-name">${item.name}</h3>
-                    <div class="product-price">₱${parseFloat(item.price).toFixed(2)} per ${item.unit || ''}</div>
+                    <div class="product-price">${this.fmtCurrency(item.price)} per ${item.unit || ''}</div>
                     <div class="product-details">${item.description ? item.description.substring(0, 100) + '...' : ''}</div>
                     <div class="product-meta">
-                        <span>Stock: ${item.stock_quantity}</span>
+                        <span>Stock: ${this.fmtNumber(item.stock_quantity ?? 0)}</span>
                     </div>
                     <div class="wishlist-actions">
                         <button class="btn btn-primary btn-small" onclick="wishlistPage.removeFromWishlist(${item.id})">Remove</button>

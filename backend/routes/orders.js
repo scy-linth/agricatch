@@ -10,7 +10,7 @@ const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agriculture_marketplace',
+  database: process.env.DB_NAME || 'agricatch',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
   ssl: pgSsl,
@@ -28,7 +28,12 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    } catch (_) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
 
     // Per-item orders: each order represents one product/item
     const result = await pool.query(`
@@ -37,7 +42,8 @@ router.get('/', async (req, res) => {
              p.unit,
              p.image_url,
              p.farmer_id,
-             f.full_name as farmer_name
+            f.full_name as farmer_name,
+            f.address as farm_location
       FROM orders o
       JOIN products p ON o.product_id = p.id
       LEFT JOIN users f ON p.farmer_id = f.id
@@ -56,6 +62,7 @@ router.get('/', async (req, res) => {
       price: row.price,
       total_amount: row.total_amount,
       status: row.status,
+      delivered_at: row.delivered_at,
       delivery_address: row.delivery_address,
       delivery_date: row.delivery_date,
       special_instructions: row.special_instructions,
@@ -70,7 +77,10 @@ router.get('/', async (req, res) => {
         image_url: row.image_url,
         farmer_id: row.farmer_id,
         farmer_name: row.farmer_name,
-        status: row.status
+        farm_location: row.farm_location,
+        status: row.status,
+        delivered_at: row.delivered_at,
+        cancellation_reason: row.cancellation_reason
       }]
     }));
 
@@ -93,7 +103,12 @@ router.get('/farmer/:farmerId', async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    } catch (_) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
 
     // Verify the user is the farmer (defensive: decoded.id may be string/number)
     if (Number(decoded.id) !== Number(farmerId)) {
@@ -113,6 +128,7 @@ router.get('/farmer/:farmerId', async (req, res) => {
         o.delivery_address,
         o.delivery_date,
         o.special_instructions,
+        o.cancellation_reason,
         o.created_at,
         o.updated_at,
         u.full_name as customer_name,
@@ -156,6 +172,7 @@ router.get('/farmer/:farmerId', async (req, res) => {
       delivery_address: row.delivery_address,
       delivery_date: row.delivery_date,
       special_instructions: row.special_instructions,
+      cancellation_reason: row.cancellation_reason,
       product_name: row.product_name,
       product_image: row.image_url,
       price: row.price,
@@ -169,7 +186,8 @@ router.get('/farmer/:farmerId', async (req, res) => {
         unit: row.unit,
         image_url: row.image_url,
         total_amount: row.total_amount,
-        status: row.status
+        status: row.status,
+        cancellation_reason: row.cancellation_reason
       }]
     }));
 
@@ -227,7 +245,7 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
     }
 
     const order = orderResult.rows[0];
-    if (role !== 'admin' && Number(order.farmer_id) !== Number(decoded.id)) {
+    if (role !== 'staff' && Number(order.farmer_id) !== Number(decoded.id)) {
       return res.status(403).json({ message: 'You can only update your own orders' });
     }
 
@@ -348,7 +366,7 @@ router.get('/:id', async (req, res) => {
              p.image_url,
              p.farmer_id,
              f.full_name as farmer_name,
-             f.location as farm_location
+                  f.address as farm_location
       FROM orders o
       JOIN products p ON o.product_id = p.id
       LEFT JOIN users f ON p.farmer_id = f.id
@@ -515,13 +533,20 @@ router.post('/', async (req, res) => {
         if (farmerResult.rows.length > 0 && farmerResult.rows[0].farmer_id) {
           const farmerId = farmerResult.rows[0].farmer_id;
           try {
+            await client.query('SAVEPOINT create_order_notify_sp');
             const message = `You have a new order #${orderId} from a customer.`;
             await client.query(`
               INSERT INTO notifications (user_id, type, title, message, order_id)
               VALUES ($1, 'order_placed', 'New Order Received', $2, $3)
             `, [farmerId, message, orderId]);
+            await client.query('RELEASE SAVEPOINT create_order_notify_sp');
             console.log(`[Create Order] Notification sent to farmer ${farmerId} for order #${orderId}`);
           } catch (notifError) {
+            try {
+              await client.query('ROLLBACK TO SAVEPOINT create_order_notify_sp');
+            } catch (savepointError) {
+              console.error('[Create Order] Savepoint rollback error:', savepointError);
+            }
             // Log notification error but don't fail the order
             console.error('[Create Order] Notification error:', notifError);
           }
@@ -600,7 +625,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update order status (for farmers/admins) - alternative endpoint
+// Update order status (for farmers/staff) - alternative endpoint
 router.put('/:id/status', async (req, res) => {
   try {
     const orderId = parseInt(req.params.id, 10);
@@ -617,10 +642,10 @@ router.put('/:id/status', async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
 
-    // Check if user is admin or farmer who owns the products in the order
+    // Check if user is staff or farmer who owns the products in the order
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
 
-    if (userResult.rows[0].role !== 'admin') {
+    if (userResult.rows[0].role !== 'staff') {
       // Check if user is a farmer who owns the product in this order (per-item order)
       const farmerCheck = await pool.query(`
         SELECT p.farmer_id
@@ -809,7 +834,10 @@ router.put('/:id/cancel', async (req, res) => {
     // Check if order belongs to user and can be cancelled
     const { reason } = req.body;
     const orderResult = await pool.query(
-      'SELECT status FROM orders WHERE id = $1 AND user_id = $2',
+      `SELECT o.status, o.product_id, p.name AS product_name
+       FROM orders o
+       JOIN products p ON p.id = o.product_id
+       WHERE o.id = $1 AND o.user_id = $2`,
       [id, decoded.id]
     );
 
@@ -855,7 +883,7 @@ router.put('/:id/cancel', async (req, res) => {
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, message, order_id)
          VALUES ($1, $2, $3, $4, $5)`,
-        [decoded.id, 'order_update', 'Order cancelled', `Order #${id} was cancelled.`, id]
+        [decoded.id, 'order_update', 'Order cancelled', `Order #${id} (${orderResult.rows[0].product_name}) was cancelled.`, id]
       );
 
       res.json({ message: 'Order cancelled successfully' });
@@ -887,7 +915,7 @@ router.put('/:id/cancel-farmer', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
 
-    if (userResult.rows[0].role !== 'admin') {
+    if (userResult.rows[0].role !== 'staff') {
       const farmerCheck = await pool.query(`
         SELECT p.farmer_id
         FROM orders o
@@ -906,7 +934,13 @@ router.put('/:id/cancel-farmer', async (req, res) => {
       }
     }
 
-    const orderInfo = await pool.query('SELECT user_id FROM orders WHERE id = $1', [id]);
+    const orderInfo = await pool.query(
+      `SELECT o.user_id, o.product_id, p.name AS product_name
+       FROM orders o
+       JOIN products p ON p.id = o.product_id
+       WHERE o.id = $1`,
+      [id]
+    );
     if (orderInfo.rows.length === 0) {
       return res.status(404).json({ message: 'Order not found' });
     }
@@ -946,7 +980,7 @@ router.put('/:id/cancel-farmer', async (req, res) => {
     await pool.query(
       `INSERT INTO notifications (user_id, type, title, message, order_id)
        VALUES ($1, $2, $3, $4, $5)`,
-      [orderInfo.rows[0].user_id, 'order_update', 'Order cancelled by farmer', `Order #${id} was cancelled by the farmer.`, id]
+      [orderInfo.rows[0].user_id, 'order_update', 'Order cancelled by farmer', `Order #${id} (${orderInfo.rows[0].product_name}) was cancelled by the farmer.`, id]
     );
 
     res.json({ message: 'Order cancelled successfully' });

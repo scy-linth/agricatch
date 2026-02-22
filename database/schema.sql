@@ -1,6 +1,6 @@
 
 -- Agricultural Products Marketplace Database Schema
--- Note: Make sure you are connected to the 'agriculture_marketplace' database before running this script
+-- Note: Make sure you are connected to the 'agricatch' database before running this script
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (

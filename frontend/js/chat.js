@@ -7,6 +7,7 @@ class ChatUI {
         this.pollInterval = null;
         this.conversationMeta = new Map();
         this.currentUserId = this.getUserId();
+        this._lastMarkReadAt = 0;
         window.chatUI = this;
         
         if (!this.token || !this.currentUserId) {
@@ -20,9 +21,34 @@ class ChatUI {
     }
 
     async init() {
+        this.configureBackButton();
         await this.loadConversations();
-        this.handleDeepLink();
+        const openedDeepLink = this.handleDeepLink();
+        if (!openedDeepLink) {
+            this.openMostRecentConversation();
+        }
         this.setupEventListeners();
+    }
+
+    configureBackButton() {
+        const backBtn = document.getElementById('back-to-shop-btn');
+        if (!backBtn) return;
+        const params = new URLSearchParams(window.location.search);
+        const returnUrl = params.get('returnUrl');
+        if (returnUrl) {
+            backBtn.setAttribute('href', decodeURIComponent(returnUrl));
+        } else {
+            backBtn.setAttribute('href', '/#products');
+        }
+    }
+
+    openMostRecentConversation() {
+        const first = document.querySelector('.conversation-item[data-id]');
+        if (!first) return;
+        const firstId = first.getAttribute('data-id');
+        if (firstId) {
+            this.openConversation(firstId);
+        }
     }
 
     setupEventListeners() {
@@ -68,6 +94,7 @@ class ChatUI {
             const lastMessageTime = conv.last_message_at 
                 ? this.formatTime(conv.last_message_at) 
                 : 'No messages';
+            const unreadCount = Number(conv.unread_count || 0);
 
             // Store metadata for later use
             this.conversationMeta.set(String(conversationId), {
@@ -77,8 +104,11 @@ class ChatUI {
             });
 
             return `
-                <div class="conversation-item" data-id="${conversationId}">
-                    <div class="conversation-name">${otherName}</div>
+                <div class="conversation-item ${unreadCount > 0 ? 'unread' : ''}" data-id="${conversationId}" data-unread="${unreadCount}">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                        <div class="conversation-name">${otherName}</div>
+                        ${unreadCount > 0 ? `<div class="unread-badge">${unreadCount}</div>` : ''}
+                    </div>
                     <div class="conversation-time">${lastMessageTime}</div>
                 </div>
             `;
@@ -148,8 +178,33 @@ class ChatUI {
 
             const data = await response.json();
             this.renderMessages(data.messages || []);
+
+            // Mark as read after rendering (throttled)
+            const now = Date.now();
+            if (now - (this._lastMarkReadAt || 0) > 2500) {
+                this._lastMarkReadAt = now;
+                await this.markConversationRead(conversationId);
+            }
         } catch (error) {
             console.error('Load messages error:', error);
+        }
+    }
+
+    async markConversationRead(conversationId) {
+        try {
+            if (!conversationId) return;
+            const res = await fetch(`${this.apiBase}/messages/conversation/${encodeURIComponent(conversationId)}/read`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+
+            // Refresh farmer dashboard unread badges immediately (if embedded)
+            if (window.farmerDashboard && typeof window.farmerDashboard.loadFarmerStats === 'function') {
+                window.farmerDashboard.loadFarmerStats({ skipProducts: true });
+            }
+        } catch (_) {
+            // ignore
         }
     }
 
@@ -240,22 +295,33 @@ class ChatUI {
         const farmerIdParam = params.get('farmerId');
         const customerIdParam = params.get('customerId');
         const orderIdParam = params.get('orderId');
+        const productNameParam = params.get('productName');
+        const quantityParam = Number(params.get('quantity') || 0);
+
+        const subtitleParts = [];
+        if (orderIdParam) subtitleParts.push(`Order #${orderIdParam}`);
+        if (productNameParam) subtitleParts.push(decodeURIComponent(productNameParam));
+        if (quantityParam > 0) subtitleParts.push(`Qty: ${quantityParam}`);
+        const subtitleText = subtitleParts.join(' · ');
 
         if (farmerIdParam && this.currentUserId) {
             const conversationId = `${farmerIdParam}_${this.currentUserId}`;
             this.ensureConversationMeta(conversationId, parseInt(farmerIdParam, 10), 'Farmer');
-            if (orderIdParam) {
-                window.__chatContext = { subtitle: `Order #${orderIdParam}` };
+            if (subtitleText) {
+                window.__chatContext = { subtitle: subtitleText };
             }
             this.openConversation(conversationId);
+            return true;
         } else if (customerIdParam && this.currentUserId) {
             const conversationId = `${this.currentUserId}_${customerIdParam}`;
             this.ensureConversationMeta(conversationId, parseInt(customerIdParam, 10), 'Customer');
-            if (orderIdParam) {
-                window.__chatContext = { subtitle: `Order #${orderIdParam}` };
+            if (subtitleText) {
+                window.__chatContext = { subtitle: subtitleText };
             }
             this.openConversation(conversationId);
+            return true;
         }
+        return false;
     }
 
     ensureConversationMeta(conversationId, otherId, otherName = 'User') {

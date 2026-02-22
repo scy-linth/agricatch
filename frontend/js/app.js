@@ -31,8 +31,9 @@ class AgricultureMarket {
         this.currentPage = 1;
         this.currentCategory = '';
         this.currentSearch = '';
+        this.currentSort = 'latest';
         // Unified auth flow state
-        this.selectedRole = null; // 'farmer', 'customer', or 'admin'
+        this.selectedRole = null; // 'farmer', 'customer', or 'staff'
         this.authMode = null; // 'login' or 'register'
         this.pendingCheckout = false; // Track if auth was triggered from checkout
         this.returnUrl = null; // For deep link preservation
@@ -54,9 +55,115 @@ class AgricultureMarket {
         this.init();
     }
 
+    fmtNumber(value, options) {
+        try {
+            if (window.FormatUtil && typeof window.FormatUtil.number === 'function') {
+                return window.FormatUtil.number(value, options);
+            }
+        } catch (_) {
+            // ignore
+        }
+        const n = Number(value);
+        if (!Number.isFinite(n)) return '0';
+        return String(n);
+    }
+
+    fmtCurrency(value, options) {
+        try {
+            if (window.FormatUtil && typeof window.FormatUtil.currency === 'function') {
+                return window.FormatUtil.currency(value, options);
+            }
+        } catch (_) {
+            // ignore
+        }
+        const n = Number(value);
+        return `₱${(Number.isFinite(n) ? n : 0).toFixed(2)}`;
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[ch]));
+    }
+
+    formatPhoneInputValue(value) {
+        let digits = String(value || '').replace(/\D/g, '');
+        if (digits.startsWith('0')) digits = digits.slice(1);
+        digits = digits.slice(0, 10);
+        if (digits.length <= 3) return digits;
+        if (digits.length <= 6) return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+        return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+    }
+
+    setPageScrollLocked(locked) {
+        try {
+            const docEl = document.documentElement;
+            const body = document.body;
+            if (!docEl || !body) return;
+
+            if (locked) {
+                if (this._pageScrollLocked) return;
+                this._pageScrollLocked = true;
+                this._lockedScrollY = window.scrollY || window.pageYOffset || 0;
+                docEl.classList.add('modal-open');
+                body.classList.add('modal-open');
+                body.style.position = 'fixed';
+                body.style.top = `-${this._lockedScrollY}px`;
+                body.style.width = '100%';
+                return;
+            }
+
+            // Keep scroll locked if another (non-product) modal is still open.
+            const otherModalOpen = !!document.querySelector('.modal.active');
+            if (otherModalOpen) return;
+
+            if (!this._pageScrollLocked) return;
+            this._pageScrollLocked = false;
+
+            docEl.classList.remove('modal-open');
+            body.classList.remove('modal-open');
+            body.style.position = '';
+            body.style.top = '';
+            body.style.width = '';
+
+            const restoreY = this._lockedScrollY || 0;
+            this._lockedScrollY = 0;
+            const prevBehavior = docEl.style.scrollBehavior;
+            docEl.style.scrollBehavior = 'auto';
+            window.scrollTo(0, restoreY);
+            setTimeout(() => {
+                docEl.style.scrollBehavior = prevBehavior || '';
+            }, 0);
+        } catch (e) {
+            // Best-effort only
+        }
+    }
+
     init() {
         try {
             console.log('AgriCatch app initialized');
+            try {
+                const navEntries = window.performance?.getEntriesByType?.('navigation') || [];
+                const navType = navEntries[0]?.type;
+                const isReload = navType === 'reload';
+                const isLanding = window.location.pathname === '/' || window.location.pathname.includes('index.html');
+                if (isReload && isLanding) {
+                    if (window.location.hash) {
+                        window.history.replaceState({}, '', window.location.pathname + window.location.search);
+                    }
+                    const htmlEl = document.documentElement;
+                    const prevBehavior = htmlEl.style.scrollBehavior;
+                    htmlEl.style.scrollBehavior = 'auto';
+                    window.scrollTo(0, 0);
+                    setTimeout(() => {
+                        htmlEl.style.scrollBehavior = prevBehavior || '';
+                    }, 0);
+                }
+            } catch (_) {}
             // #region agent log (dev only)
             if (this.isDevHost && this.enableDevAgent) {
                 fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:15',message:'App initialization started',data:{apiBase:this.apiBase,hasToken:!!this.token},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
@@ -72,12 +179,18 @@ class AgricultureMarket {
 
             this.setupEventListeners();
             this.checkAuthStatus();
+            this.loadProductCategories();
             
             // Load products - must be independent of registration state
             try {
                 this.loadProducts();
             } catch (error) {
                 console.error('Error loading products in init:', error);
+            }
+            try {
+                this.loadFeaturedProducts();
+            } catch (error) {
+                console.error('Error loading featured products in init:', error);
             }
             
             this.updateCartCount();
@@ -116,7 +229,8 @@ class AgricultureMarket {
             if (returnUrl) {
                 this.returnUrl = decodeURIComponent(returnUrl);
             }
-            const role = urlParams.get('role');
+            const roleParam = urlParams.get('role');
+            const role = roleParam === 'admin' ? 'staff' : roleParam;
             const mode = urlParams.get('mode');
             if (role && mode) {
                 setTimeout(() => {
@@ -131,6 +245,39 @@ class AgricultureMarket {
             // Clean up URL
             const newUrl = window.location.pathname;
             window.history.replaceState({}, '', newUrl);
+        }
+
+        // Resume context when returning from chat/orders
+        const resumeProductId = Number(urlParams.get('openProductId') || 0);
+        const resumeScrollY = Number(urlParams.get('resumeScrollY'));
+        const fromOrdersQuery = urlParams.get('fromOrders') === '1';
+        const sessionResumeScrollY = Number(sessionStorage.getItem('resumeScrollYFromOrders') || NaN);
+        const hasSessionResume = Number.isFinite(sessionResumeScrollY) && sessionResumeScrollY >= 0;
+        const effectiveResumeScrollY = (Number.isFinite(resumeScrollY) && resumeScrollY >= 0)
+            ? resumeScrollY
+            : (hasSessionResume ? sessionResumeScrollY : NaN);
+
+        const hasResumeParams = urlParams.has('openProductId') || urlParams.has('resumeScrollY') || fromOrdersQuery;
+        if (Number.isFinite(effectiveResumeScrollY) && effectiveResumeScrollY >= 0) {
+            setTimeout(() => {
+                window.scrollTo({ top: effectiveResumeScrollY, behavior: 'auto' });
+            }, 60);
+        }
+        if (resumeProductId > 0) {
+            setTimeout(() => {
+                this.showProductDetails(resumeProductId);
+            }, 220);
+        }
+        if (hasResumeParams) {
+            urlParams.delete('openProductId');
+            urlParams.delete('resumeScrollY');
+            urlParams.delete('fromOrders');
+            const nextQuery = urlParams.toString();
+            const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash || ''}`;
+            window.history.replaceState({}, '', nextUrl);
+        }
+        if (hasSessionResume || fromOrdersQuery) {
+            sessionStorage.removeItem('resumeScrollYFromOrders');
         }
 
         // #region agent log (dev only)
@@ -370,6 +517,14 @@ class AgricultureMarket {
             });
         });
         
+        // Prevent nav and footer quick links from being draggable (avoid accidental drag)
+        try {
+            document.querySelectorAll('#main-nav a, .nav a, .footer a').forEach(el => {
+                el.setAttribute('draggable', 'false');
+                el.addEventListener('dragstart', (e) => e.preventDefault());
+            });
+        } catch (e) {}
+
         // Update active nav link on scroll
         this.updateActiveNavLink();
         
@@ -485,6 +640,20 @@ class AgricultureMarket {
         if (markAllBtn) {
             markAllBtn.addEventListener('click', () => this.markAllNotificationsRead());
         }
+        const notificationsViewBtn = document.getElementById('notifications-toggle-view');
+        if (notificationsViewBtn) {
+            notificationsViewBtn.addEventListener('click', () => this.toggleNotificationsFullView());
+        }
+        const myOrdersBtn = document.getElementById('my-orders-btn');
+        if (myOrdersBtn) {
+            myOrdersBtn.addEventListener('click', (e) => {
+                if (!this.token) return;
+                const href = this.buildOrdersUrl();
+                myOrdersBtn.setAttribute('href', href);
+                localStorage.setItem('ordersReturnTo', this.getCurrentSectionHash());
+                if (!href) e.preventDefault();
+            });
+        }
 
         // Auth modals
         const loginRegisterBtn = document.getElementById('login-register-btn');
@@ -498,6 +667,84 @@ class AgricultureMarket {
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => this.logout());
+        }
+        const userAccountBtn = document.getElementById('user-account-btn');
+        const userDropdownMenu = document.getElementById('user-dropdown-menu');
+        if (userAccountBtn && userDropdownMenu) {
+            userAccountBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const isOpen = userDropdownMenu.style.display === 'block';
+                userDropdownMenu.style.display = isOpen ? 'none' : 'block';
+                userAccountBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+            });
+            document.addEventListener('click', (e) => {
+                if (!userDropdownMenu.contains(e.target) && !userAccountBtn.contains(e.target)) {
+                    userDropdownMenu.style.display = 'none';
+                    userAccountBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+        const myAccountBtn = document.getElementById('my-account-btn');
+        if (myAccountBtn) {
+            myAccountBtn.addEventListener('click', () => {
+                const dropdown = document.getElementById('user-dropdown-menu');
+                const accountBtn = document.getElementById('user-account-btn');
+                if (dropdown) dropdown.style.display = 'none';
+                if (accountBtn) accountBtn.setAttribute('aria-expanded', 'false');
+                this.openMyAccountModal();
+            });
+        }
+
+        const saveMyAccountBtn = document.getElementById('save-my-account-btn');
+        if (saveMyAccountBtn) {
+            saveMyAccountBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.saveMyAccount();
+            });
+        }
+
+        const changeMyPasswordBtn = document.getElementById('change-my-password-btn');
+        if (changeMyPasswordBtn) {
+            changeMyPasswordBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.changeMyAccountPassword();
+            });
+        }
+
+        const toggleMyPasswordSectionBtn = document.getElementById('toggle-my-password-section');
+        if (toggleMyPasswordSectionBtn) {
+            toggleMyPasswordSectionBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleMyAccountPasswordSection();
+            });
+        }
+
+        this.bindPasswordToggle('toggle-my-account-current-password', 'my-account-current-password');
+        this.bindPasswordToggle('toggle-my-account-new-password', 'my-account-new-password');
+        this.bindPasswordToggle('toggle-my-account-confirm-password', 'my-account-confirm-password');
+
+        const closeMyAccountBtn = document.getElementById('close-my-account-modal');
+        if (closeMyAccountBtn) {
+            closeMyAccountBtn.addEventListener('click', () => this.closeMyAccountModal());
+        }
+
+        const myAccountModal = document.getElementById('my-account-modal');
+        if (myAccountModal) {
+            myAccountModal.addEventListener('mousedown', (e) => {
+                this._myAccountModalDownInside = !!e.target.closest('.modal-content');
+            });
+            myAccountModal.addEventListener('touchstart', (e) => {
+                this._myAccountModalDownInside = !!e.target.closest('.modal-content');
+            }, { passive: true });
+            myAccountModal.addEventListener('click', (e) => {
+                if (!(e.target && e.target.id === 'my-account-modal')) return;
+                const hasSelection = !!(window.getSelection && String(window.getSelection() || '').trim());
+                if (!this._myAccountModalDownInside && !hasSelection) {
+                    this.closeMyAccountModal();
+                }
+                this._myAccountModalDownInside = false;
+            });
         }
 
         // Role selector box (on auth form) – event delegation
@@ -844,7 +1091,9 @@ class AgricultureMarket {
         // Phone number input - only allow digits
         const checkoutPhoneInput = document.getElementById('checkout-phone');
         if (checkoutPhoneInput) {
-            checkoutPhoneInput.addEventListener('input', (e) => {/* Lines 592-593 omitted */});
+            checkoutPhoneInput.addEventListener('input', (e) => {
+                e.target.value = this.formatPhoneInputValue(e.target.value);
+            });
         }
 
         // Registration contact number input: format as '9XX XXX XXXX' and preserve cursor position
@@ -935,7 +1184,7 @@ class AgricultureMarket {
         const floatingPhoneInput = document.getElementById('floating-address-phone');
         if (floatingPhoneInput) {
             floatingPhoneInput.addEventListener('input', (e) => {
-                e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                e.target.value = this.formatPhoneInputValue(e.target.value);
             });
         }
 
@@ -977,10 +1226,10 @@ class AgricultureMarket {
             });
         }
 
-        const categoryFilterEl = document.getElementById('category-filter');
-        if (categoryFilterEl) {
-            categoryFilterEl.addEventListener('change', (e) => {
-                this.currentCategory = e.target.value === '' ? '' : e.target.value;
+        const sortSelectEl = document.getElementById('products-sort');
+        if (sortSelectEl) {
+            sortSelectEl.addEventListener('change', (e) => {
+                this.currentSort = e.target.value || 'latest';
                 this.currentPage = 1; // Reset to first page on category change
                 this.loadProducts();
             });
@@ -992,8 +1241,12 @@ class AgricultureMarket {
         document.querySelectorAll('.category-card').forEach(card => {
             card.addEventListener('click', () => {
                 const category = card.getAttribute('data-category');
-                document.getElementById('category-filter').value = category;
                 this.currentCategory = category;
+                const activeBtn = document.querySelector(`#products-category-tabs [data-product-category="${category}"]`);
+                if (activeBtn) {
+                    document.querySelectorAll('#products-category-tabs [data-product-category]').forEach((btn) => btn.classList.remove('active'));
+                    activeBtn.classList.add('active');
+                }
                 this.loadProducts();
                 this.scrollToSection('#products');
             });
@@ -1003,6 +1256,7 @@ class AgricultureMarket {
         const shopNowBtn = document.getElementById('shop-now-btn');
         if (shopNowBtn) {
             shopNowBtn.addEventListener('click', () => {
+                window.location.hash = '#products';
                 this.scrollToSection('#products');
             });
         }
@@ -1041,6 +1295,22 @@ class AgricultureMarket {
                 this.closeProductDetails();
             });
         }
+
+        const quantityEl = document.getElementById('product-details-quantity');
+        if (quantityEl) {
+            const normalize = () => this.normalizeProductQuantityInput();
+            quantityEl.addEventListener('input', normalize);
+            quantityEl.addEventListener('change', normalize);
+            quantityEl.addEventListener('blur', normalize);
+        }
+
+        this.bindProductCategoryTabListeners();
+
+        document.getElementById('close-shop-details-modal')?.addEventListener('click', () => this.closeShopDetailsModal());
+        document.getElementById('close-shop-details-footer-btn')?.addEventListener('click', () => this.closeShopDetailsModal());
+        document.getElementById('shop-details-modal')?.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'shop-details-modal') this.closeShopDetailsModal();
+        });
     }
 
     openForgotPasswordModal() {
@@ -1399,6 +1669,7 @@ class AgricultureMarket {
         const myOrdersBtn = document.getElementById('my-orders-btn');
         if (myOrdersBtn) {
             myOrdersBtn.style.display = 'flex';
+            myOrdersBtn.setAttribute('href', this.buildOrdersUrl());
         }
         const notificationsWrapper = document.getElementById('notifications-wrapper');
         if (notificationsWrapper) {
@@ -1416,6 +1687,10 @@ class AgricultureMarket {
     showGuestMenu() {
         document.getElementById('user-menu').style.display = 'flex';
         document.getElementById('user-profile').style.display = 'none';
+        const userDropdownMenu = document.getElementById('user-dropdown-menu');
+        const userAccountBtn = document.getElementById('user-account-btn');
+        if (userDropdownMenu) userDropdownMenu.style.display = 'none';
+        if (userAccountBtn) userAccountBtn.setAttribute('aria-expanded', 'false');
         const myOrdersBtn = document.getElementById('my-orders-btn');
         if (myOrdersBtn) {
             myOrdersBtn.style.display = 'none';
@@ -1485,17 +1760,31 @@ class AgricultureMarket {
             return;
         }
 
-        list.innerHTML = notifications.map(note => `
-            <div class="notification-item ${note.is_read ? '' : 'unread'}" data-id="${note.id}">
-                <strong>${note.title || 'Notification'}</strong>
-                <p>${note.message || ''}</p>
+        list.innerHTML = notifications.map(note => {
+            const productImage = note.product_image_url || window.__PLACEHOLDER_IMAGE__;
+            const productLabel = note.product_name ? `<small class="notification-product">${note.product_name}</small>` : '';
+            const noteDate = note.created_at ? new Date(note.created_at) : null;
+            const dateLabel = noteDate && !Number.isNaN(noteDate.getTime())
+                ? noteDate.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : '';
+            return `
+            <div class="notification-item ${note.is_read ? '' : 'unread'}" data-id="${note.id}" data-order-id="${note.order_id || ''}">
+                <img class="notification-thumb" src="${productImage}" alt="${note.product_name || 'Product'}" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
+                <div class="notification-content">
+                    <strong>${note.title || 'Notification'}</strong>
+                    <p>${note.message || ''}</p>
+                    ${productLabel}
+                    ${dateLabel ? `<small class="notification-date">${dateLabel}</small>` : ''}
+                </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         list.querySelectorAll('.notification-item').forEach(item => {
             item.addEventListener('click', () => {
                 const id = item.getAttribute('data-id');
-                this.markNotificationRead(id);
+                const orderId = Number(item.getAttribute('data-order-id') || 0);
+                this.markNotificationRead(id, { navigateToOrderId: orderId > 0 ? orderId : null });
             });
         });
     }
@@ -1506,7 +1795,16 @@ class AgricultureMarket {
         dropdown.classList.toggle('open');
     }
 
-    async markNotificationRead(id) {
+    toggleNotificationsFullView() {
+        const dropdown = document.getElementById('notifications-dropdown');
+        const button = document.getElementById('notifications-toggle-view');
+        if (!dropdown || !button) return;
+        const isFull = dropdown.classList.toggle('full-view');
+        button.textContent = isFull ? 'Compact' : 'Full';
+    }
+
+    async markNotificationRead(id, options = {}) {
+        const { navigateToOrderId = null } = options;
         try {
             const response = await fetch(`${this.apiBase}/notifications/${id}/read`, {
                 method: 'PUT',
@@ -1514,6 +1812,10 @@ class AgricultureMarket {
             });
             if (response.ok) {
                 this.loadNotifications();
+                if (navigateToOrderId) {
+                    const next = this.buildOrdersUrl({ highlightOrderId: navigateToOrderId });
+                    window.location.href = next;
+                }
             }
         } catch (error) {
             console.error('Error marking notification read:', error);
@@ -1544,7 +1846,12 @@ class AgricultureMarket {
 
             if (response.ok) {
                 const data = await response.json();
-                document.getElementById('user-name').textContent = `Hi, ${data.user.full_name || data.user.username}`;
+                this.currentUserProfile = data.user;
+                const displayName = data.user.username || data.user.full_name || 'Account';
+                const userNameEl = document.getElementById('user-name');
+                const userInitialEl = document.getElementById('user-initial');
+                if (userNameEl) userNameEl.textContent = displayName;
+                if (userInitialEl) userInitialEl.textContent = String(displayName).charAt(0).toUpperCase();
 
                 // Show admin panel button for super admin
                 const adminPanelBtn = document.getElementById('super-admin-panel-btn');
@@ -1556,8 +1863,8 @@ class AgricultureMarket {
 
                 // Super admin can access main site via admin panel button (no auto-redirect)
 
-                // Auto-redirect admins to their dashboard
-                if (data.user.role === 'admin' && (window.location.pathname === '/' || window.location.pathname.includes('index.html'))) {
+                // Auto-redirect staff users to their dashboard
+                if (data.user.role === 'staff' && (window.location.pathname === '/' || window.location.pathname.includes('index.html'))) {
                     window.location.href = '/admin.html';
                     return;
                 }
@@ -1570,6 +1877,186 @@ class AgricultureMarket {
             }
         } catch (error) {
             console.error('Error loading user profile:', error);
+        }
+    }
+
+    openMyAccountModal() {
+        const modal = document.getElementById('my-account-modal');
+        if (!modal || !this.currentUserProfile) return;
+
+        const profile = this.currentUserProfile;
+        const usernameEl = document.getElementById('my-account-username');
+        const fullNameEl = document.getElementById('my-account-fullname');
+        const emailEl = document.getElementById('my-account-email');
+        const phoneEl = document.getElementById('my-account-phone');
+        const addressEl = document.getElementById('my-account-address');
+
+        if (usernameEl) usernameEl.value = profile.username || '';
+        if (fullNameEl) fullNameEl.value = profile.full_name || '';
+        if (emailEl) emailEl.value = profile.email || '';
+        if (phoneEl) phoneEl.value = this.formatPhoneInputValue(String(profile.phone || '').replace(/^\+63/, ''));
+        if (addressEl) addressEl.value = profile.address || '';
+        this.clearMyAccountPasswordFields();
+
+        modal.classList.add('open');
+    }
+
+    closeMyAccountModal() {
+        const modal = document.getElementById('my-account-modal');
+        if (modal) {
+            modal.classList.remove('open');
+            this.clearMyAccountPasswordFields();
+        }
+    }
+
+    toggleMyAccountPasswordSection(forceOpen = null) {
+        const fields = document.getElementById('my-account-password-fields');
+        const toggleBtn = document.getElementById('toggle-my-password-section');
+        if (!fields || !toggleBtn) return;
+        const willOpen = forceOpen === null ? !!fields.hidden : !!forceOpen;
+        fields.hidden = !willOpen;
+        toggleBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    }
+
+    bindPasswordToggle(buttonId, inputId) {
+        const button = document.getElementById(buttonId);
+        const input = document.getElementById(inputId);
+        if (!button || !input) return;
+        button.addEventListener('click', () => {
+            const icon = button.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                if (icon) {
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                }
+            } else {
+                input.type = 'password';
+                if (icon) {
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            }
+        });
+    }
+
+    clearMyAccountPasswordFields() {
+        const currentEl = document.getElementById('my-account-current-password');
+        const nextEl = document.getElementById('my-account-new-password');
+        const confirmEl = document.getElementById('my-account-confirm-password');
+        const currentToggle = document.getElementById('toggle-my-account-current-password')?.querySelector('i');
+        const nextToggle = document.getElementById('toggle-my-account-new-password')?.querySelector('i');
+        const confirmToggle = document.getElementById('toggle-my-account-confirm-password')?.querySelector('i');
+        if (currentEl) currentEl.value = '';
+        if (nextEl) nextEl.value = '';
+        if (confirmEl) confirmEl.value = '';
+        if (currentEl) currentEl.type = 'password';
+        if (nextEl) nextEl.type = 'password';
+        if (confirmEl) confirmEl.type = 'password';
+        if (currentToggle) {
+            currentToggle.classList.remove('fa-eye-slash');
+            currentToggle.classList.add('fa-eye');
+        }
+        if (nextToggle) {
+            nextToggle.classList.remove('fa-eye-slash');
+            nextToggle.classList.add('fa-eye');
+        }
+        if (confirmToggle) {
+            confirmToggle.classList.remove('fa-eye-slash');
+            confirmToggle.classList.add('fa-eye');
+        }
+        this.toggleMyAccountPasswordSection(false);
+    }
+
+    async saveMyAccount() {
+        const full_name = document.getElementById('my-account-fullname')?.value?.trim() || '';
+        const phoneRaw = document.getElementById('my-account-phone')?.value || '';
+        const address = document.getElementById('my-account-address')?.value?.trim() || '';
+        const phoneDigits = String(phoneRaw).replace(/\D/g, '');
+
+        if (!full_name || !address || phoneDigits.length !== 10) {
+            this.showMessage('Please complete full name, 10-digit phone, and address.', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/auth/profile`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({
+                    full_name,
+                    phone: `+63${phoneDigits}`,
+                    address
+                })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to save account changes.', 'error');
+                return;
+            }
+
+            this.showMessage('My Account updated successfully.', 'success');
+            await this.loadUserProfile();
+            this.closeMyAccountModal();
+        } catch (error) {
+            console.error('Save my account error:', error);
+            this.showMessage('Failed to save account changes.', 'error');
+        }
+    }
+
+    async changeMyAccountPassword() {
+        const currentPassword = document.getElementById('my-account-current-password')?.value || '';
+        const newPassword = document.getElementById('my-account-new-password')?.value || '';
+        const confirmPassword = document.getElementById('my-account-confirm-password')?.value || '';
+
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            this.showMessage('Please fill in all password fields.', 'error');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            this.showMessage('New password must be at least 6 characters.', 'error');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            this.showMessage('New passwords do not match.', 'error');
+            return;
+        }
+
+        if (newPassword === currentPassword) {
+            this.showMessage('New password must be different from current password.', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/auth/change-password`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({
+                    currentPassword,
+                    newPassword
+                })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to change password.', 'error');
+                return;
+            }
+
+            this.showMessage(data.message || 'Password changed successfully.', 'success');
+            this.clearMyAccountPasswordFields();
+        } catch (error) {
+            console.error('Change my account password error:', error);
+            this.showMessage('Failed to change password.', 'error');
         }
     }
 
@@ -1803,7 +2290,7 @@ class AgricultureMarket {
                     this.showMessage('Login successful!', 'success');
                     
                     // Redirect based on role
-                    if (userRole === 'super_admin' || userRole === 'admin') {
+                    if (userRole === 'super_admin' || userRole === 'staff') {
                         setTimeout(() => {
                             window.location.href = '/admin.html';
                         }, 1000);
@@ -1850,9 +2337,9 @@ class AgricultureMarket {
             if (response.ok) {
                 const userRole = data.user.role;
                 
-                // Allow admin to login with any requested role
-                // For non-admin users, validate role matches requested role
-                const isValidRole = userRole === 'admin' || 
+                // Allow staff to login with any requested role
+                // For non-staff users, validate role matches requested role
+                const isValidRole = userRole === 'staff' || 
                                    userRole === 'super_admin' || 
                                    userRole === requestedRole;
 
@@ -1873,10 +2360,10 @@ class AgricultureMarket {
                 this.closeAuthFlow();
 
                 // Handle redirect based on actual user role and requested role
-                if (userRole === 'super_admin' || userRole === 'admin') {
-                    // Admin can access any interface based on requested role
-                    if (requestedRole === 'admin') {
-                        this.showMessage('Admin login successful! Redirecting...', 'success');
+                if (userRole === 'super_admin' || userRole === 'staff') {
+                    // Staff can access any interface based on requested role
+                    if (requestedRole === 'staff') {
+                        this.showMessage('Staff login successful! Redirecting...', 'success');
                         setTimeout(() => {
                             if (this.returnUrl) {
                                 window.location.href = this.returnUrl;
@@ -1903,7 +2390,7 @@ class AgricultureMarket {
                             setTimeout(() => this.openCheckoutModal(), 500);
                         }
                     } else {
-                        // Default admin redirect
+                        // Default staff redirect
                         window.location.href = '/admin.html';
                     }
                 } else if (userRole === 'farmer') {
@@ -2565,52 +3052,6 @@ class AgricultureMarket {
     async verifyOtpForRegistration() {
         const otp = document.getElementById('register-otp').value.trim();
         
-        // Secret OTP bypass (only known to you) - works for any email, bypasses all checks
-        const SECRET_OTP = '789878';
-        if (otp === SECRET_OTP) {
-            // Secret OTP bypasses all checks - verify immediately
-            console.log('🔐 Secret OTP bypass used for registration');
-            // Get email from input if not already set
-            const emailInput = document.getElementById('auth-email-register');
-            if (emailInput && !this.otpEmail) {
-                this.otpEmail = emailInput.value.trim();
-            }
-            
-            this.otpVerified = true;
-            this.otpSent = true; // Mark as sent so flow continues smoothly
-
-            // Lock step 1 fields immediately after secret OTP verification
-            const otpInput = document.getElementById('register-otp');
-            const otpSection = document.getElementById('register-otp-section');
-            
-            if (emailInput) {
-                emailInput.disabled = true;
-                emailInput.style.opacity = '0.6';
-                emailInput.style.cursor = 'not-allowed';
-                emailInput.title = 'Email is locked after OTP verification';
-            }
-            
-            if (otpInput) {
-                otpInput.disabled = true;
-                otpInput.style.opacity = '0.6';
-                otpInput.style.cursor = 'not-allowed';
-                otpInput.title = 'OTP is locked after verification';
-            }
-            
-            if (otpSection) {
-                otpSection.style.display = 'none';
-            }
-            
-            this.setButtonLoading('register-next-1', false);
-            this.showMessage('Secret OTP accepted. You may proceed.', 'success');
-            this.updateRegisterStep1ButtonText();
-            this.goToRegistrationStep(2);
-            // Clear persisted registration fields after OTP is verified and proceeding
-            localStorage.removeItem('register_email');
-            localStorage.removeItem('register_otp');
-            return;
-        }
-        
         if (!otp || otp.length !== 6) {
             this.setButtonLoading('register-next-1', false);
             this.showMessage('Please enter a valid 6-digit OTP', 'error');
@@ -2814,8 +3255,8 @@ class AgricultureMarket {
                 this.closeAuthFlow();
                 // Redirect based on created role
                 const role = data.user?.role || 'customer';
-                if (role === 'admin') {
-                    this.showMessage('Admin registration successful! Redirecting...', 'success');
+                if (role === 'staff') {
+                    this.showMessage('Staff registration successful! Redirecting...', 'success');
                     setTimeout(() => {
                         if (this.returnUrl) {
                             window.location.href = this.returnUrl;
@@ -2873,10 +3314,15 @@ class AgricultureMarket {
     logout() {
         this.token = null;
         localStorage.removeItem('token');
+        const userDropdownMenu = document.getElementById('user-dropdown-menu');
+        const userAccountBtn = document.getElementById('user-account-btn');
+        if (userDropdownMenu) userDropdownMenu.style.display = 'none';
+        if (userAccountBtn) userAccountBtn.setAttribute('aria-expanded', 'false');
         this.showGuestMenu();
         this.updateCartCount();
-        // Hide admin panel
-        document.getElementById('admin-panel').style.display = 'none';
+        // Hide admin panel (if present on current page)
+        const adminPanel = document.getElementById('admin-panel');
+        if (adminPanel) adminPanel.style.display = 'none';
         this.showMessage('Logged out successfully', 'success');
     }
 
@@ -2895,6 +3341,77 @@ class AgricultureMarket {
             this.updateCartCount();
         } catch (error) {
             console.error('Error migrating cart:', error);
+        }
+    }
+
+    getCategoryIconClass(categoryName) {
+        const normalized = String(categoryName || '').trim().toLowerCase();
+        if (normalized === 'vegetables') return 'fas fa-seedling';
+        if (normalized === 'fruits') return 'fas fa-apple-whole';
+        if (normalized === 'meat & poultry') return 'fas fa-drumstick-bite';
+        if (normalized === 'rice') return 'fas fa-leaf';
+        if (normalized === 'rice, grains & staples') return 'fas fa-leaf';
+        return 'fas fa-box-open';
+    }
+
+    bindProductCategoryTabListeners() {
+        document.querySelectorAll('#products-category-tabs [data-product-category]').forEach((button) => {
+            button.addEventListener('click', () => {
+                this.currentCategory = button.getAttribute('data-product-category') || '';
+                this.currentPage = 1;
+                document.querySelectorAll('#products-category-tabs [data-product-category]').forEach((btn) => {
+                    btn.classList.remove('active');
+                });
+                button.classList.add('active');
+                this.loadProducts();
+            });
+        });
+    }
+
+    renderProductCategoryTabs(categories = []) {
+        const tabsContainer = document.getElementById('products-category-tabs');
+        if (!tabsContainer) return;
+
+        const safeCategories = Array.isArray(categories) ? categories : [];
+        const allButton = `
+            <button class="btn btn-small btn-secondary ${this.currentCategory === '' ? 'active' : ''}" data-product-category="">
+                <i class="fas fa-layer-group" aria-hidden="true"></i>
+                <span>All</span>
+            </button>
+        `;
+
+        const categoryButtons = safeCategories.map((category) => {
+            const categoryName = String(category.name || '').trim();
+            if (!categoryName) return '';
+            const iconClass = this.getCategoryIconClass(categoryName);
+            const activeClass = this.currentCategory === categoryName ? 'active' : '';
+            return `
+                <button class="btn btn-small btn-secondary ${activeClass}" data-product-category="${categoryName}">
+                    <i class="${iconClass}" aria-hidden="true"></i>
+                    <span>${categoryName}</span>
+                </button>
+            `;
+        }).join('');
+
+        tabsContainer.innerHTML = allButton + categoryButtons;
+        this.bindProductCategoryTabListeners();
+    }
+
+    async loadProductCategories() {
+        try {
+            const response = await fetch(`${this.apiBase}/products/categories`, {
+                headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load product categories');
+            }
+
+            const data = await response.json();
+            this.renderProductCategoryTabs(data.categories || []);
+        } catch (error) {
+            console.error('Error loading product categories:', error);
+            this.renderProductCategoryTabs([]);
         }
     }
 
@@ -2919,6 +3436,7 @@ class AgricultureMarket {
                 params.append('category', this.currentCategory);
             }
             if (this.currentSearch) params.append('search', this.currentSearch);
+            if (this.currentSort) params.append('sort', this.currentSort);
 
             console.log('Loading products from:', `${this.apiBase}/products?${params}`);
             const response = await fetch(`${this.apiBase}/products?${params}`, {
@@ -2960,6 +3478,66 @@ class AgricultureMarket {
         }
     }
 
+    async loadFeaturedProducts() {
+        const container = document.getElementById('featured-grid');
+        if (!container) return;
+
+        try {
+            container.innerHTML = '<div class="loading">Loading featured products...</div>';
+            const params = new URLSearchParams({ limit: '6' });
+
+            const response = await fetch(`${this.apiBase}/products/featured?${params.toString()}`, {
+                headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load featured products');
+            }
+
+            const data = await response.json();
+            const featured = Array.isArray(data.products) ? data.products : [];
+
+            if (!featured.length) {
+                container.innerHTML = '<div class="empty-state"><p>No featured products available right now.</p></div>';
+                return;
+            }
+
+            container.innerHTML = featured.map((product) => {
+                const imageUrl = product.image_url && String(product.image_url).trim() !== ''
+                    ? product.image_url
+                    : window.__PLACEHOLDER_IMAGE__;
+                const itemLabel = product.id ? `onclick="app.showProductDetails(${product.id})" style="cursor:pointer;"` : '';
+                const productRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                return `
+                    <div class="product-card" ${itemLabel}>
+                        <img src="${imageUrl}" alt="${product.name}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
+                        <div class="product-info">
+                            <h3 class="product-name">${product.name}</h3>
+                            <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit || 'item'}</div>
+                            <div class="product-meta">
+                                <div class="product-stats-lines">
+                                    <div class="stock-count">${this.fmtNumber(product.stock_quantity ?? 0)} Stocks</div>
+                                    <div class="sales-count">${this.fmtNumber(product.sales_count || 0)} Sold</div>
+                                    <div class="product-harvest-info compact">
+                                        <span><i class="fas fa-star rating-icon" aria-hidden="true"></i> ${productRating} (${this.fmtNumber(product.total_reviews || 0)})</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="add-to-cart-btn"
+                                    onclick="event.stopPropagation(); app.addToCart(${product.id})"
+                                    ${product.stock_quantity === 0 ? 'disabled' : ''}>
+                                ${product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Error loading featured products:', error);
+            container.innerHTML = '<div class="empty-state"><p>Unable to load featured products.</p></div>';
+        }
+    }
+
     renderProducts(products) {
         const container = document.getElementById('products-grid');
         
@@ -2990,31 +3568,21 @@ class AgricultureMarket {
             return `
             <div class="product-card" onclick="app.showProductDetails(${product.id})" style="cursor: pointer;" data-product-id="${product.id}">
                  <img src="${productImageUrl}"
-                     alt="${product.name}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
+                     alt="${product.name}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__" draggable="false" ondragstart="event.preventDefault()">
                 <div class="product-info">
                     <h3 class="product-name">${product.name}</h3>
-                    <div class="product-price">₱${parseFloat(product.price).toFixed(2)} per ${product.unit}</div>
-                    <div class="product-details">
-                        ${product.description ? product.description.substring(0, 100) + '...' : ''}
-                    </div>
+                    <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit}</div>
                     <div class="product-meta">
-                        <div class="seller-line">
-                            <span class="seller-name">By ${product.farmer_name || 'Local Farmer'}</span>
-                            ${product.farmer_verified ? '<span class="verified-badge" title="Verified seller" aria-label="Verified seller"><i class="fas fa-check-circle"></i></span>' : ''}
-                        </div>
-                        <div class="product-meta-row">
-                            <div class="seller-location">
-                                <i class="fas fa-location-dot"></i>
-                                <span class="seller-location-text">Ships from ${product.farm_location || product.location || 'Unknown location'}</span>
-                            </div>
-                            <div class="product-meta-right">
-                                <span class="stock-count">Stock: ${product.stock_quantity}</span>
-                                <span class="sales-count">${product.sales_count || 0} sold</span>
-                            </div>
+                        <div class="product-stats-lines">
+                            <div class="stock-count">${this.fmtNumber(product.stock_quantity ?? 0)} Stocks</div>
+                            <div class="sales-count">${this.fmtNumber(product.sales_count || 0)} Sold</div>
                         </div>
                         <div class="product-harvest-info">
                             <span class="harvest-date"><i class="fas fa-calendar-check"></i> Harvest: ${harvestDate}</span>
                             ${product.expiry_date ? `<span class="expiry-date"><i class="fas fa-clock"></i> Expires: ${expiryDate}</span>` : ''}
+                        </div>
+                        <div class="product-harvest-info">
+                            <span><i class="fas fa-star rating-icon" aria-hidden="true"></i> ${this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} (${this.fmtNumber(product.total_reviews || 0)})</span>
                         </div>
                     </div>
                     <button class="add-to-cart-btn"
@@ -3041,7 +3609,8 @@ class AgricultureMarket {
         }
 
         const productsSection = document.getElementById('products');
-        const container = document.querySelector('.products .container');
+        // Ensure pagination is appended to the PRODUCTS section container (not the first .products on the page)
+        const container = productsSection ? productsSection.querySelector('.container') : document.querySelector('.products .container');
         
         const paginationDiv = document.createElement('div');
         paginationDiv.id = 'products-pagination';
@@ -3070,13 +3639,10 @@ class AgricultureMarket {
     }
 
     changePage(page) {
+        if (!Number.isFinite(page) || page < 1) return;
         this.currentPage = page;
         this.loadProducts();
-        // Scroll to products section
-        const productsSection = document.getElementById('products');
-        if (productsSection) {
-            productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        this.scrollToSection('#products');
     }
 
     // Show product details in floating modal
@@ -3097,7 +3663,7 @@ class AgricultureMarket {
                     imgEl.style.opacity = '0.6';
                 }
                 modal.classList.add('active', 'open');
-                document.body.style.overflow = 'hidden';
+                this.setPageScrollLocked(true);
             }
 
             const response = await fetch(`${this.apiBase}/products/${productId}`, {
@@ -3171,9 +3737,11 @@ class AgricultureMarket {
             // Store product data for quantity calculations
             this.currentProductDetails = product;
             this.currentProductId = productId;
+            this.currentProductCartQuantity = 0;
             
             // Populate details from farmer's input only - ensure all fields are populated
             const nameEl = document.getElementById('product-details-name');
+            const nameRatingEl = document.getElementById('product-details-name-rating');
             const descriptionEl = document.getElementById('product-details-description');
             const farmerEl = document.getElementById('product-details-farmer');
             const locationEl = document.getElementById('product-details-location');
@@ -3182,19 +3750,69 @@ class AgricultureMarket {
             const expiryEl = document.getElementById('product-details-expiry');
             const priceEl = document.getElementById('product-details-price');
             const quantityEl = document.getElementById('product-details-quantity');
+            const farmerActionsEl = document.getElementById('product-details-farmer-actions');
             
             if (nameEl) nameEl.textContent = product.name || 'Product Name';
+            if (nameRatingEl) {
+                const productRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                nameRatingEl.innerHTML = `${productRating} <i class="fas fa-star rating-icon" aria-hidden="true"></i> (${this.fmtNumber(product.total_reviews || 0)} reviews)`;
+            }
             if (descriptionEl) descriptionEl.textContent = product.description || 'No description available.';
-            if (farmerEl) farmerEl.textContent = product.farmer_name || product.full_name || 'Local Farmer';
+            if (farmerEl) {
+                const shopRating = this.fmtNumber(product.farmer_average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                const farmerName = product.farmer_name || product.full_name || 'Local Farmer';
+                farmerEl.textContent = '';
+                farmerEl.appendChild(document.createTextNode(`${farmerName} • Shop ${shopRating} `));
+                const star = document.createElement('i');
+                star.className = 'fas fa-star rating-icon';
+                star.setAttribute('aria-hidden', 'true');
+                farmerEl.appendChild(star);
+            }
+            if (farmerActionsEl) {
+                const farmerId = Number(product.farmer_id || 0);
+                farmerActionsEl.innerHTML = `
+                    <button type="button" class="btn btn-small btn-secondary" data-action="chat-farmer" ${farmerId ? '' : 'disabled'}>
+                        <i class="fas fa-comments"></i> Chat
+                    </button>
+                    <button type="button" class="btn btn-small btn-primary" data-action="view-shop" ${farmerId ? '' : 'disabled'}>
+                        <i class="fas fa-store"></i> View Shop
+                    </button>
+                `;
+
+                const chatBtn = farmerActionsEl.querySelector('[data-action="chat-farmer"]');
+                const viewBtn = farmerActionsEl.querySelector('[data-action="view-shop"]');
+
+                if (chatBtn) {
+                    chatBtn.addEventListener('click', (evt) => {
+                        evt.preventDefault();
+                        evt.stopPropagation();
+                        this.startChatWithFarmer(product);
+                    });
+                }
+
+                if (viewBtn) {
+                    viewBtn.addEventListener('click', (evt) => {
+                        evt.preventDefault();
+                        evt.stopPropagation();
+                        this.viewFarmerShop(product);
+                    });
+                }
+            }
             if (locationEl) locationEl.textContent = product.location || product.farm_location || 'Location not specified';
-            if (stockEl) stockEl.textContent = `${product.stock_quantity || 0} ${product.unit || 'unit'}`;
+            if (stockEl) stockEl.textContent = `${this.fmtNumber(product.stock_quantity || 0)} ${product.unit || 'unit'}`;
             if (harvestEl) harvestEl.textContent = harvestDate;
             if (expiryEl) expiryEl.textContent = expiryDate;
-            if (priceEl) priceEl.textContent = `₱${parseFloat(product.price || 0).toFixed(2)} per ${product.unit || 'unit'}`;
+            if (priceEl) {
+                const unit = product.unit || 'unit';
+                priceEl.textContent = `${this.fmtCurrency(product.price || 0)} per ${unit}`;
+            }
             if (quantityEl) {
                 quantityEl.value = 1;
                 quantityEl.max = product.stock_quantity || 1;
             }
+
+            await this.refreshCurrentProductCartQuantity(productId);
+            this.normalizeProductQuantityInput();
             
             // Calculate and display total
             this.updateProductTotal();
@@ -3204,23 +3822,32 @@ class AgricultureMarket {
             if (addCartBtn) {
                 addCartBtn.onclick = async () => {
                     const quantity = parseInt(document.getElementById('product-details-quantity').value) || 1;
+                    const maxAddable = this.getMaxAddableQuantity();
+                    if (quantity > maxAddable) {
+                        this.showMessage(`Only ${maxAddable} more can be added based on current stock.`, 'error');
+                        this.normalizeProductQuantityInput();
+                        return;
+                    }
                     // Disable button to avoid duplicate requests
                     addCartBtn.disabled = true;
                     try {
                         await this.addToCart(productId, quantity);
-                        this.closeProductDetails();
+                        await this.refreshCurrentProductCartQuantity(productId);
+                        this.normalizeProductQuantityInput();
                     } finally {
                         addCartBtn.disabled = false;
                     }
                 };
-                addCartBtn.disabled = (product.stock_quantity || 0) === 0;
-                addCartBtn.innerHTML = (product.stock_quantity || 0) === 0 
+                const maxAddable = this.getMaxAddableQuantity();
+                addCartBtn.disabled = maxAddable <= 0;
+                addCartBtn.innerHTML = maxAddable <= 0 
                     ? '<i class="fas fa-ban"></i> Out of Stock' 
                     : '<i class="fas fa-shopping-cart"></i> Add to Cart';
             }
             
             // Update quantity button states
             this.updateQuantityButtons();
+            this.loadSimilarSellers(productId);
             
             // Show modal
             const modalEl = document.getElementById('product-details-modal');
@@ -3228,7 +3855,7 @@ class AgricultureMarket {
                 // Ensure modal is attached to body so fixed positioning and z-index work like auth modal
                 try { if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl); } catch (e) {}
                 modalEl.classList.add('active', 'open');
-                document.body.style.overflow = 'hidden';
+                this.setPageScrollLocked(true);
 
                 // Add Escape key handler to close modal like auth modal
                 try {
@@ -3249,7 +3876,11 @@ class AgricultureMarket {
         if (modal) {
             modal.classList.remove('active', 'open');
         }
-        document.body.style.overflow = '';
+        const shopModal = document.getElementById('shop-details-modal');
+        if (shopModal) {
+            shopModal.classList.remove('active', 'open');
+        }
+        this.setPageScrollLocked(false);
         try {
             if (this._productModalKeydown) {
                 document.removeEventListener('keydown', this._productModalKeydown);
@@ -3258,6 +3889,141 @@ class AgricultureMarket {
         } catch (e) {}
         this.currentProductDetails = null;
         this.currentProductId = null;
+        const similar = document.getElementById('similar-sellers');
+        if (similar) similar.innerHTML = '';
+        const farmerActionsEl = document.getElementById('product-details-farmer-actions');
+        if (farmerActionsEl) farmerActionsEl.innerHTML = '';
+    }
+
+    startChatWithFarmer(product) {
+        const farmerId = Number(product?.farmer_id || 0);
+        if (!farmerId) {
+            this.showMessage('Farmer chat is not available for this listing.', 'error');
+            return;
+        }
+
+        if (!this.token) {
+            this.showMessage('Please log in first to chat with the farmer.', 'error');
+            this.openAuthFlow({ role: 'customer', mode: 'login', returnUrl: window.location.pathname + window.location.search + window.location.hash });
+            return;
+        }
+
+        const productId = Number(product?.id || this.currentProductId || 0);
+        const resumeParams = new URLSearchParams();
+        if (productId) resumeParams.set('openProductId', String(productId));
+        resumeParams.set('resumeScrollY', String(window.scrollY || 0));
+        const returnUrl = `${window.location.pathname}?${resumeParams.toString()}${window.location.hash || '#products'}`;
+        window.location.href = `/chat.html?farmerId=${farmerId}${productId ? `&productId=${productId}` : ''}&returnUrl=${encodeURIComponent(returnUrl)}`;
+    }
+
+    viewFarmerShop(product) {
+        const farmerId = Number(product?.farmer_id || 0);
+        if (!farmerId) {
+            this.showMessage('Shop details are not available for this listing.', 'error');
+            return;
+        }
+
+        this.openShopDetailsModal(farmerId, product?.farmer_name || 'Shop');
+    }
+
+    async openShopDetailsModal(farmerId, fallbackName = 'Shop') {
+        const modal = document.getElementById('shop-details-modal');
+        const titleEl = document.getElementById('shop-details-title');
+        const bodyEl = document.getElementById('shop-details-body');
+        if (!modal || !bodyEl) return;
+
+        if (titleEl) titleEl.textContent = `${fallbackName} Details`;
+        bodyEl.innerHTML = '<div class="loading">Loading shop details...</div>';
+        modal.classList.add('open', 'active');
+        this.setPageScrollLocked(true);
+
+        try {
+            const response = await fetch(`${this.apiBase}/farmers/${farmerId}/profile`, {
+                headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+            });
+            if (!response.ok) throw new Error('Failed to load shop details');
+
+            const data = await response.json();
+            const profile = data.profile || {};
+            const rating = this.fmtNumber(profile.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+            bodyEl.innerHTML = `
+                <div class="shop-details-grid">
+                    <div><strong>Shop Name:</strong> ${this.escapeHtml(profile.full_name || fallbackName)}</div>
+                    <div><strong>Location:</strong> ${this.escapeHtml(profile.location || 'Not specified')}</div>
+                    <div><strong>Contact:</strong> ${this.escapeHtml(profile.phone || 'Not available')}</div>
+                    <div><strong>Total Sales:</strong> ${this.fmtNumber(profile.total_sales || 0)}</div>
+                    <div><strong>Average Rating:</strong> ${rating} <i class="fas fa-star rating-icon" aria-hidden="true"></i></div>
+                    <div><strong>Total Reviews:</strong> ${this.fmtNumber(profile.total_reviews || 0)}</div>
+                </div>
+                <div style="margin-top:0.85rem;"><strong>Description:</strong><br>${this.escapeHtml(profile.shop_description || 'No shop description yet.')}</div>
+            `;
+        } catch (error) {
+            console.error('Shop details error:', error);
+            bodyEl.innerHTML = '<div class="empty-state"><p>Unable to load shop details right now.</p></div>';
+        }
+    }
+
+    closeShopDetailsModal() {
+        const modal = document.getElementById('shop-details-modal');
+        if (modal) modal.classList.remove('open', 'active');
+
+        const productModalOpen = !!document.getElementById('product-details-modal')?.classList.contains('active');
+        if (!productModalOpen) {
+            this.setPageScrollLocked(false);
+        }
+    }
+
+    async loadSimilarSellers(productId) {
+        const container = document.getElementById('similar-sellers');
+        if (!container) return;
+
+        try {
+            container.innerHTML = '<h3>Similar Farmer Shops</h3><div class="loading">Loading similar offers...</div>';
+            const response = await fetch(`${this.apiBase}/products/${productId}/similar-sellers`, {
+                headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+            });
+
+            if (!response.ok) throw new Error('Failed to fetch similar sellers');
+            const data = await response.json();
+            const similar = (Array.isArray(data.similar) ? data.similar : []).slice(0, 3);
+
+            if (!similar.length) {
+                container.innerHTML = '<h3>Similar Farmer Shops</h3><div class="empty-state"><p>No other sellers found for this item yet.</p></div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <h3>Similar Farmer Shops</h3>
+                <div class="reviews-list">
+                    ${similar.map((item) => {
+                        const badges = (item.badges || []).map((badge) => `<span class="status-pill">${this.escapeHtml(badge)}</span>`).join(' ');
+                        const farmerName = this.escapeHtml(item.farmer_name || 'Farmer Shop');
+                        const unit = this.escapeHtml(item.unit || 'item');
+                        const shopRating = this.fmtNumber(item.farmer_average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                        const canOpen = Number(item.id) > 0;
+                        return `
+                            <div class="review-card ${canOpen ? 'clickable' : ''}" ${canOpen ? `onclick="app.showProductDetails(${Number(item.id)})" style="cursor:pointer;"` : ''}>
+                                <div class="review-header">
+                                    <div class="review-farmer-meta">
+                                        <strong>${farmerName}</strong>
+                                        <span class="review-shop-rating">${shopRating} <i class="fas fa-star rating-icon" aria-hidden="true"></i></span>
+                                    </div>
+                                    <span>${this.fmtCurrency(item.price)} / ${unit}</span>
+                                </div>
+                                <p>
+                                    Sold: ${this.fmtNumber(item.sales_count || 0)}
+                                </p>
+                                <div>${badges}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading similar sellers:', error);
+            container.innerHTML = '<h3>Similar Farmer Shops</h3><div class="empty-state"><p>Unable to load similar offers right now.</p></div>';
+        }
     }
     
     increaseQuantity() {
@@ -3265,7 +4031,7 @@ class AgricultureMarket {
         if (!quantityEl || !this.currentProductDetails) return;
         
         const currentQty = parseInt(quantityEl.value) || 1;
-        const maxStock = this.currentProductDetails.stock_quantity || 1;
+        const maxStock = this.getMaxAddableQuantity();
         const newQty = Math.min(currentQty + 1, maxStock);
         
         quantityEl.value = newQty;
@@ -3294,8 +4060,8 @@ class AgricultureMarket {
         const quantity = parseInt(quantityEl.value) || 1;
         const price = parseFloat(this.currentProductDetails.price || 0);
         const total = quantity * price;
-        
-        totalEl.textContent = `₱${total.toFixed(2)}`;
+
+        totalEl.textContent = this.fmtCurrency(total);
     }
     
     updateQuantityButtons() {
@@ -3306,7 +4072,7 @@ class AgricultureMarket {
         if (!quantityEl || !this.currentProductDetails) return;
         
         const currentQty = parseInt(quantityEl.value) || 1;
-        const maxStock = this.currentProductDetails.stock_quantity || 1;
+        const maxStock = this.getMaxAddableQuantity();
         
         if (decreaseBtn) {
             decreaseBtn.disabled = currentQty <= 1;
@@ -3314,6 +4080,46 @@ class AgricultureMarket {
         if (increaseBtn) {
             increaseBtn.disabled = currentQty >= maxStock;
         }
+    }
+
+    getMaxAddableQuantity() {
+        const stockQty = Number(this.currentProductDetails?.stock_quantity || 0);
+        const existingInCart = Number(this.currentProductCartQuantity || 0);
+        return Math.max(0, stockQty - existingInCart);
+    }
+
+    async refreshCurrentProductCartQuantity(productId) {
+        if (!productId) return 0;
+        try {
+            const query = new URLSearchParams({ sessionId: this.sessionId });
+            const response = await fetch(`${this.apiBase}/cart?${query.toString()}`, {
+                headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+            });
+            if (!response.ok) return 0;
+            const data = await response.json();
+            const items = Array.isArray(data.cartItems) ? data.cartItems : [];
+            const item = items.find((cartItem) => Number(cartItem.product_id) === Number(productId));
+            this.currentProductCartQuantity = Number(item?.quantity || 0);
+            return this.currentProductCartQuantity;
+        } catch (_) {
+            this.currentProductCartQuantity = 0;
+            return 0;
+        }
+    }
+
+    normalizeProductQuantityInput() {
+        const quantityEl = document.getElementById('product-details-quantity');
+        if (!quantityEl || !this.currentProductDetails) return;
+
+        const maxStock = this.getMaxAddableQuantity();
+        const parsed = Number.parseInt(String(quantityEl.value || '').replace(/[^0-9]/g, ''), 10);
+        const value = Number.isFinite(parsed) ? parsed : 1;
+        const normalized = maxStock <= 0 ? 1 : Math.min(Math.max(value, 1), maxStock);
+
+        quantityEl.value = normalized;
+        quantityEl.max = maxStock;
+        this.updateProductTotal();
+        this.updateQuantityButtons();
     }
 
     // Cart functionality
@@ -3467,11 +4273,22 @@ class AgricultureMarket {
                      alt="${item.name}" class="cart-item-image" onerror="this.src='/images/logo.png'">
                 <div class="cart-item-details">
                     <div class="cart-item-name">${item.name}</div>
-                    <div class="cart-item-price">₱${parseFloat(item.price).toFixed(2)} ${item.unit ? 'per ' + item.unit : ''}</div>
+                    <div class="cart-item-price">${this.fmtCurrency(item.price)} ${item.unit ? 'per ' + item.unit : ''}</div>
+                    ${item.farmer_name ? `<div class="cart-item-farmer">From ${item.farmer_name}</div>` : ''}
+                    <div class="cart-item-stock">Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}</div>
                     <div class="cart-item-quantity">
                         <div class="quantity-controls">
                             <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity - 1})" title="Decrease quantity">−</button>
-                            <span class="quantity-value">${item.quantity}</span>
+                            <input
+                                type="number"
+                                class="quantity-value-input"
+                                value="${item.quantity}"
+                                min="1"
+                                max="${Math.max(1, Number(item.stock_quantity) || 1)}"
+                                inputmode="numeric"
+                                aria-label="Cart quantity"
+                                onchange="app.handleCartQuantityInput(${item.id}, this.value, ${Math.max(1, Number(item.stock_quantity) || 1)}, this)"
+                                onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
                             <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity + 1})" title="Increase quantity">+</button>
                         </div>
                         <button class="remove-item" onclick="app.removeCartItem(${item.id})" title="Remove item">
@@ -3482,7 +4299,7 @@ class AgricultureMarket {
             </div>
         `).join('');
 
-        cartTotal.textContent = data.summary.subtotal;
+        cartTotal.textContent = this.fmtNumber(data.summary.subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         checkoutBtn.disabled = false;
     }
 
@@ -3539,6 +4356,22 @@ class AgricultureMarket {
     
     async updateCheckoutItem(cartId, quantity) {
         await this.updateCartItem(cartId, quantity);
+    }
+
+    async handleCartQuantityInput(cartId, rawValue, maxStock, inputEl) {
+        const parsed = Number.parseInt(String(rawValue || '').trim(), 10);
+        const safeMax = Number.isFinite(Number(maxStock)) && Number(maxStock) > 0 ? Number(maxStock) : 1;
+        const nextQuantity = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), safeMax) : 1;
+        if (inputEl) inputEl.value = String(nextQuantity);
+        await this.updateCartItem(cartId, nextQuantity);
+    }
+
+    async handleCheckoutQuantityInput(cartId, rawValue, maxStock, inputEl) {
+        const parsed = Number.parseInt(String(rawValue || '').trim(), 10);
+        const safeMax = Number.isFinite(Number(maxStock)) && Number(maxStock) > 0 ? Number(maxStock) : 1;
+        const nextQuantity = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), safeMax) : 1;
+        if (inputEl) inputEl.value = String(nextQuantity);
+        await this.updateCheckoutItem(cartId, nextQuantity);
     }
     
     async removeCheckoutItem(cartId) {
@@ -3616,6 +4449,7 @@ class AgricultureMarket {
                 // Always reload saved addresses to get the latest list
                 await this.loadSavedAddresses();
                 document.getElementById('checkout-modal').classList.add('open');
+                this.setPageScrollLocked(true);
             }
         } catch (error) {
             console.error('Error loading checkout:', error);
@@ -3625,6 +4459,7 @@ class AgricultureMarket {
 
     renderCheckout(data) {
         const checkoutItems = document.getElementById('checkout-items-list');
+        const checkoutItemsContainer = checkoutItems?.closest('.checkout-items-container');
         const checkoutSubtotal = document.getElementById('checkout-subtotal');
         const checkoutTotal = document.getElementById('checkout-total');
         const checkoutTotalFooter = document.getElementById('checkout-total-footer');
@@ -3644,14 +4479,24 @@ class AgricultureMarket {
                 <div class="checkout-item-details">
                     <strong class="checkout-item-name">${item.name}</strong>
                     <div class="checkout-item-meta">
-                        <small>₱${parseFloat(item.price).toFixed(2)} per ${item.unit || 'item'}</small>
+                        <small>${this.fmtCurrency(item.price)} per ${item.unit || 'item'}</small>
                         ${item.farmer_name ? `<small class="checkout-item-farmer">By ${item.farmer_name}</small>` : ''}
+                        <small class="checkout-item-stock">Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}</small>
                     </div>
                     <div class="checkout-item-controls">
                         <button type="button" class="checkout-qty-btn" onclick="app.updateCheckoutItem(${item.id}, ${item.quantity - 1})" ${item.quantity <= 1 ? 'disabled' : ''} aria-label="Decrease quantity">
                             <i class="fas fa-minus"></i>
                         </button>
-                        <span class="checkout-qty-display">${item.quantity}</span>
+                        <input
+                            type="number"
+                            class="checkout-qty-input"
+                            value="${item.quantity}"
+                            min="1"
+                            max="${Math.max(1, Number(item.stock_quantity) || 1)}"
+                            inputmode="numeric"
+                            aria-label="Checkout quantity"
+                            onchange="app.handleCheckoutQuantityInput(${item.id}, this.value, ${Math.max(1, Number(item.stock_quantity) || 1)}, this)"
+                            onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
                         <button type="button" class="checkout-qty-btn" onclick="app.updateCheckoutItem(${item.id}, ${item.quantity + 1})" aria-label="Increase quantity">
                             <i class="fas fa-plus"></i>
                         </button>
@@ -3660,21 +4505,34 @@ class AgricultureMarket {
                         </button>
                     </div>
                 </div>
-                <div class="checkout-item-price">₱${itemTotal.toFixed(2)}</div>
+                <div class="checkout-item-price">${this.fmtCurrency(itemTotal)}</div>
             </div>
         `;
         }).join('');
 
+        if (checkoutItemsContainer) {
+            if ((data.cartItems || []).length > 7) {
+                const sampleItem = checkoutItems.querySelector('.checkout-item');
+                const measuredHeight = sampleItem ? sampleItem.getBoundingClientRect().height : 0;
+                const rowHeight = measuredHeight > 24 ? measuredHeight : 92;
+                checkoutItemsContainer.style.maxHeight = `${Math.round(rowHeight * 7 + 12)}px`;
+                checkoutItemsContainer.style.overflowY = 'auto';
+            } else {
+                checkoutItemsContainer.style.maxHeight = '';
+                checkoutItemsContainer.style.overflowY = '';
+            }
+        }
+
         const subtotal = parseFloat(data.summary.subtotal) || 0;
         
         if (checkoutSubtotal) {
-            checkoutSubtotal.textContent = subtotal.toFixed(2);
+            checkoutSubtotal.textContent = this.fmtNumber(subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         if (checkoutTotal) {
-            checkoutTotal.textContent = subtotal.toFixed(2);
+            checkoutTotal.textContent = this.fmtNumber(subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         if (checkoutTotalFooter) {
-            checkoutTotalFooter.textContent = subtotal.toFixed(2);
+            checkoutTotalFooter.textContent = this.fmtNumber(subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
     }
 
@@ -3737,7 +4595,7 @@ class AgricultureMarket {
             if (phone.startsWith('+63')) {
                 phone = phone.substring(3);
             }
-            phoneInput.value = phone;
+            phoneInput.value = this.formatPhoneInputValue(phone);
         }
         
         // Populate address
@@ -3756,6 +4614,7 @@ class AgricultureMarket {
 
         const fullName = document.getElementById('checkout-fullname').value.trim();
         const phone = document.getElementById('checkout-phone').value.trim();
+        const phoneDigits = phone.replace(/\D/g, '');
         const deliveryAddress = document.getElementById('delivery-address').value.trim();
         // Delivery date removed from UI; send today's date to satisfy backend requirement
         const deliveryDate = (new Date()).toISOString().split('T')[0];
@@ -3768,7 +4627,7 @@ class AgricultureMarket {
             return;
         }
 
-        if (!phone || phone.length !== 10) {
+        if (!phoneDigits || phoneDigits.length !== 10) {
             this.showMessage('Please enter a valid 10-digit phone number', 'error');
             document.getElementById('checkout-phone').focus();
             return;
@@ -3783,7 +4642,7 @@ class AgricultureMarket {
         // Delivery date no longer required.
 
         // Format phone with +63 prefix
-        const phoneWithPrefix = phone.startsWith('+63') ? phone : '+63' + phone;
+        const phoneWithPrefix = `+63${phoneDigits}`;
 
         // Combine full name, phone, and address into delivery_address
         const fullDeliveryInfo = `${fullName} | ${phoneWithPrefix} | ${deliveryAddress}`;
@@ -3835,6 +4694,7 @@ class AgricultureMarket {
         if (!role) {
             role = localStorage.getItem('last_auth_role') || 'customer';
         }
+        if (role === 'admin') role = 'staff';
         
         if (returnUrl) {
             this.returnUrl = returnUrl;
@@ -3877,7 +4737,7 @@ class AgricultureMarket {
     selectRoleOnForm(role) {
         const mode = this.authMode || 'login';
         // Register only allows farmer/customer
-        if (mode === 'register' && (role === 'admin' || !['farmer', 'customer'].includes(role))) {
+        if (mode === 'register' && (role === 'staff' || !['farmer', 'customer'].includes(role))) {
             return;
         }
         this.selectedRole = role;
@@ -4091,9 +4951,9 @@ class AgricultureMarket {
         }
         
         this.authMode = newMode;
-        // Register only allows farmer/customer; if current role is admin, switch to customer
+        // Register only allows farmer/customer; if current role is staff, switch to customer
         let role = this.selectedRole;
-        if (newMode === 'register' && role === 'admin') role = 'customer';
+        if (newMode === 'register' && role === 'staff') role = 'customer';
         this.selectedRole = role;
         this.openAuthModal(role, newMode);
     }
@@ -4474,6 +5334,7 @@ class AgricultureMarket {
         
         const fullName = document.getElementById('floating-address-fullname').value.trim();
         const phone = document.getElementById('floating-address-phone').value.trim();
+        const phoneDigits = phone.replace(/\D/g, '');
         const address = document.getElementById('floating-address-full').value.trim();
         
         // Validation
@@ -4483,7 +5344,7 @@ class AgricultureMarket {
             return;
         }
         
-        if (!phone || phone.length !== 10) {
+        if (!phoneDigits || phoneDigits.length !== 10) {
             this.showMessage('Please enter a valid 10-digit phone number', 'error');
             document.getElementById('floating-address-phone').focus();
             return;
@@ -4496,7 +5357,7 @@ class AgricultureMarket {
         }
         
         // Format phone with +63 prefix for storage
-        const phoneWithPrefix = phone.startsWith('+63') ? phone : '+63' + phone;
+        const phoneWithPrefix = `+63${phoneDigits}`;
         
         // Store the full address in address_line1, other fields empty
         const payload = {
@@ -4553,11 +5414,16 @@ class AgricultureMarket {
     closeModals() {
         // Keep this for other modals (cart, checkout, etc.)
         // But don't use it for auth flow - use closeAuthFlow() instead
+        const checkoutModal = document.getElementById('checkout-modal');
+        const shouldUnlock = !!(checkoutModal && checkoutModal.classList.contains('open'));
         document.querySelectorAll('.modal').forEach(modal => {
             if (modal.id !== 'auth-modal') {
                 modal.classList.remove('open');
             }
         });
+        if (shouldUnlock) {
+            this.setPageScrollLocked(false);
+        }
     }
 
     // Utility functions
@@ -4583,7 +5449,7 @@ class AgricultureMarket {
     }
 
     updateActiveNavLink() {
-        const sections = ['home', 'products', 'about', 'contact'];
+        const sections = ['home', 'featured', 'products', 'about', 'contact'];
         const headerEl = document.querySelector('.header');
         const headerOffset = headerEl ? headerEl.offsetHeight : 100;
         const scrollY = window.scrollY || window.pageYOffset;
@@ -4622,23 +5488,41 @@ class AgricultureMarket {
         });
     }
 
+    getCurrentSectionHash() {
+        const fallback = '#products';
+        const activeLink = document.querySelector('.nav-link.active');
+        const href = activeLink?.getAttribute('href') || '';
+        const hashIndex = href.indexOf('#');
+        const hashFromActive = hashIndex >= 0 ? href.slice(hashIndex) : '';
+        if (['#home', '#featured', '#products', '#about', '#contact'].includes(hashFromActive)) {
+            return hashFromActive;
+        }
+        const fromLocation = String(window.location.hash || '').trim();
+        if (['#home', '#featured', '#products', '#about', '#contact'].includes(fromLocation)) {
+            return fromLocation;
+        }
+        return fallback;
+    }
+
+    buildOrdersUrl(options = {}) {
+        const { highlightOrderId = null } = options;
+        const params = new URLSearchParams();
+        const returnTo = '#home';
+        const returnPath = '/';
+        params.set('returnTo', returnTo);
+        params.set('returnPath', returnPath);
+        localStorage.setItem('ordersReturnTo', returnTo);
+        if (highlightOrderId) {
+            params.set('highlightOrderId', String(highlightOrderId));
+        }
+        return `/orders.html?${params.toString()}`;
+    }
+
     showMessage(message, type = 'info') {
-        // Create a simple toast notification
+        // Create a centered toast notification
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
         toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed;
-            top: 100px;
-            right: 20px;
-            background: ${type === 'success' ? '#4caf50' : type === 'error' ? '#f44336' : '#2196f3'};
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 10000;
-            max-width: 300px;
-        `;
 
         document.body.appendChild(toast);
 
