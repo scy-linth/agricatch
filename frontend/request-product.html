@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Product - AgriCatch</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="admin-theme farmer-theme">
+    <main class="admin-main" style="max-width: 760px; margin: 2rem auto; padding: 0 1rem;">
+        <section class="admin-section-card active">
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem;">
+                <h2><i class="fas fa-clipboard-list"></i> Request Product</h2>
+                <a href="/farmer.html#products" class="btn btn-secondary btn-small"><i class="fas fa-arrow-left"></i> Back to Product Management</a>
+            </div>
+            <div class="section-content">
+                <form id="request-product-form" class="product-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="request-product-category">Product Category *</label>
+                            <select id="request-product-category" required>
+                                <option value="">Select category</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="request-product-name">Product Name *</label>
+                            <input type="text" id="request-product-name" placeholder="Choose category first" disabled required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="request-product-notes">Details for staff (optional)</label>
+                        <textarea id="request-product-notes" rows="4" maxlength="500" placeholder="e.g., local/common name, quality details, suggested unit, etc."></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Submit Request</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        (function () {
+            function normalizeAuthToken(rawToken) {
+                let value = String(rawToken || '').trim();
+                if (!value) return null;
+                if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+                    value = value.slice(1, -1).trim();
+                }
+                if (/^Bearer\s+/i.test(value)) {
+                    value = value.replace(/^Bearer\s+/i, '').trim();
+                }
+                if (!value || value === 'null' || value === 'undefined') return null;
+                return value;
+            }
+
+            const token = normalizeAuthToken(localStorage.getItem('token'));
+            if (!token) {
+                window.location.href = '/?login=1';
+                return;
+            }
+            localStorage.setItem('token', token);
+
+            const apiBase = '/api';
+            const form = document.getElementById('request-product-form');
+            const categoryEl = document.getElementById('request-product-category');
+            const nameEl = document.getElementById('request-product-name');
+            const notesEl = document.getElementById('request-product-notes');
+
+            function showToast(message, type) {
+                const toast = document.createElement('div');
+                toast.className = `toast toast-${type || 'info'}`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+
+            function syncNameState() {
+                const hasCategory = !!String(categoryEl.value || '').trim();
+                nameEl.disabled = !hasCategory;
+                if (!hasCategory) {
+                    nameEl.value = '';
+                    nameEl.placeholder = 'Choose category first';
+                } else {
+                    nameEl.placeholder = 'Enter requested product name';
+                }
+            }
+
+            async function loadCategories() {
+                const res = await fetch(`${apiBase}/products/categories`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load categories');
+                const data = await res.json();
+                const categories = Array.isArray(data.categories) ? data.categories : [];
+                categoryEl.innerHTML = ['<option value="">Select category</option>']
+                    .concat(categories.map((category) => `<option value="${String(category.id)}">${String(category.name || 'Category')}</option>`))
+                    .join('');
+            }
+
+            categoryEl.addEventListener('change', syncNameState);
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const categoryId = String(categoryEl.value || '').trim();
+                const name = String(nameEl.value || '').trim();
+                const notes = String(notesEl.value || '').trim();
+
+                if (!categoryId) {
+                    showToast('Please choose a category first.', 'error');
+                    return;
+                }
+                if (!name) {
+                    showToast('Please enter the product name to request.', 'error');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${apiBase}/products/category-requests`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            category_id: Number(categoryId),
+                            name,
+                            notes
+                        })
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        showToast(data.message || 'Unable to submit request.', 'error');
+                        return;
+                    }
+
+                    showToast('Request submitted for staff approval.', 'success');
+                    form.reset();
+                    syncNameState();
+                } catch (error) {
+                    showToast('Unable to submit request right now.', 'error');
+                }
+            });
+
+            loadCategories()
+                .then(syncNameState)
+                .catch(() => showToast('Failed to load categories.', 'error'));
+        })();
+    </script>
+</body>
+</html>

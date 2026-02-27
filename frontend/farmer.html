@@ -31,7 +31,17 @@
                 <a class="sidebar-link" href="#products" data-section="products"><i class="fas fa-box"></i> Products</a>
                 <a class="sidebar-link" href="#orders" data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</a>
                 <a class="sidebar-link" href="#chat" data-section="chat"><i class="fas fa-comments"></i> Chat <span id="chat-unread-badge" class="sidebar-badge" style="display:none;">0</span></a>
-                <button id="logout-btn" class="sidebar-link logout-link" type="button"><i class="fas fa-sign-out-alt"></i> Log out</button>
+                <div class="user-profile sidebar-account-wrap">
+                    <button id="farmer-sidebar-account-btn" class="user-account-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+                        <span class="user-initial" id="farmer-sidebar-user-initial">F</span>
+                        <span id="farmer-sidebar-user-label">Account</span>
+                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                    </button>
+                    <div id="farmer-sidebar-dropdown-menu" class="user-dropdown-menu" style="display:none;">
+                        <button id="farmer-sidebar-my-account-btn" class="user-dropdown-item" type="button">My Account</button>
+                        <button id="farmer-sidebar-logout-btn" class="user-dropdown-item" type="button">Logout</button>
+                    </div>
+                </div>
             </nav>
         </aside>
 
@@ -46,56 +56,26 @@
                 </div>
             </div>
 
-            <header class="admin-topbar">
-                <div class="topbar-left">
-                    <h1 id="farmer-page-title" class="page-title">Overview</h1>
-                </div>
-                <div class="topbar-right">
-                    <input id="farmer-search-input" class="search-input" placeholder="Search..." style="min-width: 260px;">
-                    <button id="farmer-account-btn" class="btn btn-secondary btn-small" type="button"><i class="fas fa-user-gear"></i> Account</button>
-                    <div class="admin-profile">
-                        <img src="/images/resendlogo.png" alt="Farmer avatar" class="profile-avatar">
-                        <div class="profile-meta">
-                            <span id="user-name" class="profile-name">Farmer</span>
-                            <span id="user-email" class="profile-email">—</span>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
             <section id="overview" class="admin-section-card active">
-                <div class="section-header">
-                    <h2>Shop Overview</h2>
-                </div>
                 <div class="section-content">
                     <div class="farmer-overview-grid">
                         <div class="farmer-overview-left">
-                            <div class="shop-header">
-                                <div class="shop-avatar">
-                                    <i class="fas fa-store"></i>
-                                </div>
-                                <div class="shop-info">
-                                    <h3 id="shop-name-display">—</h3>
-                                    <p id="shop-location-display"><i class="fas fa-location-dot"></i> <span>—</span></p>
-                                    <p id="shop-description-display">—</p>
-                                </div>
-                            </div>
-
-                            <div class="admin-stats" style="margin-top: 1.5rem;">
-                                <div class="stat-card">
+                            <!-- Top row: My Products -->
+                            <div class="admin-stats farmer-overview-stats-inline farmer-overview-top-row">
+                                <div class="stat-card my-products-card">
                                     <div class="stat-icon" style="color: #10b981;"><i class="fas fa-box"></i></div>
                                     <div class="stat-details">
                                         <h3>My Products</h3>
                                         <div class="stat-number" id="my-products">0</div>
                                     </div>
                                 </div>
-                                <div class="stat-card">
-                                    <div class="stat-icon" style="color: #3b82f6;"><i class="fas fa-message"></i></div>
-                                    <div class="stat-details">
-                                        <h3>Messages</h3>
-                                        <div class="stat-number" id="unread-messages">0</div>
-                                    </div>
-                                </div>
+                            </div>
+
+                            <!-- Visual separator between My Products and other stats -->
+                            <div class="farmer-overview-separator"></div>
+
+                            <!-- Second row: Orders / Sold / Revenue -->
+                            <div class="admin-stats farmer-overview-stats-inline farmer-overview-bottom-row">
                                 <div class="stat-card">
                                     <div class="stat-icon" style="color: #f59e0b;"><i class="fas fa-clipboard-list"></i></div>
                                     <div class="stat-details">
@@ -113,55 +93,54 @@
                                 <div class="stat-card">
                                     <div class="stat-icon" style="color: #22c55e;"><i class="fas fa-peso-sign"></i></div>
                                     <div class="stat-details">
-                                        <h3>Revenue</h3>
+                                        <h3>Sales</h3>
                                         <div class="stat-number" id="total-revenue">₱0.00</div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="overview-card" style="margin-top: 1.25rem;">
-                                <div class="overview-card-title" style="display:flex; align-items:center; justify-content:space-between; gap: 0.75rem;">
-                                    <span>Recent Orders</span>
-                                    <div style="display:flex; align-items:center; gap: 0.4rem;">
-                                        <button type="button" id="overview-recent-prev" class="btn btn-secondary btn-small" aria-label="Previous page"><i class="fas fa-chevron-left"></i></button>
-                                        <span id="overview-recent-page" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 700;">1/1</span>
-                                        <button type="button" id="overview-recent-next" class="btn btn-secondary btn-small" aria-label="Next page"><i class="fas fa-chevron-right"></i></button>
-                                    </div>
+                                <div class="overview-card-title">Top Products (Items Sold, Sales, Avg Price)</div>
+                                <div class="overview-chart-wrap">
+                                    <canvas id="overview-top-products-chart" height="140"></canvas>
                                 </div>
-                                <div id="overview-recent-orders" class="overview-list"></div>
+                                <div id="overview-top-products-list" class="overview-list" style="margin-top: 0.65rem;"></div>
                             </div>
                         </div>
 
                         <div class="farmer-overview-right">
                             <div class="overview-panel-header">
-                                <div>
-                                    <h3 class="overview-panel-title">Overview</h3>
-                                    <div id="overview-last-updated" class="overview-panel-subtitle">Loading report…</div>
-                                </div>
+                                <div id="overview-last-updated" class="overview-panel-subtitle">Loading report…</div>
                                 <div class="overview-panel-actions">
-                                    <div class="overview-range-group" role="group" aria-label="Overview range">
-                                        <button type="button" class="btn btn-secondary btn-small overview-range-btn" data-range="7">7 days</button>
-                                        <button type="button" class="btn btn-secondary btn-small overview-range-btn active" data-range="30">30 days</button>
-                                        <button type="button" class="btn btn-secondary btn-small overview-range-btn" data-range="90">90 days</button>
-                                        <button type="button" class="btn btn-secondary btn-small overview-range-btn" data-range="all">All time</button>
-                                        <button type="button" class="btn btn-secondary btn-small overview-range-btn" data-range="custom" id="overview-custom-btn">Custom</button>
-                                    </div>
-                                    <div id="overview-custom-panel" class="overview-custom-panel" style="display:none;">
-                                        <div class="overview-custom-title">Choose dates</div>
-                                        <div class="overview-custom-row">
-                                            <label class="overview-custom-label" for="overview-from">From</label>
-                                            <input type="date" id="overview-from" class="overview-custom-input">
-                                            <label class="overview-custom-label" for="overview-to">To</label>
-                                            <input type="date" id="overview-to" class="overview-custom-input">
+                                    <div class="overview-actions-left">
+                                        <div class="overview-range-group" role="group" aria-label="Overview range">
+                                            <select id="overview-range-select" class="filter-select" style="min-width: 140px;">
+                                                <option value="7">Last 7 days</option>
+                                                <option value="30" selected>Last 30 days</option>
+                                                <option value="90">Last 90 days</option>
+                                                <option value="all">All time</option>
+                                                <option value="custom">Custom range</option>
+                                            </select>
                                         </div>
-                                        <div class="overview-custom-actions">
-                                            <button type="button" class="btn btn-secondary btn-small" id="overview-custom-cancel">Cancel</button>
-                                            <button type="button" class="btn btn-primary btn-small" id="overview-custom-apply">Apply</button>
+                                        <div id="overview-custom-panel" class="overview-custom-panel" style="display:none;">
+                                            <div class="overview-custom-title">Choose dates</div>
+                                            <div class="overview-custom-row">
+                                                <label class="overview-custom-label" for="overview-from">From</label>
+                                                <input type="date" id="overview-from" class="overview-custom-input">
+                                                <label class="overview-custom-label" for="overview-to">To</label>
+                                                <input type="date" id="overview-to" class="overview-custom-input">
+                                            </div>
+                                            <div class="overview-custom-actions">
+                                                <button type="button" class="btn btn-secondary btn-small" id="overview-custom-cancel">Cancel</button>
+                                                <button type="button" class="btn btn-primary btn-small" id="overview-custom-apply">Apply</button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <button type="button" id="overview-export-csv-btn" class="btn btn-secondary btn-small">
-                                        <i class="fas fa-file-arrow-down"></i> Export CSV
-                                    </button>
+                                    <div class="overview-actions-right">
+                                        <button type="button" id="overview-export-csv-btn" class="btn btn-secondary btn-small">
+                                            <i class="fas fa-file-arrow-down"></i> Export CSV
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -181,22 +160,17 @@
                                 </div>
 
                                 <div class="overview-card">
-                                    <div class="overview-card-title">Top Products (Delivered)</div>
-                                    <div class="overview-chart-wrap">
-                                        <canvas id="overview-top-products-chart" height="140"></canvas>
+                                    <div class="overview-card-title" style="display:flex; align-items:center; justify-content:space-between; gap: 0.75rem;">
+                                        <span>Recent Orders</span>
+                                        <div style="display:flex; align-items:center; gap: 0.4rem;">
+                                            <button type="button" id="overview-recent-prev" class="btn btn-secondary btn-small" aria-label="Previous page"><i class="fas fa-chevron-left"></i></button>
+                                            <span id="overview-recent-page" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 700;">1/1</span>
+                                            <button type="button" id="overview-recent-next" class="btn btn-secondary btn-small" aria-label="Next page"><i class="fas fa-chevron-right"></i></button>
+                                        </div>
                                     </div>
-                                    <div id="overview-top-products-list" class="overview-list" style="margin-top: 0.65rem;"></div>
+                                    <div id="overview-recent-orders" class="overview-list"></div>
                                 </div>
 
-                                <div class="overview-card">
-                                    <div class="overview-card-title">Low Stock</div>
-                                    <div id="overview-low-stock" class="overview-list"></div>
-                                </div>
-
-                                <div class="overview-card">
-                                    <div class="overview-card-title">Downloads</div>
-                                    <div id="overview-downloads" class="overview-list"></div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -204,41 +178,60 @@
             </section>
 
             <section id="products" class="admin-section-card">
-                <div class="section-header">
-                    <h2>Product Management</h2>
-                </div>
                 <div class="section-content">
                     <div class="product-tabs">
-                        <button id="list-products-tab" class="tab-btn active" type="button">List Products</button>
+                        <button id="list-products-tab" class="tab-btn active" type="button"><i class="fas fa-list"></i> List Products</button>
                         <button id="add-product-tab" class="tab-btn btn btn-primary btn-elevated" type="button"><i class="fas fa-plus"></i> Add Product</button>
+                        <button id="request-product-btn" class="btn btn-secondary btn-small" type="button"><i class="fas fa-clipboard-list"></i> Request Product</button>
+                    </div>
+
+                    <div class="products-search-row">
+                        <input type="text" id="products-search-input" class="search-input" placeholder="Search products by name">
                     </div>
 
                     <div id="list-products-section" class="tab-content active" data-tab-scope="products">
                         <div class="product-filters">
-                            <select id="product-status-filter" class="filter-select">
-                                <option value="available" selected>Available</option>
-                                <option value="no_stock">No stock</option>
-                                <option value="disabled">Disabled</option>
-                            </select>
+                            <div class="status-radio-group" role="radiogroup" aria-label="Filter products by status">
+                                <label class="status-radio-item">
+                                    <input type="radio" name="product-status-filter" value="all" checked>
+                                    <span>All</span>
+                                </label>
+                                <label class="status-radio-item">
+                                    <input type="radio" name="product-status-filter" value="available">
+                                    <span>Available</span>
+                                </label>
+                                <label class="status-radio-item">
+                                    <input type="radio" name="product-status-filter" value="no_stock">
+                                    <span>No Stock</span>
+                                </label>
+                                <label class="status-radio-item">
+                                    <input type="radio" name="product-status-filter" value="disabled">
+                                    <span>Disabled</span>
+                                </label>
+                            </div>
+                            <div class="product-filters-right">
+                                <select id="product-category-filter" class="filter-select" style="max-width: 240px;">
+                                    <option value="">Category: All</option>
+                                </select>
+                                <select id="product-sort-select" class="filter-select" style="max-width: 280px;">
+                                    <option value="latest">Sort: Latest Added</option>
+                                    <option value="name_asc">Name (A-Z)</option>
+                                    <option value="name_desc">Name (Z-A)</option>
+                                    <option value="category_asc">Category (A-Z)</option>
+                                    <option value="price_low_high">Price (Low to High)</option>
+                                    <option value="price_high_low">Price (High to Low)</option>
+                                    <option value="stock_high_low">Stock (High to Low)</option>
+                                    <option value="stock_low_high">Stock (Low to High)</option>
+                                    <option value="rating_high_low">Rating (High to Low)</option>
+                                    <option value="reviews_high_low">Reviews (Most First)</option>
+                                </select>
+                            </div>
                         </div>
                         <div id="my-products-grid" class="products-grid"></div>
                     </div>
 
                     <div id="add-product-section" class="tab-content" data-tab-scope="products">
                         <form id="add-product-form" class="product-form">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="product-name">Product Name *</label>
-                                    <input type="text" id="product-name" list="product-name-suggestions" required>
-                                    <datalist id="product-name-suggestions"></datalist>
-                                    <small id="product-price-suggestion" class="field-hint">Choose a catalog item to see suggested lowest and average selling price.</small>
-                                </div>
-                                <div class="form-group">
-                                    <label for="product-price">Price (₱) *</label>
-                                    <input type="number" id="product-price" step="0.01" required>
-                                </div>
-                            </div>
-
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="product-category">Category *</label>
@@ -258,15 +251,18 @@
 
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label for="custom-product-name-request">Product not listed?</label>
-                                    <input type="text" id="custom-product-name-request" placeholder="Request a new product name for approval">
+                                    <label for="product-name">Product Name *</label>
+                                    <div class="product-name-field">
+                                        <input type="text" id="product-name" placeholder="Choose category first" autocomplete="off" disabled required>
+                                        <div id="product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product name suggestions"></div>
+                                    </div>
                                 </div>
                                 <div class="form-group">
-                                    <label for="custom-product-request-notes">Notes (optional)</label>
-                                    <input type="text" id="custom-product-request-notes" placeholder="Optional notes for staff review">
+                                    <label for="product-price">Price (₱) *</label>
+                                    <input type="number" id="product-price" step="0.01" required>
+                                    <small id="product-price-suggestion" class="field-hint">Suggested lowest price: —</small>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-secondary btn-small" id="submit-custom-product-request">Request Product Name Approval</button>
 
                             <div class="form-group">
                                 <label for="product-stock">Stock Quantity *</label>
@@ -309,10 +305,11 @@
             </section>
 
             <section id="orders" class="admin-section-card">
-                <div class="section-header">
-                    <h2>Order Management</h2>
-                </div>
                 <div class="section-content">
+                    <div class="orders-search-row">
+                        <input type="text" id="orders-search-input" class="search-input" placeholder="Search orders by product, customer, or order #">
+                    </div>
+                    <div id="orders-search-empty" class="empty-state" style="display:none;"><p>No orders found!:((</p></div>
                     <div class="order-tabs">
                         <button id="pending-orders-tab" class="tab-btn active" type="button">Pending</button>
                         <button id="confirmed-orders-tab" class="tab-btn" type="button">Confirmed</button>
@@ -349,9 +346,6 @@
             </section>
 
             <section id="chat" class="admin-section-card">
-                <div class="section-header">
-                    <h2>Chat with Buyers</h2>
-                </div>
                 <div class="section-content">
                     <div class="chat-layout">
                         <div id="conversation-list" class="conversation-list"></div>
@@ -375,6 +369,17 @@
         </aside>
     </div>
 
+    <div id="farmer-product-preview-modal" class="product-details-modal">
+        <div class="product-details-overlay"></div>
+        <div class="product-details-content">
+            <div class="product-details-topbar" style="display:flex;align-items:center;justify-content:space-between;">
+                <h3>Product Details</h3>
+                <button class="product-details-close" id="farmer-product-preview-close" aria-label="Close">&times;</button>
+            </div>
+            <div id="farmer-product-preview-body" style="padding:1rem 1.25rem;"></div>
+        </div>
+    </div>
+
     <!-- Edit Product Modal -->
     <div id="edit-product-modal" class="modal">
         <div class="modal-content">
@@ -387,13 +392,15 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="edit-product-name">Product Name *</label>
-                        <input type="text" id="edit-product-name" list="edit-product-name-suggestions" required>
-                        <datalist id="edit-product-name-suggestions"></datalist>
-                        <small id="edit-product-price-suggestion" class="field-hint">Suggested pricing appears when product name matches sold listings.</small>
+                        <div class="product-name-field">
+                            <input type="text" id="edit-product-name" autocomplete="off" required>
+                            <div id="edit-product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Edit product name suggestions"></div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="edit-product-price">Price (₱) *</label>
                         <input type="number" id="edit-product-price" step="0.01" required>
+                        <small id="edit-product-price-suggestion" class="field-hint">Suggested lowest price: —</small>
                     </div>
                 </div>
 
@@ -452,6 +459,51 @@
                     <button type="submit" class="btn btn-primary">Update Product</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="request-product-modal" class="product-details-modal">
+        <div class="product-details-overlay"></div>
+        <div class="product-details-content">
+            <div class="product-details-topbar" style="display:flex;align-items:center;justify-content:space-between;">
+                <h3>Request Product</h3>
+                <button class="product-details-close" id="request-modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="request-product-body" style="padding:1rem 1.25rem; overflow:auto;">
+                <form id="request-product-form-modal" class="product-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="request-product-category">Product Category *</label>
+                            <select id="request-product-category">
+                                <option value="">Select category</option>
+                            </select>
+                            <div class="request-category-toggle" style="margin-top:0.5rem; display:flex; align-items:center;">
+                                <button type="button" id="request-new-category-toggle" class="btn btn-secondary btn-small request-new-category-btn" aria-pressed="false">Request New Category</button>
+                            </div>
+                            <input type="text" id="request-new-category-name" class="search-input request-new-category-input" style="margin-top:0.5rem; display:none;" placeholder="Enter new category name">
+                        </div>
+                        <div class="form-group">
+                            <label for="request-product-name">Product Name *</label>
+                            <input type="text" id="request-product-name" placeholder="Choose category first" disabled required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="request-product-notes">Details for staff (optional)</label>
+                        <textarea id="request-product-notes" rows="4" maxlength="500" placeholder="e.g., local/common name, quality details, suggested unit, etc."></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Submit Request</button>
+                        <button type="button" class="btn btn-secondary" id="request-form-cancel">Cancel</button>
+                    </div>
+                </form>
+
+                <div class="request-history-wrap" style="margin-top:1.25rem;">
+                    <h4 class="request-history-title" style="text-align:center;">My Requests</h4>
+                    <div id="request-product-history" class="overview-list" style="margin-top:0.5rem; max-height: 260px; overflow:auto;">
+                        <!-- history rows inserted here -->
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

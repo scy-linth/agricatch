@@ -4,7 +4,12 @@ class FarmerDashboard {
     constructor() {
         // Use relative /api so Netlify can proxy to Render.
         this.apiBase = '/api';
-        this.token = localStorage.getItem('token');
+        this.token = this.normalizeAuthToken(localStorage.getItem('token'));
+        if (this.token) {
+            localStorage.setItem('token', this.token);
+        } else {
+            localStorage.removeItem('token');
+        }
         this.userId = this.getUserId();
         this.lastOrdersById = new Map();
         this.lastOrdersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
@@ -25,6 +30,7 @@ class FarmerDashboard {
         this.overviewFetchInFlight = null;
         this.overviewRefreshTimer = null;
         this.myProductsCache = [];
+        this.catalogProductNames = [];
 
         if (!this.token) {
             window.location.href = '/?login=1';
@@ -32,6 +38,22 @@ class FarmerDashboard {
         }
 
         this.init();
+    }
+
+    normalizeAuthToken(rawToken) {
+        let token = String(rawToken || '').trim();
+        if (!token) return null;
+
+        if ((token.startsWith('"') && token.endsWith('"')) || (token.startsWith("'") && token.endsWith("'"))) {
+            token = token.slice(1, -1).trim();
+        }
+
+        if (/^Bearer\s+/i.test(token)) {
+            token = token.replace(/^Bearer\s+/i, '').trim();
+        }
+
+        if (!token || token === 'null' || token === 'undefined') return null;
+        return token;
     }
 
     fmtNumber(value, options) {
@@ -60,9 +82,12 @@ class FarmerDashboard {
     }
 
     init() {
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
         this.showDeniedBanner();
         this.checkFarmerAuth();
         this.setupEventListeners();
+        this.setupRequestModal();
         this.loadCategories();
         this.loadProductCatalogNames();
         this.setupProductSuggestionListeners();
@@ -70,6 +95,215 @@ class FarmerDashboard {
         this.setupDetailPanel();
         this.setupRealtime();
         this.initChat();
+    }
+
+    setupRequestModal() {
+        const openBtn = document.getElementById('request-product-btn');
+        const modal = document.getElementById('request-product-modal');
+        const overlay = modal?.querySelector('.product-details-overlay');
+        const closeBtn = document.getElementById('request-modal-close');
+        const cancelBtn = document.getElementById('request-form-cancel');
+
+        if (openBtn && modal) {
+            openBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.openRequestModal();
+            });
+        }
+        if (closeBtn) closeBtn.addEventListener('click', () => this.closeRequestModal());
+        if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeRequestModal());
+        if (overlay) overlay.addEventListener('click', () => this.closeRequestModal());
+
+        // Form handlers
+        const form = document.getElementById('request-product-form-modal');
+        if (form) {
+            form.addEventListener('submit', (e) => this.handleSubmitRequestForm(e));
+        }
+    }
+
+    async openRequestModal() {
+        try {
+            const modal = document.getElementById('request-product-modal');
+            if (!modal) return;
+            modal.classList.add('active');
+            document.documentElement.classList.add('modal-open');
+            document.body.classList.add('modal-open');
+            await this.loadRequestCategories();
+            await this.loadRequestHistory();
+        } catch (e) {
+            console.error('Open request modal error:', e);
+        }
+    }
+
+    closeRequestModal() {
+        const modal = document.getElementById('request-product-modal');
+        if (!modal) return;
+        modal.classList.remove('active');
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+    }
+
+    async loadRequestCategories() {
+        try {
+            const res = await fetch(`${this.apiBase}/products/categories`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const categories = Array.isArray(data.categories) ? data.categories : [];
+            const categoryEl = document.getElementById('request-product-category');
+            const newCategoryToggle = document.getElementById('request-new-category-toggle');
+            const newCategoryInput = document.getElementById('request-new-category-name');
+            if (!categoryEl) return;
+            categoryEl.innerHTML = ['<option value="">Select category</option>']
+                .concat(categories.map((c) => `<option value="${String(c.id)}">${this.escapeAttr(c.name)}</option>`))
+                .join('');
+
+            const setNewCategoryActive = (active) => {
+                if (!newCategoryToggle) return;
+                newCategoryToggle.classList.toggle('active', !!active);
+                newCategoryToggle.setAttribute('aria-pressed', active ? 'true' : 'false');
+            };
+            const isNewCategoryActive = () => !!newCategoryToggle?.classList.contains('active');
+
+            setNewCategoryActive(false);
+            if (newCategoryInput) {
+                newCategoryInput.value = '';
+                newCategoryInput.style.display = 'none';
+            }
+
+            const syncRequestCategoryState = () => {
+                const nameEl = document.getElementById('request-product-name');
+                if (!nameEl) return;
+                const has = !!String(categoryEl.value || '').trim();
+                const typedNewCategory = !!String(newCategoryInput?.value || '').trim();
+                const isRequestingNewCategory = isNewCategoryActive() || typedNewCategory;
+                if (typedNewCategory && newCategoryToggle && !isNewCategoryActive()) {
+                    setNewCategoryActive(true);
+                }
+                nameEl.disabled = !(has || isRequestingNewCategory);
+                if (!has && !isRequestingNewCategory) nameEl.placeholder = 'Choose category first';
+                else nameEl.placeholder = 'Enter requested product name';
+                categoryEl.disabled = isRequestingNewCategory;
+                if (newCategoryInput) newCategoryInput.style.display = isRequestingNewCategory ? '' : 'none';
+            };
+
+            categoryEl.onchange = syncRequestCategoryState;
+            if (newCategoryToggle) {
+                newCategoryToggle.onclick = (e) => {
+                    e.preventDefault();
+                    setNewCategoryActive(!isNewCategoryActive());
+                    if (!isNewCategoryActive() && newCategoryInput) newCategoryInput.value = '';
+                    syncRequestCategoryState();
+                };
+            }
+            if (newCategoryInput) newCategoryInput.oninput = syncRequestCategoryState;
+            syncRequestCategoryState();
+        } catch (e) {
+            console.error('Load request categories error:', e);
+        }
+    }
+
+    async handleSubmitRequestForm(e) {
+        try {
+            e.preventDefault();
+            const categoryEl = document.getElementById('request-product-category');
+            const nameEl = document.getElementById('request-product-name');
+            const notesEl = document.getElementById('request-product-notes');
+            const newCategoryToggle = document.getElementById('request-new-category-toggle');
+            const newCategoryNameEl = document.getElementById('request-new-category-name');
+            if (!categoryEl || !nameEl) return;
+            const categoryId = String(categoryEl.value || '').trim();
+            const name = String(nameEl.value || '').trim();
+            const notes = String(notesEl?.value || '').trim();
+            const requestedCategoryName = String(newCategoryNameEl?.value || '').trim();
+            const isRequestingNewCategory = !!newCategoryToggle?.classList.contains('active') || !!requestedCategoryName;
+            if (!categoryId && !isRequestingNewCategory) return this.showMessage('Please choose a category.', 'error');
+            if (isRequestingNewCategory && !requestedCategoryName) return this.showMessage('Please enter the new category name.', 'error');
+            if (!name) return this.showMessage('Please enter the product name.', 'error');
+
+            const res = await fetch(`${this.apiBase}/products/category-requests`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
+                body: JSON.stringify({
+                    category_id: categoryId ? Number(categoryId) : null,
+                    requested_category_name: isRequestingNewCategory ? requestedCategoryName : null,
+                    name,
+                    notes
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return this.showMessage(data.message || 'Unable to submit request', 'error');
+            this.showMessage('Request submitted for staff approval.', 'success');
+            // reset
+            (document.getElementById('request-product-form-modal') || {}).reset?.();
+            await this.loadRequestCategories();
+            await this.loadRequestHistory();
+        } catch (err) {
+            console.error('Submit request error:', err);
+            this.showMessage('Unable to submit request right now.', 'error');
+        }
+    }
+
+    async loadRequestHistory() {
+        try {
+            const requestUrls = [
+                `${this.apiBase}/products/category-requests/mine`,
+                `${this.apiBase}/products/requests/mine`
+            ];
+            let data = null;
+            for (const url of requestUrls) {
+                const res = await fetch(url, {
+                    headers: { Authorization: `Bearer ${this.token}` }
+                });
+                if (res.ok) {
+                    data = await res.json();
+                    break;
+                }
+                if (res.status === 401) {
+                    const errorData = await res.json().catch(() => ({}));
+                    this.showMessage(errorData.message || 'Session expired. Please log in again.', 'error');
+                    return;
+                }
+                if (res.status !== 404) {
+                    const errorData = await res.json().catch(() => ({}));
+                    this.showMessage(errorData.message || 'Unable to load request history right now.', 'error');
+                    return;
+                }
+            }
+            if (!data) return;
+            const listEl = document.getElementById('request-product-history');
+            if (!listEl) return;
+            const rows = Array.isArray(data.requests) ? data.requests : [];
+            if (!rows.length) {
+                listEl.innerHTML = '<div class="overview-list-item">No requests yet.</div>';
+                return;
+            }
+            listEl.innerHTML = rows.map(r => {
+                    const status = String(r.status || 'pending');
+                    const statusClass = status === 'approved' ? 'badge badge-success' : status === 'rejected' ? 'badge badge-danger' : 'badge badge-secondary';
+                    const cat = this.escapeAttr(r.category_name || r.requested_category_name || 'Uncategorized');
+                    const when = new Date(r.created_at).toLocaleString();
+                    const note = this.escapeAttr(r.notes || '');
+                    const review = this.escapeAttr(r.review_notes || '');
+                    return `
+                        <div class="overview-list-item request-history-item" style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+                            <div style="flex:1;">
+                                <div style="font-size:0.92rem;color:var(--text-secondary);">Product Name: <strong style="color:var(--text-primary);">${this.escapeAttr(r.name)}</strong></div>
+                                <div style="font-size:0.92rem;color:var(--text-secondary);">Product Category: <strong style="color:var(--text-primary);">${cat}</strong></div>
+                                <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.2rem;">${when}</div>
+                                ${note ? `<div style="margin-top:0.35rem;color:var(--text-muted);">${note}</div>` : ''}
+                                ${review ? `<div style="margin-top:0.35rem;color:var(--text-muted);font-style:italic;">Review: ${review}</div>` : ''}
+                            </div>
+                            <div style="margin-left:0.75rem;white-space:nowrap;align-self:flex-start;">
+                                <span class="${statusClass}" style="padding:6px 8px;border-radius:12px;font-weight:700;">${status}</span>
+                            </div>
+                        </div>
+                    `;
+            }).join('');
+        } catch (e) {
+            console.error('Load request history error:', e);
+        }
     }
 
     initChat() {
@@ -215,6 +449,20 @@ class FarmerDashboard {
                 if (nameEl) nameEl.textContent = `Farmer: ${data.user.full_name || data.user.username}`;
                 const emailEl = document.getElementById('user-email');
                 if (emailEl) emailEl.textContent = data.user.email || '—';
+                const farmerUserLabel = document.getElementById('farmer-user-label');
+                if (farmerUserLabel) farmerUserLabel.textContent = data.user.username || data.user.full_name || 'Account';
+                const farmerUserInitial = document.getElementById('farmer-user-initial');
+                if (farmerUserInitial) {
+                    const displayName = data.user.username || data.user.full_name || 'F';
+                    farmerUserInitial.textContent = String(displayName).charAt(0).toUpperCase();
+                }
+                const sidebarUserLabel = document.getElementById('farmer-sidebar-user-label');
+                if (sidebarUserLabel) sidebarUserLabel.textContent = data.user.username || data.user.full_name || 'Account';
+                const sidebarUserInitial = document.getElementById('farmer-sidebar-user-initial');
+                if (sidebarUserInitial) {
+                    const displayName = data.user.username || data.user.full_name || 'F';
+                    sidebarUserInitial.textContent = String(displayName).charAt(0).toUpperCase();
+                }
                 this.farmerId = data.user.id;
                 this.loadFarmerStats();
                 this.loadMyProducts();
@@ -308,11 +556,9 @@ class FarmerDashboard {
             });
         }
 
-        document.getElementById('logout-btn')?.addEventListener('click', () => this.logout());
         document.getElementById('add-product-form')?.addEventListener('submit', (e) => this.handleAddProduct(e));
         document.getElementById('edit-product-form')?.addEventListener('submit', (e) => this.handleEditProduct(e));
         document.getElementById('save-shop-profile-btn')?.addEventListener('click', (e) => this.handleShopProfileUpdate(e));
-        document.getElementById('submit-custom-product-request')?.addEventListener('click', () => this.submitCustomProductRequest());
 
         const editShopBtn = document.getElementById('edit-shop-profile-btn');
         if (editShopBtn) {
@@ -323,9 +569,14 @@ class FarmerDashboard {
             cancelShopBtn.addEventListener('click', () => this.cancelShopProfileEdit());
         }
 
-        const searchInput = document.getElementById('farmer-search-input');
-        if (searchInput) {
-            searchInput.addEventListener('input', () => this.applyTopSearch());
+        const productsSearchInput = document.getElementById('products-search-input');
+        if (productsSearchInput) {
+            productsSearchInput.addEventListener('input', () => this.filterProducts());
+        }
+
+        const ordersSearchInput = document.getElementById('orders-search-input');
+        if (ordersSearchInput) {
+            ordersSearchInput.addEventListener('input', () => this.applyOrdersSearch());
         }
 
         const exportBtn = document.getElementById('overview-export-csv-btn');
@@ -336,6 +587,62 @@ class FarmerDashboard {
         const accountBtn = document.getElementById('farmer-account-btn');
         if (accountBtn) {
             accountBtn.addEventListener('click', () => this.openAccountPanel());
+        }
+
+        const setupAccountDropdown = (buttonId, menuId) => {
+            const userAccountBtn = document.getElementById(buttonId);
+            const userDropdownMenu = document.getElementById(menuId);
+            if (!(userAccountBtn && userDropdownMenu)) return;
+
+            userAccountBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const isOpen = userDropdownMenu.style.display === 'block';
+                userDropdownMenu.style.display = isOpen ? 'none' : 'block';
+                userAccountBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!userDropdownMenu.contains(e.target) && !userAccountBtn.contains(e.target)) {
+                    userDropdownMenu.style.display = 'none';
+                    userAccountBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
+        };
+
+        setupAccountDropdown('farmer-user-account-btn', 'farmer-user-dropdown-menu');
+        setupAccountDropdown('farmer-sidebar-account-btn', 'farmer-sidebar-dropdown-menu');
+
+        const myAccountDropdownBtn = document.getElementById('farmer-my-account-btn');
+        if (myAccountDropdownBtn) {
+            myAccountDropdownBtn.addEventListener('click', () => {
+                const topMenu = document.getElementById('farmer-user-dropdown-menu');
+                const topBtn = document.getElementById('farmer-user-account-btn');
+                if (topMenu) topMenu.style.display = 'none';
+                if (topBtn) topBtn.setAttribute('aria-expanded', 'false');
+                this.openAccountPanel();
+            });
+        }
+
+        const sidebarMyAccountBtn = document.getElementById('farmer-sidebar-my-account-btn');
+        if (sidebarMyAccountBtn) {
+            sidebarMyAccountBtn.addEventListener('click', () => {
+                const sideMenu = document.getElementById('farmer-sidebar-dropdown-menu');
+                const sideBtn = document.getElementById('farmer-sidebar-account-btn');
+                if (sideMenu) sideMenu.style.display = 'none';
+                if (sideBtn) sideBtn.setAttribute('aria-expanded', 'false');
+                this.openAccountPanel();
+            });
+        }
+
+        const logoutDropdownBtn = document.getElementById('farmer-logout-menu-btn');
+        if (logoutDropdownBtn) {
+            logoutDropdownBtn.addEventListener('click', () => this.logout());
+        }
+
+        const sidebarLogoutBtn = document.getElementById('farmer-sidebar-logout-btn');
+        if (sidebarLogoutBtn) {
+            sidebarLogoutBtn.addEventListener('click', () => this.logout());
         }
 
         const recentPrev = document.getElementById('overview-recent-prev');
@@ -354,12 +661,12 @@ class FarmerDashboard {
             });
         }
 
-        document.querySelectorAll('.overview-range-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const range = btn.getAttribute('data-range');
-                this.setOverviewRange(range);
+        const overviewRangeSelect = document.getElementById('overview-range-select');
+        if (overviewRangeSelect) {
+            overviewRangeSelect.addEventListener('change', () => {
+                this.setOverviewRange(overviewRangeSelect.value);
             });
-        });
+        }
 
         const customApplyBtn = document.getElementById('overview-custom-apply');
         if (customApplyBtn) {
@@ -389,7 +696,9 @@ class FarmerDashboard {
 
         // Tab switching
         document.getElementById('list-products-tab')?.addEventListener('click', () => this.switchTab('list-products'));
-        document.getElementById('add-product-tab')?.addEventListener('click', () => this.switchTab('add-product'));
+        document.getElementById('add-product-tab')?.addEventListener('click', () => {
+            this.switchTab('add-product');
+        });
 
         // Order status tabs - all 6 statuses
         document.getElementById('pending-orders-tab')?.addEventListener('click', () => this.switchOrderTab('pending'));
@@ -400,10 +709,11 @@ class FarmerDashboard {
         document.getElementById('cancelled-orders-tab')?.addEventListener('click', () => this.switchOrderTab('cancelled'));
 
         // Product filters
-        const productStatusFilter = document.getElementById('product-status-filter');
-        if (productStatusFilter) {
-            productStatusFilter.addEventListener('change', () => this.filterProducts());
-        }
+        document.querySelectorAll('input[name="product-status-filter"]').forEach((radio) => {
+            radio.addEventListener('change', () => this.filterProducts());
+        });
+        document.getElementById('product-category-filter')?.addEventListener('change', () => this.filterProducts());
+        document.getElementById('product-sort-select')?.addEventListener('change', () => this.filterProducts());
         
         // Optional refresh buttons (check if they exist)
         const refreshOrdersBtn = document.getElementById('refresh-orders-btn');
@@ -428,6 +738,12 @@ class FarmerDashboard {
         if (editImageInput) {
             editImageInput.addEventListener('change', () => this.previewImage(editImageInput, 'edit-product-image-preview'));
         }
+
+        const previewModal = document.getElementById('farmer-product-preview-modal');
+        const previewCloseBtn = document.getElementById('farmer-product-preview-close');
+        const previewOverlay = previewModal?.querySelector('.product-details-overlay');
+        if (previewCloseBtn) previewCloseBtn.addEventListener('click', () => this.closeMyProductPreview());
+        if (previewOverlay) previewOverlay.addEventListener('click', () => this.closeMyProductPreview());
 
         // Detail panel actions (event delegation)
         document.addEventListener('click', (e) => {
@@ -474,15 +790,52 @@ class FarmerDashboard {
 
             const data = await response.json();
             const names = Array.isArray(data.names) ? data.names : [];
-            const addList = document.getElementById('product-name-suggestions');
-            const editList = document.getElementById('edit-product-name-suggestions');
-
-            const optionsHtml = names.map((name) => `<option value="${this.escapeAttr(name)}"></option>`).join('');
-            if (addList) addList.innerHTML = optionsHtml;
-            if (editList) editList.innerHTML = optionsHtml;
+            this.catalogProductNames = names;
+            this.renderProductNameSuggestions('add');
+            this.renderProductNameSuggestions('edit');
         } catch (error) {
             console.error('Error loading product catalog names:', error);
         }
+    }
+
+    renderProductNameSuggestions(mode = 'add') {
+        const isEdit = mode === 'edit';
+        const nameInput = document.getElementById(isEdit ? 'edit-product-name' : 'product-name');
+        const listEl = document.getElementById(isEdit ? 'edit-product-name-suggestions' : 'product-name-suggestions');
+        if (!nameInput || !listEl) return;
+
+        if (nameInput.disabled) {
+            listEl.classList.remove('open');
+            listEl.innerHTML = '';
+            return;
+        }
+
+        const query = String(nameInput.value || '').trim().toLowerCase();
+        const source = Array.isArray(this.catalogProductNames) ? this.catalogProductNames : [];
+        const matches = source
+            .filter((name) => !query || String(name).toLowerCase().includes(query))
+            .slice(0, 10);
+
+        if (!matches.length) {
+            listEl.classList.remove('open');
+            listEl.innerHTML = '';
+            return;
+        }
+
+        listEl.innerHTML = matches.map((name) => (
+            `<button type="button" class="product-name-option" data-name="${this.escapeAttr(name)}">${this.escapeHtml(name)}</button>`
+        )).join('');
+        listEl.classList.add('open');
+
+        listEl.querySelectorAll('.product-name-option').forEach((btn) => {
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                const selected = String(btn.getAttribute('data-name') || '').trim();
+                nameInput.value = selected;
+                listEl.classList.remove('open');
+                this.updatePriceSuggestion(mode);
+            });
+        });
     }
 
     async loadCategories() {
@@ -510,14 +863,33 @@ class FarmerDashboard {
 
             if (addSelect) addSelect.innerHTML = renderOptions(addSelect.value || '');
             if (editSelect) editSelect.innerHTML = renderOptions(editSelect.value || '');
-
-            const defaultCategoryId = categories[0]?.id || '';
-            if (addSelect && !addSelect.value) addSelect.value = String(defaultCategoryId || '');
-
             await this.loadProductCatalogNames(addSelect?.value || null);
+            this.syncProductNameAvailability('add');
+            this.syncProductNameAvailability('edit');
         } catch (error) {
             console.error('Error loading categories:', error);
         }
+    }
+
+    syncProductNameAvailability(mode = 'add') {
+        const isEdit = mode === 'edit';
+        const categoryInput = document.getElementById(isEdit ? 'edit-product-category' : 'product-category');
+        const nameInput = document.getElementById(isEdit ? 'edit-product-name' : 'product-name');
+        const hint = document.getElementById(isEdit ? 'edit-product-price-suggestion' : 'product-price-suggestion');
+        if (!nameInput) return;
+
+        const hasCategory = !!String(categoryInput?.value || '').trim();
+        nameInput.disabled = !hasCategory;
+        if (!hasCategory) {
+            nameInput.value = '';
+            nameInput.placeholder = 'Choose category first';
+            if (hint) hint.textContent = 'Suggested lowest price: —';
+            this.renderProductNameSuggestions(mode);
+            return;
+        }
+
+        nameInput.placeholder = 'Select product name';
+        this.renderProductNameSuggestions(mode);
     }
 
     setupProductSuggestionListeners() {
@@ -529,19 +901,42 @@ class FarmerDashboard {
         if (addName) {
             addName.addEventListener('change', () => this.updatePriceSuggestion('add'));
             addName.addEventListener('blur', () => this.updatePriceSuggestion('add'));
+            addName.addEventListener('input', () => this.renderProductNameSuggestions('add'));
+            addName.addEventListener('focus', () => this.renderProductNameSuggestions('add'));
+            addName.addEventListener('blur', () => setTimeout(() => {
+                const list = document.getElementById('product-name-suggestions');
+                if (list) list.classList.remove('open');
+            }, 120));
         }
         if (editName) {
             editName.addEventListener('change', () => this.updatePriceSuggestion('edit'));
             editName.addEventListener('blur', () => this.updatePriceSuggestion('edit'));
+            editName.addEventListener('input', () => this.renderProductNameSuggestions('edit'));
+            editName.addEventListener('focus', () => this.renderProductNameSuggestions('edit'));
+            editName.addEventListener('blur', () => setTimeout(() => {
+                const list = document.getElementById('edit-product-name-suggestions');
+                if (list) list.classList.remove('open');
+            }, 120));
         }
         if (addCategory) addCategory.addEventListener('change', async () => {
+            this.syncProductNameAvailability('add');
             await this.loadProductCatalogNames(addCategory.value || null);
             this.updatePriceSuggestion('add');
         });
         if (editCategory) editCategory.addEventListener('change', async () => {
+            this.syncProductNameAvailability('edit');
             await this.loadProductCatalogNames(editCategory.value || null);
             this.updatePriceSuggestion('edit');
         });
+
+        const addPrice = document.getElementById('product-price');
+        if (addPrice) addPrice.addEventListener('focus', () => this.updatePriceSuggestion('add'));
+
+        const editPrice = document.getElementById('edit-product-price');
+        if (editPrice) editPrice.addEventListener('focus', () => this.updatePriceSuggestion('edit'));
+
+        this.syncProductNameAvailability('add');
+        this.syncProductNameAvailability('edit');
     }
 
     async submitCustomProductRequest() {
@@ -597,12 +992,12 @@ class FarmerDashboard {
         const name = String(nameInput.value || '').trim();
         const categoryId = String(categoryInput?.value || '').trim();
         if (!name) {
-            hint.textContent = 'Choose a catalog item to see suggested lowest and average selling price.';
+            hint.textContent = 'Suggested lowest price: —';
             return;
         }
 
         try {
-            hint.textContent = 'Checking suggested price...';
+            hint.textContent = 'Suggested lowest price: checking...';
             const params = new URLSearchParams({ name });
             if (categoryId) params.set('category_id', categoryId);
 
@@ -610,26 +1005,23 @@ class FarmerDashboard {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (!response.ok) {
-                hint.textContent = 'No pricing suggestion available yet for this product name.';
+                hint.textContent = 'Suggested lowest price: —';
                 return;
             }
 
             const data = await response.json();
-            if (!data || !data.sample_count) {
-                hint.textContent = 'No delivered sales history yet for this item. You can set your own introductory price.';
-                return;
-            }
-
-            const lowest = Number(data.suggested_lowest_price || 0);
-            const average = Number(data.average_price || 0);
-            hint.textContent = `Suggested lowest: ${this.fmtCurrency(lowest)} • Market average: ${this.fmtCurrency(average)} • Based on ${this.fmtNumber(data.sample_count)} delivered sales.`;
+            const hasSystemSample = Number(data?.sample_count || 0) > 0;
+            const lowest = hasSystemSample ? Number(data.suggested_lowest_price || 0) : 0;
+            hint.textContent = lowest > 0
+                ? `Suggested lowest price: ${this.fmtCurrency(lowest)}`
+                : 'Suggested lowest price: —';
 
             if (priceInput && (!priceInput.value || Number(priceInput.value) <= 0) && lowest > 0) {
                 priceInput.value = lowest.toFixed(2);
             }
         } catch (error) {
             console.error('Error updating price suggestion:', error);
-            hint.textContent = 'Unable to fetch pricing suggestion right now.';
+            hint.textContent = 'Suggested lowest price: —';
         }
     }
 
@@ -788,6 +1180,7 @@ class FarmerDashboard {
         if (safeSection === 'orders') {
             this.loadMyOrders();
         } else if (safeSection === 'products') {
+            this.switchTab('list-products');
             this.loadMyProducts();
         } else if (safeSection === 'overview') {
             this.loadOverviewMetrics();
@@ -857,14 +1250,18 @@ class FarmerDashboard {
             });
             if (statsResponse.ok) {
                 const stats = await statsResponse.json();
-                const totalOrdersEl = document.getElementById('total-orders');
-                const totalSoldEl = document.getElementById('total-sold');
-                const totalRevenueEl = document.getElementById('total-revenue');
                 const unreadMessagesEl = document.getElementById('unread-messages');
 
-                if (totalOrdersEl) totalOrdersEl.textContent = this.fmtNumber(stats.total_orders ?? 0);
-                if (totalSoldEl) totalSoldEl.textContent = this.fmtNumber(stats.total_sold ?? 0);
-                if (totalRevenueEl) totalRevenueEl.textContent = this.fmtCurrency(stats.total_revenue || 0);
+                // Overview totals are rendered from /farmers/me/metrics so they match the delivered trend chart.
+                // Avoid racing /me/stats updates that can cause the Revenue card and chart to disagree.
+                if (this.activeSection !== 'overview') {
+                    const totalOrdersEl = document.getElementById('total-orders');
+                    const totalSoldEl = document.getElementById('total-sold');
+                    const totalRevenueEl = document.getElementById('total-revenue');
+                    if (totalOrdersEl) totalOrdersEl.textContent = this.fmtNumber(stats.total_orders ?? 0);
+                    if (totalSoldEl) totalSoldEl.textContent = this.fmtNumber(stats.total_sold ?? 0);
+                    if (totalRevenueEl) totalRevenueEl.textContent = this.fmtCurrency(stats.total_revenue || 0);
+                }
                 const unread = stats.unread_customers ?? 0;
                 if (unreadMessagesEl) unreadMessagesEl.textContent = this.fmtNumber(unread);
 
@@ -1138,7 +1535,6 @@ class FarmerDashboard {
                 const data = await response.json();
                 this.myProductsCache = Array.isArray(data.products) ? data.products : [];
                 this.renderMyProducts(data.products);
-                this.renderOverviewLowStock();
             }
         } catch (error) {
             console.error('Error loading products:', error);
@@ -1162,6 +1558,23 @@ class FarmerDashboard {
         } catch (_) {
             return '';
         }
+    }
+
+    normalizeDateKey(value) {
+        if (!value) return '';
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            const direct = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (direct) return direct[1];
+        }
+
+        const d = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(d.getTime())) return '';
+
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
     }
 
     showOverviewCustomPanel() {
@@ -1231,15 +1644,12 @@ class FarmerDashboard {
             this.overviewRangeDays = days;
         }
 
-        document.querySelectorAll('.overview-range-btn').forEach(b => {
-            const r = String(b.getAttribute('data-range') || '').trim().toLowerCase();
-            const isActive = (this.overviewRangeMode === 'all' && r === 'all')
-                || (this.overviewRangeMode === 'days' && r === String(this.overviewRangeDays));
-            b.classList.toggle('active', isActive);
-        });
+        const select = document.getElementById('overview-range-select');
+        if (select) {
+            select.value = this.overviewRangeMode === 'all' ? 'all' : String(this.overviewRangeDays);
+        }
 
         this.loadOverviewMetrics({ force: true });
-        this.loadFarmerStats({ skipProducts: true });
     }
 
     setOverviewCustomRange(from, to) {
@@ -1248,13 +1658,10 @@ class FarmerDashboard {
         this.overviewCustomTo = to;
         this.hideOverviewCustomPanel();
 
-        document.querySelectorAll('.overview-range-btn').forEach(b => {
-            const r = String(b.getAttribute('data-range') || '').trim().toLowerCase();
-            b.classList.toggle('active', r === 'custom');
-        });
+        const select = document.getElementById('overview-range-select');
+        if (select) select.value = 'custom';
 
         this.loadOverviewMetrics({ force: true });
-        this.loadFarmerStats({ skipProducts: true });
     }
 
     async loadOverviewMetrics({ force = false } = {}) {
@@ -1315,15 +1722,33 @@ class FarmerDashboard {
         this.renderOverviewCharts(metrics);
         this.renderOverviewRecentOrders(metrics.recentOrders || []);
         this.renderOverviewTopProductsList(metrics.topProducts || []);
-        this.renderOverviewDownloads();
-        this.renderOverviewLowStock();
+
+        const statusKeys = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+        const totalOrders = statusKeys.reduce((sum, key) => sum + Number(metrics?.ordersByStatus?.[key] || 0), 0);
+        const totalSold = Number(metrics?.ordersByStatus?.delivered || 0);
+        const totalRevenue = (Array.isArray(metrics?.revenueByDay)
+            ? metrics.revenueByDay.reduce((sum, row) => sum + Number(row?.revenue || 0), 0)
+            : 0);
+
+        const totalOrdersEl = document.getElementById('total-orders');
+        const totalSoldEl = document.getElementById('total-sold');
+        const totalRevenueEl = document.getElementById('total-revenue');
+        if (totalOrdersEl) totalOrdersEl.textContent = this.fmtNumber(totalOrders);
+        if (totalSoldEl) totalSoldEl.textContent = this.fmtNumber(totalSold);
+        if (totalRevenueEl) totalRevenueEl.textContent = this.fmtCurrency(totalRevenue);
     }
 
     renderOverviewTopProductsList(topProducts) {
         const wrap = document.getElementById('overview-top-products-list');
         if (!wrap) return;
 
-        const list = Array.isArray(topProducts) ? topProducts : [];
+        const list = (Array.isArray(topProducts) ? topProducts : [])
+            .slice()
+            .sort((a, b) => {
+                const soldDiff = Number(b.sold_qty || 0) - Number(a.sold_qty || 0);
+                if (soldDiff !== 0) return soldDiff;
+                return Number(b.revenue || 0) - Number(a.revenue || 0);
+            });
         if (list.length === 0) {
             wrap.innerHTML = '<div class="empty-state"><p>No sales yet.</p></div>';
             return;
@@ -1331,16 +1756,19 @@ class FarmerDashboard {
 
         wrap.innerHTML = list.map((p, idx) => {
             const sold = Number(p.sold_qty || 0);
+            const totalSales = Number(p.total_sales || p.order_count || 0);
             const revenue = this.fmtCurrency(p.revenue || 0);
-            const searchText = `${p.product_name} ${sold} ${revenue}`.toLowerCase();
+            const averagePrice = sold > 0 ? this.fmtCurrency((Number(p.revenue || 0) / sold) || 0) : this.fmtCurrency(0);
+            const searchText = `${p.product_name} ${sold} ${totalSales} ${revenue} ${averagePrice}`.toLowerCase();
             return `
                 <div class="overview-row" data-search-text="${this.escapeAttr(searchText)}">
                     <div class="overview-row-main">
                         <div class="overview-row-title">${idx + 1}. ${this.escapeHtml(p.product_name || 'Product')}</div>
-                        <div class="overview-row-sub">Sold: ${this.fmtNumber(sold)}</div>
+                        <div class="overview-row-sub">Items Sold: ${this.fmtNumber(sold)} • Total Sales: ${this.fmtNumber(totalSales)}</div>
                     </div>
                     <div class="overview-row-meta">
                         <span class="overview-amount">${revenue}</span>
+                        <span class="overview-pill">Avg: ${averagePrice}</span>
                     </div>
                 </div>
             `;
@@ -1358,8 +1786,8 @@ class FarmerDashboard {
         const values = [];
         const map = new Map();
         for (const row of (Array.isArray(revenueByDay) ? revenueByDay : [])) {
-            const key = String(row.date).slice(0, 10);
-            map.set(key, Number(row.revenue) || 0);
+            const key = this.normalizeDateKey(row?.date);
+            if (key) map.set(key, Number(row.revenue) || 0);
         }
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -1384,8 +1812,8 @@ class FarmerDashboard {
         const values = [];
         const map = new Map();
         for (const row of (Array.isArray(revenueByDay) ? revenueByDay : [])) {
-            const key = String(row.date).slice(0, 10);
-            map.set(key, Number(row.revenue) || 0);
+            const key = this.normalizeDateKey(row?.date);
+            if (key) map.set(key, Number(row.revenue) || 0);
         }
 
         const start = new Date(`${from}T00:00:00`);
@@ -1414,8 +1842,11 @@ class FarmerDashboard {
             let values = [];
             if (metrics?.range === 'all') {
                 const rows = Array.isArray(metrics.revenueByDay) ? metrics.revenueByDay : [];
-                labels = rows.map(r => String(r.date).slice(0, 10));
-                values = rows.map(r => Number(r.revenue) || 0);
+                const parsedRows = rows
+                    .map((row) => ({ key: this.normalizeDateKey(row?.date), revenue: Number(row?.revenue) || 0 }))
+                    .filter((row) => !!row.key);
+                labels = parsedRows.map((row) => row.key);
+                values = parsedRows.map((row) => row.revenue);
             } else if (metrics?.range === 'custom' && metrics?.from && metrics?.to) {
                 const filled = this.buildDateSpanLabels(metrics.revenueByDay, metrics.from, metrics.to);
                 labels = filled.labels;
@@ -1431,7 +1862,7 @@ class FarmerDashboard {
                 data: {
                     labels,
                     datasets: [{
-                        label: 'Revenue',
+                        label: 'Sales',
                         data: values,
                         tension: 0.35,
                         fill: true
@@ -1503,7 +1934,13 @@ class FarmerDashboard {
         // Top products (bar)
         const topCanvas = document.getElementById('overview-top-products-chart');
         if (topCanvas) {
-            const top = Array.isArray(metrics.topProducts) ? metrics.topProducts : [];
+            const top = (Array.isArray(metrics.topProducts) ? metrics.topProducts : [])
+                .slice()
+                .sort((a, b) => {
+                    const soldDiff = Number(b.sold_qty || 0) - Number(a.sold_qty || 0);
+                    if (soldDiff !== 0) return soldDiff;
+                    return Number(b.revenue || 0) - Number(a.revenue || 0);
+                });
             const labels = top.map(p => p.product_name);
             const values = top.map(p => Number(p.sold_qty || 0));
             const cfg = {
@@ -1617,51 +2054,6 @@ class FarmerDashboard {
         }).join('');
     }
 
-    getDownloadsKey() {
-        return `farmerOverviewDownloads:${this.userId || 'me'}`;
-    }
-
-    readDownloads() {
-        try {
-            const raw = localStorage.getItem(this.getDownloadsKey());
-            const arr = JSON.parse(raw || '[]');
-            return Array.isArray(arr) ? arr : [];
-        } catch (_) {
-            return [];
-        }
-    }
-
-    writeDownloads(items) {
-        try {
-            localStorage.setItem(this.getDownloadsKey(), JSON.stringify(items.slice(0, 10)));
-        } catch (_) {
-            // ignore
-        }
-    }
-
-    renderOverviewDownloads() {
-        const wrap = document.getElementById('overview-downloads');
-        if (!wrap) return;
-        const items = this.readDownloads();
-        if (items.length === 0) {
-            wrap.innerHTML = '<div class="empty-state"><p>No downloads yet.</p></div>';
-            return;
-        }
-
-        wrap.innerHTML = items.map(it => {
-            const when = it.ts ? new Date(it.ts).toLocaleString() : '';
-            const searchText = `${it.name || ''} ${when}`.toLowerCase();
-            return `
-                <div class="overview-row" data-search-text="${this.escapeAttr(searchText)}">
-                    <div class="overview-row-main">
-                        <div class="overview-row-title">${this.escapeHtml(it.name || 'report.csv')}</div>
-                        <div class="overview-row-sub">${this.escapeHtml(when)}</div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
     parseFilenameFromDisposition(disposition) {
         try {
             const m = String(disposition || '').match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
@@ -1707,11 +2099,6 @@ class FarmerDashboard {
             a.remove();
             URL.revokeObjectURL(urlObj);
 
-            const items = [{ name: filename, ts: Date.now() }, ...this.readDownloads()]
-                .filter((v, idx, arr) => arr.findIndex(x => x.name === v.name && x.ts === v.ts) === idx);
-            this.writeDownloads(items);
-            this.renderOverviewDownloads();
-
             this.showMessage('Export downloaded!', 'success');
         } catch (error) {
             console.error('Export CSV error:', error);
@@ -1737,11 +2124,12 @@ class FarmerDashboard {
             const stock = Number(product.stock_quantity ?? 0);
             const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
             const status = !isAvailable ? 'disabled' : (stock <= 0 ? 'no_stock' : 'available');
-            const displayStatus = isAvailable ? 'Available' : 'Disabled';
-            const toggleLabel = isAvailable ? 'Disable' : 'Enable';
-            const toggleArg = !isAvailable;
+            const displayStatus = !isAvailable ? 'Disabled' : (stock <= 0 ? 'No Stock' : 'Available');
+            const reviewCount = Number(product.total_reviews || 0);
+            const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            const categoryName = String(product.category_name || '').trim();
             return `
-            <div class="product-card" data-status="${status}" data-stock-quantity="${stock}">
+            <div class="product-card" data-status="${status}" data-stock-quantity="${stock}" data-category="${this.escapeAttr(categoryName)}" data-price="${Number(product.price || 0)}" data-rating="${Number(product.average_rating || 0)}" data-reviews="${reviewCount}" data-created-at="${this.escapeAttr(product.created_at || '')}" onclick="farmerDashboard.openMyProductPreview(${product.id})" style="cursor:pointer;">
                 <img src="${product.image_url || '/images/logo.png'}"
                      alt="${product.name}" class="product-image" onerror="this.src='/images/logo.png'">
                 <div class="product-info">
@@ -1751,20 +2139,91 @@ class FarmerDashboard {
                         <span class="product-status">${displayStatus}</span> |
                         Stock: ${product.stock_quantity}
                     </div>
-                    <div class="product-actions">
-                        <button onclick="farmerDashboard.editProduct(${product.id})" class="btn btn-small">Edit</button>
-                        <button onclick="farmerDashboard.toggleProductStatus(${product.id}, ${toggleArg})" class="btn btn-small">
-                            ${toggleLabel}
-                        </button>
-                        <button onclick="farmerDashboard.deleteProduct(${product.id})" class="btn btn-small btn-danger">Delete</button>
+                    <div class="product-meta product-card-summary">
+                        <span>Reviews: ${this.fmtNumber(reviewCount)} • ${avgRating}★</span>
                     </div>
+                    <div class="product-card-click-hint" aria-hidden="true">Click card to view details</div>
                 </div>
             </div>
         `;
         }).join('');
 
+        this.refreshProductCategoryFilterOptions(products);
+
         // Apply current filters after re-render
         this.filterProducts();
+    }
+
+    refreshProductCategoryFilterOptions(products) {
+        const categoryFilter = document.getElementById('product-category-filter');
+        if (!categoryFilter) return;
+
+        const previousValue = String(categoryFilter.value || '').trim().toLowerCase();
+        const categories = Array.from(new Set(
+            (Array.isArray(products) ? products : [])
+                .map((p) => String(p?.category_name || '').trim())
+                .filter(Boolean)
+        )).sort((a, b) => a.localeCompare(b));
+
+        categoryFilter.innerHTML = ['<option value="">Category: All</option>']
+            .concat(categories.map((category) => `<option value="${this.escapeAttr(category.toLowerCase())}">${this.escapeHtml(category)}</option>`))
+            .join('');
+
+        if (previousValue && categories.some((category) => category.toLowerCase() === previousValue)) {
+            categoryFilter.value = previousValue;
+        }
+    }
+
+    openMyProductPreview(productId) {
+        const product = (Array.isArray(this.myProductsCache) ? this.myProductsCache : []).find((p) => Number(p.id) === Number(productId));
+        if (!product) return;
+
+        const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+        const status = isAvailable ? 'Available' : 'Disabled';
+        const toggleLabel = isAvailable ? 'Disable' : 'Enable';
+        const toggleArg = !isAvailable;
+        const harvestDate = product.harvest_date ? new Date(product.harvest_date).toLocaleDateString() : 'Not specified';
+        const expiryDate = product.expiry_date ? new Date(product.expiry_date).toLocaleDateString() : 'Not specified';
+        const reviewCount = this.fmtNumber(product.total_reviews || 0);
+        const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+        const body = document.getElementById('farmer-product-preview-body');
+        const modal = document.getElementById('farmer-product-preview-modal');
+        if (!(body && modal)) return;
+
+        body.innerHTML = `
+            <div class="farmer-product-preview-grid" style="display:grid;grid-template-columns:minmax(220px,320px) 1fr;gap:1.15rem;align-items:start;">
+                <img src="${this.escapeAttr(product.image_url || '/images/logo.png')}" alt="${this.escapeAttr(product.name)}" style="width:100%;max-width:260px;border-radius:12px;border:1px solid #e2e8f0;object-fit:cover;" onerror="this.src='/images/logo.png'">
+                <div>
+                    <h3 style="margin:0 0 0.5rem 0;">${this.escapeHtml(product.name)}</h3>
+                    <div style="font-weight:700;color:var(--primary-color);margin-bottom:0.5rem;">${this.fmtCurrency(product.price)} per ${this.escapeHtml(product.unit || 'item')}</div>
+                    <div style="display:grid;gap:0.45rem;color:var(--text-secondary);line-height:1.5;">
+                        <div><strong>Status:</strong> ${this.escapeHtml(status)}</div>
+                        <div><strong>Stock:</strong> ${this.fmtNumber(product.stock_quantity || 0)}</div>
+                        <div><strong>Harvest Date:</strong> ${this.escapeHtml(harvestDate)}</div>
+                        <div><strong>Expiry Date:</strong> ${this.escapeHtml(expiryDate)}</div>
+                        <div><strong>Reviews:</strong> ${reviewCount} (${avgRating}★)</div>
+                        <div><strong>Location:</strong> ${this.escapeHtml(product.location || 'Not specified')}</div>
+                        <div><strong>Description:</strong> ${this.escapeHtml(product.description || 'No description provided.')}</div>
+                    </div>
+                    <div class="product-preview-actions" style="display:flex;gap:0.55rem;flex-wrap:wrap;margin-top:1rem;">
+                        <button type="button" class="btn product-preview-action-btn" onclick="farmerDashboard.closeMyProductPreview(); farmerDashboard.editProduct(${product.id});">Edit</button>
+                        <button type="button" class="btn product-preview-action-btn" onclick="farmerDashboard.closeMyProductPreview(); farmerDashboard.toggleProductStatus(${product.id}, ${toggleArg});">${toggleLabel}</button>
+                        <button type="button" class="btn btn-danger product-preview-action-btn" onclick="farmerDashboard.closeMyProductPreview(); farmerDashboard.deleteProduct(${product.id});">Delete</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        modal.classList.add('active');
+        document.body.classList.add('modal-open');
+    }
+
+    closeMyProductPreview() {
+        const modal = document.getElementById('farmer-product-preview-modal');
+        if (!modal) return;
+        modal.classList.remove('active');
+        document.body.classList.remove('modal-open');
     }
 
     async handleAddProduct(e) {
@@ -2018,6 +2477,9 @@ class FarmerDashboard {
                 document.getElementById('edit-product-stock').value = product.stock_quantity;
                 document.getElementById('edit-product-description').value = product.description || '';
                 document.getElementById('edit-product-location').value = product.location || '';
+                await this.loadProductCatalogNames(product.category_id || null);
+                this.syncProductNameAvailability('edit');
+                this.updatePriceSuggestion('edit');
                 
                 if (product.harvest_date) {
                     document.getElementById('edit-harvest-date').value = product.harvest_date;
@@ -2083,34 +2545,113 @@ class FarmerDashboard {
         document.querySelectorAll('.product-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
 
         // Show selected tab
-        document.getElementById(`${tabName}-section`).classList.add('active');
-        document.getElementById(`${tabName}-tab`).classList.add('active');
+        const targetSection = document.getElementById(`${tabName}-section`);
+        const targetTab = document.getElementById(`${tabName}-tab`);
+        if (targetSection) targetSection.classList.add('active');
+        if (targetTab) targetTab.classList.add('active');
+
+        const productsSearchRow = document.querySelector('.products-search-row');
+        if (productsSearchRow) {
+            productsSearchRow.style.display = tabName === 'list-products' ? '' : 'none';
+        }
     }
 
     filterProducts() {
-        const searchTerm = (document.getElementById('farmer-search-input')?.value || '').toLowerCase().trim();
-        const statusFilter = document.getElementById('product-status-filter')?.value || 'available';
+        const searchTerm = (document.getElementById('products-search-input')?.value || '').toLowerCase().trim();
+        const statusFilter = document.querySelector('input[name="product-status-filter"]:checked')?.value || 'all';
+        const categoryFilter = (document.getElementById('product-category-filter')?.value || '').toLowerCase().trim();
 
         const productCards = document.querySelectorAll('#my-products-grid .product-card');
 
         productCards.forEach(card => {
             const name = card.querySelector('.product-name').textContent.toLowerCase();
             const cardStatus = String(card.getAttribute('data-status') || '').toLowerCase();
-            const stockQty = Number(card.getAttribute('data-stock-quantity') || 0);
+            const cardCategory = String(card.getAttribute('data-category') || '').toLowerCase().trim();
 
             const matchesSearch = !searchTerm || name.includes(searchTerm);
-            const matchesStatus = (
-                                (statusFilter === 'available' && cardStatus === 'available') ||
-                                (statusFilter === 'no_stock' && cardStatus === 'no_stock') ||
-                                (statusFilter === 'disabled' && cardStatus === 'disabled')
-                                );
+            const matchesStatus = statusFilter === 'all' || cardStatus === statusFilter;
+            const matchesCategory = !categoryFilter || cardCategory === categoryFilter;
 
-            if (matchesSearch && matchesStatus) {
+            if (matchesSearch && matchesStatus && matchesCategory) {
                 card.style.display = '';
             } else {
                 card.style.display = 'none';
             }
         });
+
+        this.applyProductSort();
+
+        // Show empty message when no product cards are visible after filtering
+        try {
+            const container = document.getElementById('my-products-grid');
+            if (container) {
+                const cards = Array.from(container.querySelectorAll('.product-card'));
+                const visible = cards.filter(c => (c.style.display || '') !== 'none');
+                let emptyEl = container.querySelector('.filter-empty-state');
+                if (visible.length === 0) {
+                    if (!emptyEl) {
+                        emptyEl = document.createElement('div');
+                        emptyEl.className = 'filter-empty-state empty-state';
+                        emptyEl.innerHTML = '<p>No products match the selected filters.</p>';
+                        container.appendChild(emptyEl);
+                    } else {
+                        emptyEl.style.display = '';
+                    }
+                } else if (emptyEl) {
+                    emptyEl.style.display = 'none';
+                }
+            }
+        } catch (e) {
+            console.warn('Could not update empty-state message for products', e);
+        }
+    }
+
+    applyProductSort() {
+        const container = document.getElementById('my-products-grid');
+        if (!container) return;
+
+        const sortBy = String(document.getElementById('product-sort-select')?.value || 'latest').trim();
+        const cards = Array.from(container.querySelectorAll('.product-card'));
+
+        const getTimestamp = (card) => {
+            const raw = String(card.getAttribute('data-created-at') || '').trim();
+            const ts = raw ? Date.parse(raw) : NaN;
+            return Number.isFinite(ts) ? ts : 0;
+        };
+
+        cards.sort((a, b) => {
+            const nameA = String(a.querySelector('.product-name')?.textContent || '').toLowerCase();
+            const nameB = String(b.querySelector('.product-name')?.textContent || '').toLowerCase();
+            const catA = String(a.getAttribute('data-category') || '').toLowerCase();
+            const catB = String(b.getAttribute('data-category') || '').toLowerCase();
+            const priceA = Number(a.getAttribute('data-price') || 0);
+            const priceB = Number(b.getAttribute('data-price') || 0);
+            const stockA = Number(a.getAttribute('data-stock-quantity') || 0);
+            const stockB = Number(b.getAttribute('data-stock-quantity') || 0);
+            const ratingA = Number(a.getAttribute('data-rating') || 0);
+            const ratingB = Number(b.getAttribute('data-rating') || 0);
+            const reviewsA = Number(a.getAttribute('data-reviews') || 0);
+            const reviewsB = Number(b.getAttribute('data-reviews') || 0);
+            const createdA = getTimestamp(a);
+            const createdB = getTimestamp(b);
+
+            switch (sortBy) {
+                case 'name_asc': return nameA.localeCompare(nameB);
+                case 'name_desc': return nameB.localeCompare(nameA);
+                case 'category_asc': return catA.localeCompare(catB) || nameA.localeCompare(nameB);
+                case 'price_low_high': return priceA - priceB;
+                case 'price_high_low': return priceB - priceA;
+                case 'stock_low_high': return stockA - stockB;
+                case 'stock_high_low': return stockB - stockA;
+                case 'rating_high_low': return ratingB - ratingA || reviewsB - reviewsA;
+                case 'reviews_high_low': return reviewsB - reviewsA || ratingB - ratingA;
+                case 'latest':
+                default:
+                    return createdB - createdA;
+            }
+        });
+
+        cards.forEach((card) => container.appendChild(card));
     }
 
     openAccountPanel() {
@@ -2150,31 +2691,125 @@ class FarmerDashboard {
             </div>
 
             <div class="panel-section">
-                <h4 style="margin:0 0 10px 0;">Change Password</h4>
+                <div class="my-account-password-section">
+                    <button type="button" class="btn btn-outline btn-full" id="toggle-my-password-section" aria-expanded="false" aria-controls="my-account-password-fields">
+                        <i class="fas fa-key"></i> Change Password
+                    </button>
+                </div>
+            </div>
+
+            <div id="my-account-password-fields" class="my-account-password-fields" hidden>
+                <div class="my-account-password-header">
+                    <button type="button" class="my-account-password-back" id="my-account-password-back"><i class="fas fa-arrow-left"></i> Back</button>
+                    <h4>Change Password</h4>
+                </div>
                 <form id="account-password-form" class="product-form">
-                    <div class="form-group">
+                    <div class="form-group" style="position:relative;">
                         <label for="account-current-password">Current Password</label>
                         <input type="password" id="account-current-password" class="editable-field" autocomplete="current-password" required>
+                        <button type="button" class="password-toggle" data-target="account-current-password" aria-label="Show current password">Show</button>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="position:relative;">
                         <label for="account-new-password">New Password</label>
                         <input type="password" id="account-new-password" class="editable-field" autocomplete="new-password" required>
+                        <button type="button" class="password-toggle" data-target="account-new-password" aria-label="Show new password">Show</button>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="position:relative;">
                         <label for="account-confirm-password">Confirm New Password</label>
                         <input type="password" id="account-confirm-password" class="editable-field" autocomplete="new-password" required>
+                        <button type="button" class="password-toggle" data-target="account-confirm-password" aria-label="Show confirm password">Show</button>
                     </div>
+                    <div id="account-password-error" class="field-error" style="display:none;margin-top:8px;margin-bottom:6px;"></div>
                     <div style="display:flex; gap:10px; justify-content:flex-end;">
-                        <button type="submit" class="btn btn-primary btn-small">Update Password</button>
+                        <button type="submit" class="btn btn-primary btn-small" id="account-password-submit">Update Password</button>
                     </div>
                 </form>
             </div>
         `;
 
-        this.openDetailPanel(html);
+        // Render as a centered modal instead of the side detail panel
+        const modalId = 'my-account-modal';
+        let modal = document.getElementById(modalId);
+        const modalInner = `
+            <div class="modal-header">
+                <h3>My Account</h3>
+                <button class="close-btn" id="close-my-account-modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">${html}</div>
+        `;
 
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = modalId;
+            modal.className = 'modal open';
+            modal.innerHTML = `<div class="modal-content">${modalInner}</div>`;
+            document.body.appendChild(modal);
+        } else {
+            const content = modal.querySelector('.modal-content');
+            if (content) content.innerHTML = modalInner;
+            modal.classList.add('open');
+        }
+
+        // Close handlers (use modal-scoped selectors to avoid timing issues)
+        const closeFn = () => {
+            try { modal.classList.remove('open'); } catch (_) {}
+            try { modal.parentNode && modal.parentNode.removeChild(modal); } catch (_) {}
+        };
+        const closeBtn = modal.querySelector('#close-my-account-modal');
+        if (closeBtn) closeBtn.addEventListener('click', closeFn);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeFn();
+        });
+
+        // Bind forms and toggles inside modal
         document.getElementById('account-shop-form')?.addEventListener('submit', (e) => this.handleShopProfileUpdate(e));
         document.getElementById('account-password-form')?.addEventListener('submit', (e) => this.handleChangePassword(e));
+
+        // Bind password toggle buttons
+        modal.querySelectorAll('.password-toggle').forEach(btn => {
+            try {
+                const targetId = btn.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                if (!input) return;
+                btn.addEventListener('click', (ev) => {
+                    ev.preventDefault();
+                    const isPassword = input.type === 'password';
+                    input.type = isPassword ? 'text' : 'password';
+                    btn.textContent = isPassword ? 'Hide' : 'Show';
+                    btn.setAttribute('aria-pressed', String(isPassword));
+                });
+            } catch (err) {
+                // ignore binding errors
+            }
+        });
+
+        // Bind toggle for showing/hiding the change-password fields
+        const togglePwBtn = document.getElementById('toggle-my-password-section');
+        const pwFields = document.getElementById('my-account-password-fields');
+        if (togglePwBtn) {
+            togglePwBtn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                if (!pwFields) return;
+                const isHidden = pwFields.hasAttribute('hidden');
+                if (isHidden) {
+                    pwFields.removeAttribute('hidden');
+                    togglePwBtn.setAttribute('aria-expanded', 'true');
+                } else {
+                    pwFields.setAttribute('hidden', '');
+                    togglePwBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+
+        const pwBackBtn = document.getElementById('my-account-password-back');
+        if (pwBackBtn && pwFields) {
+            pwBackBtn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                pwFields.setAttribute('hidden', '');
+                const toggleEl = document.getElementById('toggle-my-password-section');
+                if (toggleEl) toggleEl.setAttribute('aria-expanded', 'false');
+            });
+        }
     }
 
     async handleChangePassword(e) {
@@ -2197,6 +2832,18 @@ class FarmerDashboard {
             return;
         }
 
+        const submitBtn = document.getElementById('account-password-submit');
+        const errorEl = document.getElementById('account-password-error');
+        if (errorEl) {
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+        }
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.dataset.orig = submitBtn.innerHTML;
+            submitBtn.innerHTML = 'Updating...';
+        }
+
         try {
             const response = await fetch(`${this.apiBase}/auth/change-password`, {
                 method: 'PUT',
@@ -2216,12 +2863,33 @@ class FarmerDashboard {
                 if (newEl) newEl.value = '';
                 if (confEl) confEl.value = '';
             } else {
-                const err = await response.json().catch(() => ({}));
-                this.showMessage(err.message || 'Failed to update password', 'error');
+                let err = null;
+                try { err = await response.json(); } catch (_) { err = null; }
+                const msg = (err && (err.message || err.error || err.detail)) || `Failed to update password (status ${response.status})`;
+                if (errorEl) {
+                    errorEl.style.display = '';
+                    errorEl.textContent = msg;
+                }
+                this.showMessage(msg, 'error');
+                if (response.status === 401) {
+                    // Token problems: prompt re-login
+                    // Optionally clear local token
+                    try { localStorage.removeItem('token'); } catch (_) {}
+                }
             }
         } catch (error) {
             console.error('Change password error:', error);
-            this.showMessage('Error updating password', 'error');
+            const msg = (error && error.message) ? error.message : 'Error updating password';
+            if (errorEl) {
+                errorEl.style.display = '';
+                errorEl.textContent = msg;
+            }
+            this.showMessage(msg, 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = submitBtn.dataset.orig || 'Update Password';
+            }
         }
     }
 
@@ -2301,6 +2969,8 @@ class FarmerDashboard {
             tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
         }
 
+        this.applyOrdersSearch();
+
         // Load orders for this status unless we're skipping (e.g., already loaded)
         if (!skipLoad) {
             this.loadOrdersByStatus(status);
@@ -2338,12 +3008,25 @@ class FarmerDashboard {
             const price = item.price || order.price || 0;
             const totalAmount = item.total_amount || order.total_amount || 0;
             const orderId = Number(order.id);
+            const orderDate = order.created_at ? new Date(order.created_at) : null;
+            const deliveryAddress = String(order.delivery_address || '').trim();
+            const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString() : 'Not specified';
+            const specialInstructions = String(order.special_instructions || '').trim();
+            const dateLabel = orderDate && !Number.isNaN(orderDate.getTime())
+                ? orderDate.toLocaleDateString()
+                : '—';
+            const timeLabel = orderDate && !Number.isNaN(orderDate.getTime())
+                ? orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '—';
             
             return `
             <div class="order-card" data-order-id="${orderId}" style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; background: #fff;">
-                <div class="order-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <span class="order-id" style="font-weight: 700; font-size: 16px;">Order #${orderId}</span>
-                    <span class="order-date" style="color: #64748b; font-size: 14px;">${new Date(order.created_at).toLocaleDateString()}</span>
+                <div class="order-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <div class="order-head-left" style="display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
+                        <span class="order-date" style="color: #64748b; font-size: 14px;">${dateLabel}</span>
+                        <span class="order-time" style="color: #64748b; font-size: 14px;">${timeLabel}</span>
+                        <span class="order-id" style="font-weight: 700; font-size: 16px;">Order #${orderId}</span>
+                    </div>
                 </div>
                 
                 <div style="display: flex; gap: 16px; margin-bottom: 16px;">
@@ -2353,6 +3036,9 @@ class FarmerDashboard {
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Customer:</strong> ${this.escapeHtml(order.customer_name || '—')}</div>
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Quantity:</strong> ${this.fmtNumber(quantity)} x ${this.fmtCurrency(price)} ${item.unit || order.unit || ''}</div>
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Total:</strong> ${this.fmtCurrency(totalAmount)}</div>
+                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Delivery Date:</strong> ${this.escapeHtml(deliveryDate)}</div>
+                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Delivery Address:</strong> ${this.escapeHtml(deliveryAddress || 'Not provided')}</div>
+                        ${specialInstructions ? `<div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Notes:</strong> ${this.escapeHtml(specialInstructions)}</div>` : ''}
                         <div style="color: #64748b; font-size: 14px;"><strong>Status:</strong> <span style="font-weight: 600; color: ${this.getStatusColor(currentStatus)};">${this.escapeHtml(this.formatStatusLabel(currentStatus))}</span></div>
                     </div>
                 </div>
@@ -2385,6 +3071,8 @@ class FarmerDashboard {
             </div>
         `;
         }).join('');
+
+        this.applyOrdersSearch();
     }
 
     openOrderDetails(orderId) {
@@ -2434,6 +3122,7 @@ class FarmerDashboard {
             document.querySelectorAll('.orders-list .order-card').forEach(el => (el.style.display = ''));
             document.querySelectorAll('#conversation-list .conversation-item').forEach(el => (el.style.display = ''));
             document.querySelectorAll('#overview .overview-row').forEach(el => (el.style.display = ''));
+            this.updateOrdersSearchEmptyState();
             return;
         }
 
@@ -2442,6 +3131,7 @@ class FarmerDashboard {
                 const text = (card.textContent || '').toLowerCase();
                 card.style.display = text.includes(q) ? '' : 'none';
             });
+            this.updateOrdersSearchEmptyState();
         } else if (this.activeSection === 'chat') {
             document.querySelectorAll('#conversation-list .conversation-item').forEach(item => {
                 const text = (item.textContent || '').toLowerCase();
@@ -2453,6 +3143,53 @@ class FarmerDashboard {
                 row.style.display = text.includes(q) ? '' : 'none';
             });
         }
+    }
+
+    applyOrdersSearch() {
+        const q = (document.getElementById('orders-search-input')?.value || '').trim().toLowerCase();
+        const cards = document.querySelectorAll('.orders-list .order-card');
+
+        cards.forEach((card) => {
+            if (!q) {
+                card.style.display = '';
+                return;
+            }
+            const text = (card.textContent || '').toLowerCase();
+            card.style.display = text.includes(q) ? '' : 'none';
+        });
+
+        this.updateOrdersSearchEmptyState();
+    }
+
+    updateOrdersSearchEmptyState() {
+        const emptyEl = document.getElementById('orders-search-empty');
+        if (!emptyEl) return;
+
+        const activeSection = document.querySelector('[data-tab-scope="orders"].tab-content.active');
+        if (!activeSection) {
+            emptyEl.style.display = 'none';
+            return;
+        }
+
+        const cards = activeSection.querySelectorAll('.order-card');
+        const q = (document.getElementById('orders-search-input')?.value || '').trim().toLowerCase();
+        const allCards = document.querySelectorAll('.orders-list .order-card');
+        if (!cards.length) {
+            emptyEl.style.display = 'none';
+            return;
+        }
+
+        const hasVisible = Array.from(cards).some((card) => card.style.display !== 'none');
+        if (!hasVisible) {
+            const hasVisibleAnywhere = Array.from(allCards).some((card) => card.style.display !== 'none');
+            const p = emptyEl.querySelector('p');
+            if (p) {
+                p.textContent = q && !hasVisibleAnywhere
+                    ? 'No orders match your search in any status.'
+                    : 'No orders match your search in this status.';
+            }
+        }
+        emptyEl.style.display = hasVisible ? 'none' : 'block';
     }
 
     escapeHtml(str) {

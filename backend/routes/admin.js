@@ -1,5 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { Pool } = require('pg');
 const { writeAdminAuditLog, ensureAuditTable } = require('../utils/auditLog');
 const { broadcastEvent } = require('../utils/realtime');
@@ -48,6 +50,7 @@ const ensureCategoryAdminSchema = async () => {
     CREATE TABLE IF NOT EXISTS product_name_requests (
       id SERIAL PRIMARY KEY,
       category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
+      requested_category_name VARCHAR(120),
       name VARCHAR(120) NOT NULL,
       notes TEXT,
       requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -58,6 +61,7 @@ const ensureCategoryAdminSchema = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  await pool.query(`ALTER TABLE product_name_requests ADD COLUMN IF NOT EXISTS requested_category_name VARCHAR(120)`);
 };
 
 // Middleware to check staff/admin role
@@ -461,6 +465,69 @@ router.put('/users/:id/shop-profile', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('Admin update shop profile error:', error);
     res.status(500).json({ message: 'Server error updating shop profile' });
+  }
+});
+
+// Generate a one-time temporary password for a user (admin-only).
+// This returns the plaintext password in the response but stores only the bcrypt hash in the database.
+router.post('/users/:id/generate-temp-password', requireAdmin, async (req, res) => {
+  try {
+    const targetUserId = parseInt(req.params.id, 10);
+    if (!targetUserId) return res.status(400).json({ message: 'Invalid user id' });
+
+    const userResult = await pool.query('SELECT id, username, email, role FROM users WHERE id = $1', [targetUserId]);
+    if (userResult.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    // Generate a reasonably strong temporary password (12 chars, URL-safe)
+    const tmp = crypto.randomBytes(9).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 12);
+    const BCRYPT_ROUNDS = Number.parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
+    const hash = await bcrypt.hash(tmp, BCRYPT_ROUNDS);
+
+    // Determine which password columns exist and update accordingly
+    const colsRes = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'");
+    const cols = new Set(colsRes.rows.map(r => r.column_name));
+    const sets = [];
+    const values = [];
+    let idx = 1;
+
+    if (cols.has('password')) {
+      sets.push(`password = $${idx}`);
+      values.push(hash);
+      idx++;
+    }
+    if (cols.has('password_hash')) {
+      sets.push(`password_hash = $${idx}`);
+      values.push(hash);
+      idx++;
+    }
+
+    if (sets.length === 0) {
+      return res.status(500).json({ message: 'No password columns found to update' });
+    }
+
+    values.push(targetUserId);
+    const updateSql = `UPDATE users SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`;
+    await pool.query(updateSql, values);
+
+    // Audit log if available
+    try {
+      await ensureAuditTable(pool);
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: req.user.id,
+        action: 'user.generate_temp_password',
+        entity: 'users',
+        entity_id: targetUserId,
+        before: null,
+        after: { updated_password: true }
+      });
+      broadcastEvent('admin.audit', { action: 'user.generate_temp_password', entity: 'users', entity_id: targetUserId, actor_admin_id: req.user.id });
+    } catch (_) {}
+
+    // Return plaintext temporary password to admin caller (do NOT store plaintext)
+    res.json({ message: 'Temporary password generated', temp_password: tmp });
+  } catch (error) {
+    console.error('Generate temp password error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -1085,6 +1152,70 @@ router.delete('/categories/:id', requireAdmin, async (req, res) => {
   }
 });
 
+router.get('/catalog-names', requireAdmin, async (req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const result = await pool.query(
+      `SELECT c.id, c.name, c.category_id, cat.name AS category_name, c.is_approved, c.source, c.created_at
+       FROM product_name_catalog c
+       LEFT JOIN categories cat ON cat.id = c.category_id
+       ORDER BY c.name ASC`
+    );
+    return res.json({ names: result.rows });
+  } catch (error) {
+    console.error('Admin get catalog names error:', error);
+    return res.status(500).json({ message: 'Server error fetching catalog names' });
+  }
+});
+
+router.post('/catalog-names', requireAdmin, async (req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const name = String(req.body?.name || '').trim();
+    const categoryId = Number(req.body?.category_id || 0);
+    if (!name) return res.status(400).json({ message: 'Name is required' });
+    if (!categoryId) return res.status(400).json({ message: 'Category is required' });
+
+    const inserted = await pool.query(
+      `INSERT INTO product_name_catalog (name, category_id, source, is_approved, reviewed_by, reviewed_at)
+       VALUES ($1, $2, 'staff', true, $3, CURRENT_TIMESTAMP)
+       RETURNING id, name, category_id`,
+      [name, categoryId, req.user.id || null]
+    );
+
+    return res.status(201).json({ message: 'Catalog name added', item: inserted.rows[0] });
+  } catch (error) {
+    console.error('Admin add catalog name error:', error);
+    return res.status(500).json({ message: 'Server error adding catalog name' });
+  }
+});
+
+router.put('/catalog-names/:id', requireAdmin, async (req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const id = Number(req.params.id || 0);
+    const name = String(req.body?.name || '').trim();
+    const categoryId = Number(req.body?.category_id || 0);
+    if (!id) return res.status(400).json({ message: 'Invalid catalog id' });
+    if (!name) return res.status(400).json({ message: 'Name is required' });
+    if (!categoryId) return res.status(400).json({ message: 'Category is required' });
+
+    const updated = await pool.query(
+      `UPDATE product_name_catalog
+       SET name = $1, category_id = $2, reviewed_by = $3, reviewed_at = CURRENT_TIMESTAMP, is_approved = true
+       WHERE id = $4
+       RETURNING id, name, category_id`,
+      [name, categoryId, req.user.id || null, id]
+    );
+
+    if (!updated.rows.length) return res.status(404).json({ message: 'Catalog name not found' });
+    return res.json({ message: 'Catalog name updated', item: updated.rows[0] });
+  } catch (error) {
+    console.error('Admin edit catalog name error:', error);
+    return res.status(500).json({ message: 'Server error updating catalog name' });
+  }
+});
+
 // Staff review queue for farmer custom product names
 router.get('/category-requests', requireAdmin, async (req, res) => {
   try {
@@ -1093,7 +1224,8 @@ router.get('/category-requests', requireAdmin, async (req, res) => {
     const includeAll = status === 'all';
 
     const result = await pool.query(
-      `SELECT r.id, r.name, r.notes, r.status, r.review_notes, r.created_at, r.reviewed_at,
+          `SELECT r.id, r.name, r.notes, r.status, r.review_notes, r.created_at, r.reviewed_at,
+            r.requested_category_name,
               r.category_id, c.name AS category_name,
               r.requested_by, u.username AS requested_by_username,
               r.reviewed_by, rv.username AS reviewed_by_username
@@ -1120,8 +1252,8 @@ router.put('/category-requests/:id/review', requireAdmin, async (req, res) => {
     if (!id) return res.status(400).json({ message: 'Invalid request id' });
 
     const status = String(req.body?.status || '').trim().toLowerCase();
-    const approvedStatus = ['approved', 'rejected'].includes(status) ? status : null;
-    if (!approvedStatus) return res.status(400).json({ message: 'Status must be approved or rejected' });
+    const nextStatus = ['pending', 'approved', 'rejected'].includes(status) ? status : null;
+    if (!nextStatus) return res.status(400).json({ message: 'Status must be pending, approved, or rejected' });
 
     const rowRes = await pool.query('SELECT * FROM product_name_requests WHERE id = $1', [id]);
     if (!rowRes.rows.length) return res.status(404).json({ message: 'Request not found' });
@@ -1131,11 +1263,24 @@ router.put('/category-requests/:id/review', requireAdmin, async (req, res) => {
     }
 
     const nextName = String(req.body?.name || requestRow.name).trim();
-    const nextCategoryId = Number(req.body?.category_id || requestRow.category_id || 0);
+    let nextCategoryId = Number(req.body?.category_id || requestRow.category_id || 0);
+    const requestedCategoryName = String(req.body?.requested_category_name || requestRow.requested_category_name || '').trim();
+    const newCategoryName = String(req.body?.new_category_name || '').trim();
     const reviewNotes = String(req.body?.review_notes || '').trim();
     const reviewerId = Number(req.user?.id || 0) > 0 ? Number(req.user.id) : null;
 
-    if (approvedStatus === 'approved') {
+    if (newCategoryName) {
+      const createdCategory = await pool.query(
+        `INSERT INTO categories (name, description, type)
+         VALUES ($1, $2, 'agricultural')
+         ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
+         RETURNING id`,
+        [newCategoryName, `${newCategoryName} category`]
+      );
+      nextCategoryId = Number(createdCategory.rows[0]?.id || 0);
+    }
+
+    if (nextStatus === 'approved') {
       if (!nextName) return res.status(400).json({ message: 'Approved name is required' });
       if (!nextCategoryId) return res.status(400).json({ message: 'Approved category is required' });
 
@@ -1148,18 +1293,33 @@ router.put('/category-requests/:id/review', requireAdmin, async (req, res) => {
       );
     }
 
-    const updated = await pool.query(
-      `UPDATE product_name_requests
-       SET status = $1,
-           name = $2,
-           category_id = $3,
-           review_notes = $4,
-           reviewed_by = $5,
-           reviewed_at = CURRENT_TIMESTAMP
-       WHERE id = $6
-       RETURNING *`,
-      [approvedStatus, nextName, nextCategoryId || null, reviewNotes || null, reviewerId, id]
-    );
+    let updated;
+    if (nextStatus === 'pending') {
+      updated = await pool.query(
+        `UPDATE product_name_requests
+         SET name = $1,
+             category_id = $2,
+             requested_category_name = $3,
+             review_notes = $4
+         WHERE id = $5
+         RETURNING *`,
+        [nextName, nextCategoryId || null, requestedCategoryName || null, reviewNotes || null, id]
+      );
+    } else {
+      updated = await pool.query(
+        `UPDATE product_name_requests
+         SET status = $1,
+             name = $2,
+             category_id = $3,
+             requested_category_name = $4,
+             review_notes = $5,
+             reviewed_by = $6,
+             reviewed_at = CURRENT_TIMESTAMP
+         WHERE id = $7
+         RETURNING *`,
+        [nextStatus, nextName, nextCategoryId || null, requestedCategoryName || null, reviewNotes || null, reviewerId, id]
+      );
+    }
 
     await writeAdminAuditLog(pool, {
       actor_admin_id: req.user.id,
@@ -1171,7 +1331,8 @@ router.put('/category-requests/:id/review', requireAdmin, async (req, res) => {
     });
     broadcastEvent('admin.audit', { action: 'category.request.review', entity: 'category_requests', entity_id: id, actor_admin_id: req.user.id });
 
-    return res.json({ message: `Request ${approvedStatus}`, request: updated.rows[0] });
+    const actionLabel = nextStatus === 'pending' ? 'saved' : nextStatus;
+    return res.json({ message: `Request ${actionLabel}`, request: updated.rows[0] });
   } catch (error) {
     console.error('Admin review category request error:', error);
     return res.status(500).json({ message: 'Server error reviewing request' });
