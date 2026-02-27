@@ -127,7 +127,7 @@
     <section id="featured" class="products">
         <div class="container">
             <div class="products-header">
-                <h2 class="section-title">Best Selling Low Price</h2>
+                <h2 class="section-title">Featured / Best Selling</h2>
             </div>
             <div id="featured-grid" class="products-grid">
                 <!-- Featured products will be loaded here -->
@@ -144,15 +144,22 @@
                     <div class="search-input-wrapper">
                         <input type="text" id="search-input" placeholder="Search products..." class="search-input">
                     </div>
-                    <div class="filter-select-wrapper">
-                        <select id="products-sort" class="filter-select" aria-label="Sort products">
-                            <option value="latest">Latest</option>
-                            <option value="harvest_date">Harvest Date</option>
-                            <option value="ratings">Ratings</option>
-                            <option value="top_sales">Top Sales</option>
-                            <option value="price_low_high">Price: Low to High</option>
-                            <option value="price_high_low">Price: High to Low</option>
-                        </select>
+                    <div class="products-sort-bar" aria-label="Sort products">
+                        <span class="sort-label">Sort by</span>
+                        <div class="sort-button-group" role="group" aria-label="Primary sort options">
+                            <button type="button" class="sort-option-btn active" data-sort-option="latest">Latest</button>
+                            <button type="button" class="sort-option-btn" data-sort-option="top_sales">Top Sales</button>
+                            <button type="button" class="sort-option-btn" data-sort-option="ratings">Ratings</button>
+                            <button type="button" class="sort-option-btn" data-sort-option="harvest_date">Harvest Date</button>
+                            <button type="button" class="sort-option-btn" data-sort-option="expiry_date">Expiration Date</button>
+                        </div>
+                        <div class="filter-select-wrapper sort-price-select-wrapper">
+                            <select id="products-price-sort" class="filter-select" aria-label="Sort by price">
+                                <option value="">Price</option>
+                                <option value="price_low_high">Price: Low to High</option>
+                                <option value="price_high_low">Price: High to Low</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -261,68 +268,74 @@
                 <button class="close-btn" id="close-my-account-modal">&times;</button>
             </div>
             <div class="auth-form">
-                <div class="form-group">
-                    <label for="my-account-username">Username</label>
-                    <input type="text" id="my-account-username" maxlength="30" readonly>
-                </div>
-                <div class="form-group">
-                    <label for="my-account-fullname">Full Name</label>
-                    <input type="text" id="my-account-fullname" required>
-                </div>
-                <div class="form-group">
-                    <label for="my-account-email">Email</label>
-                    <input type="email" id="my-account-email" readonly>
-                </div>
-                <div class="form-group">
-                    <label for="my-account-phone">Phone Number</label>
-                    <div class="phone-input-wrapper">
-                        <span class="phone-prefix">+63</span>
-                        <input type="tel" id="my-account-phone" maxlength="12" placeholder="929 819 6629" required>
+                <div id="my-account-main-fields">
+                    <div class="form-group">
+                        <label for="my-account-username">Username</label>
+                        <input type="text" id="my-account-username" maxlength="30" readonly>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label for="my-account-address">Address</label>
-                    <textarea id="my-account-address" rows="3" required></textarea>
-                </div>
-                <div class="my-account-password-section">
-                    <button type="button" class="btn btn-outline btn-full" id="toggle-my-password-section" aria-expanded="false" aria-controls="my-account-password-fields">
-                        <i class="fas fa-key"></i> Change Password
-                    </button>
-                    <div id="my-account-password-fields" class="my-account-password-fields" hidden>
-                        <div class="form-group">
-                            <label for="my-account-current-password">Current Password</label>
-                            <div class="password-input-wrapper">
-                                <input type="password" id="my-account-current-password" autocomplete="current-password">
-                                <button type="button" class="password-toggle" id="toggle-my-account-current-password" aria-label="Show current password">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="my-account-new-password">New Password</label>
-                            <div class="password-input-wrapper">
-                                <input type="password" id="my-account-new-password" autocomplete="new-password">
-                                <button type="button" class="password-toggle" id="toggle-my-account-new-password" aria-label="Show new password">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="my-account-confirm-password">Confirm New Password</label>
-                            <div class="password-input-wrapper">
-                                <input type="password" id="my-account-confirm-password" autocomplete="new-password">
-                                <button type="button" class="password-toggle" id="toggle-my-account-confirm-password" aria-label="Show confirm password">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="step-actions my-account-password-actions">
-                            <button type="button" class="btn btn-secondary btn-full" id="change-my-password-btn">Change Password</button>
+                    <div class="form-group">
+                        <label for="my-account-fullname">Full Name</label>
+                        <input type="text" id="my-account-fullname" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="my-account-email">Email</label>
+                        <input type="email" id="my-account-email" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="my-account-phone">Phone Number</label>
+                        <div class="phone-input-wrapper">
+                            <span class="phone-prefix">+63</span>
+                            <input type="tel" id="my-account-phone" maxlength="12" placeholder="929 819 6629" required>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label for="my-account-address">Address</label>
+                        <textarea id="my-account-address" rows="3" required></textarea>
+                    </div>
+                    <div class="my-account-password-section">
+                        <button type="button" class="btn btn-outline btn-full" id="toggle-my-password-section" aria-expanded="false" aria-controls="my-account-password-fields">
+                            <i class="fas fa-key"></i> Change Password
+                        </button>
+                    </div>
+                    <div class="step-actions">
+                        <button type="button" class="btn btn-primary btn-full" id="save-my-account-btn">Save</button>
+                    </div>
                 </div>
-                <div class="step-actions">
-                    <button type="button" class="btn btn-primary btn-full" id="save-my-account-btn">Save</button>
+                <div id="my-account-password-fields" class="my-account-password-fields" hidden>
+                    <div class="my-account-password-header">
+                        <button type="button" class="my-account-password-back" id="my-account-password-back"><i class="fas fa-arrow-left"></i> Back</button>
+                        <h4>Change Password</h4>
+                    </div>
+                    <div class="form-group">
+                        <label for="my-account-current-password">Current Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="my-account-current-password" autocomplete="current-password">
+                            <button type="button" class="password-toggle" id="toggle-my-account-current-password" aria-label="Show current password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="my-account-new-password">New Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="my-account-new-password" autocomplete="new-password">
+                            <button type="button" class="password-toggle" id="toggle-my-account-new-password" aria-label="Show new password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="my-account-confirm-password">Confirm New Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="my-account-confirm-password" autocomplete="new-password">
+                            <button type="button" class="password-toggle" id="toggle-my-account-confirm-password" aria-label="Show confirm password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="step-actions my-account-password-actions">
+                        <button type="button" class="btn btn-secondary btn-full" id="change-my-password-btn">Change Password</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -371,7 +384,6 @@
                 <button class="close-btn" id="auth-close-btn">&times;</button>
             </div>
             <form id="auth-form" class="auth-form">
-                <input type="hidden" id="auth-role" value="customer">
                 
                 <!-- Login mode fields -->
                 <div id="auth-login-fields" class="auth-mode-fields">
@@ -393,15 +405,7 @@
                         <a href="#" id="forgot-password-link">Forgot password?</a>
                     </div>
                     
-                    <!-- Role selector box: choose Farmer, Customer, or Staff (login) -->
-                    <div class="form-group role-selector-group">
-                        <label>I am</label>
-                        <div id="role-selector-login" class="role-selector-box">
-                            <button type="button" class="role-box" data-role="customer">Customer</button>
-                            <button type="button" class="role-box" data-role="farmer">Farmer</button>
-                            <button type="button" class="role-box" data-role="staff">Staff</button>
-                        </div>
-                    </div>
+                    <!-- Role selector removed for login — server determines account type -->
                     
                     <!-- OTP Section removed from login - login now works with email/password only -->
                 </div>
@@ -961,7 +965,7 @@
     <!-- Contact Section -->
     <section id="contact" class="contact">
         <div class="container">
-            <h2 class="section-title">Contact Us</h2>
+            <h2 class="section-title contact-title">Contact Us</h2>
             <div class="contact-content">
                 <div class="contact-info">
                     <div class="contact-item">

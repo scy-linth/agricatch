@@ -370,6 +370,8 @@ router.post('/login', async (req, res) => {
     const storedPassword = getStoredPasswordFromRow(user);
     const providedPassword = String(password || '');
     let passwordOk = false;
+
+    // If the stored value is a bcrypt hash, prefer bcrypt compare
     if (isBcryptHash(storedPassword)) {
       try {
         passwordOk = await bcrypt.compare(providedPassword, normalizeBcryptHash(storedPassword));
@@ -377,9 +379,33 @@ router.post('/login', async (req, res) => {
         console.error('bcrypt compare failed:', e.message);
         passwordOk = false;
       }
+
+      // Fallback: if bcrypt compare failed but a legacy plaintext `password` column exists and matches,
+      // accept the login and upgrade the stored password to a bcrypt hash.
+      if (!passwordOk && user.password && String(user.password) === providedPassword) {
+        passwordOk = true;
+        try {
+          const newHash = await bcrypt.hash(providedPassword, BCRYPT_ROUNDS);
+          await updateUserPassword(user.id, newHash);
+          console.log(`Upgraded plaintext password to bcrypt for user ${user.id}`);
+        } catch (e) {
+          console.warn('Failed to upgrade password hash:', e.message);
+        }
+      }
     } else {
+      // Stored value is not a bcrypt hash (legacy plaintext). Compare directly and then upgrade to bcrypt.
       passwordOk = providedPassword === String(storedPassword || '');
+      if (passwordOk) {
+        try {
+          const newHash = await bcrypt.hash(providedPassword, BCRYPT_ROUNDS);
+          await updateUserPassword(user.id, newHash);
+          console.log(`Upgraded legacy plaintext password to bcrypt for user ${user.id}`);
+        } catch (e) {
+          console.warn('Failed to upgrade plaintext password to bcrypt:', e.message);
+        }
+      }
     }
+
     if (!passwordOk) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }

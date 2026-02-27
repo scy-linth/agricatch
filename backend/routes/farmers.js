@@ -143,7 +143,10 @@ router.get('/me/stats', async (req, res) => {
       // If no range param is provided, keep lifetime stats.
       const clientAskedRange = req.query.rangeDays !== undefined || req.query.range !== undefined;
       if (clientAskedRange) {
-        whereSql = `AND o.created_at >= (NOW() - ($2::int * INTERVAL '1 day'))`;
+        whereSql = `
+          AND o.created_at >= (CURRENT_DATE - (($2::int - 1) * INTERVAL '1 day'))
+          AND o.created_at < (CURRENT_DATE + INTERVAL '1 day')
+        `;
         params = [user.id, Number(rangeDays || 30)];
       }
     }
@@ -222,26 +225,33 @@ router.get('/me/metrics', async (req, res) => {
       }
     }
 
+    // Use delivery date for delivered rows, and created_at for non-delivered rows.
+    // This keeps the delivered sales trend aligned with when orders were actually delivered.
+    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.delivered_at, o.updated_at, o.created_at) ELSE o.created_at END`;
+
     const dateSelect = isAllTime
-      ? `DATE_TRUNC('month', o.created_at)::date`
-      : `DATE(o.created_at)`;
+      ? `DATE_TRUNC('month', ${timeRef})::date`
+      : `DATE(${timeRef})`;
 
     let rangeWhere = '';
     let paramsRange = [];
     if (hasCustom) {
-      rangeWhere = `AND o.created_at >= $2::date AND o.created_at < ($3::date + INTERVAL '1 day')`;
+      rangeWhere = `AND ${timeRef} >= $2::date AND ${timeRef} < ($3::date + INTERVAL '1 day')`;
       paramsRange = [user.id, from, to];
     } else if (isAllTime) {
       rangeWhere = '';
       paramsRange = [user.id];
     } else {
-      rangeWhere = `AND o.created_at >= (NOW() - ($2::int * INTERVAL '1 day'))`;
+      rangeWhere = `
+        AND ${timeRef} >= (CURRENT_DATE - (($2::int - 1) * INTERVAL '1 day'))
+        AND ${timeRef} < (CURRENT_DATE + INTERVAL '1 day')
+      `;
       paramsRange = [user.id, Number(rangeDays || 30)];
     }
 
     // Revenue by day (delivered orders only)
     const revenueByDayResult = await pool.query(`
-      SELECT ${dateSelect} AS day,
+      SELECT TO_CHAR(${dateSelect}, 'YYYY-MM-DD') AS day,
              COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
       FROM orders o
       JOIN products p ON o.product_id = p.id
@@ -249,7 +259,7 @@ router.get('/me/metrics', async (req, res) => {
         ${rangeWhere}
         AND o.status = 'delivered'
       GROUP BY ${dateSelect}
-      ORDER BY day ASC
+      ORDER BY ${dateSelect} ASC
     `, paramsRange);
 
     // Orders by status (all statuses)
@@ -368,14 +378,18 @@ router.get('/me/metrics/export.csv', async (req, res) => {
       }
     }
 
+    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.delivered_at, o.updated_at, o.created_at) ELSE o.created_at END`;
     const dateSelect = isAllTime
-      ? `DATE_TRUNC('month', o.created_at)::date`
-      : `DATE(o.created_at)`;
+      ? `DATE_TRUNC('month', ${timeRef})::date`
+      : `DATE(${timeRef})`;
     const rangeWhere = isAllTime
       ? ''
       : (hasCustom
-        ? `AND o.created_at >= $2::date AND o.created_at < ($3::date + INTERVAL '1 day')`
-        : `AND o.created_at >= (NOW() - ($2::int * INTERVAL '1 day'))`);
+        ? `AND ${timeRef} >= $2::date AND ${timeRef} < ($3::date + INTERVAL '1 day')`
+        : `
+          AND ${timeRef} >= (CURRENT_DATE - (($2::int - 1) * INTERVAL '1 day'))
+          AND ${timeRef} < (CURRENT_DATE + INTERVAL '1 day')
+        `);
 
     const paramsRange = hasCustom
       ? [user.id, from, to]
@@ -395,7 +409,7 @@ router.get('/me/metrics/export.csv', async (req, res) => {
 
     // Fetch blocks separately (clear + simple for CSV generation)
     const revenue = await pool.query(`
-      SELECT ${dateSelect} AS day,
+      SELECT TO_CHAR(${dateSelect}, 'YYYY-MM-DD') AS day,
              COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
       FROM orders o
       JOIN products p ON o.product_id = p.id
@@ -403,7 +417,7 @@ router.get('/me/metrics/export.csv', async (req, res) => {
         ${rangeWhere}
         AND o.status = 'delivered'
       GROUP BY ${dateSelect}
-      ORDER BY day ASC
+      ORDER BY ${dateSelect} ASC
     `, paramsRange);
 
     const byStatus = await pool.query(`
@@ -432,7 +446,7 @@ router.get('/me/metrics/export.csv', async (req, res) => {
 
     const recentOrders = await pool.query(`
       SELECT o.id,
-             o.created_at,
+             TO_CHAR(o.created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at,
              o.status,
              o.total_amount,
              u.full_name AS customer_name,
@@ -457,14 +471,17 @@ router.get('/me/metrics/export.csv', async (req, res) => {
 
     const s = summary.rows[0] || {};
     lines.push('Summary');
-    lines.push('Total Orders,Total Sold (Delivered),Total Revenue (Delivered)');
+    lines.push('Total Orders,Total Sold (Delivered),Total Sales (Delivered)');
     lines.push(`${csvEscape(s.total_orders || 0)},${csvEscape(s.total_sold || 0)},${csvEscape(s.total_revenue || 0)}`);
     lines.push('');
 
-    lines.push(isAllTime ? 'Revenue By Month' : 'Revenue By Day');
-    lines.push('Date,Revenue');
+    lines.push(isAllTime ? 'Sales By Month' : 'Sales By Day');
+    lines.push('Date,Sales');
     for (const row of revenue.rows) {
-      lines.push(`${csvEscape(row.day)},${csvEscape(row.revenue)}`);
+      // Prefix with a single quote so Excel will treat values as text and
+      // avoid displaying "#####" when the column is too narrow or formatted
+      // as a date/number. Excel strips the leading quote when displaying.
+      lines.push(`${csvEscape('\'' + row.day)},${csvEscape('\'' + row.revenue)}`);
     }
     lines.push('');
 
@@ -476,7 +493,7 @@ router.get('/me/metrics/export.csv', async (req, res) => {
     lines.push('');
 
     lines.push('Top Products (Delivered)');
-    lines.push('Product,Sold Qty,Revenue');
+    lines.push('Product,Sold Qty,Sales');
     for (const row of topProducts.rows) {
       lines.push(`${csvEscape(row.product_name)},${csvEscape(row.sold_qty)},${csvEscape(row.revenue)}`);
     }
@@ -485,7 +502,9 @@ router.get('/me/metrics/export.csv', async (req, res) => {
     lines.push('Recent Orders');
     lines.push('Order ID,Date,Customer,Product,Status,Total Amount');
     for (const row of recentOrders.rows) {
-      lines.push(`${csvEscape(row.id)},${csvEscape(row.created_at)},${csvEscape(row.customer_name || '')},${csvEscape(row.product_name || '')},${csvEscape(row.status)},${csvEscape(row.total_amount)}`);
+      // Prefix date and amount with a single quote to force Excel to treat
+      // these as text values (prevents the '#####' display when width is small)
+      lines.push(`${csvEscape(row.id)},${csvEscape('\'' + row.created_at)},${csvEscape(row.customer_name || '')},${csvEscape(row.product_name || '')},${csvEscape(row.status)},${csvEscape('\'' + row.total_amount)}`);
     }
 
     const csv = lines.join('\n');

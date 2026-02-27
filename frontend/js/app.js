@@ -21,10 +21,10 @@ class AgricultureMarket {
         this.isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         // Set to true if you run a local dev agent on port 7242
         this.enableDevAgent = false;
-        this.token = localStorage.getItem('token');
-        // Sanitize token values stored as literal strings 'null' or 'undefined'
-        if (!this.token || this.token === 'null' || this.token === 'undefined') {
-            this.token = null;
+        this.token = this.normalizeAuthToken(localStorage.getItem('token'));
+        if (this.token) {
+            try { localStorage.setItem('token', this.token); } catch (e) {}
+        } else {
             try { localStorage.removeItem('token'); } catch (e) {}
         }
         this.sessionId = this.getOrCreateSessionId();
@@ -237,7 +237,7 @@ class AgricultureMarket {
                     this.openAuthFlow({ role, mode, returnUrl: this.returnUrl });
                 }, 100);
             } else {
-                // Open auth modal (login form with role selector)
+                // Open auth modal (login; account type is auto-detected)
                 setTimeout(() => {
                     this.openAuthFlow({ returnUrl: this.returnUrl });
                 }, 100);
@@ -644,6 +644,19 @@ class AgricultureMarket {
         if (notificationsViewBtn) {
             notificationsViewBtn.addEventListener('click', () => this.toggleNotificationsFullView());
         }
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('notifications-dropdown');
+            const button = document.getElementById('notifications-btn');
+            if (!dropdown || !button) return;
+            if (!dropdown.classList.contains('open')) return;
+            if (dropdown.contains(e.target) || button.contains(e.target)) return;
+            dropdown.classList.remove('open');
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const dropdown = document.getElementById('notifications-dropdown');
+            if (dropdown) dropdown.classList.remove('open');
+        });
         const myOrdersBtn = document.getElementById('my-orders-btn');
         if (myOrdersBtn) {
             myOrdersBtn.addEventListener('click', (e) => {
@@ -716,7 +729,15 @@ class AgricultureMarket {
         if (toggleMyPasswordSectionBtn) {
             toggleMyPasswordSectionBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.toggleMyAccountPasswordSection();
+                this.toggleMyAccountPasswordSection(true);
+            });
+        }
+
+        const myAccountPasswordBackBtn = document.getElementById('my-account-password-back');
+        if (myAccountPasswordBackBtn) {
+            myAccountPasswordBackBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleMyAccountPasswordSection(false);
             });
         }
 
@@ -1230,10 +1251,39 @@ class AgricultureMarket {
         if (sortSelectEl) {
             sortSelectEl.addEventListener('change', (e) => {
                 this.currentSort = e.target.value || 'latest';
-                this.currentPage = 1; // Reset to first page on category change
+                this.currentPage = 1;
+                this.syncSortControls();
                 this.loadProducts();
             });
         }
+
+        const sortButtons = document.querySelectorAll('.sort-option-btn[data-sort-option]');
+        sortButtons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const sortValue = String(btn.getAttribute('data-sort-option') || 'latest');
+                this.currentSort = sortValue;
+                this.currentPage = 1;
+
+                const priceSortEl = document.getElementById('products-price-sort');
+                if (priceSortEl) priceSortEl.value = '';
+
+                this.syncSortControls();
+                this.loadProducts();
+            });
+        });
+
+        const priceSortEl = document.getElementById('products-price-sort');
+        if (priceSortEl) {
+            priceSortEl.addEventListener('change', (e) => {
+                const selected = String(e.target.value || '').trim();
+                this.currentSort = selected || 'latest';
+                this.currentPage = 1;
+                this.syncSortControls();
+                this.loadProducts();
+            });
+        }
+
+        this.syncSortControls();
 
         // Pagination removed - now showing all products on one page
 
@@ -1656,10 +1706,55 @@ class AgricultureMarket {
     // Authentication
     checkAuthStatus() {
         if (this.token) {
+            this.redirectAuthenticatedLandingByToken();
             this.showUserMenu();
             this.migrateGuestCart();
         } else {
             this.showGuestMenu();
+        }
+    }
+
+    normalizeAuthToken(rawToken) {
+        let token = String(rawToken || '').trim();
+        if (!token) return null;
+
+        if ((token.startsWith('"') && token.endsWith('"')) || (token.startsWith("'") && token.endsWith("'"))) {
+            token = token.slice(1, -1).trim();
+        }
+
+        if (/^Bearer\s+/i.test(token)) {
+            token = token.replace(/^Bearer\s+/i, '').trim();
+        }
+
+        if (!token || token === 'null' || token === 'undefined') return null;
+        return token;
+    }
+
+    decodeJwtPayload(token) {
+        try {
+            if (!token) return null;
+            const parts = String(token).split('.');
+            if (parts.length < 2) return null;
+            const base64Url = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const padded = base64Url + '='.repeat((4 - (base64Url.length % 4)) % 4);
+            return JSON.parse(atob(padded));
+        } catch (_) {
+            return null;
+        }
+    }
+
+    redirectAuthenticatedLandingByToken() {
+        const isLanding = window.location.pathname === '/' || window.location.pathname.includes('index.html');
+        if (!isLanding) return;
+
+        const payload = this.decodeJwtPayload(this.token);
+        const role = String(payload?.role || '').toLowerCase();
+        if (role === 'farmer') {
+            window.location.replace('/farmer.html');
+            return;
+        }
+        if (role === 'staff' || role === 'super_admin') {
+            window.location.replace('/admin.html');
         }
     }
 
@@ -1911,11 +2006,17 @@ class AgricultureMarket {
 
     toggleMyAccountPasswordSection(forceOpen = null) {
         const fields = document.getElementById('my-account-password-fields');
+        const mainFields = document.getElementById('my-account-main-fields');
         const toggleBtn = document.getElementById('toggle-my-password-section');
-        if (!fields || !toggleBtn) return;
+        if (!fields) return;
         const willOpen = forceOpen === null ? !!fields.hidden : !!forceOpen;
         fields.hidden = !willOpen;
-        toggleBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        if (mainFields) {
+            mainFields.hidden = willOpen;
+        }
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        }
     }
 
     bindPasswordToggle(buttonId, inputId) {
@@ -2247,79 +2348,22 @@ class AgricultureMarket {
 
         const email = document.getElementById('auth-email').value;
         const password = document.getElementById('auth-password').value;
-        const requestedRole = this.selectedRole;
 
         if (!email || !password) {
             this.showMessage('Please enter email and password', 'error');
             return;
         }
 
-        // Super admin bypasses OTP (only known in browser, not in database)
-        const isSuperAdmin = (email === 'scy@linth' || email === 'scy_linth') && password === '1234';
-        
-        if (isSuperAdmin) {
-            // Super admin can login directly without OTP
-            try {
-                const response = await fetch(`${this.apiBase}/auth/login`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password, requestedRole })
-                });
-                let data;
-                const ct = response.headers.get('content-type') || '';
-                if (ct.includes('application/json')) {
-                    data = await response.json();
-                } else {
-                    const text = await response.text();
-                    if (!response.ok) {
-                        this.showMessage(text || 'Login failed', 'error');
-                        return;
-                    }
-                    this.showMessage('Unexpected non-JSON login response', 'error');
-                    return;
-                }
-
-                if (response.ok) {
-                    const userRole = data.user.role;
-                    localStorage.setItem('token', data.token);
-                    this.token = data.token;
-                    this.closeModals();
-                    this.checkAuthStatus();
-                    this.showMessage('Login successful!', 'success');
-                    
-                    // Redirect based on role
-                    if (userRole === 'super_admin' || userRole === 'staff') {
-                        setTimeout(() => {
-                            window.location.href = '/admin.html';
-                        }, 1000);
-                    } else if (userRole === 'farmer') {
-                        setTimeout(() => {
-                            window.location.href = '/farmer.html';
-                        }, 1000);
-                    }
-                    return;
-                } else {
-                    this.showMessage(data.message || 'Login failed', 'error');
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                this.showMessage('Login failed. Please try again.', 'error');
-            }
-            return;
-        }
-
-        // Login without OTP - proceed directly with email and password
+        // Prepare payload without sending a client-chosen role
+        const payload = { email, password };
 
         try {
             const response = await fetch(`${this.apiBase}/auth/login`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ email, password, requestedRole })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
+
             let data;
             const ct = response.headers.get('content-type') || '';
             if (ct.includes('application/json')) {
@@ -2335,22 +2379,12 @@ class AgricultureMarket {
             }
 
             if (response.ok) {
-                const userRole = data.user.role;
-                
-                // Allow staff to login with any requested role
-                // For non-staff users, validate role matches requested role
-                const isValidRole = userRole === 'staff' || 
-                                   userRole === 'super_admin' || 
-                                   userRole === requestedRole;
-
-                if (!isValidRole) {
-                    this.showMessage(`Invalid ${requestedRole} credentials`, 'error');
-                    return;
-                }
+                const userRole = data.user?.role;
 
                 this.token = data.token;
                 localStorage.setItem('token', this.token);
-                // Clear form data and saved step on successful login
+
+                // Clear and close auth UI
                 this.clearFormData('login');
                 localStorage.removeItem('last_registration_step');
                 localStorage.removeItem('last_otp_sent');
@@ -2359,40 +2393,16 @@ class AgricultureMarket {
                 this.clearAuthForm();
                 this.closeAuthFlow();
 
-                // Handle redirect based on actual user role and requested role
+                // Redirect / update UI based on server-determined role
                 if (userRole === 'super_admin' || userRole === 'staff') {
-                    // Staff can access any interface based on requested role
-                    if (requestedRole === 'staff') {
-                        this.showMessage('Staff login successful! Redirecting...', 'success');
-                        setTimeout(() => {
-                            if (this.returnUrl) {
-                                window.location.href = this.returnUrl;
-                            } else {
-                                window.location.href = '/admin.html';
-                            }
-                        }, 1000);
-                    } else if (requestedRole === 'farmer') {
-                        this.showMessage('Login successful! Redirecting...', 'success');
-                        setTimeout(() => {
-                            if (this.returnUrl) {
-                                window.location.href = this.returnUrl;
-                            } else {
-                                window.location.href = '/farmer.html';
-                            }
-                        }, 1000);
-                    } else if (requestedRole === 'customer') {
-                        this.showUserMenu();
-                        this.migrateGuestCart();
-                        this.showMessage('Login successful!', 'success');
-                        // Reopen checkout if pending
-                        if (this.pendingCheckout) {
-                            this.pendingCheckout = false;
-                            setTimeout(() => this.openCheckoutModal(), 500);
+                    this.showMessage('Staff login successful! Redirecting...', 'success');
+                    setTimeout(() => {
+                        if (this.returnUrl) {
+                            window.location.href = this.returnUrl;
+                        } else {
+                            window.location.href = '/admin.html';
                         }
-                    } else {
-                        // Default staff redirect
-                        window.location.href = '/admin.html';
-                    }
+                    }, 1000);
                 } else if (userRole === 'farmer') {
                     this.showMessage('Farmer login successful! Redirecting...', 'success');
                     setTimeout(() => {
@@ -2402,22 +2412,21 @@ class AgricultureMarket {
                             window.location.href = '/farmer.html';
                         }
                     }, 1000);
-                } else if (userRole === 'customer') {
+                } else {
+                    // Customer or unknown role: stay in UI
                     this.showUserMenu();
                     this.migrateGuestCart();
-                    this.showMessage('Customer login successful!', 'success');
-                    // Reopen checkout if pending
+                    this.showMessage('Login successful!', 'success');
                     if (this.pendingCheckout) {
                         this.pendingCheckout = false;
                         setTimeout(() => this.openCheckoutModal(), 500);
                     }
-                    // Handle return URL for customers
                     if (this.returnUrl) {
-                        setTimeout(() => {
-                            window.location.href = this.returnUrl;
-                        }, 1000);
+                        setTimeout(() => { window.location.href = this.returnUrl; }, 1000);
                     }
                 }
+
+                return;
             } else {
                 // If login failed due to OTP verification, reset OTP state
                 if (data.message && (data.message.includes('OTP verification') || data.message.includes('OTP'))) {
@@ -3415,6 +3424,49 @@ class AgricultureMarket {
         }
     }
 
+    isProductExpired(product) {
+        if (!product?.expiry_date) return false;
+        const expiryDate = new Date(product.expiry_date);
+        if (Number.isNaN(expiryDate.getTime())) return false;
+        const now = new Date();
+        expiryDate.setHours(23, 59, 59, 999);
+        return expiryDate.getTime() < now.getTime();
+    }
+
+    isProductPurchasable(product) {
+        const stock = Number(product?.stock_quantity ?? 0);
+        const isAvailable = (
+            product?.is_available === undefined
+            || product?.is_available === true
+            || product?.is_available === 't'
+            || product?.is_available === 'true'
+            || product?.is_available === 1
+            || product?.is_available === '1'
+        );
+        return isAvailable && stock > 0 && !this.isProductExpired(product);
+    }
+
+    syncSortControls() {
+        const current = String(this.currentSort || 'latest').trim();
+
+        const legacySelect = document.getElementById('products-sort');
+        if (legacySelect) {
+            legacySelect.value = current;
+        }
+
+        const sortButtons = document.querySelectorAll('.sort-option-btn[data-sort-option]');
+        sortButtons.forEach((btn) => {
+            const option = String(btn.getAttribute('data-sort-option') || '');
+            btn.classList.toggle('active', option === current);
+        });
+
+        const priceSortEl = document.getElementById('products-price-sort');
+        if (priceSortEl) {
+            const isPriceSort = current === 'price_low_high' || current === 'price_high_low';
+            priceSortEl.value = isPriceSort ? current : '';
+        }
+    }
+
     // Products
     async loadProducts() {
         const container = document.getElementById('products-grid');
@@ -3508,25 +3560,23 @@ class AgricultureMarket {
                     : window.__PLACEHOLDER_IMAGE__;
                 const itemLabel = product.id ? `onclick="app.showProductDetails(${product.id})" style="cursor:pointer;"` : '';
                 const productRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                const isPurchasable = this.isProductPurchasable(product);
                 return `
                     <div class="product-card" ${itemLabel}>
                         <img src="${imageUrl}" alt="${product.name}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
                         <div class="product-info">
+                            <div class="featured-seller-badge">Best Seller</div>
                             <h3 class="product-name">${product.name}</h3>
                             <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit || 'item'}</div>
-                            <div class="product-meta">
-                                <div class="product-stats-lines">
-                                    <div class="stock-count">${this.fmtNumber(product.stock_quantity ?? 0)} Stocks</div>
-                                    <div class="sales-count">${this.fmtNumber(product.sales_count || 0)} Sold</div>
-                                    <div class="product-harvest-info compact">
-                                        <span><i class="fas fa-star rating-icon" aria-hidden="true"></i> ${productRating} (${this.fmtNumber(product.total_reviews || 0)})</span>
-                                    </div>
-                                </div>
+                            <div class="product-meta product-card-summary">
+                                <button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); app.showProductDetails(${product.id});">
+                                    Reviews (${this.fmtNumber(product.total_reviews || 0)}) • ${productRating}★
+                                </button>
                             </div>
                             <button class="add-to-cart-btn"
                                     onclick="event.stopPropagation(); app.addToCart(${product.id})"
-                                    ${product.stock_quantity === 0 ? 'disabled' : ''}>
-                                ${product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+                                    ${isPurchasable ? '' : 'disabled'}>
+                                ${isPurchasable ? 'Add to Cart' : 'Unavailable'}
                             </button>
                         </div>
                     </div>
@@ -3553,8 +3603,9 @@ class AgricultureMarket {
 
         console.log('Rendering products to container:', container, 'Products count:', products.length);
         container.innerHTML = products.map(product => {
-            const harvestDate = product.harvest_date ? new Date(product.harvest_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified';
-            const expiryDate = product.expiry_date ? new Date(product.expiry_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified';
+            const isPurchasable = this.isProductPurchasable(product);
+            const totalReviews = this.fmtNumber(product.total_reviews || 0);
+            const averageRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
             
             // Ensure image URL is properly formatted
             let productImageUrl = product.image_url || '';
@@ -3572,23 +3623,16 @@ class AgricultureMarket {
                 <div class="product-info">
                     <h3 class="product-name">${product.name}</h3>
                     <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit}</div>
-                    <div class="product-meta">
-                        <div class="product-stats-lines">
-                            <div class="stock-count">${this.fmtNumber(product.stock_quantity ?? 0)} Stocks</div>
-                            <div class="sales-count">${this.fmtNumber(product.sales_count || 0)} Sold</div>
-                        </div>
-                        <div class="product-harvest-info">
-                            <span class="harvest-date"><i class="fas fa-calendar-check"></i> Harvest: ${harvestDate}</span>
-                            ${product.expiry_date ? `<span class="expiry-date"><i class="fas fa-clock"></i> Expires: ${expiryDate}</span>` : ''}
-                        </div>
-                        <div class="product-harvest-info">
-                            <span><i class="fas fa-star rating-icon" aria-hidden="true"></i> ${this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} (${this.fmtNumber(product.total_reviews || 0)})</span>
-                        </div>
+                    <div class="product-meta product-card-summary">
+                        <button class="btn btn-secondary btn-small"
+                                onclick="event.stopPropagation(); app.showProductDetails(${product.id})">
+                            Reviews (${totalReviews}) • ${averageRating}★
+                        </button>
                     </div>
                     <button class="add-to-cart-btn"
                             onclick="event.stopPropagation(); app.addToCart(${product.id})"
-                            ${product.stock_quantity === 0 ? 'disabled' : ''}>
-                        ${product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+                            ${isPurchasable ? '' : 'disabled'}>
+                        ${isPurchasable ? 'Add to Cart' : 'Unavailable'}
                     </button>
                 </div>
             </div>
@@ -3821,6 +3865,10 @@ class AgricultureMarket {
             const addCartBtn = document.getElementById('product-details-add-cart');
             if (addCartBtn) {
                 addCartBtn.onclick = async () => {
+                    if (!this.isProductPurchasable(product)) {
+                        this.showMessage('This product is currently unavailable.', 'error');
+                        return;
+                    }
                     const quantity = parseInt(document.getElementById('product-details-quantity').value) || 1;
                     const maxAddable = this.getMaxAddableQuantity();
                     if (quantity > maxAddable) {
@@ -3839,10 +3887,11 @@ class AgricultureMarket {
                     }
                 };
                 const maxAddable = this.getMaxAddableQuantity();
-                addCartBtn.disabled = maxAddable <= 0;
-                addCartBtn.innerHTML = maxAddable <= 0 
-                    ? '<i class="fas fa-ban"></i> Out of Stock' 
-                    : '<i class="fas fa-shopping-cart"></i> Add to Cart';
+                const canAdd = this.isProductPurchasable(product) && maxAddable > 0;
+                addCartBtn.disabled = !canAdd;
+                addCartBtn.innerHTML = canAdd
+                    ? '<i class="fas fa-shopping-cart"></i> Add to Cart'
+                    : '<i class="fas fa-ban"></i> Unavailable';
             }
             
             // Update quantity button states
@@ -4142,7 +4191,7 @@ class AgricultureMarket {
 
             if (response.ok) {
                 this.updateCartCount();
-                this.showMessage('Item added to cart!', 'success');
+                this.showMessage('Item added to cart!', 'success', { position: 'center' });
                 
                 // If cart is already open, refresh the cart display
                 const cartSidebar = document.getElementById('cart-sidebar');
@@ -4700,19 +4749,13 @@ class AgricultureMarket {
             this.returnUrl = returnUrl;
         }
 
-        // Always open auth modal first (login form with role selector on it)
+        // Open auth modal; login role is now identified by backend
         this.selectedRole = role;
         this.authMode = mode;
-        // Before opening, adjust role selector visibility when customer-only
+        // Register flow still supports role selection (customer/farmer)
         try {
-            const loginSel = document.getElementById('role-selector-login');
             const regSel = document.getElementById('role-selector-register');
             if (customerOnly) {
-                if (loginSel) {
-                    loginSel.querySelectorAll('.role-box, .role-box-enhanced').forEach(btn => {
-                        if (btn.getAttribute('data-role') !== 'customer') btn.style.display = 'none';
-                    });
-                }
                 if (regSel) {
                     regSel.querySelectorAll('.role-box-enhanced').forEach(btn => {
                         if (btn.getAttribute('data-role') !== 'customer') btn.style.display = 'none';
@@ -4722,8 +4765,6 @@ class AgricultureMarket {
                 role = 'customer';
                 this.selectedRole = 'customer';
             } else {
-                // restore visibility
-                if (loginSel) loginSel.querySelectorAll('.role-box, .role-box-enhanced').forEach(btn => btn.style.display = 'inline-flex');
                 if (regSel) regSel.querySelectorAll('.role-box-enhanced').forEach(btn => btn.style.display = 'inline-flex');
             }
         } catch (e) {
@@ -4741,25 +4782,18 @@ class AgricultureMarket {
             return;
         }
         this.selectedRole = role;
-        const authRoleInput = document.getElementById('auth-role');
-        if (authRoleInput) authRoleInput.value = role;
 
-        const loginSel = document.getElementById('role-selector-login');
         const regSel = document.getElementById('role-selector-register');
-        const visible = mode === 'login' ? loginSel : regSel;
-        const hidden = mode === 'login' ? regSel : loginSel;
-        [loginSel, regSel].forEach(el => {
+        [regSel].forEach(el => {
             if (!el) return;
-            // Support both old .role-box and new .role-box-enhanced
-            el.querySelectorAll('.role-box, .role-box-enhanced').forEach(btn => {
+            el.querySelectorAll('.role-box-enhanced').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-role') === role);
             });
         });
 
         const authTitle = document.getElementById('auth-modal-title');
         if (authTitle) {
-            const name = role.charAt(0).toUpperCase() + role.slice(1);
-            authTitle.textContent = mode === 'login' ? `Login as ${name}` : 'Register';
+            authTitle.textContent = mode === 'login' ? 'Login' : 'Register';
         }
         
         // Update fullname hint based on selected role in step 4
@@ -4778,7 +4812,6 @@ class AgricultureMarket {
         try { this.closeCart(); } catch (e) {}
         const authModal = document.getElementById('auth-modal');
         const authTitle = document.getElementById('auth-modal-title');
-        const authRoleInput = document.getElementById('auth-role');
         const authSubmitBtn = document.getElementById('auth-submit-btn');
         const sendOtpBtn = document.getElementById('send-otp-btn');
         const authModeToggle = document.getElementById('auth-mode-toggle');
@@ -4822,7 +4855,6 @@ class AgricultureMarket {
             role = 'customer';
         }
         this.selectedRole = role;
-        if (authRoleInput) authRoleInput.value = role;
 
         // Hide OTP sections
         if (loginOtpSection) loginOtpSection.style.display = 'none';
@@ -4836,8 +4868,7 @@ class AgricultureMarket {
 
         // Update title
         if (authTitle) {
-            const name = role.charAt(0).toUpperCase() + role.slice(1);
-            authTitle.textContent = mode === 'login' ? `Login as ${name}` : 'Register';
+            authTitle.textContent = mode === 'login' ? 'Login' : 'Register';
         }
 
         if (mode === 'login') {
@@ -4893,7 +4924,7 @@ class AgricultureMarket {
             const registerFields = document.getElementById('auth-register-fields');
             if (registerFields) {
                 registerFields.querySelectorAll('input, textarea').forEach(field => {
-                    if (field.id !== 'auth-role') field.value = '';
+                    field.value = '';
                 });
             }
         } else {
@@ -4901,7 +4932,7 @@ class AgricultureMarket {
             const loginFields = document.getElementById('auth-login-fields');
             if (loginFields) {
                 loginFields.querySelectorAll('input').forEach(input => {
-                    if (input.id !== 'auth-role') input.value = '';
+                    input.value = '';
                 });
             }
         }
@@ -4938,14 +4969,14 @@ class AgricultureMarket {
             const loginFields = document.getElementById('auth-login-fields');
             if (loginFields) {
                 loginFields.querySelectorAll('input').forEach(input => {
-                    if (input.id !== 'auth-role') input.value = '';
+                    input.value = '';
                 });
             }
         } else {
             const registerFields = document.getElementById('auth-register-fields');
             if (registerFields) {
                 registerFields.querySelectorAll('input, textarea').forEach(field => {
-                    if (field.id !== 'auth-role') field.value = '';
+                    field.value = '';
                 });
             }
         }
@@ -5256,12 +5287,12 @@ class AgricultureMarket {
         
         if (loginFields) {
             loginFields.querySelectorAll('input').forEach(input => {
-                if (input.id !== 'auth-role') input.value = '';
+                input.value = '';
             });
         }
         if (registerFields) {
             registerFields.querySelectorAll('input, textarea').forEach(field => {
-                if (field.id !== 'auth-role') field.value = '';
+                field.value = '';
             });
         }
         
@@ -5518,10 +5549,12 @@ class AgricultureMarket {
         return `/orders.html?${params.toString()}`;
     }
 
-    showMessage(message, type = 'info') {
-        // Create a centered toast notification
+    showMessage(message, type = 'info', options = {}) {
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
+        if (options?.position === 'center') {
+            toast.classList.add('toast-centered');
+        }
         toast.textContent = message;
 
         document.body.appendChild(toast);

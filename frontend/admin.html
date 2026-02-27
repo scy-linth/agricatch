@@ -258,6 +258,24 @@
                                 </thead>
                                 <tbody id="category-requests-tbody"></tbody>
                             </table>
+
+                            <h3 style="margin:1rem 0 0.75rem;">Product Name Catalog</h3>
+                            <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap: wrap;">
+                                <select id="catalog-category-select" class="filter-select" style="min-width:170px;"></select>
+                                <input id="new-catalog-name" class="search-input" placeholder="Product name">
+                                <button id="add-catalog-name-btn" class="btn btn-primary btn-small" type="button">Add Product Name</button>
+                            </div>
+                            <table class="admin-table" id="catalog-names-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Category</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="catalog-names-tbody"></tbody>
+                            </table>
                         </div>
                     </div>
                 </div>

@@ -118,6 +118,7 @@ const ensureProductCatalogSchema = async () => {
     CREATE TABLE IF NOT EXISTS product_name_requests (
       id SERIAL PRIMARY KEY,
       category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT,
+      requested_category_name VARCHAR(120),
       name VARCHAR(120) NOT NULL,
       notes TEXT,
       requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -128,6 +129,8 @@ const ensureProductCatalogSchema = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  await pool.query(`ALTER TABLE product_name_requests ADD COLUMN IF NOT EXISTS requested_category_name VARCHAR(120)`);
 
   for (const groupName of FEATURED_CATEGORY_GROUPS) {
     await pool.query(
@@ -201,10 +204,9 @@ router.get('/categories', async (_req, res) => {
 // Farmer custom product-name request (requires staff approval)
 router.post('/category-requests', async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'Authentication required' });
+    const decoded = getUserFromToken(req);
+    if (!decoded?.id) return res.status(401).json({ message: 'Invalid or expired token' });
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
     const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
     const role = roleResult.rows[0]?.role;
     if (role !== 'farmer') {
@@ -213,20 +215,31 @@ router.post('/category-requests', async (req, res) => {
 
     const name = String(req.body?.name || '').trim();
     const notes = String(req.body?.notes || '').trim();
-    const categoryId = Number(req.body?.category_id || 0);
+    const requestedCategoryName = String(req.body?.requested_category_name || '').trim();
+    const parsedCategoryId = Number(req.body?.category_id);
+    const categoryId = Number.isFinite(parsedCategoryId) && parsedCategoryId > 0 ? parsedCategoryId : 0;
 
     if (!name) return res.status(400).json({ message: 'Product name is required' });
-    if (!categoryId) return res.status(400).json({ message: 'Category is required' });
+    if (!categoryId && !requestedCategoryName) {
+      return res.status(400).json({ message: 'Category is required' });
+    }
+    if (requestedCategoryName.length > 120) {
+      return res.status(400).json({ message: 'Requested category is too long (max 120 chars)' });
+    }
     if (name.length > 120) return res.status(400).json({ message: 'Product name is too long (max 120 chars)' });
 
     await ensureProductCatalogSchema();
 
-    const categoryResult = await pool.query(
-      `SELECT id FROM categories WHERE id = $1 AND (COALESCE(LOWER(type), 'agricultural') <> 'fishery')`,
-      [categoryId]
-    );
-    if (!categoryResult.rows.length) {
-      return res.status(400).json({ message: 'Invalid category' });
+    let validCategoryId = null;
+    if (categoryId) {
+      const categoryResult = await pool.query(
+        `SELECT id FROM categories WHERE id = $1 AND (COALESCE(LOWER(type), 'agricultural') <> 'fishery')`,
+        [categoryId]
+      );
+      if (!categoryResult.rows.length) {
+        return res.status(400).json({ message: 'Invalid category' });
+      }
+      validCategoryId = categoryId;
     }
 
     const catalogCheck = await pool.query(
@@ -248,10 +261,10 @@ router.post('/category-requests', async (req, res) => {
     }
 
     const inserted = await pool.query(
-      `INSERT INTO product_name_requests (category_id, name, notes, requested_by)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, category_id, name, notes, status, created_at`,
-      [categoryId, name, notes || null, decoded.id]
+      `INSERT INTO product_name_requests (category_id, requested_category_name, name, notes, requested_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, category_id, requested_category_name, name, notes, status, created_at`,
+      [validCategoryId, requestedCategoryName || null, name, notes || null, decoded.id]
     );
 
     return res.status(201).json({
@@ -263,6 +276,32 @@ router.post('/category-requests', async (req, res) => {
     return res.status(500).json({ message: 'Server error creating request' });
   }
 });
+
+const getMyCategoryRequestsHandler = async (req, res) => {
+  try {
+    const decoded = getUserFromToken(req);
+    if (!decoded?.id) return res.status(401).json({ message: 'Invalid or expired token' });
+    const userId = decoded.id;
+
+    const result = await pool.query(
+      `SELECT r.id, r.category_id, r.requested_category_name, c.name as category_name, r.name, r.notes, r.status, r.review_notes, r.reviewed_at, r.created_at
+       FROM product_name_requests r
+       LEFT JOIN categories c ON r.category_id = c.id
+       WHERE r.requested_by = $1
+       ORDER BY r.created_at DESC`,
+      [userId]
+    );
+
+    return res.json({ requests: result.rows });
+  } catch (error) {
+    console.error('Get my category requests error:', error.message);
+    return res.status(500).json({ message: 'Server error fetching requests' });
+  }
+};
+
+// Get current farmer's product name requests (history)
+router.get('/category-requests/mine', getMyCategoryRequestsHandler);
+router.get('/requests/mine', getMyCategoryRequestsHandler);
 
 // Get all products with pagination and filtering
 router.get('/', async (req, res) => {
@@ -278,6 +317,8 @@ router.get('/', async (req, res) => {
     const orderByMap = {
       latest: 'p.created_at DESC',
       harvest_date: 'p.harvest_date DESC NULLS LAST, p.created_at DESC',
+      expiry_date: 'p.expiry_date ASC NULLS LAST, p.created_at DESC',
+      expiration_date: 'p.expiry_date ASC NULLS LAST, p.created_at DESC',
       ratings: 'average_rating DESC, total_reviews DESC, p.created_at DESC',
       top_sales: 'p.sales_count DESC, p.created_at DESC',
       price_low_high: 'p.price ASC, p.created_at DESC',
@@ -418,7 +459,7 @@ router.get('/catalog/names', async (_req, res) => {
   }
 });
 
-// Suggested pricing based on delivered sales, excluding disabled/out-of-stock/expired listings
+// Suggested pricing based on system-wide delivered sales history
 router.get('/pricing/suggestion', async (req, res) => {
   try {
     const rawName = String(req.query.name || '').trim();
@@ -447,9 +488,6 @@ router.get('/pricing/suggestion', async (req, res) => {
         JOIN products p ON p.id = o.product_id
         LEFT JOIN categories c ON c.id = p.category_id
         WHERE o.status = 'delivered'
-          AND p.is_available = true
-          AND p.stock_quantity > 0
-          AND ${NON_EXPIRED_PRODUCT_SQL}
           AND (
             c.id IS NULL
             OR (COALESCE(LOWER(c.type), 'agricultural') <> 'fishery'

@@ -143,6 +143,7 @@ class AdminDashboard {
         this.loadProducts();
         this.loadCategories();
         this.loadCategoryRequests();
+        this.loadCatalogNames();
         this.setupEventListeners();
         this.setupRealtime();
         this.startUnreadPolling();
@@ -282,6 +283,7 @@ class AdminDashboard {
         if (sectionId === 'categories') {
             this.loadCategories();
             this.loadCategoryRequests();
+            this.loadCatalogNames();
         }
     }
 
@@ -418,6 +420,7 @@ class AdminDashboard {
         }
 
         document.getElementById('create-category-btn')?.addEventListener('click', () => this.createCategory());
+        document.getElementById('add-catalog-name-btn')?.addEventListener('click', () => this.addCatalogName());
     }
 
     async loadAuditLogs() {
@@ -717,6 +720,13 @@ class AdminDashboard {
                 </td>
             </tr>
         `).join('');
+
+        const catalogCategorySelect = document.getElementById('catalog-category-select');
+        if (catalogCategorySelect) {
+            const options = ['<option value="">Select category</option>']
+                .concat((categories || []).map((category) => `<option value="${category.id}">${this.escapeHtml(category.name || '')}</option>`));
+            catalogCategorySelect.innerHTML = options.join('');
+        }
     }
 
     async createCategory() {
@@ -752,6 +762,120 @@ class AdminDashboard {
         } catch (error) {
             console.error('Create category error:', error);
             this.showMessage('Failed to create category', 'error');
+        }
+    }
+
+    async loadCatalogNames() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/catalog-names`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            this.lastCatalogNames = data.names || [];
+            this.renderCatalogNames(this.lastCatalogNames);
+        } catch (error) {
+            console.error('Error loading catalog names:', error);
+        }
+    }
+
+    renderCatalogNames(items) {
+        const tbody = document.getElementById('catalog-names-tbody');
+        if (!tbody) return;
+
+        if (!(items || []).length) {
+            tbody.innerHTML = `<tr><td colspan="4" style="color:#64748b;">No catalog names yet.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = (items || []).map((item) => `
+            <tr>
+                <td>${item.id}</td>
+                <td>${this.escapeHtml(item.name || '')}</td>
+                <td>${this.escapeHtml(item.category_name || '—')}</td>
+                <td>
+                    <button class="btn btn-small" onclick="adminDashboard.editCatalogName(${item.id})">Edit</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async addCatalogName() {
+        const categoryId = Number(document.getElementById('catalog-category-select')?.value || 0);
+        const nameEl = document.getElementById('new-catalog-name');
+        const name = String(nameEl?.value || '').trim();
+
+        if (!categoryId || !name) {
+            this.showMessage('Category and product name are required', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/catalog-names`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ name, category_id: categoryId })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to add product name', 'error');
+                return;
+            }
+
+            this.showMessage('Product name added to catalog', 'success');
+            if (nameEl) nameEl.value = '';
+            this.loadCatalogNames();
+        } catch (error) {
+            console.error('Add catalog name error:', error);
+            this.showMessage('Failed to add product name', 'error');
+        }
+    }
+
+    async editCatalogName(catalogId) {
+        const item = (this.lastCatalogNames || []).find((entry) => Number(entry.id) === Number(catalogId));
+        if (!item) return;
+
+        const nextName = prompt('Edit product name:', item.name || '');
+        if (nextName === null) return;
+        const trimmedName = String(nextName || '').trim();
+        if (!trimmedName) {
+            this.showMessage('Product name cannot be empty', 'error');
+            return;
+        }
+
+        const categoryPrompt = prompt('Enter category ID:', String(item.category_id || ''));
+        if (categoryPrompt === null) return;
+        const nextCategoryId = Number(categoryPrompt || 0);
+        if (!nextCategoryId) {
+            this.showMessage('Valid category ID is required', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/catalog-names/${catalogId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ name: trimmedName, category_id: nextCategoryId })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to update product name', 'error');
+                return;
+            }
+
+            this.showMessage('Product name updated', 'success');
+            this.loadCatalogNames();
+        } catch (error) {
+            console.error('Edit catalog name error:', error);
+            this.showMessage('Failed to update product name', 'error');
         }
     }
 
@@ -846,7 +970,7 @@ class AdminDashboard {
             <tr>
                 <td>${request.id}</td>
                 <td>${this.escapeHtml(request.name || '')}</td>
-                <td>${this.escapeHtml(request.category_name || '')}</td>
+                <td>${this.escapeHtml(request.category_name || request.requested_category_name || '—')}</td>
                 <td>${this.escapeHtml(request.requested_by_username || 'Farmer')}</td>
                 <td>
                     <button class="btn btn-small" onclick="adminDashboard.openCategoryRequestPanel(${request.id})">Review</button>
@@ -863,10 +987,10 @@ class AdminDashboard {
         const content = document.getElementById('category-detail-content');
         if (!panel || !content) return;
 
-        const categoryOptions = (this.lastCategories || []).map((category) => {
+        const categoryOptions = ['<option value="">Select category</option>'].concat((this.lastCategories || []).map((category) => {
             const selected = Number(category.id) === Number(request.category_id) ? 'selected' : '';
             return `<option value="${category.id}" ${selected}>${this.escapeHtml(category.name)}</option>`;
-        }).join('');
+        })).join('');
 
         content.innerHTML = `
             <div class="panel-header">
@@ -877,13 +1001,18 @@ class AdminDashboard {
                 <input id="category-request-name" class="search-input" value="${this.escapeHtml(request.name || '')}">
                 <label>Category</label>
                 <select id="category-request-category" class="filter-select">${categoryOptions}</select>
+                <label>Requested New Category</label>
+                <input id="category-request-requested-category" class="search-input" value="${this.escapeHtml(request.requested_category_name || '')}" placeholder="Optional farmer-requested category name">
+                <label>Add New Category (Staff)</label>
+                <input id="category-request-new-category" class="search-input" placeholder="Create category during review (optional)">
                 <label>Request Notes</label>
                 <textarea class="search-input" rows="3" disabled>${this.escapeHtml(request.notes || '')}</textarea>
                 <label>Review Notes</label>
                 <textarea id="category-request-review-notes" class="search-input" rows="3" placeholder="Optional review notes"></textarea>
                 <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+                    <button class="btn btn-secondary btn-small" onclick="adminDashboard.reviewCategoryRequest(${request.id}, 'pending')">Save Edits</button>
                     <button class="btn btn-primary btn-small" onclick="adminDashboard.reviewCategoryRequest(${request.id}, 'approved')">Approve</button>
-                    <button class="btn btn-danger btn-small" onclick="adminDashboard.reviewCategoryRequest(${request.id}, 'rejected')">Reject</button>
+                    <button class="btn btn-danger btn-small" onclick="adminDashboard.reviewCategoryRequest(${request.id}, 'rejected')">Decline</button>
                 </div>
             </div>
         `;
@@ -898,9 +1027,11 @@ class AdminDashboard {
     async reviewCategoryRequest(requestId, status) {
         const name = String(document.getElementById('category-request-name')?.value || '').trim();
         const category_id = Number(document.getElementById('category-request-category')?.value || 0);
+        const requested_category_name = String(document.getElementById('category-request-requested-category')?.value || '').trim();
+        const new_category_name = String(document.getElementById('category-request-new-category')?.value || '').trim();
         const review_notes = String(document.getElementById('category-request-review-notes')?.value || '').trim();
 
-        if (status === 'approved' && (!name || !category_id)) {
+        if (status === 'approved' && (!name || (!category_id && !new_category_name))) {
             this.showMessage('Name and category are required for approval', 'error');
             return;
         }
@@ -912,7 +1043,14 @@ class AdminDashboard {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify({ status, name, category_id, review_notes })
+                body: JSON.stringify({
+                    status,
+                    name,
+                    category_id,
+                    requested_category_name,
+                    new_category_name,
+                    review_notes
+                })
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
@@ -920,9 +1058,11 @@ class AdminDashboard {
                 return;
             }
 
-            this.showMessage(`Request ${status}`, 'success');
-            this.closeCategoryDetails();
+            this.showMessage(`Request ${status === 'pending' ? 'saved' : status}`, 'success');
+            if (status !== 'pending') this.closeCategoryDetails();
+            this.loadCategories();
             this.loadCategoryRequests();
+            this.loadCatalogNames();
         } catch (error) {
             console.error('Review category request error:', error);
             this.showMessage('Failed to review request', 'error');
