@@ -4745,6 +4745,29 @@ textarea.invalid:focus {
     background: #f8fafc;
 }
 
+.product-name-option.active {
+    background: #eef6ff;
+}
+
+#edit-product-modal .product-name-dropdown {
+    z-index: 120;
+}
+
+/* Hide spinner arrows for farmer product price inputs */
+#product-price::-webkit-outer-spin-button,
+#product-price::-webkit-inner-spin-button,
+#edit-product-price::-webkit-outer-spin-button,
+#edit-product-price::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+#product-price,
+#edit-product-price {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
 .search-input {
     flex: 1;
     padding: 0.75rem;
@@ -6888,8 +6911,9 @@ textarea.invalid:focus {
 
 .brand-logo-container {
     display: flex;
+    align-items: center;
     max-width: 1200px;
-    gap: 0.75rem;
+    gap: 0.42rem;
     width: 100%;
 }
 
@@ -6911,6 +6935,8 @@ textarea.invalid:focus {
 .brand-text {
     display: flex;
     flex-direction: column;
+    gap: 0.05rem;
+    line-height: 1.15;
 }
 
 .brand-title {
@@ -6931,6 +6957,7 @@ textarea.invalid:focus {
 .brand-subtitle {
     font-size: 0.85rem;
     color: #cbd5f5;
+    margin-top: -1px;
 }
 
 .sidebar-nav {
@@ -7901,7 +7928,151 @@ textarea.invalid:focus {
 }
 
 .orders-search-row {
+    position: relative;
     margin-bottom: 0.85rem;
+}
+
+.orders-search-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 45;
+    display: none;
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.15);
+}
+
+.orders-search-dropdown.open {
+    display: block;
+}
+
+.orders-search-option {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid #eef2f7;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    padding: 0.6rem 0.75rem;
+    color: var(--text-primary);
+}
+
+.orders-search-option:last-child {
+    border-bottom: 0;
+}
+
+.orders-search-option:hover,
+.orders-search-option:focus {
+    background: #f8fafc;
+}
+
+.orders-search-option.active {
+    background: #eef6ff;
+}
+
+/* Farmer dashboard chat: solid, higher-contrast colors */
+.farmer-theme #chat .chat-layout {
+    gap: 14px;
+}
+
+.farmer-theme #chat .conversation-list,
+.farmer-theme #chat .conversation-sidebar,
+.farmer-theme #chat .chat-window,
+.farmer-theme #chat .chat-messages,
+.farmer-theme #chat .chat-header,
+.farmer-theme #chat .chat-form {
+    background: #0f172a;
+    border-color: #1e293b;
+}
+
+.farmer-theme #chat .conversation-sidebar {
+    background: #111827;
+}
+
+.farmer-theme #chat .conversation-sidebar-header {
+    background: #1f2937;
+    border-bottom: 1px solid #334155;
+}
+
+.farmer-theme #chat .conversation-sidebar-header h3,
+.farmer-theme #chat .conversation-name,
+.farmer-theme #chat .chat-header-title,
+.farmer-theme #chat .message-text {
+    color: #f8fafc;
+}
+
+.farmer-theme #chat .conversation-time,
+.farmer-theme #chat .chat-header-subtitle,
+.farmer-theme #chat .message-time {
+    color: #cbd5e1;
+}
+
+.farmer-theme #chat .conversation-item {
+    border-bottom: 1px solid #1f2937;
+}
+
+.farmer-theme #chat .conversation-item:hover {
+    background: #1e293b;
+}
+
+.farmer-theme #chat .conversation-item.active {
+    background: #1d4ed8;
+    border-left-color: #93c5fd;
+}
+
+.farmer-theme #chat .conversation-item.unread {
+    background: #1e3a8a;
+    border-left-color: #60a5fa;
+}
+
+.farmer-theme #chat .chat-messages {
+    background: #0b1220;
+}
+
+.farmer-theme #chat .message-bubble.received {
+    background: #1f2937;
+    color: #f8fafc;
+    border: 1px solid #334155;
+}
+
+.farmer-theme #chat .message-bubble.sent {
+    background: #065f46;
+    color: #f0fdf4;
+    border: 1px solid #047857;
+}
+
+.farmer-theme #chat .message-bubble .message-sender {
+    color: #93c5fd;
+}
+
+.farmer-theme #chat .message-bubble.sent .message-sender {
+    color: #bbf7d0;
+}
+
+.farmer-theme #chat .chat-form input {
+    background: #111827;
+    color: #f8fafc;
+    border: 1px solid #334155;
+}
+
+.farmer-theme #chat .chat-form input::placeholder {
+    color: #94a3b8;
+}
+
+.orders-search-option .title {
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
+.orders-search-option .meta {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
 }
 
 .farmer-overview-stats-inline .stat-number {

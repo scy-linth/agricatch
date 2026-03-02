@@ -31,6 +31,8 @@ class FarmerDashboard {
         this.overviewRefreshTimer = null;
         this.myProductsCache = [];
         this.catalogProductNames = [];
+        this.ordersSearchActiveIndex = -1;
+        this.productNameActiveIndex = { add: -1, edit: -1 };
 
         if (!this.token) {
             window.location.href = '/?login=1';
@@ -576,7 +578,18 @@ class FarmerDashboard {
 
         const ordersSearchInput = document.getElementById('orders-search-input');
         if (ordersSearchInput) {
-            ordersSearchInput.addEventListener('input', () => this.applyOrdersSearch());
+            ordersSearchInput.addEventListener('input', () => {
+                this.applyOrdersSearch();
+                this.renderOrdersSearchDropdown();
+            });
+            ordersSearchInput.addEventListener('focus', () => this.renderOrdersSearchDropdown());
+            ordersSearchInput.addEventListener('keydown', (e) => this.handleOrdersSearchKeydown(e));
+            ordersSearchInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    const drop = document.getElementById('orders-search-dropdown');
+                    if (drop) drop.classList.remove('open');
+                }, 120);
+            });
         }
 
         const exportBtn = document.getElementById('overview-export-csv-btn');
@@ -781,16 +794,33 @@ class FarmerDashboard {
 
     async loadProductCatalogNames(categoryId = null) {
         try {
-            const params = new URLSearchParams();
-            if (categoryId) params.set('category_id', String(categoryId));
-            const response = await fetch(`${this.apiBase}/products/catalog/names${params.toString() ? `?${params.toString()}` : ''}`, {
-                headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-            if (!response.ok) return;
+            const fetchNames = async (targetCategoryId = null) => {
+                const params = new URLSearchParams();
+                if (targetCategoryId) params.set('category_id', String(targetCategoryId));
+                const response = await fetch(`${this.apiBase}/products/catalog/names${params.toString() ? `?${params.toString()}` : ''}`, {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                if (!response.ok) return [];
+                const data = await response.json().catch(() => ({}));
+                return Array.isArray(data.names) ? data.names : [];
+            };
 
-            const data = await response.json();
-            const names = Array.isArray(data.names) ? data.names : [];
-            this.catalogProductNames = names;
+            // Use selected category names first, then include global names as fallback
+            // so known items like "Malunggay" are still discoverable in dropdown.
+            const scopedNames = await fetchNames(categoryId || null);
+            const globalNames = categoryId ? await fetchNames(null) : [];
+            const merged = [];
+            const seen = new Set();
+            for (const name of [...scopedNames, ...globalNames]) {
+                const normalized = String(name || '').trim();
+                if (!normalized) continue;
+                const key = normalized.toLowerCase();
+                if (seen.has(key)) continue;
+                seen.add(key);
+                merged.push(normalized);
+            }
+
+            this.catalogProductNames = merged;
             this.renderProductNameSuggestions('add');
             this.renderProductNameSuggestions('edit');
         } catch (error) {
@@ -798,7 +828,7 @@ class FarmerDashboard {
         }
     }
 
-    renderProductNameSuggestions(mode = 'add') {
+    renderProductNameSuggestions(mode = 'add', forceAll = false) {
         const isEdit = mode === 'edit';
         const nameInput = document.getElementById(isEdit ? 'edit-product-name' : 'product-name');
         const listEl = document.getElementById(isEdit ? 'edit-product-name-suggestions' : 'product-name-suggestions');
@@ -810,7 +840,7 @@ class FarmerDashboard {
             return;
         }
 
-        const query = String(nameInput.value || '').trim().toLowerCase();
+        const query = forceAll ? '' : String(nameInput.value || '').trim().toLowerCase();
         const source = Array.isArray(this.catalogProductNames) ? this.catalogProductNames : [];
         const matches = source
             .filter((name) => !query || String(name).toLowerCase().includes(query))
@@ -826,6 +856,7 @@ class FarmerDashboard {
             `<button type="button" class="product-name-option" data-name="${this.escapeAttr(name)}">${this.escapeHtml(name)}</button>`
         )).join('');
         listEl.classList.add('open');
+        this.productNameActiveIndex[mode] = -1;
 
         listEl.querySelectorAll('.product-name-option').forEach((btn) => {
             btn.addEventListener('mousedown', (e) => {
@@ -836,6 +867,49 @@ class FarmerDashboard {
                 this.updatePriceSuggestion(mode);
             });
         });
+    }
+
+    handleProductNameKeydown(mode = 'add', e) {
+        const isEdit = mode === 'edit';
+        const listEl = document.getElementById(isEdit ? 'edit-product-name-suggestions' : 'product-name-suggestions');
+        const nameInput = document.getElementById(isEdit ? 'edit-product-name' : 'product-name');
+        if (!listEl || !nameInput) return;
+
+        const options = Array.from(listEl.querySelectorAll('.product-name-option'));
+        if (!listEl.classList.contains('open') || !options.length) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.renderProductNameSuggestions(mode, true);
+            }
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.productNameActiveIndex[mode] = (this.productNameActiveIndex[mode] + 1) % options.length;
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.productNameActiveIndex[mode] = (this.productNameActiveIndex[mode] - 1 + options.length) % options.length;
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const index = this.productNameActiveIndex[mode];
+            if (index >= 0 && index < options.length) {
+                const selected = String(options[index].getAttribute('data-name') || '').trim();
+                nameInput.value = selected;
+                listEl.classList.remove('open');
+                this.updatePriceSuggestion(mode);
+            }
+            return;
+        } else if (e.key === 'Escape') {
+            listEl.classList.remove('open');
+            return;
+        } else {
+            return;
+        }
+
+        options.forEach((option, idx) => option.classList.toggle('active', idx === this.productNameActiveIndex[mode]));
+        const current = options[this.productNameActiveIndex[mode]];
+        if (current) current.scrollIntoView({ block: 'nearest' });
     }
 
     async loadCategories() {
@@ -902,7 +976,8 @@ class FarmerDashboard {
             addName.addEventListener('change', () => this.updatePriceSuggestion('add'));
             addName.addEventListener('blur', () => this.updatePriceSuggestion('add'));
             addName.addEventListener('input', () => this.renderProductNameSuggestions('add'));
-            addName.addEventListener('focus', () => this.renderProductNameSuggestions('add'));
+            addName.addEventListener('focus', () => this.renderProductNameSuggestions('add', true));
+            addName.addEventListener('keydown', (e) => this.handleProductNameKeydown('add', e));
             addName.addEventListener('blur', () => setTimeout(() => {
                 const list = document.getElementById('product-name-suggestions');
                 if (list) list.classList.remove('open');
@@ -912,7 +987,8 @@ class FarmerDashboard {
             editName.addEventListener('change', () => this.updatePriceSuggestion('edit'));
             editName.addEventListener('blur', () => this.updatePriceSuggestion('edit'));
             editName.addEventListener('input', () => this.renderProductNameSuggestions('edit'));
-            editName.addEventListener('focus', () => this.renderProductNameSuggestions('edit'));
+            editName.addEventListener('focus', () => this.renderProductNameSuggestions('edit', true));
+            editName.addEventListener('keydown', (e) => this.handleProductNameKeydown('edit', e));
             editName.addEventListener('blur', () => setTimeout(() => {
                 const list = document.getElementById('edit-product-name-suggestions');
                 if (list) list.classList.remove('open');
@@ -2970,6 +3046,7 @@ class FarmerDashboard {
         }
 
         this.applyOrdersSearch();
+        this.renderOrdersSearchDropdown();
 
         // Load orders for this status unless we're skipping (e.g., already loaded)
         if (!skipLoad) {
@@ -3012,6 +3089,8 @@ class FarmerDashboard {
             const deliveryAddress = String(order.delivery_address || '').trim();
             const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString() : 'Not specified';
             const specialInstructions = String(order.special_instructions || '').trim();
+            const customerName = String(order.customer_name || '—').trim();
+            const searchText = `${String(orderId)} ${productName} ${customerName}`.toLowerCase();
             const dateLabel = orderDate && !Number.isNaN(orderDate.getTime())
                 ? orderDate.toLocaleDateString()
                 : '—';
@@ -3020,7 +3099,7 @@ class FarmerDashboard {
                 : '—';
             
             return `
-            <div class="order-card" data-order-id="${orderId}" style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; background: #fff;">
+            <div class="order-card" data-order-id="${orderId}" data-order-status="${this.escapeAttr(status)}" data-search-text="${this.escapeAttr(searchText)}" style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; background: #fff;">
                 <div class="order-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
                     <div class="order-head-left" style="display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
                         <span class="order-date" style="color: #64748b; font-size: 14px;">${dateLabel}</span>
@@ -3033,7 +3112,7 @@ class FarmerDashboard {
                     <img src="${this.escapeAttr(productImage)}" alt="${this.escapeHtml(productName)}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0;" onerror="this.src='/images/logo.png'">
                     <div style="flex: 1;">
                         <div style="font-weight: 700; margin-bottom: 8px; font-size: 16px;">${this.escapeHtml(productName)}</div>
-                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Customer:</strong> ${this.escapeHtml(order.customer_name || '—')}</div>
+                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Customer:</strong> ${this.escapeHtml(customerName)}</div>
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Quantity:</strong> ${this.fmtNumber(quantity)} x ${this.fmtCurrency(price)} ${item.unit || order.unit || ''}</div>
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Total:</strong> ${this.fmtCurrency(totalAmount)}</div>
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Delivery Date:</strong> ${this.escapeHtml(deliveryDate)}</div>
@@ -3073,6 +3152,112 @@ class FarmerDashboard {
         }).join('');
 
         this.applyOrdersSearch();
+        this.renderOrdersSearchDropdown();
+    }
+
+    renderOrdersSearchDropdown() {
+        const input = document.getElementById('orders-search-input');
+        const dropdown = document.getElementById('orders-search-dropdown');
+        if (!input || !dropdown) return;
+
+        const q = String(input.value || '').trim().toLowerCase();
+        if (!q) {
+            dropdown.classList.remove('open');
+            dropdown.innerHTML = '';
+            return;
+        }
+
+        const cards = Array.from(document.querySelectorAll('.orders-list .order-card'));
+        const matches = cards
+            .map((card) => {
+            const text = String(card.getAttribute('data-search-text') || '').toLowerCase();
+                if (!text.includes(q)) return null;
+                const orderId = String(card.getAttribute('data-order-id') || '').trim();
+                const status = String(card.getAttribute('data-order-status') || '').trim();
+                const product = String(card.querySelector('img')?.getAttribute('alt') || 'Product').trim();
+                const customerText = String(card.textContent || '');
+                const m = customerText.match(/Customer:\s*([^\n\r]+)/i);
+                const customer = m ? String(m[1] || '').trim() : '—';
+                return { orderId, status, product, customer };
+            })
+            .filter(Boolean)
+            .slice(0, 10);
+
+        if (!matches.length) {
+            dropdown.classList.remove('open');
+            dropdown.innerHTML = '';
+            return;
+        }
+
+        dropdown.innerHTML = matches.map((m) => (
+            `<button type="button" class="orders-search-option" data-order-id="${this.escapeAttr(m.orderId)}" data-status="${this.escapeAttr(m.status)}">
+                <div class="title">Order #${this.escapeHtml(m.orderId)} • ${this.escapeHtml(m.product)}</div>
+                <div class="meta">Customer: ${this.escapeHtml(m.customer)} • ${this.escapeHtml(this.formatStatusLabel(m.status || 'pending'))}</div>
+            </button>`
+        )).join('');
+        dropdown.classList.add('open');
+        this.ordersSearchActiveIndex = -1;
+
+        dropdown.querySelectorAll('.orders-search-option').forEach((btn) => {
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                this.applyOrderSearchSelection(btn);
+            });
+        });
+    }
+
+    handleOrdersSearchKeydown(e) {
+        const dropdown = document.getElementById('orders-search-dropdown');
+        if (!dropdown || !dropdown.classList.contains('open')) return;
+
+        const options = Array.from(dropdown.querySelectorAll('.orders-search-option'));
+        if (!options.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.ordersSearchActiveIndex = (this.ordersSearchActiveIndex + 1) % options.length;
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.ordersSearchActiveIndex = (this.ordersSearchActiveIndex - 1 + options.length) % options.length;
+        } else if (e.key === 'Enter') {
+            if (this.ordersSearchActiveIndex >= 0 && this.ordersSearchActiveIndex < options.length) {
+                e.preventDefault();
+                this.applyOrderSearchSelection(options[this.ordersSearchActiveIndex]);
+            }
+            return;
+        } else if (e.key === 'Escape') {
+            dropdown.classList.remove('open');
+            return;
+        } else {
+            return;
+        }
+
+        options.forEach((opt, index) => {
+            opt.classList.toggle('active', index === this.ordersSearchActiveIndex);
+        });
+        const current = options[this.ordersSearchActiveIndex];
+        if (current) current.scrollIntoView({ block: 'nearest' });
+    }
+
+    applyOrderSearchSelection(btn) {
+        if (!btn) return;
+        const dropdown = document.getElementById('orders-search-dropdown');
+        const orderId = String(btn.getAttribute('data-order-id') || '').trim();
+        const status = String(btn.getAttribute('data-status') || '').trim();
+        if (status) {
+            this.switchOrderTab(status, true);
+        }
+        const target = document.querySelector(`.order-card[data-order-id="${orderId}"]`);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.style.outline = '2px solid var(--primary-color)';
+            target.style.outlineOffset = '2px';
+            setTimeout(() => {
+                target.style.outline = '';
+                target.style.outlineOffset = '';
+            }, 1200);
+        }
+        if (dropdown) dropdown.classList.remove('open');
     }
 
     openOrderDetails(orderId) {
@@ -3154,7 +3339,7 @@ class FarmerDashboard {
                 card.style.display = '';
                 return;
             }
-            const text = (card.textContent || '').toLowerCase();
+            const text = String(card.getAttribute('data-search-text') || '').toLowerCase();
             card.style.display = text.includes(q) ? '' : 'none';
         });
 

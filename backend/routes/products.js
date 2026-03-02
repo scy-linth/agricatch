@@ -470,44 +470,54 @@ router.get('/pricing/suggestion', async (req, res) => {
     }
 
     const baseName = rawName.split('(')[0].trim();
-    const params = [rawName, baseName ? `${baseName}%` : rawName];
-    let whereCategory = '';
 
-    if (categoryId) {
-      params.push(Number(categoryId));
-      whereCategory = ` AND p.category_id = $${params.length}`;
+    const runSuggestionQuery = async (opts = { withCategory: false }) => {
+      const params = [rawName, baseName ? `${baseName}%` : rawName];
+      let whereCategory = '';
+      if (opts.withCategory && categoryId) {
+        params.push(Number(categoryId));
+        whereCategory = ` AND p.category_id = $${params.length}`;
+      }
+
+      const result = await pool.query(
+        `
+          SELECT
+            MIN(p.price)::numeric(10,2) AS lowest_price,
+            AVG(p.price)::numeric(10,2) AS average_price,
+            COUNT(*)::int AS sample_count
+          FROM orders o
+          JOIN products p ON p.id = o.product_id
+          LEFT JOIN categories c ON c.id = p.category_id
+          WHERE o.status = 'delivered'
+            AND (
+              c.id IS NULL
+              OR (COALESCE(LOWER(c.type), 'agricultural') <> 'fishery'
+                  AND c.name NOT ILIKE '%fish%'
+                  AND c.name NOT ILIKE '%seafood%')
+            )
+            AND (
+              p.name !~* '${FISHERY_KEYWORDS_PATTERN}'
+              AND (p.description IS NULL OR p.description !~* '${FISHERY_KEYWORDS_PATTERN}')
+            )
+            AND (
+              p.name ILIKE $1
+              OR p.name ILIKE $2
+            )
+            ${whereCategory}
+        `,
+        params
+      );
+
+      return result.rows?.[0] || {};
+    };
+
+    // First try category-scoped suggestion (if category is selected), then
+    // fall back to system-wide history if no delivered samples exist in that category.
+    let row = await runSuggestionQuery({ withCategory: !!categoryId });
+    if (categoryId && Number(row.sample_count || 0) <= 0) {
+      row = await runSuggestionQuery({ withCategory: false });
     }
 
-    const result = await pool.query(
-      `
-        SELECT
-          MIN(p.price)::numeric(10,2) AS lowest_price,
-          AVG(p.price)::numeric(10,2) AS average_price,
-          COUNT(*)::int AS sample_count
-        FROM orders o
-        JOIN products p ON p.id = o.product_id
-        LEFT JOIN categories c ON c.id = p.category_id
-        WHERE o.status = 'delivered'
-          AND (
-            c.id IS NULL
-            OR (COALESCE(LOWER(c.type), 'agricultural') <> 'fishery'
-                AND c.name NOT ILIKE '%fish%'
-                AND c.name NOT ILIKE '%seafood%')
-          )
-          AND (
-            p.name !~* '${FISHERY_KEYWORDS_PATTERN}'
-            AND (p.description IS NULL OR p.description !~* '${FISHERY_KEYWORDS_PATTERN}')
-          )
-          AND (
-            p.name ILIKE $1
-            OR p.name ILIKE $2
-          )
-          ${whereCategory}
-      `,
-      params
-    );
-
-    const row = result.rows?.[0] || {};
     const normalizedKey = rawName.toLowerCase();
     const fallback = SUGGESTED_PRICE_BASELINE[normalizedKey] || null;
     const hasSample = Number(row.sample_count || 0) > 0;
