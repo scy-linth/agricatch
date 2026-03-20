@@ -23,11 +23,18 @@ function sendIngest(payload) {
   }
 }
 
-// Render Postgres requires SSL for external connections.
-// Enable SSL automatically when connecting to a Render-hosted database.
-const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
-  ? { rejectUnauthorized: false }
-  : false;
+// Render / Supabase Postgres requires SSL for external connections.
+// Enable SSL automatically when connecting to Render- or Supabase-hosted databases.
+// You can also force SSL by setting DB_SSL=true in environment.
+let pgSsl = false;
+if (process.env.DB_SSL === 'true') {
+  pgSsl = { rejectUnauthorized: false };
+} else {
+  const hostHint = String(process.env.DB_HOST || process.env.DATABASE_URL || '').toLowerCase();
+  if (hostHint.includes('render.com') || hostHint.includes('supabase.co')) {
+    pgSsl = { rejectUnauthorized: false };
+  }
+}
 
 // Middleware - CORS Configuration
 // Allow multiple origins for production and development
