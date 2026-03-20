@@ -3686,26 +3686,38 @@ class AgricultureMarket {
         const paginationDiv = document.createElement('div');
         paginationDiv.id = 'products-pagination';
         paginationDiv.className = 'pagination';
-        
-        const prevDisabled = !pagination.hasPrevPage ? 'disabled' : '';
-        const nextDisabled = !pagination.hasNextPage ? 'disabled' : '';
-        
-        paginationDiv.innerHTML = `
-                <button type="button" class="btn btn-secondary pagination-btn" ${prevDisabled} 
-                    onclick="event.preventDefault(); event.stopPropagation(); app.changePage(${pagination.currentPage - 1}); return false;" 
-                    ${!pagination.hasPrevPage ? 'disabled' : ''}>
-                <i class="fas fa-chevron-left"></i> Previous
-            </button>
-            <span class="pagination-info">
-                Page ${pagination.currentPage} of ${pagination.totalPages}
-            </span>
-                <button type="button" class="btn btn-secondary pagination-btn" ${nextDisabled}
-                    onclick="event.preventDefault(); event.stopPropagation(); app.changePage(${pagination.currentPage + 1}); return false;"
-                    ${!pagination.hasNextPage ? 'disabled' : ''}>
-                Next <i class="fas fa-chevron-right"></i>
-            </button>
-        `;
-        
+
+        const prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.className = 'btn btn-secondary pagination-btn';
+        prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i> Previous';
+        if (!pagination.hasPrevPage) prevBtn.disabled = true;
+        prevBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (prevBtn.disabled) return;
+            this.changePage(pagination.currentPage - 1);
+        });
+
+        const infoSpan = document.createElement('span');
+        infoSpan.className = 'pagination-info';
+        infoSpan.textContent = `Page ${pagination.currentPage} of ${pagination.totalPages}`;
+
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'btn btn-secondary pagination-btn';
+        nextBtn.innerHTML = 'Next <i class="fas fa-chevron-right"></i>';
+        if (!pagination.hasNextPage) nextBtn.disabled = true;
+        nextBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (nextBtn.disabled) return;
+            this.changePage(pagination.currentPage + 1);
+        });
+
+        paginationDiv.appendChild(prevBtn);
+        paginationDiv.appendChild(infoSpan);
+        paginationDiv.appendChild(nextBtn);
         container.appendChild(paginationDiv);
     }
 
