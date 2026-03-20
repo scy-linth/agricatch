@@ -39,6 +39,10 @@ router.post('/product-image', ensureAuth, productUpload.single('image'), async (
       use_filename: true,
       unique_filename: false,
       resource_type: 'image',
+      transformation: [
+        { width: 1200, crop: 'limit', quality: 'auto' },
+        { fetch_format: 'auto' }
+      ]
     });
     try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
     res.json({ imageUrl: result.secure_url });
@@ -57,6 +61,10 @@ router.post('/shop-banner', ensureAuth, bannerUpload.single('image'), async (req
       use_filename: true,
       unique_filename: false,
       resource_type: 'image',
+      transformation: [
+        { width: 1600, crop: 'limit', quality: 'auto' },
+        { fetch_format: 'auto' }
+      ]
     });
     // delete local file
     try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
@@ -76,6 +84,10 @@ router.post('/shop-avatar', ensureAuth, avatarUpload.single('image'), async (req
       use_filename: true,
       unique_filename: false,
       resource_type: 'image',
+      transformation: [
+        { width: 400, height: 400, crop: 'limit', quality: 'auto' },
+        { fetch_format: 'auto' }
+      ]
     });
     // delete local file
     try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }

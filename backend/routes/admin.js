@@ -595,6 +595,10 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
           use_filename: true,
           unique_filename: false,
           resource_type: 'image',
+          transformation: [
+            { width: 1200, crop: 'limit', quality: 'auto' },
+            { fetch_format: 'auto' }
+          ]
         });
         image_url = uploaded.secure_url;
       } catch (uploadError) {
