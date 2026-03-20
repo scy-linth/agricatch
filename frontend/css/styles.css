@@ -1898,6 +1898,22 @@ body.loading {
     letter-spacing: 0.02em;
 }
 
+.product-rating-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.product-stock {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--muted, #666);
+    background: rgba(0,0,0,0.03);
+    padding: 0.12rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
 .product-stats-lines {
     display: flex;
     flex-direction: column;
