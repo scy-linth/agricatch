@@ -3709,10 +3709,27 @@ class AgricultureMarket {
         container.appendChild(paginationDiv);
     }
 
-    changePage(page) {
+    async changePage(page) {
         if (!Number.isFinite(page) || page < 1) return;
+
+        // Preserve current scroll position to avoid content-load reflows
+        // causing the viewport to jump (e.g., to footer) when switching pages.
+        const prevY = window.scrollY || window.pageYOffset || 0;
         this.currentPage = page;
-        this.loadProducts();
+
+        try {
+            await this.loadProducts();
+        } finally {
+            // If the scroll moved unexpectedly during load, restore it.
+            const currentY = window.scrollY || window.pageYOffset || 0;
+            if (Math.abs(currentY - prevY) > 5) {
+                const docEl = document.documentElement;
+                const prevBehavior = docEl.style.scrollBehavior;
+                docEl.style.scrollBehavior = 'auto';
+                window.scrollTo(0, prevY);
+                setTimeout(() => { docEl.style.scrollBehavior = prevBehavior || ''; }, 0);
+            }
+        }
     }
 
     // Show product details in floating modal
