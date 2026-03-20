@@ -2380,6 +2380,15 @@ class FarmerDashboard {
         }
 
         const imageFile = document.getElementById('product-image').files[0];
+        let compressedBlob = null;
+        if (imageFile) {
+            try {
+                compressedBlob = await this.compressImage(imageFile, 2048, 0.82);
+            } catch (err) {
+                console.warn('Image compression failed, uploading original', err);
+                compressedBlob = imageFile;
+            }
+        }
 
         // Send product data and optional image file to backend.
         // Backend is responsible for uploading images to Cloudinary.
@@ -2393,7 +2402,7 @@ class FarmerDashboard {
         formData.append('location', location);
         formData.append('harvest_date', harvestDate);
         formData.append('expiry_date', expiryDate);
-        if (imageFile) formData.append('image', imageFile);
+        if (imageFile) formData.append('image', compressedBlob, imageFile.name);
 
         try {
             const response = await fetch(`${this.apiBase}/products`, {
@@ -2455,7 +2464,14 @@ class FarmerDashboard {
 
         const imageFile = document.getElementById('edit-product-image').files[0];
         if (imageFile) {
-            formData.append('image', imageFile);
+            let compressedEditBlob = null;
+            try {
+                compressedEditBlob = await this.compressImage(imageFile, 2048, 0.82);
+            } catch (err) {
+                console.warn('Edit image compression failed, uploading original', err);
+                compressedEditBlob = imageFile;
+            }
+            formData.append('image', compressedEditBlob, imageFile.name);
         }
 
         try {
@@ -2512,6 +2528,37 @@ class FarmerDashboard {
             preview.appendChild(img);
         };
         reader.readAsDataURL(file);
+    }
+
+    // Lightweight client-side image compressor: returns a Blob (JPEG) resized to maxDimension
+    compressImage(file, maxDimension = 2048, quality = 0.82) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = (e) => reject(e);
+            reader.onload = (ev) => {
+                const img = new Image();
+                img.onerror = (e) => reject(e);
+                img.onload = () => {
+                    let { width, height } = img;
+                    if (width > maxDimension || height > maxDimension) {
+                        const scale = Math.max(width, height) / maxDimension;
+                        width = Math.round(width / scale);
+                        height = Math.round(height / scale);
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    canvas.toBlob((blob) => {
+                        if (blob) resolve(blob);
+                        else reject(new Error('Compression produced no blob'));
+                    }, 'image/jpeg', Math.max(0.5, Math.min(quality, 0.95)));
+                };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
     }
 
     async toggleProductStatus(productId, newStatus) {
