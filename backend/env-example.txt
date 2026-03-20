@@ -18,6 +18,8 @@ PORT=3000
 
 # Node Environment
 NODE_ENV=development
+DEV_PLAINTEXT_PASSWORDS=false
+ALLOW_PLAINTEXT_PASSWORDS=false
 
 # SMTP Configuration for OTP Emails
 SMTP_HOST=smtp.gmail.com

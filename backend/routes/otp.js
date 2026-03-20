@@ -89,23 +89,12 @@ router.post('/send', async (req, res) => {
         [email, purpose]
       );
 
-      // Consider request as development if NODE_ENV isn't production or request originates from localhost
-      const hostHeader = String(req.headers.host || '').toLowerCase();
-      const isDev = process.env.NODE_ENV !== 'production' || hostHeader.includes('localhost') || hostHeader.includes('127.0.0.1');
       const insertResult = await pool.query(
         'INSERT INTO otps (email, otp_code, purpose, expires_at, is_used) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at',
-        [email, otp, purpose, expiresAt, isDev]
+        [email, otp, purpose, expiresAt, false]
       );
       insertedOtpId = insertResult.rows?.[0]?.id || null;
       console.log('✅ OTP stored in database', { insertedOtpId });
-      if (isDev && insertedOtpId) {
-        try {
-          await pool.query('UPDATE otps SET is_used = true WHERE id = $1', [insertedOtpId]);
-          console.log('🔧 Development mode: explicitly set is_used=true for id', insertedOtpId);
-        } catch (uerr) {
-          console.error('❌ Failed to explicitly set is_used for dev:', uerr);
-        }
-      }
     } catch (dbError) {
       dbErrorOccurred = true;
       console.error('❌ DB Error storing OTP:', dbError);

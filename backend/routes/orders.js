@@ -222,7 +222,7 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
 
     // Get order with product info (per-item order)
     const orderResult = await pool.query(`
-      SELECT o.id, o.product_id, o.quantity, o.status, o.user_id as customer_id,
+            SELECT o.id, o.product_id, o.quantity, o.total_amount, o.status, o.user_id as customer_id,
              p.farmer_id
       FROM orders o
       JOIN products p ON o.product_id = p.id
@@ -286,6 +286,21 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
             cancelled_by = CASE WHEN $1::varchar = 'cancelled'::varchar THEN 'farmer'::varchar ELSE cancelled_by END
         WHERE id = $2
       `, [status, actualOrderId]);
+
+      if (status === 'delivered' && order.status !== 'delivered') {
+        await client.query(
+          `UPDATE products SET sales_count = COALESCE(sales_count, 0) + $1 WHERE id = $2`,
+          [order.quantity, order.product_id]
+        );
+
+        await client.query(
+          `UPDATE users
+           SET total_sales = COALESCE(total_sales, 0) + $1,
+               total_revenue = COALESCE(total_revenue, 0) + $2
+           WHERE id = $3`,
+          [order.quantity, order.total_amount || 0, order.farmer_id]
+        );
+      }
 
       if (status === 'cancelled' && order.status !== 'cancelled') {
         await client.query(`

@@ -16,6 +16,12 @@ const PASSWORD_RESET_MAX_REQUESTS_PER_HOUR = Number.parseInt(process.env.PASSWOR
 
 // Dev-only OTP surfacing toggle (do NOT enable in production)
 const DEV_SHOW_PASSWORD_RESET_OTP = (process.env.DEV_SHOW_PASSWORD_RESET_OTP === 'true') && process.env.NODE_ENV !== 'production';
+// Plaintext password mode:
+// - ALLOW_PLAINTEXT_PASSWORDS=true enables plaintext even in production (for thesis/demo only).
+// - DEV_PLAINTEXT_PASSWORDS=true works only outside production.
+const PLAINTEXT_PASSWORDS_ENABLED =
+  process.env.ALLOW_PLAINTEXT_PASSWORDS === 'true' ||
+  ((process.env.DEV_PLAINTEXT_PASSWORDS === 'true') && process.env.NODE_ENV !== 'production');
 
 function isBcryptHash(value) {
   return typeof value === 'string' && value.startsWith('$2') && value.length > 20;
@@ -107,7 +113,7 @@ async function getUserColumns() {
   return USER_COLUMNS_CACHE;
 }
 
-async function insertUserRecord({ username, email, fullName, phone, address, role, passwordHash }) {
+async function insertUserRecord({ username, email, fullName, phone, address, role, passwordValue }) {
   const columns = await getUserColumns();
   const fieldNames = [];
   const values = [];
@@ -125,8 +131,8 @@ async function insertUserRecord({ username, email, fullName, phone, address, rol
   pushField('address', address || null);
   pushField('role', role);
   pushField('user_type', role);
-  pushField('password', passwordHash);
-  pushField('password_hash', passwordHash);
+  pushField('password', passwordValue);
+  pushField('password_hash', passwordValue);
 
   if (!fieldNames.length) {
     throw new Error('No compatible user columns found for insert');
@@ -143,17 +149,17 @@ function getStoredPasswordFromRow(row) {
   return row.password_hash || row.password || '';
 }
 
-async function updateUserPassword(userId, hashedPassword) {
+async function updateUserPassword(userId, passwordValue) {
   const columns = await getUserColumns();
   const sets = [];
   const values = [];
 
   if (columns.has('password')) {
-    values.push(hashedPassword);
+    values.push(passwordValue);
     sets.push(`password = $${values.length}`);
   }
   if (columns.has('password_hash')) {
-    values.push(hashedPassword);
+    values.push(passwordValue);
     sets.push(`password_hash = $${values.length}`);
   }
   if (columns.has('updated_at')) {
@@ -167,6 +173,22 @@ async function updateUserPassword(userId, hashedPassword) {
   values.push(userId);
   const query = `UPDATE users SET ${sets.join(', ')} WHERE id = $${values.length}`;
   await pool.query(query, values);
+}
+
+async function getLoginSelectFields() {
+  const columns = await getUserColumns();
+  const fields = ['id', 'username', 'email', 'full_name', 'role'];
+  if (columns.has('password')) fields.push('password');
+  if (columns.has('password_hash')) fields.push('password_hash');
+  return fields;
+}
+
+async function getPasswordSelectFields() {
+  const columns = await getUserColumns();
+  const fields = [];
+  if (columns.has('password')) fields.push('password');
+  if (columns.has('password_hash')) fields.push('password_hash');
+  return fields;
 }
 
 // Check username availability
@@ -247,8 +269,10 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Store password as bcrypt hash (existing plaintext accounts are still supported at login).
-    const hashedPassword = await bcrypt.hash(String(password || ''), BCRYPT_ROUNDS);
+    const providedPassword = String(password || '');
+    const passwordValue = PLAINTEXT_PASSWORDS_ENABLED
+      ? providedPassword
+      : await bcrypt.hash(providedPassword, BCRYPT_ROUNDS);
 
     // Role rules:
     // - If password matches ADMIN_SECRET (default: 'admin123') -> staff
@@ -274,7 +298,7 @@ router.post('/register', async (req, res) => {
       phone,
       address,
       role: userRole,
-      passwordHash: hashedPassword
+      passwordValue
     });
 
     // Create JWT token
@@ -333,8 +357,9 @@ router.post('/login', async (req, res) => {
     }
 
     // Find regular user by either email or username
+    const loginSelectFields = await getLoginSelectFields();
     const result = await pool.query(
-      'SELECT id, username, email, password, password_hash, full_name, role FROM users WHERE email = $1 OR username = $1',
+      `SELECT ${loginSelectFields.join(', ')} FROM users WHERE email = $1 OR username = $1`,
       [loginIdentifier]
     );
 
@@ -351,8 +376,10 @@ router.post('/login', async (req, res) => {
     const providedPassword = String(password || '');
     let passwordOk = false;
 
-    // If the stored value is a bcrypt hash, prefer bcrypt compare
-    if (isBcryptHash(storedPassword)) {
+    if (PLAINTEXT_PASSWORDS_ENABLED) {
+      // Development-only: keep password checks as direct plaintext equality.
+      passwordOk = providedPassword === String(storedPassword || '');
+    } else if (isBcryptHash(storedPassword)) {
       try {
         passwordOk = await bcrypt.compare(providedPassword, normalizeBcryptHash(storedPassword));
       } catch (e) {
@@ -751,8 +778,10 @@ router.post('/forgot/reset', async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired code.', attemptsLeft });
     }
 
-    const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-    await updateUserPassword(userId, newHash);
+    const newPasswordValue = PLAINTEXT_PASSWORDS_ENABLED
+      ? newPassword
+      : await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await updateUserPassword(userId, newPasswordValue);
     await pool.query('UPDATE password_resets SET used = true, used_at = CURRENT_TIMESTAMP WHERE id = $1', [record.id]);
 
     return res.json({ message: 'Password reset successful.' });
@@ -791,14 +820,21 @@ router.put('/change-password', async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 6 characters.' });
     }
 
-    const userRes = await pool.query('SELECT password, password_hash FROM users WHERE id = $1', [userId]);
+    const passwordFields = await getPasswordSelectFields();
+    if (!passwordFields.length) {
+      return res.status(500).json({ message: 'Password columns are missing on users table.' });
+    }
+
+    const userRes = await pool.query(`SELECT ${passwordFields.join(', ')} FROM users WHERE id = $1`, [userId]);
     if (userRes.rows.length === 0) {
       return res.status(404).json({ message: 'User not found.' });
     }
 
     const stored = getStoredPasswordFromRow(userRes.rows[0]);
     let ok = false;
-    if (isBcryptHash(stored)) {
+    if (PLAINTEXT_PASSWORDS_ENABLED) {
+      ok = String(stored || '') === currentPassword;
+    } else if (isBcryptHash(stored)) {
       try {
         ok = await bcrypt.compare(currentPassword, normalizeBcryptHash(stored));
       } catch (_) {
@@ -811,8 +847,10 @@ router.put('/change-password', async (req, res) => {
       return res.status(400).json({ message: 'Current password is incorrect.' });
     }
 
-    const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-    await updateUserPassword(userId, newHash);
+    const newPasswordValue = PLAINTEXT_PASSWORDS_ENABLED
+      ? newPassword
+      : await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await updateUserPassword(userId, newPasswordValue);
 
     return res.json({ message: 'Password updated successfully.' });
   } catch (error) {
