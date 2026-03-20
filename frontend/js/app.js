@@ -280,7 +280,9 @@ class AgricultureMarket {
             urlParams.delete('resumeScrollY');
             urlParams.delete('fromOrders');
             const nextQuery = urlParams.toString();
-            const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash || ''}`;
+            // Preserve the current app section hash using getCurrentSectionHash to avoid unexpectedly jumping to another section (e.g., #about)
+            const currentHash = (typeof this.getCurrentSectionHash === 'function') ? this.getCurrentSectionHash() : (window.location.hash || '');
+            const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${currentHash}`;
             window.history.replaceState({}, '', nextUrl);
         }
         if (hasSessionResume || fromOrdersQuery) {
