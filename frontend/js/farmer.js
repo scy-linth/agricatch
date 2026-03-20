@@ -3101,6 +3101,8 @@ class FarmerDashboard {
                 this.loadOrdersByStatus('delivered'),
                 this.loadOrdersByStatus('cancelled')
             ]);
+            // Update tab counters after loading all statuses
+            this.updateOrderTabCounts();
         } catch (error) {
             console.error('Error loading all orders:', error);
         }
@@ -3370,6 +3372,25 @@ class FarmerDashboard {
             'cancelled': 'Cancelled'
         };
         return labels[status] || status;
+    }
+
+    updateOrderTabCounts() {
+        try {
+            const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+            statuses.forEach(status => {
+                const count = (this.lastOrdersByStatus[status] || []).length || 0;
+                const tab = document.getElementById(`${status}-orders-tab`);
+                if (!tab) return;
+                const label = this.formatStatusLabel(status);
+                if (count > 0) {
+                    tab.innerHTML = `${label} <span class="tab-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">${count}</span>`;
+                } else {
+                    tab.textContent = label;
+                }
+            });
+        } catch (e) {
+            // ignore DOM errors
+        }
     }
 
     applyTopSearch() {
