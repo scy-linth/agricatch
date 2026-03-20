@@ -5,8 +5,13 @@ window.__PLACEHOLDER_IMAGE__ = window.__PLACEHOLDER_IMAGE__ || '/images/resendlo
 
 class AdminDashboard {
     constructor() {
-        // Use relative /api so Netlify can proxy to Render.
-        this.apiBase = '/api';
+        // Resolve API base by host so dashboard pages work even without app.js.
+        const host = window.location.hostname;
+        const isCustomFrontendHost = host === 'agricatch.store' ||
+            host === 'www.agricatch.store' ||
+            host.includes('agricatch.store') ||
+            host === 'agricatch.page.dev';
+        this.apiBase = window.API_BASE || (isCustomFrontendHost ? 'https://agricatch.onrender.com/api' : '/api');
         this.token = localStorage.getItem('token');
         this.currentUserId = null;
         this.lastUsers = [];
@@ -175,7 +180,7 @@ class AdminDashboard {
     setupRealtime() {
         try {
             if (!this.token) return;
-            const url = `/api/events?token=${encodeURIComponent(this.token)}`;
+            const url = `${this.apiBase}/events?token=${encodeURIComponent(this.token)}`;
             const es = new EventSource(url);
 
             es.addEventListener('order.updated', (evt) => {

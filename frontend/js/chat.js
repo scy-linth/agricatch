@@ -1,7 +1,12 @@
 class ChatUI {
     constructor() {
-        // Use relative /api so Netlify can proxy to Render.
-        this.apiBase = '/api';
+        // Resolve API base by host so chat works even without app.js.
+        const host = window.location.hostname;
+        const isCustomFrontendHost = host === 'agricatch.store' ||
+            host === 'www.agricatch.store' ||
+            host.includes('agricatch.store') ||
+            host === 'agricatch.page.dev';
+        this.apiBase = window.API_BASE || (isCustomFrontendHost ? 'https://agricatch.onrender.com/api' : '/api');
         this.token = localStorage.getItem('token');
         this.currentConversation = null;
         this.pollInterval = null;
