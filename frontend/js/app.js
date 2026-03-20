@@ -8,14 +8,18 @@ class AgricultureMarket {
     // ...existing code...
     constructor() {
         // Determine environment and API base
-        const isProduction = window.location.hostname === 'agricatch.store' ||
-                     window.location.hostname === 'www.agricatch.store' ||
-                     window.location.hostname === 'agricatch.onrender.com' ||
-                     window.location.hostname.includes('agricatch.store') ||
-                     window.location.hostname === 'agricatch.page.dev';
+        const host = window.location.hostname;
+        const isCustomFrontendHost = host === 'agricatch.store' ||
+                     host === 'www.agricatch.store' ||
+                     host.includes('agricatch.store') ||
+                     host === 'agricatch.page.dev';
+        const isRenderHost = host === 'agricatch.onrender.com';
 
-        // Prefer a single canonical API hostname in production to avoid cross-origin issues
-        this.apiBase = isProduction ? 'https://api.agricatch.store/api' : '/api';
+        // Use Render API directly for custom frontend hosts.
+        // This avoids hard dependency on api.agricatch.store TLS/proxy setup.
+        this.apiBase = isCustomFrontendHost
+            ? 'https://agricatch.onrender.com/api'
+            : (isRenderHost ? '/api' : '/api');
 
         // Dev host detection for local-only debug endpoints
         this.isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -399,12 +403,7 @@ class AgricultureMarket {
         // Ping the API server to wake it up immediately when user lands on the site
         // This prevents the "cold start" delay on Render's free tier
         
-        // Use direct API URL if on production domain, otherwise use relative path
-        const isProduction = window.location.hostname === 'agricatch.store' || 
-                            window.location.hostname === 'www.agricatch.store';
-        const apiUrl = isProduction 
-            ? 'https://api.agricatch.store/api/test-db'
-            : '/api/test-db';
+        const apiUrl = `${this.apiBase}/test-db`;
         
         // Fire and forget - don't block UI, handle errors silently
         fetch(apiUrl, {
@@ -426,24 +425,6 @@ class AgricultureMarket {
             console.log('Server wake-up ping sent');
         });
         
-        // Ping api.agricatch.store when visiting the site
-        fetch('https://api.agricatch.store/api/test-db', {
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache',
-            headers: {
-                'Accept': 'application/json'
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                console.log('✅ API ping to api.agricatch.store successful');
-            }
-        })
-        .catch(error => {
-            // Silently fail - this is just a ping, not critical
-            console.log('API ping to api.agricatch.store sent');
-        });
     }
 
     // Setup all event listeners
