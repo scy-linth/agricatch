@@ -3724,38 +3724,41 @@ class AgricultureMarket {
     async changePage(page) {
         if (!Number.isFinite(page) || page < 1) return;
 
-        // Preserve current scroll position to avoid content-load reflows
-        // causing the viewport to jump (e.g., to footer) when switching pages.
+        // Lock scroll during page load to prevent unintended jumps (especially on last pages).
         const prevY = window.scrollY || window.pageYOffset || 0;
-        const productsSection = document.getElementById('products');
-        const headerEl = document.querySelector('.header');
-        const headerOffset = headerEl ? headerEl.offsetHeight : 100;
-        const productsTop = productsSection
-            ? Math.max(0, Math.floor(productsSection.getBoundingClientRect().top + prevY - headerOffset - 8))
-            : 0;
         this.currentPage = page;
+
+        // Freeze scroll position while loading by locking body like modal-open
+        const docEl = document.documentElement;
+        const body = document.body;
+        const prevBehavior = docEl.style.scrollBehavior || '';
+        docEl.style.scrollBehavior = 'auto';
+        
+        const origPosition = body.style.position;
+        const origTop = body.style.top;
+        const origWidth = body.style.width;
+        const origOverflow = body.style.overflow;
+        
+        body.style.position = 'fixed';
+        body.style.top = `-${prevY}px`;
+        body.style.width = '100%';
+        body.style.overflow = 'hidden';
 
         try {
             await this.loadProducts();
         } finally {
-            const docEl = document.documentElement;
-            const prevBehavior = docEl.style.scrollBehavior;
-            docEl.style.scrollBehavior = 'auto';
-
-            // Try to restore the previous Y, but clamp against new document height.
-            // If the next/previous page is shorter (common on last pages), browser clamps
-            // to bottom, which can make the footer appear like an unexpected pan.
+            // Unfreeze scroll position
+            body.style.position = origPosition;
+            body.style.top = origTop;
+            body.style.width = origWidth;
+            body.style.overflow = origOverflow;
+            
+            // Clamp restored scroll to valid range [0, maxScroll]
             const maxY = Math.max(0, docEl.scrollHeight - window.innerHeight);
-            const targetY = Math.min(prevY, maxY);
-            window.scrollTo(0, targetY);
-
-            const nowY = window.scrollY || window.pageYOffset || 0;
-            const atBottom = (nowY + window.innerHeight) >= (docEl.scrollHeight - 2);
-            if (atBottom && productsTop > 0) {
-                window.scrollTo(0, productsTop);
-            }
-
-            setTimeout(() => { docEl.style.scrollBehavior = prevBehavior || ''; }, 0);
+            const safeY = Math.max(0, Math.min(prevY, maxY));
+            window.scrollTo(0, safeY);
+            
+            setTimeout(() => { docEl.style.scrollBehavior = prevBehavior; }, 0);
         }
     }
 
