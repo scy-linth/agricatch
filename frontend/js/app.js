@@ -3670,7 +3670,6 @@ class AgricultureMarket {
         if (!Number.isFinite(page) || page < 1) return;
         this.currentPage = page;
         this.loadProducts();
-        this.scrollToSection('#products');
     }
 
     // Show product details in floating modal
