@@ -932,16 +932,22 @@ app.listen(PORT, () => {
   // #endregion
 });
 
-// Self-ping to prevent Render free tier from sleeping (random interval 1-13 min)
+// Self-ping to prevent Render free tier from sleeping (configurable interval)
 if (process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_URL) {
   const https = require('https');
   const url = process.env.RENDER_EXTERNAL_URL || 'https://api.agricatch.store';
 
+  // Allow configuring the ping interval via env vars (minutes)
+  const minMinutes = Number.parseInt(process.env.SELF_PING_MIN_MINUTES || process.env.SELF_PING_MINUTES || '1', 10) || 1;
+  const maxMinutes = Number.parseInt(process.env.SELF_PING_MAX_MINUTES || process.env.SELF_PING_MINUTES || '13', 10) || minMinutes;
+
   function schedulePing() {
-    // Random interval between 1 and 13 minutes (in ms)
-    const min = 1 * 60 * 1000;
-    const max = 13 * 60 * 1000;
+    // Compute random interval between minMinutes and maxMinutes (in ms)
+    const min = Math.max(0, minMinutes) * 60 * 1000;
+    const max = Math.max(min, maxMinutes) * 60 * 1000;
     const interval = Math.floor(Math.random() * (max - min + 1)) + min;
+
+    console.log(`[Self-ping] Scheduling next ping in ${(interval/1000/60).toFixed(2)} minutes to ${url}/api/test-db`);
 
     setTimeout(() => {
       https.get(url + '/api/test-db', (res) => {
