@@ -3527,7 +3527,9 @@ class AgricultureMarket {
                     ? product.image_url
                     : window.__PLACEHOLDER_IMAGE__;
                 const itemLabel = product.id ? `onclick="app.showProductDetails(${product.id})" style="cursor:pointer;"` : '';
-                const productRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                const productRating = Number(product.average_rating || 0);
+                const roundedRating = Math.max(0, Math.min(5, Math.round(productRating)));
+                const ratingStars = `${'★'.repeat(roundedRating)}${'☆'.repeat(5 - roundedRating)}`;
                 const isPurchasable = this.isProductPurchasable(product);
                 return `
                     <div class="product-card" ${itemLabel}>
@@ -3537,9 +3539,9 @@ class AgricultureMarket {
                             <h3 class="product-name">${product.name}</h3>
                             <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit || 'item'}</div>
                             <div class="product-meta product-card-summary">
-                                <button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); app.showProductDetails(${product.id});">
-                                    Reviews (${this.fmtNumber(product.total_reviews || 0)}) • ${productRating}★
-                                </button>
+                                <div class="product-rating-text" aria-label="${this.fmtNumber(product.total_reviews || 0)} reviews, average ${this.fmtNumber(productRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} out of 5">
+                                    ${ratingStars} (${this.fmtNumber(product.total_reviews || 0)})
+                                </div>
                             </div>
                             <button class="add-to-cart-btn"
                                     onclick="event.stopPropagation(); app.addToCart(${product.id})"
@@ -3573,7 +3575,10 @@ class AgricultureMarket {
         container.innerHTML = products.map(product => {
             const isPurchasable = this.isProductPurchasable(product);
             const totalReviews = this.fmtNumber(product.total_reviews || 0);
-            const averageRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            const averageRatingValue = Number(product.average_rating || 0);
+            const roundedRating = Math.max(0, Math.min(5, Math.round(averageRatingValue)));
+            const averageRating = this.fmtNumber(averageRatingValue, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            const ratingStars = `${'★'.repeat(roundedRating)}${'☆'.repeat(5 - roundedRating)}`;
             
             // Ensure image URL is properly formatted
             let productImageUrl = product.image_url || '';
@@ -3592,10 +3597,9 @@ class AgricultureMarket {
                     <h3 class="product-name">${product.name}</h3>
                     <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit}</div>
                     <div class="product-meta product-card-summary">
-                        <button class="btn btn-secondary btn-small"
-                                onclick="event.stopPropagation(); app.showProductDetails(${product.id})">
-                            Reviews (${totalReviews}) • ${averageRating}★
-                        </button>
+                        <div class="product-rating-text" aria-label="${totalReviews} reviews, average ${averageRating} out of 5">
+                            ${ratingStars} (${totalReviews})
+                        </div>
                     </div>
                     <button class="add-to-cart-btn"
                             onclick="event.stopPropagation(); app.addToCart(${product.id})"

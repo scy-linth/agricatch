@@ -1169,15 +1169,12 @@ class FarmerDashboard {
             });
         });
 
-        // Initial section based on saved state, hash, or default
+        // Initial section should default to overview on every fresh farmer login.
+        // Allow hash overrides for deep links only.
         const validSections = new Set(['overview', 'products', 'orders', 'chat']);
-        const savedSectionRaw = localStorage.getItem('farmerActiveSection');
-        const savedSection = String(savedSectionRaw || '').trim();
         const hash = String((window.location.hash || '')).replace('#', '').trim();
 
-        const initialSection = validSections.has(savedSection)
-            ? savedSection
-            : (validSections.has(hash) ? hash : 'overview');
+        const initialSection = validSections.has(hash) ? hash : 'overview';
 
         this.showSection(initialSection);
     }
