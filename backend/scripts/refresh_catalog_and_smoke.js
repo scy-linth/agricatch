@@ -255,39 +255,44 @@ async function seedAliasFarmersAndCatalog(pool) {
   );
 
   let seededCount = 0;
+  // Ensure up to 20 products per category, linked to alias farmers (rotated).
+  const TARGET_PER_CATEGORY = 20;
   for (let i = 0; i < categories.rows.length; i += 1) {
     const category = categories.rows[i];
-    const farmer = farmers[i % farmers.length];
-    const picked = categoryProduct(category.name);
-    const image = CLOUDINARY_IMAGES[i % CLOUDINARY_IMAGES.length];
-
-    const existing = await pool.query(
-      'SELECT id FROM products WHERE category_id = $1 AND is_available = true LIMIT 1',
+    // count existing products in this category
+    const existingCountRes = await pool.query(
+      'SELECT COUNT(*)::int AS count FROM products WHERE category_id = $1',
       [category.id]
     );
+    const existingCount = Number(existingCountRes.rows[0].count || 0);
+    const toCreate = Math.max(0, TARGET_PER_CATEGORY - existingCount);
+    if (toCreate <= 0) continue;
 
-    if (existing.rows.length) {
-      continue;
+    for (let j = 0; j < toCreate; j += 1) {
+      const farmer = farmers[(i + j) % farmers.length];
+      const picked = categoryProduct(category.name);
+      const image = CLOUDINARY_IMAGES[(i + j) % CLOUDINARY_IMAGES.length];
+      const priceVariation = Math.round(picked.price * (0.9 + Math.random() * 0.2));
+      const name = `${picked.name} ${j + 1}`;
+      await pool.query(
+        `INSERT INTO products
+          (name, description, price, category_id, farmer_id, stock_quantity, unit, image_url, location, is_available)
+         VALUES
+          ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)`,
+        [
+          name,
+          `Fresh ${picked.name.toLowerCase()} from ${farmer.full_name}. Item ${j + 1}.`,
+          priceVariation,
+          category.id,
+          farmer.id,
+          50,
+          picked.unit,
+          image,
+          farmer.address
+        ]
+      );
+      seededCount += 1;
     }
-
-    await pool.query(
-      `INSERT INTO products
-        (name, description, price, category_id, farmer_id, stock_quantity, unit, image_url, location, is_available)
-       VALUES
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)`,
-      [
-        picked.name,
-        `Fresh ${picked.name.toLowerCase()} from ${farmer.full_name}.`,
-        picked.price,
-        category.id,
-        farmer.id,
-        50,
-        picked.unit,
-        image,
-        farmer.address
-      ]
-    );
-    seededCount += 1;
   }
 
   const batmanFarmer = farmers[0];
