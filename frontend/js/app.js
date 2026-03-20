@@ -3589,11 +3589,11 @@ class AgricultureMarket {
                                         ${ratingStars} (${this.fmtNumber(product.total_reviews || 0)})
                                     </div>
                                     <div class="product-stock" aria-label="Stock available">
-                                        ${(() => { const qty = Number(product.stock_quantity ?? product.stock ?? 0); const unit = String(product.unit || 'item'); const stockWord = qty === 1 ? 'stock' : 'stocks'; return `(${qty} ${unit} ${stockWord})`; })()}
+                                        ${(() => { const qty = Number(product.stock_quantity ?? product.stock ?? 0); const unit = String(product.unit || 'item'); const stockWord = qty === 1 ? 'stock' : 'stocks'; return `${qty} ${unit} ${stockWord}`; })()}
                                     </div>
                                 </div>
                             </div>
-                            <button class="add-to-cart-btn"
+                                <button type="button" class="add-to-cart-btn"
                                     onclick="event.stopPropagation(); app.addToCart(${product.id})"
                                     ${isPurchasable ? '' : 'disabled'}>
                                 ${isPurchasable ? 'Add to Cart' : 'Unavailable'}
@@ -3652,11 +3652,11 @@ class AgricultureMarket {
                                 ${ratingStars} (${totalReviews})
                             </div>
                             <div class="product-stock" aria-label="Stock available">
-                                ${(() => { const qty = Number(product.stock_quantity ?? product.stock ?? 0); const unit = String(product.unit || 'item'); const stockWord = qty === 1 ? 'stock' : 'stocks'; return `(${qty} ${unit} ${stockWord})`; })()}
+                                ${(() => { const qty = Number(product.stock_quantity ?? product.stock ?? 0); const unit = String(product.unit || 'item'); const stockWord = qty === 1 ? 'stock' : 'stocks'; return `${qty} ${unit} ${stockWord}`; })()}
                             </div>
                         </div>
                     </div>
-                    <button class="add-to-cart-btn"
+                        <button type="button" class="add-to-cart-btn"
                             onclick="event.stopPropagation(); app.addToCart(${product.id})"
                             ${isPurchasable ? '' : 'disabled'}>
                         ${isPurchasable ? 'Add to Cart' : 'Unavailable'}
