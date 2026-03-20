@@ -10,6 +10,8 @@ class FarmerDashboard {
         } else {
             localStorage.removeItem('token');
         }
+        // Track transient auth retries to avoid redirect loops when API is temporarily down
+        this._authRetryCount = 0;
         this.userId = this.getUserId();
         this.lastOrdersById = new Map();
         this.lastOrdersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
@@ -428,7 +430,7 @@ class FarmerDashboard {
     }
 
     async checkFarmerAuth() {
-        const doRedirectHome = () => { window.location.href = '/'; };
+        const redirectHome = (query = '') => { window.location.href = `/${query}`; };
 
         try {
             const fetchProfile = async () => {
@@ -442,10 +444,16 @@ class FarmerDashboard {
 
             let response = await fetchProfile();
 
-            // If transient failure, retry once after a short delay to avoid redirect loops
-            if (!response.ok && (response.status === 401 || response.status === 0 || response.status >= 500)) {
-                await new Promise(r => setTimeout(r, 600));
-                response = await fetchProfile();
+            // If we got a transient error (network or server), retry a few times instead of redirecting immediately
+            if (!response.ok && (response.status === 0 || response.status >= 500)) {
+                this._authRetryCount = (this._authRetryCount || 0) + 1;
+                if (this._authRetryCount <= 3) {
+                    // Backoff before retrying
+                    const delayMs = 700 * this._authRetryCount;
+                    console.warn(`Transient auth fetch failure, retry #${this._authRetryCount} after ${delayMs}ms`);
+                    await new Promise(r => setTimeout(r, delayMs));
+                    response = await fetchProfile();
+                }
             }
 
             if (response.ok) {
@@ -457,9 +465,12 @@ class FarmerDashboard {
                     return;
                 }
                 if (data.user.role !== 'farmer') {
-                    doRedirectHome();
+                    // Unauthorized for farmer dashboard — send user back to main site (prompt login if needed)
+                    redirectHome('?login=1');
                     return;
                 }
+                // Success — reset retry counter
+                this._authRetryCount = 0;
                 const nameEl = document.getElementById('user-name');
                 if (nameEl) nameEl.textContent = `Farmer: ${data.user.full_name || data.user.username}`;
                 const emailEl = document.getElementById('user-email');
@@ -485,13 +496,39 @@ class FarmerDashboard {
                 this.loadShopProfile();
                 this.loadOverviewMetrics({ force: true });
             } else {
-                // Avoid immediate redirect on transient failures; only redirect for persistent errors
-                console.warn('Auth profile fetch failed, redirecting home');
-                doRedirectHome();
+                // Handle explicit unauthorized separately
+                if (response.status === 401 || response.status === 403) {
+                    // Clear token and redirect to login on main site
+                    try { localStorage.removeItem('token'); } catch (_) {}
+                    redirectHome('?login=1');
+                    return;
+                }
+
+                // For other errors (e.g., 404, 429, 5xx) avoid immediate redirect; show message and retry later
+                console.warn('Auth profile fetch failed with status', response.status);
+                // Show a non-blocking message to the user if possible
+                try { this.showMessage('Temporary server issue. Retrying…', 'info'); } catch (_) {}
+                // Retry after delay (but avoid infinite loops)
+                this._authRetryCount = (this._authRetryCount || 0) + 1;
+                if (this._authRetryCount <= 3) {
+                    const delayMs = 1000 * this._authRetryCount;
+                    setTimeout(() => this.checkFarmerAuth(), delayMs);
+                    return;
+                }
+
+                // If retries exhausted, fallback to home so user can re-authenticate
+                redirectHome('?login=1');
             }
         } catch (error) {
             console.error('Auth check error:', error);
-            doRedirectHome();
+            // Network errors: retry a few times before redirecting
+            this._authRetryCount = (this._authRetryCount || 0) + 1;
+            if (this._authRetryCount <= 3) {
+                const delayMs = 800 * this._authRetryCount;
+                setTimeout(() => this.checkFarmerAuth(), delayMs);
+                return;
+            }
+            redirectHome('?login=1');
         }
     }
 
@@ -3504,7 +3541,7 @@ class FarmerDashboard {
             padding: 1rem 1.5rem;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 10000;
+            z-index: 110000;
             max-width: 300px;
         `;
 

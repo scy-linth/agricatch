@@ -239,18 +239,9 @@ router.post('/register', async (req, res) => {
     const otpRecord = otpCheck.rows[0];
     const now = new Date();
     const otpExpiresAt = new Date(otpRecord.expires_at);
-    const otpCreatedAt = new Date(otpRecord.created_at);
-    
+
     // Check if OTP has expired (expires_at is in the past)
     if (otpExpiresAt < now) {
-      return res.status(403).json({ 
-        message: 'OTP verification expired. Please request a new OTP and verify again.' 
-      });
-    }
-
-    // Check if OTP was created recently (within last 10 minutes - OTP validity period)
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-    if (otpCreatedAt < tenMinutesAgo) {
       return res.status(403).json({ 
         message: 'OTP verification expired. Please request a new OTP and verify again.' 
       });
