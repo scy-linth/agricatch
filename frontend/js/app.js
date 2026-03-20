@@ -3724,41 +3724,22 @@ class AgricultureMarket {
     async changePage(page) {
         if (!Number.isFinite(page) || page < 1) return;
 
-        // Lock scroll during page load to prevent unintended jumps (especially on last pages).
+        // Save scroll position before loading new page content
         const prevY = window.scrollY || window.pageYOffset || 0;
         this.currentPage = page;
-
-        // Freeze scroll position while loading by locking body like modal-open
-        const docEl = document.documentElement;
-        const body = document.body;
-        const prevBehavior = docEl.style.scrollBehavior || '';
-        docEl.style.scrollBehavior = 'auto';
-        
-        const origPosition = body.style.position;
-        const origTop = body.style.top;
-        const origWidth = body.style.width;
-        const origOverflow = body.style.overflow;
-        
-        body.style.position = 'fixed';
-        body.style.top = `-${prevY}px`;
-        body.style.width = '100%';
-        body.style.overflow = 'hidden';
 
         try {
             await this.loadProducts();
         } finally {
-            // Unfreeze scroll position
-            body.style.position = origPosition;
-            body.style.top = origTop;
-            body.style.width = origWidth;
-            body.style.overflow = origOverflow;
-            
-            // Clamp restored scroll to valid range [0, maxScroll]
+            // Restore scroll position after load, clamped to valid document height
+            const docEl = document.documentElement;
             const maxY = Math.max(0, docEl.scrollHeight - window.innerHeight);
             const safeY = Math.max(0, Math.min(prevY, maxY));
-            window.scrollTo(0, safeY);
             
-            setTimeout(() => { docEl.style.scrollBehavior = prevBehavior; }, 0);
+            // Use setTimeout to ensure restore happens after DOM settle
+            setTimeout(() => {
+                window.scrollTo(0, safeY);
+            }, 0);
         }
     }
 
