@@ -5,7 +5,9 @@ const crypto = require('crypto');
 const { writeAdminAuditLog, ensureAuditTable } = require('../utils/auditLog');
 const { broadcastEvent } = require('../utils/realtime');
 const { productUpload } = require('../middleware/upload');
+const { deleteFileIfExists } = require('../utils/fileUtils');
 const { pool } = require('../utils/db');
+const cloudinary = require('../utils/cloudinary');
 
 // Super admin virtual user storage (shared with auth.js)
 let superAdminProfile = {
@@ -586,10 +588,21 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
     } = req.body;
 
     let image_url = req.body.image_url;
-    if (req.file) {
-      // Save relative path for frontend use
-      const relPath = req.file.path.replace(/.*frontend[\\/]/, '/');
-      image_url = relPath.replace(/\\/g, '/');
+    if (req.file && req.file.path) {
+      try {
+        const uploaded = await cloudinary.uploader.upload(req.file.path, {
+          folder: 'products',
+          use_filename: true,
+          unique_filename: false,
+          resource_type: 'image',
+        });
+        image_url = uploaded.secure_url;
+      } catch (uploadError) {
+        console.error('Cloudinary upload failed:', uploadError);
+        return res.status(500).json({ message: 'Image upload failed' });
+      } finally {
+        deleteFileIfExists(req.file.path);
+      }
     }
 
     const productResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);

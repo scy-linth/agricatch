@@ -2379,33 +2379,10 @@ class FarmerDashboard {
             return;
         }
 
-        // Handle image upload to Cloudinary
-        let imageUrl = '';
         const imageFile = document.getElementById('product-image').files[0];
-        if (imageFile) {
-            const cloudData = new FormData();
-            cloudData.append('file', imageFile);
-            cloudData.append('upload_preset', 'agricatch');
-            cloudData.append('folder', 'products');
-            try {
-                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dwv7lhgvm/image/upload', {
-                    method: 'POST',
-                    body: cloudData
-                });
-                const cloudJson = await cloudRes.json();
-                if (cloudJson.secure_url) {
-                    imageUrl = cloudJson.secure_url;
-                } else {
-                    this.showMessage('Image upload failed: ' + (cloudJson.error?.message || 'Unknown error'), 'error');
-                    return;
-                }
-            } catch (err) {
-                this.showMessage('Image upload failed: ' + err.message, 'error');
-                return;
-            }
-        }
 
-        // Now send product data to backend
+        // Send product data and optional image file to backend.
+        // Backend is responsible for uploading images to Cloudinary.
         const formData = new FormData();
         formData.append('name', name);
         formData.append('description', description);
@@ -2416,7 +2393,7 @@ class FarmerDashboard {
         formData.append('location', location);
         formData.append('harvest_date', harvestDate);
         formData.append('expiry_date', expiryDate);
-        if (imageUrl) formData.append('image_url', imageUrl);
+        if (imageFile) formData.append('image', imageFile);
 
         try {
             const response = await fetch(`${this.apiBase}/products`, {

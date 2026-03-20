@@ -40,28 +40,49 @@ router.post('/product-image', ensureAuth, productUpload.single('image'), async (
       unique_filename: false,
       resource_type: 'image',
     });
-    // Optionally, delete local file after upload
-    // fs.unlinkSync(req.file.path);
+    try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
     res.json({ imageUrl: result.secure_url });
   } catch (err) {
     res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
   }
 });
 
-router.post('/shop-banner', ensureAuth, bannerUpload.single('image'), (req, res) => {
+router.post('/shop-banner', ensureAuth, bannerUpload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Image is required' });
   }
-  const imageUrl = `/images/uploads/shops/banners/${req.file.filename}`;
-  res.json({ imageUrl });
+  try {
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: 'shops/banners',
+      use_filename: true,
+      unique_filename: false,
+      resource_type: 'image',
+    });
+    // delete local file
+    try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+    res.json({ imageUrl: result.secure_url });
+  } catch (err) {
+    res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
+  }
 });
 
-router.post('/shop-avatar', ensureAuth, avatarUpload.single('image'), (req, res) => {
+router.post('/shop-avatar', ensureAuth, avatarUpload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Image is required' });
   }
-  const imageUrl = `/images/uploads/shops/avatars/${req.file.filename}`;
-  res.json({ imageUrl });
+  try {
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: 'shops/avatars',
+      use_filename: true,
+      unique_filename: false,
+      resource_type: 'image',
+    });
+    // delete local file
+    try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+    res.json({ imageUrl: result.secure_url });
+  } catch (err) {
+    res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
+  }
 });
 
 module.exports = router;
