@@ -1911,7 +1911,7 @@ body.loading {
     color: #000;
     background: #f1f1f1;
     padding: 0.12rem 0.5rem;
-    border-radius: 0.25rem;
+    border-radius: 0;
     line-height: 1.2;
     white-space: nowrap;
 }

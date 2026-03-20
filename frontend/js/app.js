@@ -3445,9 +3445,16 @@ class AgricultureMarket {
             return;
         }
 
+        const previousHeight = container.offsetHeight;
         try {
-            // Show loading state
-            container.innerHTML = '<div class="loading">Loading products...</div>';
+            // Keep current grid height while loading to prevent layout collapse/jump to footer.
+            if (previousHeight > 0) {
+                container.style.minHeight = `${previousHeight}px`;
+            }
+            container.setAttribute('aria-busy', 'true');
+            if (!container.children.length) {
+                container.innerHTML = '<div class="loading">Loading products...</div>';
+            }
 
             const params = new URLSearchParams({
                 page: this.currentPage,
@@ -3497,6 +3504,9 @@ class AgricultureMarket {
             if (typeof this.showMessage === 'function') {
                 this.showMessage('Error loading products: ' + error.message, 'error');
             }
+        } finally {
+            container.removeAttribute('aria-busy');
+            container.style.minHeight = '';
         }
     }
 
@@ -3668,12 +3678,8 @@ class AgricultureMarket {
 
     changePage(page) {
         if (!Number.isFinite(page) || page < 1) return;
-        const currentScrollY = window.scrollY || window.pageYOffset || 0;
         this.currentPage = page;
-        this.loadProducts().finally(() => {
-            // Keep user's current viewport; do not pan to another section on pagination.
-            window.scrollTo({ top: currentScrollY, behavior: 'auto' });
-        });
+        this.loadProducts();
     }
 
     // Show product details in floating modal
