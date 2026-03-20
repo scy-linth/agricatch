@@ -1,23 +1,12 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
 const crypto = require('crypto');
+const { pool } = require('../utils/db');
 
 const { sendOtpEmail } = require('../utils/emailService');
 
 const router = express.Router();
-const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
-  ? { rejectUnauthorized: false }
-  : false;
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agricatch',
-  password: process.env.DB_PASSWORD || 'password',
-  port: process.env.DB_PORT || 5432,
-  ssl: pgSsl,
-});
 
 const BCRYPT_ROUNDS = Number.parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
 const PASSWORD_RESET_OTP_TTL_MINUTES = Number.parseInt(process.env.PASSWORD_RESET_OTP_TTL_MINUTES || '15', 10);

@@ -2,10 +2,10 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { Pool } = require('pg');
 const { writeAdminAuditLog, ensureAuditTable } = require('../utils/auditLog');
 const { broadcastEvent } = require('../utils/realtime');
 const { productUpload } = require('../middleware/upload');
+const { pool } = require('../utils/db');
 
 // Super admin virtual user storage (shared with auth.js)
 let superAdminProfile = {
@@ -19,17 +19,6 @@ let superAdminProfile = {
 };
 
 const router = express.Router();
-const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
-  ? { rejectUnauthorized: false }
-  : false;
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agricatch',
-  password: process.env.DB_PASSWORD || 'password',
-  port: process.env.DB_PORT || 5432,
-  ssl: pgSsl,
-});
 
 const ensureCategoryAdminSchema = async () => {
   await pool.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS type VARCHAR(50)`);

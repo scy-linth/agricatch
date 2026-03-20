@@ -1,18 +1,7 @@
 const express = require('express');
-const { Pool } = require('pg');
+const { pool } = require('../utils/db');
 
 const router = express.Router();
-const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
-  ? { rejectUnauthorized: false }
-  : false;
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agricatch',
-  password: process.env.DB_PASSWORD || 'password',
-  port: process.env.DB_PORT || 5432,
-  ssl: pgSsl,
-});
 
 const jwt = require('jsonwebtoken');
 const { deleteFileIfExists, resolvePublicPath } = require('../utils/fileUtils');
