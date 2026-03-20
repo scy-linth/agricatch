@@ -3544,7 +3544,7 @@ class AgricultureMarket {
                                         ${ratingStars} (${this.fmtNumber(product.total_reviews || 0)})
                                     </div>
                                     <div class="product-stock" aria-label="Stock available">
-                                        ${typeof product.stock_quantity !== 'undefined' ? product.stock_quantity : (typeof product.stock !== 'undefined' ? product.stock : '')}
+                                        ${(() => { const qty = Number(product.stock_quantity ?? product.stock ?? 0); const unit = String(product.unit || 'item'); const stockWord = qty === 1 ? 'stock' : 'stocks'; return `(${qty} ${unit} ${stockWord})`; })()}
                                     </div>
                                 </div>
                             </div>
@@ -3607,7 +3607,7 @@ class AgricultureMarket {
                                 ${ratingStars} (${totalReviews})
                             </div>
                             <div class="product-stock" aria-label="Stock available">
-                                ${typeof product.stock_quantity !== 'undefined' ? product.stock_quantity : (typeof product.stock !== 'undefined' ? product.stock : '')}
+                                ${(() => { const qty = Number(product.stock_quantity ?? product.stock ?? 0); const unit = String(product.unit || 'item'); const stockWord = qty === 1 ? 'stock' : 'stocks'; return `(${qty} ${unit} ${stockWord})`; })()}
                             </div>
                         </div>
                     </div>

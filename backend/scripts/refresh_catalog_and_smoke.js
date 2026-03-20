@@ -433,6 +433,62 @@ async function runSmokeOrderReview(pool, { customerId, farmerId, productId }) {
   return { orderId, reviewId: review.body?.review?.id || null };
 }
 
+async function runBulkPurchases(pool, { customerBase = [], productIds = [], repeatPerProduct = 3 }) {
+  const results = [];
+  for (let i = 0; i < customerBase.length; i += 1) {
+    const cust = customerBase[i];
+    try {
+      const customerToken = jwt.sign({ id: cust.id, role: 'customer' }, JWT_SECRET, { expiresIn: '2h' });
+      for (const pid of productIds) {
+        // add to cart
+        await jfetch(`${BASE}/cart`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${customerToken}` },
+          json: { productId: pid, quantity: 1 }
+        }).catch(() => {});
+      }
+
+      // create order
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const deliveryDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+      const createOrder = await jfetch(`${BASE}/orders`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${customerToken}` },
+        json: { delivery_address: cust.address || 'Test District', delivery_date: deliveryDate, special_instructions: 'bulk_purchase_test' }
+      });
+
+      if (createOrder.ok && Array.isArray(createOrder.body?.orderIds) && createOrder.body.orderIds.length) {
+        for (const oid of createOrder.body.orderIds) {
+          // progress each order to delivered by finding its farmer (we'll try to deduce from order items via API) and using farmer token
+          // best-effort: fetch order details
+          try {
+            const orderRes = await jfetch(`${BASE}/orders/${oid}`);
+            if (!orderRes.ok) continue;
+            const items = orderRes.body?.items || [];
+            for (const it of items) {
+              const farmerId = it.farmer_id || it.farmerId || it.owner_id;
+              if (!farmerId) continue;
+              const farmerToken = jwt.sign({ id: farmerId, role: 'farmer' }, JWT_SECRET, { expiresIn: '2h' });
+              const flow = ['confirmed', 'preparing', 'out_for_delivery', 'delivered'];
+              for (const status of flow) {
+                await jfetch(`${BASE}/orders/${oid}/items/${oid}/status`, { method: 'PUT', headers: { Authorization: `Bearer ${farmerToken}` }, json: { status } }).catch(() => {});
+              }
+            }
+          } catch (e) {
+            // continue
+          }
+        }
+      }
+
+      results.push({ customer: cust.email, ok: true });
+    } catch (e) {
+      results.push({ customer: cust.email, ok: false, error: e.message || String(e) });
+    }
+  }
+  return results;
+}
+
 async function main() {
   const pool = createPool();
   try {
@@ -450,13 +506,34 @@ async function main() {
       customerId: seeded.customerId
     });
 
-    console.log('3) Running customer order + review smoke flow via API...');
-    const smoke = await runSmokeOrderReview(pool, {
-      customerId: seeded.customerId,
-      farmerId: seeded.farmers[0].id,
-      productId: seeded.smokeProductId
-    });
-    console.log('smoke', smoke);
+      console.log('3) Running customer order + review smoke flow via API...');
+      const smoke = await runSmokeOrderReview(pool, {
+        customerId: seeded.customerId,
+        farmerId: seeded.farmers[0].id,
+        productId: seeded.smokeProductId
+      });
+      console.log('smoke', smoke);
+
+      // 4) Create additional customers and run bulk purchases to stimulate bestseller ranking
+      console.log('4) Creating extra customers and running bulk purchases for best-seller tests...');
+      const extraCustomersInfo = [
+        { username: 'clark_kent', full_name: 'Clark Kent', email: 'clark.kent@agricatch.local', address: 'Metropolis' },
+        { username: 'diana_prince', full_name: 'Diana Prince', email: 'diana.prince@agricatch.local', address: 'Themyscira' },
+        { username: 'barry_allen', full_name: 'Barry Allen', email: 'barry.allen@agricatch.local', address: 'Central City' },
+        { username: 'john_doe1', full_name: 'John Doe 1', email: `john.doe1+${Date.now()}@agricatch.local`, address: 'Testville' },
+        { username: 'jane_doe1', full_name: 'Jane Doe 1', email: `jane.doe1+${Date.now()}@agricatch.local`, address: 'Testville' }
+      ];
+      const customerIds = [];
+      for (const info of extraCustomersInfo) {
+        const id = await upsertUser(pool, await getUserColumns(pool), { ...info, role: 'customer', password: 'Pass1234!' });
+        customerIds.push({ id, email: info.email, address: info.address });
+      }
+
+      // pick target products to boost: smoke product + 2 recent products
+      const topProductsRes = await pool.query('SELECT id FROM products WHERE is_available = true ORDER BY id DESC LIMIT 5');
+      const productIds = topProductsRes.rows.map(r => r.id);
+      const bulkResult = await runBulkPurchases(pool, { customerBase: customerIds, productIds, repeatPerProduct: 1 });
+      console.log('bulk purchases result', bulkResult);
 
     console.log('DONE');
   } finally {
