@@ -4,6 +4,7 @@ const { pool } = require('../utils/db');
 const { productUpload } = require('../middleware/upload');
 const { deleteFileIfExists, resolvePublicPath } = require('../utils/fileUtils');
 const { broadcastEvent } = require('../utils/realtime');
+const cloudinary = require('../utils/cloudinary');
 
 const router = express.Router();
 
@@ -851,13 +852,25 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'Invalid category. Fishery categories are not allowed.' });
     }
 
-    // Determine image URL: prefer explicit `image_url`, otherwise use uploaded file
+    // Determine image URL: prefer explicit `image_url`, otherwise upload file to Cloudinary
     let imageUrl = null;
     if (image_url && String(image_url).trim() !== '') {
       imageUrl = image_url;
-    } else if (req.file && req.file.filename) {
-      const dateFolder = new Date().toISOString().split('T')[0];
-      imageUrl = `/images/uploads/products/${dateFolder}/${req.file.filename}`;
+    } else if (req.file && req.file.path) {
+      try {
+        const uploaded = await cloudinary.uploader.upload(req.file.path, {
+          folder: 'products',
+          use_filename: true,
+          unique_filename: false,
+          resource_type: 'image',
+        });
+        imageUrl = uploaded.secure_url;
+      } catch (uploadError) {
+        console.error('Cloudinary upload failed:', uploadError);
+        return res.status(500).json({ message: 'Image upload failed' });
+      } finally {
+        deleteFileIfExists(req.file.path);
+      }
     }
 
     // Auto-populate location with shop address if not provided
@@ -959,13 +972,25 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'Invalid category. Fishery categories are not allowed.' });
     }
 
-    // Determine image URL: prefer explicit `image_url`, otherwise use uploaded file, otherwise keep current
+    // Determine image URL: prefer explicit `image_url`, otherwise upload file to Cloudinary, otherwise keep current
     let imageUrl = current.image_url;
     if (typeof image_url !== 'undefined' && image_url !== null && String(image_url).trim() !== '') {
       imageUrl = image_url;
-    } else if (req.file && req.file.filename) {
-      const dateFolder = new Date().toISOString().split('T')[0];
-      imageUrl = `/images/uploads/products/${dateFolder}/${req.file.filename}`;
+    } else if (req.file && req.file.path) {
+      try {
+        const uploaded = await cloudinary.uploader.upload(req.file.path, {
+          folder: 'products',
+          use_filename: true,
+          unique_filename: false,
+          resource_type: 'image',
+        });
+        imageUrl = uploaded.secure_url;
+      } catch (uploadError) {
+        console.error('Cloudinary upload failed:', uploadError);
+        return res.status(500).json({ message: 'Image upload failed' });
+      } finally {
+        deleteFileIfExists(req.file.path);
+      }
     }
 
     // If a new file was uploaded and an old image exists on disk, delete the old file
