@@ -2359,6 +2359,20 @@ class FarmerDashboard {
     async handleAddProduct(e) {
         e.preventDefault();
 
+        if (this._addingProduct) {
+            // Prevent duplicate concurrent submissions
+            return;
+        }
+        this._addingProduct = true;
+
+        const formEl = e.target || document.getElementById('add-product-form');
+        let submitBtn = formEl ? formEl.querySelector('button[type="submit"]') : null;
+        const prevBtnText = submitBtn ? submitBtn.textContent : null;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding...';
+        }
+
         const name = document.getElementById('product-name').value;
         const description = document.getElementById('product-description').value;
         const price = document.getElementById('product-price').value;
@@ -2425,6 +2439,13 @@ class FarmerDashboard {
         } catch (error) {
             console.error('Error adding product:', error);
             this.showMessage('Error adding product', 'error');
+        } finally {
+            // Re-enable submit button and clear in-flight flag
+            this._addingProduct = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                try { submitBtn.textContent = prevBtnText || 'Add Product'; } catch (_) {}
+            }
         }
     }
 
