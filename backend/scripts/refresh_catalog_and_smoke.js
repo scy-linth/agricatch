@@ -30,8 +30,19 @@ const ALIAS_FARMERS = [
 ];
 
 function createPool() {
+  // Prefer a single connection string if available to avoid mixed/undefined fields
+  if (process.env.DATABASE_URL) {
+    return new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl:
+        String(process.env.DB_HOST || '').includes('render.com') ||
+        String(process.env.DB_HOST || '').includes('supabase.com')
+          ? { rejectUnauthorized: false }
+          : false
+    });
+  }
+
   return new Pool({
-    connectionString: process.env.DATABASE_URL || undefined,
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
