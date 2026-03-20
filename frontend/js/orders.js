@@ -322,6 +322,26 @@ class OrdersPage {
         Object.keys(this.ordersByStatus).forEach(status => {
             this.renderOrdersByStatus(status);
         });
+        // Update tab counters after rendering
+        this.updateTabCounts();
+    }
+
+    updateTabCounts() {
+        try {
+            Object.keys(this.ordersByStatus).forEach(status => {
+                const count = (this.ordersByStatus[status] || []).length || 0;
+                const tab = document.getElementById(`${status}-orders-tab`);
+                if (!tab) return;
+                const label = this.formatStatusLabel(status);
+                if (count > 0) {
+                    tab.innerHTML = `${label} <span class="tab-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">${count}</span>`;
+                } else {
+                    tab.textContent = label;
+                }
+            });
+        } catch (e) {
+            // ignore DOM errors
+        }
     }
 
     renderOrdersByStatus(status) {
