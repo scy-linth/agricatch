@@ -1908,10 +1908,12 @@ body.loading {
 .product-stock {
     font-size: 0.9rem;
     font-weight: 600;
-    color: var(--muted, #666);
-    background: rgba(0,0,0,0.03);
+    color: #000;
+    background: #f1f1f1;
     padding: 0.12rem 0.5rem;
     border-radius: 0.25rem;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 
 .product-stats-lines {

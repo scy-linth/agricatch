@@ -3648,16 +3648,16 @@ class AgricultureMarket {
         const nextDisabled = !pagination.hasNextPage ? 'disabled' : '';
         
         paginationDiv.innerHTML = `
-            <button class="btn btn-secondary pagination-btn" ${prevDisabled} 
-                    onclick="app.changePage(${pagination.currentPage - 1})" 
+                <button type="button" class="btn btn-secondary pagination-btn" ${prevDisabled} 
+                    onclick="event.preventDefault(); event.stopPropagation(); app.changePage(${pagination.currentPage - 1}); return false;" 
                     ${!pagination.hasPrevPage ? 'disabled' : ''}>
                 <i class="fas fa-chevron-left"></i> Previous
             </button>
             <span class="pagination-info">
                 Page ${pagination.currentPage} of ${pagination.totalPages}
             </span>
-            <button class="btn btn-secondary pagination-btn" ${nextDisabled}
-                    onclick="app.changePage(${pagination.currentPage + 1})"
+                <button type="button" class="btn btn-secondary pagination-btn" ${nextDisabled}
+                    onclick="event.preventDefault(); event.stopPropagation(); app.changePage(${pagination.currentPage + 1}); return false;"
                     ${!pagination.hasNextPage ? 'disabled' : ''}>
                 Next <i class="fas fa-chevron-right"></i>
             </button>
@@ -3668,8 +3668,12 @@ class AgricultureMarket {
 
     changePage(page) {
         if (!Number.isFinite(page) || page < 1) return;
+        const currentScrollY = window.scrollY || window.pageYOffset || 0;
         this.currentPage = page;
-        this.loadProducts();
+        this.loadProducts().finally(() => {
+            // Keep user's current viewport; do not pan to another section on pagination.
+            window.scrollTo({ top: currentScrollY, behavior: 'auto' });
+        });
     }
 
     // Show product details in floating modal
