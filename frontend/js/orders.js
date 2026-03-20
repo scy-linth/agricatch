@@ -5,6 +5,13 @@ class OrdersPage {
     constructor() {
         // Use relative /api so Netlify can proxy to Render.
         this.apiBase = '/api';
+        this.apiFallbackBase = 'https://agricatch.onrender.com/api';
+        if (typeof window !== 'undefined') {
+            const host = String(window.location.hostname || '').toLowerCase();
+            if (host === 'agricatch.store' || host === 'www.agricatch.store') {
+                this.apiBase = this.apiFallbackBase;
+            }
+        }
         this.token = localStorage.getItem('token');
         this.userId = this.getUserId();
         this.currentStatus = 'pending';
@@ -26,6 +33,40 @@ class OrdersPage {
         };
         this.cancelDraftOrderId = null;
         this.init();
+    }
+
+    getApiBases() {
+        const bases = [this.apiBase];
+        if (this.apiFallbackBase && this.apiFallbackBase !== this.apiBase) {
+            bases.push(this.apiFallbackBase);
+        }
+        return bases;
+    }
+
+    async fetchWithApiFallback(path, options = {}) {
+        let lastResponse = null;
+        let lastError = null;
+
+        for (const base of this.getApiBases()) {
+            try {
+                const response = await fetch(`${base}${path}`, options);
+                lastResponse = response;
+
+                // Retry on alternate base when a proxy is missing routes.
+                if (response.status === 404) continue;
+
+                if (base !== this.apiBase) {
+                    this.apiBase = base;
+                }
+                return response;
+            } catch (error) {
+                lastError = error;
+            }
+        }
+
+        if (lastResponse) return lastResponse;
+        if (lastError) throw lastError;
+        throw new Error('API request failed');
     }
 
     escapeHtml(value) {
@@ -163,8 +204,19 @@ class OrdersPage {
     setupRealtime() {
         try {
             if (!this.token || !this.userId) return;
-            const url = `/api/events?token=${encodeURIComponent(this.token)}`;
-            const es = new EventSource(url);
+            const eventBases = this.getApiBases();
+            let es = null;
+            for (const base of eventBases) {
+                try {
+                    const normalized = String(base || '').replace(/\/+$/, '');
+                    const url = `${normalized}/events?token=${encodeURIComponent(this.token)}`;
+                    es = new EventSource(url);
+                    break;
+                } catch (_) {
+                    // Try next base.
+                }
+            }
+            if (!es) return;
             es.addEventListener('order.updated', (evt) => {
                 try {
                     const data = JSON.parse(evt.data || '{}');
@@ -201,7 +253,7 @@ class OrdersPage {
 
     async loadOrders() {
         try {
-            const response = await fetch(`${this.apiBase}/orders?t=${Date.now()}`, {
+            const response = await this.fetchWithApiFallback(`/orders?t=${Date.now()}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` },
                 cache: 'no-store'
             });
