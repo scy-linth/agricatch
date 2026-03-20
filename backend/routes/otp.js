@@ -82,17 +82,30 @@ router.post('/send', async (req, res) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     let dbErrorOccurred = false;
+    let insertedOtpId = null;
     try {
       await pool.query(
         'UPDATE otps SET is_used = true WHERE email = $1 AND purpose = $2 AND is_used = false',
         [email, purpose]
       );
 
-      await pool.query(
-        'INSERT INTO otps (email, otp_code, purpose, expires_at) VALUES ($1, $2, $3, $4)',
-        [email, otp, purpose, expiresAt]
+      // Consider request as development if NODE_ENV isn't production or request originates from localhost
+      const hostHeader = String(req.headers.host || '').toLowerCase();
+      const isDev = process.env.NODE_ENV !== 'production' || hostHeader.includes('localhost') || hostHeader.includes('127.0.0.1');
+      const insertResult = await pool.query(
+        'INSERT INTO otps (email, otp_code, purpose, expires_at, is_used) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at',
+        [email, otp, purpose, expiresAt, isDev]
       );
-      console.log('✅ OTP stored in database');
+      insertedOtpId = insertResult.rows?.[0]?.id || null;
+      console.log('✅ OTP stored in database', { insertedOtpId });
+      if (isDev && insertedOtpId) {
+        try {
+          await pool.query('UPDATE otps SET is_used = true WHERE id = $1', [insertedOtpId]);
+          console.log('🔧 Development mode: explicitly set is_used=true for id', insertedOtpId);
+        } catch (uerr) {
+          console.error('❌ Failed to explicitly set is_used for dev:', uerr);
+        }
+      }
     } catch (dbError) {
       dbErrorOccurred = true;
       console.error('❌ DB Error storing OTP:', dbError);
@@ -103,10 +116,26 @@ router.post('/send', async (req, res) => {
 
     if (!emailResult.success) {
       console.error('❌ OTP email send failed:', emailResult.error);
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+
+      // In local/dev environments, allow OTP flow to proceed even if email transport fails.
+      // This prevents local registration from being blocked by SMTP/Resend credential issues.
+      if (isDevelopment) {
+        return res.json({
+          message: 'OTP generated for development mode. Email delivery failed, but you can continue using the OTP below.',
+          expiresIn: 600,
+          otp,
+          emailDelivery: 'failed',
+          emailError: emailResult.error || 'Unknown email error'
+        });
+      }
+
       let errorMessage = 'Failed to send OTP email.';
       if (emailResult.error) {
         if (emailResult.error.includes('Invalid login') || emailResult.error.includes('authentication failed')) {
           errorMessage = 'SMTP authentication failed. Please verify email credentials.';
+        } else if (emailResult.error.toLowerCase().includes('password') && emailResult.error.toLowerCase().includes('expired')) {
+          errorMessage = 'Email account password expired. Update your SMTP/Resend credentials.';
         } else if (emailResult.error.includes('ECONNREFUSED') || emailResult.error.includes('ENOTFOUND')) {
           errorMessage = 'Cannot connect to email server. Please check SMTP host configuration.';
         } else if (emailResult.error.includes('timeout')) {

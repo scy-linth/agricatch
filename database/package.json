@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "import:supabase": "node import_to_supabase.js",
+    "import:supabase:auto": "powershell -ExecutionPolicy Bypass -File ./auto_import_supabase.ps1"
+  },
   "dependencies": {
     "dotenv": "^17.2.3",
     "pg": "^8.17.2"
