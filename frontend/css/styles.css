@@ -1890,6 +1890,14 @@ body.loading {
     width: 100%;
 }
 
+.product-rating-text {
+    width: 100%;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #f2b400;
+    letter-spacing: 0.02em;
+}
+
 .product-stats-lines {
     display: flex;
     flex-direction: column;
