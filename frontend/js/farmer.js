@@ -428,12 +428,25 @@ class FarmerDashboard {
     }
 
     async checkFarmerAuth() {
+        const doRedirectHome = () => { window.location.href = '/'; };
+
         try {
-            const response = await fetch(`${this.apiBase}/auth/profile`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
+            const fetchProfile = async () => {
+                const response = await fetch(`${this.apiBase}/auth/profile`, {
+                    headers: {
+                        'Authorization': `Bearer ${this.token}`
+                    }
+                });
+                return response;
+            };
+
+            let response = await fetchProfile();
+
+            // If transient failure, retry once after a short delay to avoid redirect loops
+            if (!response.ok && (response.status === 401 || response.status === 0 || response.status >= 500)) {
+                await new Promise(r => setTimeout(r, 600));
+                response = await fetchProfile();
+            }
 
             if (response.ok) {
                 const data = await response.json();
@@ -444,7 +457,7 @@ class FarmerDashboard {
                     return;
                 }
                 if (data.user.role !== 'farmer') {
-                    window.location.href = '/';
+                    doRedirectHome();
                     return;
                 }
                 const nameEl = document.getElementById('user-name');
@@ -472,11 +485,13 @@ class FarmerDashboard {
                 this.loadShopProfile();
                 this.loadOverviewMetrics({ force: true });
             } else {
-                window.location.href = '/';
+                // Avoid immediate redirect on transient failures; only redirect for persistent errors
+                console.warn('Auth profile fetch failed, redirecting home');
+                doRedirectHome();
             }
         } catch (error) {
             console.error('Auth check error:', error);
-            window.location.href = '/';
+            doRedirectHome();
         }
     }
 
