@@ -469,8 +469,11 @@ router.post('/users/:id/generate-temp-password', requireAdmin, async (req, res) 
 
     // Generate a reasonably strong temporary password (12 chars, URL-safe)
     const tmp = crypto.randomBytes(9).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 12);
+    const plaintextPasswordsEnabled =
+      process.env.ALLOW_PLAINTEXT_PASSWORDS === 'true' ||
+      ((process.env.DEV_PLAINTEXT_PASSWORDS === 'true') && process.env.NODE_ENV !== 'production');
     const BCRYPT_ROUNDS = Number.parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
-    const hash = await bcrypt.hash(tmp, BCRYPT_ROUNDS);
+    const passwordValue = plaintextPasswordsEnabled ? tmp : await bcrypt.hash(tmp, BCRYPT_ROUNDS);
 
     // Determine which password columns exist and update accordingly
     const colsRes = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'");
@@ -481,12 +484,12 @@ router.post('/users/:id/generate-temp-password', requireAdmin, async (req, res) 
 
     if (cols.has('password')) {
       sets.push(`password = $${idx}`);
-      values.push(hash);
+      values.push(passwordValue);
       idx++;
     }
     if (cols.has('password_hash')) {
       sets.push(`password_hash = $${idx}`);
-      values.push(hash);
+      values.push(passwordValue);
       idx++;
     }
 

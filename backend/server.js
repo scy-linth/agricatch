@@ -130,11 +130,34 @@ app.use(session({
     // Best-effort: ensure core marketplace tables exist.
     // This keeps the API from crashing on fresh/partially initialized databases.
     {
+      const tableColumnsCache = new Map();
+      const getTableColumns = async (tableName) => {
+        if (tableColumnsCache.has(tableName)) return tableColumnsCache.get(tableName);
+        const res = await pool.query(
+          `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
+          [tableName]
+        );
+        const cols = new Set((res.rows || []).map((row) => String(row.column_name || '').toLowerCase()));
+        tableColumnsCache.set(tableName, cols);
+        return cols;
+      };
+
+      const hasColumns = async (tableName, requiredColumns) => {
+        const cols = await getTableColumns(tableName);
+        return requiredColumns.every((name) => cols.has(String(name).toLowerCase()));
+      };
+
       const safeQuery = async (label, sql) => {
         try {
           await pool.query(sql);
         } catch (e) {
-          console.warn(`⚠️ Core init skipped (${label}):`, e.message);
+          const code = String(e?.code || '');
+          const isExpectedSchemaGap = code === '42703' || code === '42P01';
+          if (isExpectedSchemaGap) {
+            console.log(`ℹ️ Core init note (${label}): ${e.message}`);
+            return;
+          }
+          console.warn(`⚠️ Core init issue (${label}):`, e.message);
         }
       };
 
@@ -174,9 +197,13 @@ app.use(session({
       await safeQuery('users.address column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT');
       await safeQuery('users.is_verified column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false');
 
-      // Backfill new columns from legacy ones when present
-      await safeQuery('users.password backfill', "UPDATE users SET password = password_hash WHERE (password IS NULL OR password = '') AND password_hash IS NOT NULL");
-      await safeQuery('users.role backfill', "UPDATE users SET role = user_type WHERE (role IS NULL OR role = '') AND user_type IS NOT NULL");
+      // Backfill new columns from legacy ones only when source columns exist.
+      if (await hasColumns('users', ['password', 'password_hash'])) {
+        await safeQuery('users.password backfill', "UPDATE users SET password = password_hash WHERE (password IS NULL OR password = '') AND password_hash IS NOT NULL");
+      }
+      if (await hasColumns('users', ['role', 'user_type'])) {
+        await safeQuery('users.role backfill', "UPDATE users SET role = user_type WHERE (role IS NULL OR role = '') AND user_type IS NOT NULL");
+      }
       await safeQuery('users.role default', "UPDATE users SET role = 'customer' WHERE role IS NULL OR role = ''");
       await safeQuery('users.role rename admin->staff', "UPDATE users SET role = 'staff' WHERE role = 'admin'");
       await safeQuery(
@@ -263,10 +290,12 @@ app.use(session({
       await safeQuery('cart.product_id column', 'ALTER TABLE cart ADD COLUMN IF NOT EXISTS product_id INTEGER');
       await safeQuery('cart.quantity column', 'ALTER TABLE cart ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1');
       await safeQuery('cart.added_at column', 'ALTER TABLE cart ADD COLUMN IF NOT EXISTS added_at TIMESTAMP');
-      await safeQuery(
-        'cart.added_at backfill',
-        "UPDATE cart SET added_at = COALESCE(added_at, created_at, updated_at, CURRENT_TIMESTAMP)"
-      );
+      if (await hasColumns('cart', ['added_at'])) {
+        const cartColumns = await getTableColumns('cart');
+        const fallbackColumns = ['created_at', 'updated_at'].filter((name) => cartColumns.has(name));
+        const coalesceArgs = ['added_at', ...fallbackColumns, 'CURRENT_TIMESTAMP'];
+        await safeQuery('cart.added_at backfill', `UPDATE cart SET added_at = COALESCE(${coalesceArgs.join(', ')})`);
+      }
       await safeQuery('cart.added_at default', 'ALTER TABLE cart ALTER COLUMN added_at SET DEFAULT CURRENT_TIMESTAMP');
       await safeQuery('cart unique (session_id, product_id)', 'CREATE UNIQUE INDEX IF NOT EXISTS cart_session_product_unique ON cart (session_id, product_id)');
       await safeQuery('cart unique (user_id, product_id)', 'CREATE UNIQUE INDEX IF NOT EXISTS cart_user_product_unique ON cart (user_id, product_id)');
@@ -517,49 +546,6 @@ app.use(session({
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_user_created ON password_resets(user_id, created_at DESC)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_expires ON password_resets(expires_at)`);
     console.log('✅ Password reset table verified/created');
-
-    // Best-effort schema compatibility migrations (keeps the API working if DB is slightly behind)
-    // These are safe to run repeatedly.
-    try {
-      await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS location VARCHAR(100)`);
-      await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS harvest_date DATE`);
-      await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS expiry_date DATE`);
-      await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT true`);
-      await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
-      await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
-      console.log('✅ Products table columns verified/added');
-    } catch (e) {
-      console.warn('⚠️ Skipped products table migrations:', e.message);
-    }
-
-    // Ensure expected columns exist on users table (older DBs may be missing these)
-    try {
-      const existsRes = await pool.query(`SELECT to_regclass('public.users') as reg`);
-      const usersTableExists = !!existsRes.rows?.[0]?.reg;
-      if (usersTableExists) {
-        const alterStatements = [
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false`,
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS shop_description TEXT`,
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS shop_banner_url VARCHAR(255)`,
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS shop_avatar_url VARCHAR(255)`,
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS total_sales INTEGER DEFAULT 0`,
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS total_revenue DECIMAL(10,2) DEFAULT 0`,
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS response_rate DECIMAL(5,2) DEFAULT 0`,
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS average_response_time INTEGER DEFAULT 0`,
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS cancellation_rate DECIMAL(5,2) DEFAULT 0`,
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS total_reviews INTEGER DEFAULT 0`,
-          `ALTER TABLE users ADD COLUMN IF NOT EXISTS average_rating DECIMAL(3,2) DEFAULT 0`,
-        ];
-
-        for (const sql of alterStatements) {
-          await pool.query(sql);
-        }
-
-        console.log('✅ Users table columns verified/created');
-      }
-    } catch (e) {
-      console.warn('⚠️ Users table column check failed:', e.message);
-    }
 
     // Ensure chat tables exist (conversations/messages)
     try {
