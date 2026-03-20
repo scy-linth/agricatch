@@ -3437,6 +3437,17 @@ class AgricultureMarket {
         }
     }
 
+    async fetchJsonWithTimeout(url, options = {}, timeoutMs = 25000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            return response;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
+
     // Products
     async loadProducts() {
         const container = document.getElementById('products-grid');
@@ -3468,9 +3479,23 @@ class AgricultureMarket {
             if (this.currentSort) params.append('sort', this.currentSort);
 
             console.log('Loading products from:', `${this.apiBase}/products?${params}`);
-            const response = await fetch(`${this.apiBase}/products?${params}`, {
-                headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
-            });
+            let response;
+            try {
+                response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
+                    headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+                }, 25000);
+            } catch (firstErr) {
+                // Render cold starts can be slow; wake server and retry once with a longer timeout.
+                console.warn('Products request timed out, attempting wake-up retry...', firstErr?.message || firstErr);
+                try {
+                    await this.fetchJsonWithTimeout(`${this.apiBase}/test-db`, { cache: 'no-cache' }, 15000);
+                } catch (_) {
+                    // best effort warmup
+                }
+                response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
+                    headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+                }, 70000);
+            }
             
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
@@ -3518,9 +3543,17 @@ class AgricultureMarket {
             container.innerHTML = '<div class="loading">Loading featured products...</div>';
             const params = new URLSearchParams({ limit: '6' });
 
-            const response = await fetch(`${this.apiBase}/products/featured?${params.toString()}`, {
-                headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
-            });
+            let response;
+            try {
+                response = await this.fetchJsonWithTimeout(`${this.apiBase}/products/featured?${params.toString()}`, {
+                    headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+                }, 25000);
+            } catch (firstErr) {
+                console.warn('Featured products request timed out, retrying once...', firstErr?.message || firstErr);
+                response = await this.fetchJsonWithTimeout(`${this.apiBase}/products/featured?${params.toString()}`, {
+                    headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+                }, 70000);
+            }
 
             if (!response.ok) {
                 throw new Error('Failed to load featured products');
