@@ -3539,8 +3539,13 @@ class AgricultureMarket {
                             <h3 class="product-name">${product.name}</h3>
                             <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit || 'item'}</div>
                             <div class="product-meta product-card-summary">
-                                <div class="product-rating-text" aria-label="${this.fmtNumber(product.total_reviews || 0)} reviews, average ${this.fmtNumber(productRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} out of 5">
-                                    ${ratingStars} (${this.fmtNumber(product.total_reviews || 0)})
+                                <div class="product-rating-wrap" aria-hidden="false">
+                                    <div class="product-rating-text" aria-label="${this.fmtNumber(product.total_reviews || 0)} reviews, average ${this.fmtNumber(productRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} out of 5">
+                                        ${ratingStars} (${this.fmtNumber(product.total_reviews || 0)})
+                                    </div>
+                                    <div class="product-stock" aria-label="Stock available">
+                                        ${typeof product.stock_quantity !== 'undefined' ? product.stock_quantity : (typeof product.stock !== 'undefined' ? product.stock : '')}
+                                    </div>
                                 </div>
                             </div>
                             <button class="add-to-cart-btn"
@@ -3597,8 +3602,13 @@ class AgricultureMarket {
                     <h3 class="product-name">${product.name}</h3>
                     <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit}</div>
                     <div class="product-meta product-card-summary">
-                        <div class="product-rating-text" aria-label="${totalReviews} reviews, average ${averageRating} out of 5">
-                            ${ratingStars} (${totalReviews})
+                        <div class="product-rating-wrap" aria-hidden="false">
+                            <div class="product-rating-text" aria-label="${totalReviews} reviews, average ${averageRating} out of 5">
+                                ${ratingStars} (${totalReviews})
+                            </div>
+                            <div class="product-stock" aria-label="Stock available">
+                                ${typeof product.stock_quantity !== 'undefined' ? product.stock_quantity : (typeof product.stock !== 'undefined' ? product.stock : '')}
+                            </div>
                         </div>
                     </div>
                     <button class="add-to-cart-btn"
