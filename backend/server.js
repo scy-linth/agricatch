@@ -29,31 +29,58 @@ function sendIngest(payload) {
 
 
 // Middleware - CORS Configuration
-// Allow multiple origins for production and development
-// Set allowed origins for CORS. Add all frontend URLs (Cloudflare Pages, custom domain, localhost, etc.)
-const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : (() => {
-    // Production default origins (conservative)
-    if (process.env.NODE_ENV === 'production') {
-      return [
-        'https://agricatch.store',
-        'https://www.agricatch.store',
-        'https://agricatch.onrender.com',
-        'https://api.agricatch.store'
-      ];
-    }
+// Normalize origins to avoid false negatives from trailing slashes and casing.
+const normalizeOrigin = (value) => {
+  if (!value) return '';
+  try {
+    const parsed = new URL(String(value).trim());
+    return `${parsed.protocol}//${parsed.host}`.toLowerCase();
+  } catch (_) {
+    return String(value).trim().replace(/\/+$/, '').toLowerCase();
+  }
+};
 
-    // Development defaults
-    return [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'http://localhost:7242',
-      'http://127.0.0.1:7242',
-      'http://localhost:5173',
-      'http://127.0.0.1:5173'
-    ];
-  })();
+const defaultProductionOrigins = [
+  'https://agricatch.store',
+  'https://www.agricatch.store',
+  'https://agricatch.onrender.com',
+  'https://api.agricatch.store',
+  'https://agricatch.page.dev'
+];
+
+const defaultDevelopmentOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:7242',
+  'http://127.0.0.1:7242',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+];
+
+const configuredOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((url) => normalizeOrigin(url))
+  .filter(Boolean);
+
+const allowedOrigins = new Set([
+  ...configuredOrigins,
+  ...(process.env.NODE_ENV === 'production' ? defaultProductionOrigins : defaultDevelopmentOrigins).map(normalizeOrigin)
+]);
+
+const isTrustedAgricatchOrigin = (origin) => {
+  try {
+    const { protocol, hostname } = new URL(origin);
+    if (protocol !== 'https:') return false;
+    return (
+      hostname === 'agricatch.store' ||
+      hostname.endsWith('.agricatch.store') ||
+      hostname === 'agricatch.page.dev' ||
+      hostname.endsWith('.agricatch.page.dev')
+    );
+  } catch (_) {
+    return false;
+  }
+};
 
 // CORS configuration
 if (process.env.PERMISSIVE_CORS === 'true') {
@@ -69,8 +96,10 @@ if (process.env.PERMISSIVE_CORS === 'true') {
       // In development allow any origin (useful for local testing)
       if (process.env.NODE_ENV !== 'production') return callback(null, true);
 
-      // In production only allow explicit origins
-      if (allowedOrigins.includes(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      // In production allow explicit origins and trusted agricatch domains.
+      if (allowedOrigins.has(normalizedOrigin) || isTrustedAgricatchOrigin(normalizedOrigin)) {
         return callback(null, true);
       }
 
