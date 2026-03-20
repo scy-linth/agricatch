@@ -285,11 +285,21 @@ async function seedAliasFarmersAndCatalog(pool) {
       const image = CLOUDINARY_IMAGES[(i + j) % CLOUDINARY_IMAGES.length];
       const priceVariation = Math.round(picked.price * (0.9 + Math.random() * 0.2));
       const name = `${picked.name} ${j + 1}`;
+      // random harvest within last 7 days
+      const now = new Date();
+      const harvestOffset = Math.floor(Math.random() * 7) + 1; // 1-7 days ago
+      const harvestDate = new Date(now);
+      harvestDate.setDate(now.getDate() - harvestOffset);
+      // expiry 3-14 days after harvest
+      const expiryOffset = Math.floor(Math.random() * 12) + 3; // 3-14 days
+      const expiryDate = new Date(harvestDate);
+      expiryDate.setDate(harvestDate.getDate() + expiryOffset);
+
       await pool.query(
         `INSERT INTO products
-          (name, description, price, category_id, farmer_id, stock_quantity, unit, image_url, location, is_available)
+          (name, description, price, category_id, farmer_id, stock_quantity, unit, image_url, location, harvest_date, expiry_date, is_available)
          VALUES
-          ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)`,
+          ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)`,
         [
           name,
           `Fresh ${picked.name.toLowerCase()} from ${farmer.full_name}. Item ${j + 1}.`,
@@ -299,7 +309,9 @@ async function seedAliasFarmersAndCatalog(pool) {
           50,
           picked.unit,
           image,
-          farmer.address
+          farmer.address,
+          harvestDate.toISOString().slice(0, 10),
+          expiryDate.toISOString().slice(0, 10)
         ]
       );
       seededCount += 1;
@@ -319,11 +331,17 @@ async function seedAliasFarmersAndCatalog(pool) {
   if (smokeProductExisting.rows.length) {
     smokeProductId = smokeProductExisting.rows[0].id;
   } else {
+    // set harvest/expiry for the smoke product
+    const smokeHarvest = new Date();
+    smokeHarvest.setDate(smokeHarvest.getDate() - 3);
+    const smokeExpiry = new Date(smokeHarvest);
+    smokeExpiry.setDate(smokeHarvest.getDate() + 10);
+
     const inserted = await pool.query(
       `INSERT INTO products
-        (name, description, price, category_id, farmer_id, stock_quantity, unit, image_url, location, is_available)
+        (name, description, price, category_id, farmer_id, stock_quantity, unit, image_url, location, harvest_date, expiry_date, is_available)
        VALUES
-        ($1, $2, $3, $4, $5, $6, 'box', $7, $8, true)
+        ($1, $2, $3, $4, $5, $6, 'box', $7, $8, $9, $10, true)
        RETURNING id`,
       [
         smokeName,
@@ -333,7 +351,9 @@ async function seedAliasFarmersAndCatalog(pool) {
         batmanFarmer.id,
         40,
         CLOUDINARY_IMAGES[0],
-        batmanFarmer.address
+        batmanFarmer.address,
+        smokeHarvest.toISOString().slice(0, 10),
+        smokeExpiry.toISOString().slice(0, 10)
       ]
     );
     smokeProductId = inserted.rows[0].id;
