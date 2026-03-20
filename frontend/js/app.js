@@ -21,6 +21,9 @@ class AgricultureMarket {
             ? 'https://agricatch.onrender.com/api'
             : (isRenderHost ? '/api' : '/api');
 
+        // Expose resolved API base globally so other page scripts can reuse it
+        try { window.API_BASE = this.apiBase; } catch (e) {}
+
         // Dev host detection for local-only debug endpoints
         this.isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         // Set to true if you run a local dev agent on port 7242
@@ -2378,20 +2381,12 @@ class AgricultureMarket {
                 if (userRole === 'super_admin' || userRole === 'staff') {
                     this.showMessage('Staff login successful! Redirecting...', 'success');
                     setTimeout(() => {
-                        if (this.returnUrl) {
-                            window.location.href = this.returnUrl;
-                        } else {
-                            window.location.href = '/admin.html';
-                        }
+                        window.location.href = '/admin.html';
                     }, 1000);
                 } else if (userRole === 'farmer') {
                     this.showMessage('Farmer login successful! Redirecting...', 'success');
                     setTimeout(() => {
-                        if (this.returnUrl) {
-                            window.location.href = this.returnUrl;
-                        } else {
-                            window.location.href = '/farmer.html';
-                        }
+                        window.location.href = '/farmer.html';
                     }, 1000);
                 } else {
                     // Customer or unknown role: stay in UI
@@ -3245,25 +3240,17 @@ class AgricultureMarket {
                 this.closeAuthFlow();
                 // Redirect based on created role
                 const role = data.user?.role || 'customer';
-                if (role === 'staff') {
+                if (role === 'staff' || role === 'super_admin') {
                     this.showMessage('Staff registration successful! Redirecting...', 'success');
                     setTimeout(() => {
-                        if (this.returnUrl) {
-                            window.location.href = this.returnUrl;
-                        } else {
-                            window.location.href = '/admin.html';
-                        }
+                        window.location.href = '/admin.html';
                     }, 800);
                     return;
                 }
                 if (role === 'farmer') {
                     this.showMessage('Farmer registration successful! Redirecting...', 'success');
                     setTimeout(() => {
-                        if (this.returnUrl) {
-                            window.location.href = this.returnUrl;
-                        } else {
-                            window.location.href = '/farmer.html';
-                        }
+                        window.location.href = '/farmer.html';
                     }, 800);
                     return;
                 }

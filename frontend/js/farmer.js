@@ -2,8 +2,13 @@
 
 class FarmerDashboard {
     constructor() {
-        // Use relative /api so Netlify can proxy to Render.
-        this.apiBase = '/api';
+        // Resolve API base by host so dashboard pages work even without app.js.
+        const host = window.location.hostname;
+        const isCustomFrontendHost = host === 'agricatch.store' ||
+            host === 'www.agricatch.store' ||
+            host.includes('agricatch.store') ||
+            host === 'agricatch.page.dev';
+        this.apiBase = window.API_BASE || (isCustomFrontendHost ? 'https://agricatch.onrender.com/api' : '/api');
         this.token = this.normalizeAuthToken(localStorage.getItem('token'));
         if (this.token) {
             localStorage.setItem('token', this.token);
@@ -322,7 +327,7 @@ class FarmerDashboard {
     setupRealtime() {
         try {
             if (!this.token || !this.userId) return;
-            const url = `/api/events?token=${encodeURIComponent(this.token)}`;
+            const url = `${this.apiBase}/events?token=${encodeURIComponent(this.token)}`;
             const es = new EventSource(url);
             es.addEventListener('order.updated', (evt) => {
                 try {
@@ -459,8 +464,8 @@ class FarmerDashboard {
             if (response.ok) {
                 const data = await response.json();
                 this.authProfile = data?.user || null;
-                // If a staff user opens farmer page, send them back to staff panel
-                if (data.user.role === 'staff') {
+                // If a staff/super-admin user opens farmer page, send them to staff panel
+                if (data.user.role === 'staff' || data.user.role === 'super_admin') {
                     this.showAdminDeniedBannerAndRedirect();
                     return;
                 }
