@@ -1,34 +1,5 @@
 // Agriculture Market Frontend JavaScript
-                const avgRating = this.fmtNumber(productRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                const shipsFrom = product.location || product.shop_location || product.farmer_location || '';
-                return `
-                    <div class="product-card" ${itemLabel}>
-                        <img src="${imageUrl}" alt="${product.name}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
-                        <div class="product-info">
-                            <div class="featured-seller-badge">Best Seller</div>
-                            <h3 class="product-name">${product.name}</h3>
-                            <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit || 'item'}</div>
-                            <div class="product-meta product-card-summary">
-                                <div class="product-stock" aria-label="Stock available">
-                                    ${(() => { const qty = Number(product.stock_quantity ?? product.stock ?? 0); const unit = String(product.unit || 'item'); const stockWord = qty === 1 ? 'stock' : 'stocks'; return `${qty} ${unit} ${stockWord}`; })()}
-                                </div>
-                                <div class="product-rating-wrap" aria-hidden="false">
-                                    <div class="product-rating-text product-rating-left" aria-label="${this.fmtNumber(product.total_reviews || 0)} reviews, average ${avgRating} out of 5">
-                                        <span class="rating-star">★</span>
-                                        <span class="rating-value">${avgRating}</span>
-                                        <span class="rating-count">(${this.fmtNumber(product.total_reviews || 0)})</span>
-                                    </div>
-                                </div>
-                                <div class="product-ships-from">${shipsFrom ? `Ships from: ${shipsFrom}` : ''}</div>
-                            </div>
-                                <button type="button" class="add-to-cart-btn"
-                                    onclick="event.stopPropagation(); app.addToCart(${product.id})"
-                                    ${isPurchasable ? '' : 'disabled'}>
-                                ${isPurchasable ? 'Add to Cart' : 'Unavailable'}
-                            </button>
-                        </div>
-                    </div>
-                `;
+function AgricultureMarket() {
         // Dev host detection for local-only debug endpoints
         this.isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         // Set to true if you run a local dev agent on port 7242
