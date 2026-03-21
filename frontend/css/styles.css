@@ -1774,6 +1774,27 @@ body.loading {
     line-height: 1.2;
 }
 
+#featured-grid .product-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    gap: 12px;
+}
+
+#featured-grid .product-meta-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+#featured-grid .product-meta-right {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
 #featured-grid .product-card-summary {
     align-items: flex-start;
 }

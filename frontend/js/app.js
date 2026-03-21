@@ -3584,17 +3584,24 @@ class AgricultureMarket {
                             <h3 class="product-name">${product.name}</h3>
                             <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit || 'item'}</div>
                             <div class="product-meta product-card-summary">
-                                <div class="product-stock" aria-label="Stock available">
-                                    ${(() => { const qty = Number(product.stock_quantity ?? product.stock ?? 0); const unit = String(product.unit || 'item'); const stockWord = qty === 1 ? 'stock' : 'stocks'; return `${qty} ${unit} ${stockWord}`; })()}
-                                </div>
-                                <div class="product-rating-wrap" aria-hidden="false">
-                                    <div class="product-rating-text" aria-label="Average rating ${ratingValue} out of 5">
-                                        <i class="fas fa-star product-rating-icon" aria-hidden="true"></i>
-                                        <span class="product-rating-value">${ratingValue}</span>
+                                <div class="product-meta-row">
+                                    <div class="product-meta-left">
+                                        <div class="product-stock" aria-label="Stock available">
+                                            ${(() => { const qty = Number(product.stock_quantity ?? product.stock ?? 0); const unit = String(product.unit || 'item'); const stockWord = qty === 1 ? 'stock' : 'stocks'; return `${qty} ${unit} ${stockWord}`; })()}
+                                        </div>
+                                        <div class="product-rating-wrap" aria-hidden="false">
+                                            <div class="product-rating-text" aria-label="Average rating ${ratingValue} out of 5">
+                                                <i class="fas fa-star product-rating-icon" aria-hidden="true"></i>
+                                                <span class="product-rating-value">${ratingValue}</span>
+                                            </div>
+                                        </div>
+                                        <div class="product-ship-from" aria-label="Shipping origin">
+                                            Ships from ${shipFrom}
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="product-ship-from" aria-label="Shipping origin">
-                                    Ships from ${shipFrom}
+                                    <div class="product-meta-right">
+                                        Sold: ${this.fmtNumber(product.sales_count || 0)}
+                                    </div>
                                 </div>
                             </div>
                                 <button type="button" class="add-to-cart-btn"
