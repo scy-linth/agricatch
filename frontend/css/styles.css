@@ -1790,9 +1790,32 @@ body.loading {
 
 #featured-grid .product-meta-right {
     font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-weight: 600;
+    color: #6b7280; /* grey */
     white-space: nowrap;
+}
+
+.sold-count {
+    color: #6b7280;
+    font-weight: 600;
+}
+
+/* Product details modal rating row */
+.product-details-name-rating .name-rating-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.product-details-name-rating .name-rating-left {
+    color: #111;
+    font-weight: 600;
+}
+
+.product-details-name-rating .name-rating-right {
+    color: #6b7280;
+    font-weight: 600;
 }
 
 #featured-grid .product-card-summary {
