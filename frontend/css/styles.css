@@ -1774,36 +1774,12 @@ body.loading {
     line-height: 1.2;
 }
 
-/* Featured cards: stack meta vertically and left-align */
-#featured-grid .product-meta {
-    display: flex;
-    flex-direction: column;
+#featured-grid .product-card-summary {
     align-items: flex-start;
-    gap: 0.25rem;
 }
 
-.product-rating-text.product-rating-left {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    color: #f2b400; /* star color */
-}
-
-.product-rating-text.product-rating-left .rating-value {
-    color: #000; /* numeric rating black */
-    font-weight: 700;
-}
-
-.product-rating-text.product-rating-left .rating-count {
-    color: var(--gray);
-    font-weight: 600;
-    margin-left: 0.25rem;
-}
-
-.product-ships-from {
-    font-size: 0.85rem;
-    color: var(--gray);
-    margin-top: 0.2rem;
+#featured-grid .product-rating-wrap {
+    justify-content: flex-start;
 }
 
 #featured-grid .product-harvest-info {
@@ -1918,6 +1894,8 @@ body.loading {
 .product-card-summary {
     margin-top: 0.15rem;
     margin-bottom: 0.85rem;
+    flex-direction: column;
+    align-items: flex-start;
 }
 
 .product-card-summary .btn {
@@ -1925,17 +1903,28 @@ body.loading {
 }
 
 .product-rating-text {
-    width: 100%;
+    width: auto;
     font-size: 0.95rem;
-    font-weight: 700;
-    color: #f2b400;
+    font-weight: 600;
+    color: #111;
     letter-spacing: 0.02em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.product-rating-icon {
+    color: #f2b400;
+}
+
+.product-rating-value {
+    color: #111;
 }
 
 .product-rating-wrap {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 0.5rem;
 }
 
@@ -1948,6 +1937,13 @@ body.loading {
     border-radius: 0;
     line-height: 1.2;
     white-space: nowrap;
+}
+
+.product-ship-from {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #6b7280;
+    line-height: 1.2;
 }
 
 .product-stats-lines {
