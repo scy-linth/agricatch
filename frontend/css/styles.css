@@ -1774,6 +1774,38 @@ body.loading {
     line-height: 1.2;
 }
 
+/* Featured cards: stack meta vertically and left-align */
+#featured-grid .product-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+}
+
+.product-rating-text.product-rating-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #f2b400; /* star color */
+}
+
+.product-rating-text.product-rating-left .rating-value {
+    color: #000; /* numeric rating black */
+    font-weight: 700;
+}
+
+.product-rating-text.product-rating-left .rating-count {
+    color: var(--gray);
+    font-weight: 600;
+    margin-left: 0.25rem;
+}
+
+.product-ships-from {
+    font-size: 0.85rem;
+    color: var(--gray);
+    margin-top: 0.2rem;
+}
+
 #featured-grid .product-harvest-info {
     border-top: none;
     margin-top: 0.3rem;
