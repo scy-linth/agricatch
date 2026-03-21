@@ -1,5 +1,6 @@
 // Agriculture Market Frontend JavaScript
-function AgricultureMarket() {
+class AgricultureMarket {
+    constructor() {
         // Dev host detection for local-only debug endpoints
         this.isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         // Set to true if you run a local dev agent on port 7242
