@@ -1776,8 +1776,8 @@ body.loading {
 
 #featured-grid .product-meta-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    justify-content: flex-start;
+    align-items: flex-start;
     width: 100%;
     gap: 12px;
 }
@@ -1786,6 +1786,10 @@ body.loading {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+}
+
+#featured-grid .product-sold-left {
+    margin-top: 0.25rem;
 }
 
 #featured-grid .product-meta-right {
@@ -1803,7 +1807,7 @@ body.loading {
 /* Product details modal rating row */
 .product-details-name-rating .name-rating-row {
     display: flex;
-    justify-content: space-between;
+    justify-content: center; /* center the rating group */
     align-items: center;
     gap: 8px;
 }
