@@ -1,6 +1,29 @@
 // Agriculture Market Frontend JavaScript
+
+// Use a tiny inlined 1x1 GIF as a lightweight placeholder to avoid external requests
+// Use the project's resend logo as the default placeholder so Cloudinary or external services aren't called
+window.__PLACEHOLDER_IMAGE__ = '/images/resendlogo.png';
+
 class AgricultureMarket {
+    // ...existing code...
     constructor() {
+        // Determine environment and API base
+        const host = window.location.hostname;
+        const isCustomFrontendHost = host === 'agricatch.store' ||
+                     host === 'www.agricatch.store' ||
+                     host.includes('agricatch.store') ||
+                     host === 'agricatch.page.dev';
+        const isRenderHost = host === 'agricatch.onrender.com';
+
+        // Use Render API directly for custom frontend hosts.
+        // This avoids hard dependency on api.agricatch.store TLS/proxy setup.
+        this.apiBase = isCustomFrontendHost
+            ? 'https://agricatch.onrender.com/api'
+            : (isRenderHost ? '/api' : '/api');
+
+        // Expose resolved API base globally so other page scripts can reuse it
+        try { window.API_BASE = this.apiBase; } catch (e) {}
+
         // Dev host detection for local-only debug endpoints
         this.isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         // Set to true if you run a local dev agent on port 7242
@@ -3550,8 +3573,8 @@ class AgricultureMarket {
                     : window.__PLACEHOLDER_IMAGE__;
                 const itemLabel = product.id ? `onclick="app.showProductDetails(${product.id})" style="cursor:pointer;"` : '';
                 const productRating = Number(product.average_rating || 0);
-                const roundedRating = Math.max(0, Math.min(5, Math.round(productRating)));
-                const ratingStars = `${'★'.repeat(roundedRating)}${'☆'.repeat(5 - roundedRating)}`;
+                const ratingValue = this.fmtNumber(productRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                const shipFrom = product.location || product.farm_location || 'your local area';
                 const isPurchasable = this.isProductPurchasable(product);
                 return `
                     <div class="product-card" ${itemLabel}>
@@ -3565,9 +3588,13 @@ class AgricultureMarket {
                                     ${(() => { const qty = Number(product.stock_quantity ?? product.stock ?? 0); const unit = String(product.unit || 'item'); const stockWord = qty === 1 ? 'stock' : 'stocks'; return `${qty} ${unit} ${stockWord}`; })()}
                                 </div>
                                 <div class="product-rating-wrap" aria-hidden="false">
-                                    <div class="product-rating-text" aria-label="${this.fmtNumber(product.total_reviews || 0)} reviews, average ${this.fmtNumber(productRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} out of 5">
-                                        ${ratingStars} (${this.fmtNumber(product.total_reviews || 0)})
+                                    <div class="product-rating-text" aria-label="Average rating ${ratingValue} out of 5">
+                                        <i class="fas fa-star product-rating-icon" aria-hidden="true"></i>
+                                        <span class="product-rating-value">${ratingValue}</span>
                                     </div>
+                                </div>
+                                <div class="product-ship-from" aria-label="Shipping origin">
+                                    Ships from ${shipFrom}
                                 </div>
                             </div>
                                 <button type="button" class="add-to-cart-btn"
@@ -3603,9 +3630,8 @@ class AgricultureMarket {
             const isPurchasable = this.isProductPurchasable(product);
             const totalReviews = this.fmtNumber(product.total_reviews || 0);
             const averageRatingValue = Number(product.average_rating || 0);
-            const roundedRating = Math.max(0, Math.min(5, Math.round(averageRatingValue)));
             const averageRating = this.fmtNumber(averageRatingValue, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-            const ratingStars = `${'★'.repeat(roundedRating)}${'☆'.repeat(5 - roundedRating)}`;
+            const shipFrom = product.location || product.farm_location || 'your local area';
             
             // Ensure image URL is properly formatted
             let productImageUrl = product.image_url || '';
@@ -3629,8 +3655,12 @@ class AgricultureMarket {
                         </div>
                         <div class="product-rating-wrap" aria-hidden="false">
                             <div class="product-rating-text" aria-label="${totalReviews} reviews, average ${averageRating} out of 5">
-                                ${ratingStars} (${totalReviews})
+                                <i class="fas fa-star product-rating-icon" aria-hidden="true"></i>
+                                <span class="product-rating-value">${averageRating}</span>
                             </div>
+                        </div>
+                        <div class="product-ship-from" aria-label="Shipping origin">
+                            Ships from ${shipFrom}
                         </div>
                     </div>
                         <button type="button" class="add-to-cart-btn"
