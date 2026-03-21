@@ -1874,7 +1874,9 @@ body.loading {
 
 .product-meta {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
     gap: 0.5rem;
     font-size: 0.9rem;
     color: var(--gray);
