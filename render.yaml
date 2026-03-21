@@ -1,0 +1,17 @@
+# Render manifest: adds a cron job to ping the app health endpoint every 5 minutes.
+# Push this file and connect the repo in Render, or create the Scheduled Job via the Render dashboard using the same command.
+
+services: []
+
+jobs:
+  - type: cron
+    name: self-ping
+    environment: production
+    plan: free
+    schedule: "*/5 * * * *"  # every 5 minutes
+    region: oregon
+    command: "node scripts/self_ping.js"
+    # Optional: set env vars if your URL differs
+    # env:
+    #   PING_URL: https://api.agricatch.store
+    #   PING_PATH: /_health
