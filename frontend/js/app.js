@@ -3598,9 +3598,9 @@ class AgricultureMarket {
                                         <div class="product-ship-from" aria-label="Shipping origin">
                                             Ships from ${shipFrom}
                                         </div>
-                                    </div>
-                                    <div class="product-meta-right">
-                                        <span class="sold-count">Sold ${this.fmtNumber(product.sales_count || 0)}</span>
+                                        <div class="product-sold-left">
+                                            <span class="sold-count">Sold ${this.fmtNumber(product.sales_count || 0)}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
