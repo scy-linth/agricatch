@@ -3600,7 +3600,7 @@ class AgricultureMarket {
                                         </div>
                                     </div>
                                     <div class="product-meta-right">
-                                        Sold: ${this.fmtNumber(product.sales_count || 0)}
+                                        <span class="sold-count">Sold ${this.fmtNumber(product.sales_count || 0)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -3867,7 +3867,13 @@ class AgricultureMarket {
             if (nameEl) nameEl.textContent = product.name || 'Product Name';
             if (nameRatingEl) {
                 const productRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                nameRatingEl.innerHTML = `${productRating} <i class="fas fa-star rating-icon" aria-hidden="true"></i> (${this.fmtNumber(product.total_reviews || 0)} reviews)`;
+                const soldCount = this.fmtNumber(product.sales_count || 0);
+                nameRatingEl.innerHTML = `
+                    <div class="name-rating-row">
+                        <div class="name-rating-left">${productRating} <i class="fas fa-star rating-icon" aria-hidden="true"></i> (${this.fmtNumber(product.total_reviews || 0)} reviews)</div>
+                        <div class="name-rating-right">Sold ${soldCount}</div>
+                    </div>
+                `;
             }
             if (descriptionEl) descriptionEl.textContent = product.description || 'No description available.';
             if (farmerEl) {
