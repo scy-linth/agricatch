@@ -3593,6 +3593,7 @@ class AgricultureMarket {
                                             <div class="product-rating-text" aria-label="Average rating ${ratingValue} out of 5">
                                                 <i class="fas fa-star product-rating-icon" aria-hidden="true"></i>
                                                 <span class="product-rating-value">${ratingValue}</span>
+                                                <span class="product-reviews-count">(${this.fmtNumber(product.total_reviews || 0)} reviews)</span>
                                             </div>
                                         </div>
                                         <div class="ship-sold-row">
@@ -3664,6 +3665,7 @@ class AgricultureMarket {
                             <div class="product-rating-text" aria-label="${totalReviews} reviews, average ${averageRating} out of 5">
                                 <i class="fas fa-star product-rating-icon" aria-hidden="true"></i>
                                 <span class="product-rating-value">${averageRating}</span>
+                                <span class="product-reviews-count">(${totalReviews} reviews)</span>
                             </div>
                         </div>
                         <div class="product-ship-from" aria-label="Shipping origin">
