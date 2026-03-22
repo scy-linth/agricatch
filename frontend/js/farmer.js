@@ -2255,8 +2255,8 @@ class FarmerDashboard {
             const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
             const status = !isAvailable ? 'disabled' : (stock <= 0 ? 'no_stock' : 'available');
             const displayStatus = !isAvailable ? 'Disabled' : (stock <= 0 ? 'No Stock' : 'Available');
-            const reviewCount = Number(product.total_reviews || 0);
-            const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            const reviewCount = Number(product.total_reviews || product.reviews_count || product.review_count || (product.reviews && product.reviews.length) || 0);
+            const avgRating = this.fmtNumber(product.average_rating || product.avg_rating || product.rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
             const categoryName = String(product.category_name || '').trim();
             return `
             <div class="product-card" data-status="${status}" data-stock-quantity="${stock}" data-category="${this.escapeAttr(categoryName)}" data-price="${Number(product.price || 0)}" data-rating="${Number(product.average_rating || 0)}" data-reviews="${reviewCount}" data-created-at="${this.escapeAttr(product.created_at || '')}" onclick="farmerDashboard.openMyProductPreview(${product.id})" style="cursor:pointer;">

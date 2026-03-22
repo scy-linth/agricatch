@@ -74,8 +74,8 @@ class ProductPage {
         const safeFarmer = this.escapeHtml(product.farmer_name || 'Local Farmer');
         const safeUnit = this.escapeHtml(product.unit || 'unit');
         const safeLocation = this.escapeHtml(product.farm_location || product.location || 'Unknown location');
-        const productRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-        const shopRating = this.fmtNumber(product.farmer_average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        const productRating = this.fmtNumber(product.average_rating || product.avg_rating || product.rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        const shopRating = this.fmtNumber(product.farmer_average_rating || product.farmer_avg_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
         container.innerHTML = `
             <div class="product-card">
@@ -94,8 +94,8 @@ class ProductPage {
                         <span>Stock: ${this.fmtNumber(product.stock_quantity ?? 0)}</span>
                         <span>
                             ${productRating}
-                            <i class="fas fa-star rating-icon" aria-hidden="true"></i>
-                            (${this.fmtNumber(product.total_reviews || 0)} reviews)
+                                <i class="fas fa-star rating-icon" aria-hidden="true"></i>
+                                (${this.fmtNumber(product.total_reviews || product.reviews_count || product.review_count || (product.reviews && product.reviews.length) || 0)} reviews)
                         </span>
                         <span>
                             Shop: ${shopRating}
