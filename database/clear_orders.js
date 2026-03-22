@@ -33,9 +33,7 @@ async function clearAllOrders() {
     const notificationsResult = await client.query('DELETE FROM notifications WHERE order_id IS NOT NULL RETURNING id');
     console.log(`   ✓ Deleted ${notificationsResult.rowCount} notifications`);
 
-    console.log('Deleting refunds...');
-    const refundsResult = await client.query('DELETE FROM refunds RETURNING id');
-    console.log(`   ✓ Deleted ${refundsResult.rowCount} refunds`);
+    // Refunds table removed - no refunds to delete
 
     // Step 2: Handle self-referencing replacement_order_id (if column exists)
     // Check if column exists first to avoid transaction abort
@@ -80,7 +78,6 @@ async function clearAllOrders() {
     await client.query('ALTER SEQUENCE orders_id_seq RESTART WITH 1');
     await client.query('ALTER SEQUENCE order_items_id_seq RESTART WITH 1');
     await client.query('ALTER SEQUENCE notifications_id_seq RESTART WITH 1');
-    await client.query('ALTER SEQUENCE refunds_id_seq RESTART WITH 1');
     console.log('   ✓ Sequences reset');
 
     await client.query('COMMIT');

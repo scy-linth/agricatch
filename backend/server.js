@@ -349,8 +349,6 @@ app.use(session({
             cancelled_at TIMESTAMP,
             cancellation_reason TEXT,
             cancelled_by VARCHAR(20),
-            refund_status VARCHAR(20),
-            refund_amount DECIMAL(10,2),
             replacement_order_id INTEGER,
             special_instructions TEXT,
             delivered_at TIMESTAMP,

@@ -83,8 +83,6 @@ CREATE TABLE IF NOT EXISTS orders (
     cancelled_at TIMESTAMP,
     cancellation_reason TEXT,
     cancelled_by VARCHAR(20),
-    refund_status VARCHAR(20),
-    refund_amount DECIMAL(10,2),
     replacement_order_id INTEGER,
     special_instructions TEXT,
     delivered_at TIMESTAMP,
@@ -182,16 +180,7 @@ CREATE TABLE IF NOT EXISTS user_addresses (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Refunds table (optional tracking)
-CREATE TABLE IF NOT EXISTS refunds (
-    id SERIAL PRIMARY KEY,
-    order_id INTEGER REFERENCES orders(id),
-    refund_amount DECIMAL(10,2),
-    refund_reason TEXT,
-    status VARCHAR(20),
-    processed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- (Refunds tracking removed)
 
 -- OTPs table for email verification
 CREATE TABLE IF NOT EXISTS otps (

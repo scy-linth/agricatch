@@ -1987,13 +1987,6 @@ body.loading {
     color: #111;
 }
 
-.product-reviews-count {
-    color: #6b7280;
-    font-size: 0.85rem;
-    font-weight: 600;
-    margin-left: 0.35rem;
-}
-
 .product-rating-wrap {
     display: flex;
     align-items: center;

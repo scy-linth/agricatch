@@ -13,8 +13,6 @@ DELETE FROM order_items;
 -- Delete all notifications related to orders
 DELETE FROM notifications WHERE order_id IS NOT NULL;
 
--- Delete all refunds related to orders
-DELETE FROM refunds;
 
 -- Step 2: Handle self-referencing replacement_order_id in orders table
 -- Set replacement_order_id to NULL for all orders that have it
@@ -24,12 +22,12 @@ UPDATE orders SET replacement_order_id = NULL WHERE replacement_order_id IS NOT 
 DELETE FROM orders;
 
 -- Step 4: Reset the sequence for orders table (so new orders start from 1)
-ALTER SEQUENCE orders_id_seq RESTART WITH 1;
 
 -- Optionally reset other sequences
+ALTER SEQUENCE orders_id_seq RESTART WITH 1;
+
 ALTER SEQUENCE order_items_id_seq RESTART WITH 1;
 ALTER SEQUENCE notifications_id_seq RESTART WITH 1;
-ALTER SEQUENCE refunds_id_seq RESTART WITH 1;
 
 -- Commit the transaction
 COMMIT;
