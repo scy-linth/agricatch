@@ -26,7 +26,7 @@ const featureTables = [
   'admin_audit_logs',
   'product_name_catalog',
   'product_name_requests',
-  'refunds'
+  // refunds removed
 ];
 
 const requiredColumns = {

@@ -184,7 +184,6 @@ async function main() {
     'conversations',
     'messages',
     'user_addresses',
-    'refunds',
     'otps',
     'password_resets',
   ];

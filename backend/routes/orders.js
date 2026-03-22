@@ -868,10 +868,9 @@ router.put('/:id/cancel', async (req, res) => {
              cancelled_at = CURRENT_TIMESTAMP,
              cancellation_reason = $2,
              cancelled_by = $3,
-             refund_status = $4,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $5`,
-        ['cancelled', reason || null, 'customer', 'none', id]
+         WHERE id = $4`,
+        ['cancelled', reason || null, 'customer', id]
       );
 
       // Restore product stock (per-item order)
@@ -959,10 +958,9 @@ router.put('/:id/cancel-farmer', async (req, res) => {
              cancelled_at = CURRENT_TIMESTAMP,
              cancellation_reason = $2,
              cancelled_by = $3,
-             refund_status = $4,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $5`,
-        ['cancelled', reason || null, 'farmer', 'none', id]
+         WHERE id = $4`,
+        ['cancelled', reason || null, 'farmer', id]
       );
 
       // Restore product stock (per-item order)
