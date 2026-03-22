@@ -884,6 +884,8 @@ router.post('/', productUpload.single('image'), async (req, res) => {
     const harvestDateValue = (harvest_date && String(harvest_date).trim() !== '') ? harvest_date : null;
     const expiryDateValue = (expiry_date && String(expiry_date).trim() !== '') ? expiry_date : null;
 
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS cloudinary_public_id VARCHAR(255)");
+
     const result = await pool.query(`
       INSERT INTO products (name, description, price, category_id, farmer_id, stock_quantity,
                            unit, image_url, location, harvest_date, expiry_date)
@@ -897,6 +899,15 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       product_id: Number(result.rows[0].id),
       farmer_id: Number(decoded.id)
     });
+
+    // If client provided a Cloudinary public_id when creating via uploaded image, store it.
+    if (req.body && req.body.cloudinary_public_id) {
+      try {
+        await pool.query('UPDATE products SET cloudinary_public_id = $1 WHERE id = $2', [req.body.cloudinary_public_id, result.rows[0].id]);
+      } catch (e) {
+        console.warn('Failed to store cloudinary_public_id for new product:', e && (e.message || e));
+      }
+    }
 
     res.status(201).json({
       message: 'Product added successfully',
@@ -922,6 +933,8 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
     const { id } = req.params;
 
     // Check if product belongs to the farmer
+    // Ensure products table has cloudinary_public_id column
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS cloudinary_public_id VARCHAR(255)");
     const productResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
     if (productResult.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
@@ -1001,6 +1014,15 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
     `, [nextName, nextDescription, nextPrice, nextCategoryId, nextStockQuantity, nextUnit,
          imageUrl, nextLocation, nextHarvestDate, nextExpiryDate, nextIsAvailable, id]);
 
+    // If client provided a cloudinary public_id, store it. If a new local file was uploaded,
+    // clear any existing cloudinary_public_id for this product.
+    if (typeof req.body.cloudinary_public_id !== 'undefined') {
+      await pool.query('UPDATE products SET cloudinary_public_id = $1 WHERE id = $2', [req.body.cloudinary_public_id || null, id]);
+    } else if (req.file && productResult.rows[0] && productResult.rows[0].cloudinary_public_id) {
+      // Clearing stored public_id when replacing remote image with a local upload
+      await pool.query('UPDATE products SET cloudinary_public_id = NULL WHERE id = $1', [id]);
+    }
+
     broadcastEvent('product.updated', {
       action: 'product.update',
       product_id: Number(id),
@@ -1028,7 +1050,7 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
     // Check if product belongs to the farmer
-    const productResult = await pool.query('SELECT farmer_id, image_url FROM products WHERE id = $1', [id]);
+    const productResult = await pool.query('SELECT farmer_id, image_url, cloudinary_public_id FROM products WHERE id = $1', [id]);
     if (productResult.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
@@ -1077,6 +1099,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     const imageUrl = productResult.rows[0].image_url;
+    const cloudPublicId = productResult.rows[0].cloudinary_public_id;
     const oldPath = resolvePublicPath(imageUrl);
     if (oldPath) {
       deleteFileIfExists(oldPath);
@@ -1084,15 +1107,12 @@ router.delete('/:id', async (req, res) => {
 
     // If the image is hosted on Cloudinary, attempt to remove it there as well.
     try {
-      if (imageUrl && /^https:\/\/res\.cloudinary\.com\//.test(String(imageUrl))) {
-        const match = String(imageUrl).match(/^https:\/\/res\.cloudinary\.com\/[^\/]+\/(?:image|video)\/upload\/(?:[^\/]+\/)*?(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?(?:\?.*)?$/);
-        const publicId = match && match[1] ? match[1] : null;
-        if (publicId) {
-          try {
-            await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
-          } catch (cloudErr) {
-            console.warn('Cloudinary deletion failed for', publicId, cloudErr && (cloudErr.message || cloudErr));
-          }
+      const publicIdToDelete = cloudPublicId || (imageUrl && /^https:\/\/res\.cloudinary\.com\//.test(String(imageUrl)) && (String(imageUrl).match(/^https:\/\/res\.cloudinary\.com\/[^\/]+\/(?:image|video)\/upload\/(?:[^\/]+\/)*?(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?(?:\?.*)?$/) || [])[1]);
+      if (publicIdToDelete) {
+        try {
+          await cloudinary.uploader.destroy(publicIdToDelete, { resource_type: 'image' });
+        } catch (cloudErr) {
+          console.warn('Cloudinary deletion failed for', publicIdToDelete, cloudErr && (cloudErr.message || cloudErr));
         }
       }
     } catch (e) {

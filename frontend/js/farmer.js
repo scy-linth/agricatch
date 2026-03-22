@@ -2338,6 +2338,8 @@ class FarmerDashboard {
                 const cloudJson = await cloudRes.json();
                 if (cloudJson.secure_url) {
                     imageUrl = cloudJson.secure_url;
+                    // include public_id so backend can store it for safe deletions
+                    var imagePublicId = cloudJson.public_id;
                 } else {
                     this.showMessage('Image upload failed: ' + (cloudJson.error?.message || 'Unknown error'), 'error');
                     return;
@@ -2360,6 +2362,7 @@ class FarmerDashboard {
         formData.append('harvest_date', harvestDate);
         formData.append('expiry_date', expiryDate);
         if (imageUrl) formData.append('image_url', imageUrl);
+        if (typeof imagePublicId !== 'undefined' && imagePublicId) formData.append('cloudinary_public_id', imagePublicId);
 
         try {
             const response = await fetch(`${this.apiBase}/products`, {

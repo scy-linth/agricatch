@@ -45,7 +45,7 @@ router.post('/product-image', ensureAuth, productUpload.single('image'), async (
       ]
     });
     try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
-    res.json({ imageUrl: result.secure_url });
+    res.json({ imageUrl: result.secure_url, public_id: result.public_id });
   } catch (err) {
     res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
   }
@@ -68,7 +68,7 @@ router.post('/shop-banner', ensureAuth, bannerUpload.single('image'), async (req
     });
     // delete local file
     try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
-    res.json({ imageUrl: result.secure_url });
+    res.json({ imageUrl: result.secure_url, public_id: result.public_id });
   } catch (err) {
     res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
   }
@@ -91,7 +91,7 @@ router.post('/shop-avatar', ensureAuth, avatarUpload.single('image'), async (req
     });
     // delete local file
     try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
-    res.json({ imageUrl: result.secure_url });
+    res.json({ imageUrl: result.secure_url, public_id: result.public_id });
   } catch (err) {
     res.status(500).json({ message: 'Cloudinary upload failed', error: err.message });
   }
