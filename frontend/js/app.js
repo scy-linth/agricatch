@@ -3572,9 +3572,8 @@ class AgricultureMarket {
                     ? product.image_url
                     : window.__PLACEHOLDER_IMAGE__;
                 const itemLabel = product.id ? `onclick="app.showProductDetails(${product.id})" style="cursor:pointer;"` : '';
-                const productRating = Number(product.average_rating || product.avg_rating || product.rating || 0);
+                const productRating = Number(product.average_rating || 0);
                 const ratingValue = this.fmtNumber(productRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                const productReviewsCount = this.fmtNumber(product.total_reviews || product.reviews_count || product.review_count || (product.reviews && product.reviews.length) || 0);
                 const shipFrom = product.location || product.farm_location || 'your local area';
                 const isPurchasable = this.isProductPurchasable(product);
                 return `
@@ -3594,14 +3593,13 @@ class AgricultureMarket {
                                             <div class="product-rating-text" aria-label="Average rating ${ratingValue} out of 5">
                                                 <i class="fas fa-star product-rating-icon" aria-hidden="true"></i>
                                                 <span class="product-rating-value">${ratingValue}</span>
-                                                <span class="product-reviews-count"> (${productReviewsCount} reviews)</span>
                                             </div>
                                         </div>
-                                        <div class="ship-sold-row">
-                                            <div class="product-ship-from" aria-label="Shipping origin">Ships from ${shipFrom}</div>
-                                            <div class="product-sold-right">
-                                                <span class="sold-count">Sold ${this.fmtNumber(product.sales_count || 0)}</span>
-                                            </div>
+                                        <div class="product-ship-from" aria-label="Shipping origin">
+                                            Ships from ${shipFrom}
+                                        </div>
+                                        <div class="product-sold-left">
+                                            <span class="sold-count">Sold ${this.fmtNumber(product.sales_count || 0)}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -3637,8 +3635,8 @@ class AgricultureMarket {
         console.log('Rendering products to container:', container, 'Products count:', products.length);
         container.innerHTML = products.map(product => {
             const isPurchasable = this.isProductPurchasable(product);
-            const totalReviews = this.fmtNumber(product.total_reviews || product.reviews_count || product.review_count || (product.reviews && product.reviews.length) || 0);
-            const averageRatingValue = Number(product.average_rating || product.avg_rating || product.rating || 0);
+            const totalReviews = this.fmtNumber(product.total_reviews || 0);
+            const averageRatingValue = Number(product.average_rating || 0);
             const averageRating = this.fmtNumber(averageRatingValue, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
             const shipFrom = product.location || product.farm_location || 'your local area';
             
@@ -3666,7 +3664,6 @@ class AgricultureMarket {
                             <div class="product-rating-text" aria-label="${totalReviews} reviews, average ${averageRating} out of 5">
                                 <i class="fas fa-star product-rating-icon" aria-hidden="true"></i>
                                 <span class="product-rating-value">${averageRating}</span>
-                                <span class="product-reviews-count"> (${totalReviews} reviews)</span>
                             </div>
                         </div>
                         <div class="product-ship-from" aria-label="Shipping origin">

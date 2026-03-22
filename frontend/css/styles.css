@@ -1804,24 +1804,6 @@ body.loading {
     font-weight: 600;
 }
 
-/* Layout for ship-from and sold count on the same row in featured cards */
-.ship-sold-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-}
-
-.product-sold-right {
-    margin-left: 0;
-    flex: 0 0 auto;
-}
-
-#featured-grid .product-meta-left {
-    flex: 1 1 100%;
-}
-
 /* Product details modal rating row */
 .product-details-name-rating .name-rating-row {
     display: flex;
