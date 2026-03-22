@@ -2,8 +2,11 @@
 
 class FarmerDashboard {
     constructor() {
-        // Use relative /api so Netlify can proxy to Render.
-        this.apiBase = '/api';
+        // Prefer relative /api, but auto-fallback to direct backend when host has no /api proxy.
+        this.apiBaseCandidates = ['/api', 'https://agricatch.onrender.com/api'];
+        this.apiBase = this.getInitialApiBase();
+        this.isResolvingApiBase = false;
+        this.authRetryAttempts = 0;
         this.token = this.normalizeAuthToken(localStorage.getItem('token'));
         if (this.token) {
             localStorage.setItem('token', this.token);
@@ -40,6 +43,57 @@ class FarmerDashboard {
         }
 
         this.init();
+    }
+
+    getInitialApiBase() {
+        try {
+            const saved = String(sessionStorage.getItem('farmer_api_base') || '').trim();
+            if (saved) return saved;
+        } catch (_) {
+            // ignore
+        }
+        return '/api';
+    }
+
+    setApiBase(nextBase) {
+        this.apiBase = String(nextBase || '/api').trim() || '/api';
+        try {
+            sessionStorage.setItem('farmer_api_base', this.apiBase);
+        } catch (_) {
+            // ignore
+        }
+    }
+
+    async resolveWorkingApiBase() {
+        if (this.isResolvingApiBase) return false;
+        this.isResolvingApiBase = true;
+
+        try {
+            const orderedCandidates = [this.apiBase, ...this.apiBaseCandidates]
+                .map((v) => String(v || '').trim())
+                .filter(Boolean)
+                .filter((v, i, arr) => arr.indexOf(v) === i);
+
+            for (const base of orderedCandidates) {
+                try {
+                    const res = await fetch(`${base}/auth/profile`, {
+                        headers: { 'Authorization': `Bearer ${this.token}` }
+                    });
+
+                    // Any non-404 response means this base is reachable.
+                    if (res.status !== 404) {
+                        this.setApiBase(base);
+                        return true;
+                    }
+                } catch (_) {
+                    // try next candidate
+                }
+            }
+
+            return false;
+        } finally {
+            this.isResolvingApiBase = false;
+        }
     }
 
     normalizeAuthToken(rawToken) {
@@ -429,6 +483,7 @@ class FarmerDashboard {
 
     async checkFarmerAuth() {
         try {
+            const attemptedBase = this.apiBase;
             const response = await fetch(`${this.apiBase}/auth/profile`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
@@ -466,6 +521,7 @@ class FarmerDashboard {
                     sidebarUserInitial.textContent = String(displayName).charAt(0).toUpperCase();
                 }
                 this.farmerId = data.user.id;
+                this.authRetryAttempts = 0;
                 this.loadFarmerStats();
                 this.loadMyProducts();
                 this.loadMyOrders();
@@ -480,15 +536,36 @@ class FarmerDashboard {
                     return;
                 }
 
+                if (response.status === 404) {
+                    const found = await this.resolveWorkingApiBase();
+                    if (found && this.apiBase !== attemptedBase) {
+                        console.warn('Switched farmer API base to:', this.apiBase);
+                        this.showMessage('Connected to fallback API server.', 'success');
+                        return this.checkFarmerAuth();
+                    }
+                    this.showMessage('API routes are not available on this host. Please contact support to configure /api proxy.', 'error');
+                    return;
+                }
+
                 console.warn('Farmer auth check failed with status:', response.status);
-                this.showMessage('Connection issue while verifying account. Staying on dashboard and retrying...', 'error');
-                setTimeout(() => this.checkFarmerAuth(), 2500);
+                this.authRetryAttempts += 1;
+                if (this.authRetryAttempts <= 5) {
+                    this.showMessage('Connection issue while verifying account. Staying on dashboard and retrying...', 'error');
+                    setTimeout(() => this.checkFarmerAuth(), 2500);
+                } else {
+                    this.showMessage('Unable to verify account after several tries. Please refresh or re-login.', 'error');
+                }
             }
         } catch (error) {
             console.error('Auth check error:', error);
             // Network hiccups should not throw the user back to home/login repeatedly.
-            this.showMessage('Unable to verify account right now. Retrying...', 'error');
-            setTimeout(() => this.checkFarmerAuth(), 2500);
+            this.authRetryAttempts += 1;
+            if (this.authRetryAttempts <= 5) {
+                this.showMessage('Unable to verify account right now. Retrying...', 'error');
+                setTimeout(() => this.checkFarmerAuth(), 2500);
+            } else {
+                this.showMessage('Network issue persists. Please refresh or re-login.', 'error');
+            }
         }
     }
 
