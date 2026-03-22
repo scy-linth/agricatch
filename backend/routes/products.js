@@ -801,9 +801,7 @@ router.get('/farmer/:farmerId', async (req, res) => {
     const { farmerId } = req.params;
 
     const result = await pool.query(`
-      SELECT p.*, c.name as category_name,
-             (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) AS average_rating,
-             (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) AS total_reviews
+      SELECT p.*, c.name as category_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.farmer_id = $1

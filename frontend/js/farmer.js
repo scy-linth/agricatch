@@ -2,21 +2,14 @@
 
 class FarmerDashboard {
     constructor() {
-        // Resolve API base by host so dashboard pages work even without app.js.
-        const host = window.location.hostname;
-        const isCustomFrontendHost = host === 'agricatch.store' ||
-            host === 'www.agricatch.store' ||
-            host.includes('agricatch.store') ||
-            host === 'agricatch.page.dev';
-        this.apiBase = window.API_BASE || (isCustomFrontendHost ? 'https://agricatch.onrender.com/api' : '/api');
+        // Use relative /api so Netlify can proxy to Render.
+        this.apiBase = '/api';
         this.token = this.normalizeAuthToken(localStorage.getItem('token'));
         if (this.token) {
             localStorage.setItem('token', this.token);
         } else {
             localStorage.removeItem('token');
         }
-        // Track transient auth retries to avoid redirect loops when API is temporarily down
-        this._authRetryCount = 0;
         this.userId = this.getUserId();
         this.lastOrdersById = new Map();
         this.lastOrdersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
@@ -327,7 +320,7 @@ class FarmerDashboard {
     setupRealtime() {
         try {
             if (!this.token || !this.userId) return;
-            const url = `${this.apiBase}/events?token=${encodeURIComponent(this.token)}`;
+            const url = `/api/events?token=${encodeURIComponent(this.token)}`;
             const es = new EventSource(url);
             es.addEventListener('order.updated', (evt) => {
                 try {
@@ -435,47 +428,25 @@ class FarmerDashboard {
     }
 
     async checkFarmerAuth() {
-        const redirectHome = (query = '') => { window.location.href = `/${query}`; };
-
         try {
-            const fetchProfile = async () => {
-                const response = await fetch(`${this.apiBase}/auth/profile`, {
-                    headers: {
-                        'Authorization': `Bearer ${this.token}`
-                    }
-                });
-                return response;
-            };
-
-            let response = await fetchProfile();
-
-            // If we got a transient error (network or server), retry a few times instead of redirecting immediately
-            if (!response.ok && (response.status === 0 || response.status >= 500)) {
-                this._authRetryCount = (this._authRetryCount || 0) + 1;
-                if (this._authRetryCount <= 3) {
-                    // Backoff before retrying
-                    const delayMs = 700 * this._authRetryCount;
-                    console.warn(`Transient auth fetch failure, retry #${this._authRetryCount} after ${delayMs}ms`);
-                    await new Promise(r => setTimeout(r, delayMs));
-                    response = await fetchProfile();
+            const response = await fetch(`${this.apiBase}/auth/profile`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
                 }
-            }
+            });
 
             if (response.ok) {
                 const data = await response.json();
                 this.authProfile = data?.user || null;
-                // If a staff/super-admin user opens farmer page, send them to staff panel
-                if (data.user.role === 'staff' || data.user.role === 'super_admin') {
+                // If a staff user opens farmer page, send them back to staff panel
+                if (data.user.role === 'staff') {
                     this.showAdminDeniedBannerAndRedirect();
                     return;
                 }
                 if (data.user.role !== 'farmer') {
-                    // Unauthorized for farmer dashboard — send user back to main site (prompt login if needed)
-                    redirectHome('?login=1');
+                    window.location.href = '/';
                     return;
                 }
-                // Success — reset retry counter
-                this._authRetryCount = 0;
                 const nameEl = document.getElementById('user-name');
                 if (nameEl) nameEl.textContent = `Farmer: ${data.user.full_name || data.user.username}`;
                 const emailEl = document.getElementById('user-email');
@@ -501,39 +472,11 @@ class FarmerDashboard {
                 this.loadShopProfile();
                 this.loadOverviewMetrics({ force: true });
             } else {
-                // Handle explicit unauthorized separately
-                if (response.status === 401 || response.status === 403) {
-                    // Clear token and redirect to login on main site
-                    try { localStorage.removeItem('token'); } catch (_) {}
-                    redirectHome('?login=1');
-                    return;
-                }
-
-                // For other errors (e.g., 404, 429, 5xx) avoid immediate redirect; show message and retry later
-                console.warn('Auth profile fetch failed with status', response.status);
-                // Show a non-blocking message to the user if possible
-                try { this.showMessage('Temporary server issue. Retrying…', 'info'); } catch (_) {}
-                // Retry after delay (but avoid infinite loops)
-                this._authRetryCount = (this._authRetryCount || 0) + 1;
-                if (this._authRetryCount <= 3) {
-                    const delayMs = 1000 * this._authRetryCount;
-                    setTimeout(() => this.checkFarmerAuth(), delayMs);
-                    return;
-                }
-
-                // If retries exhausted, fallback to home so user can re-authenticate
-                redirectHome('?login=1');
+                window.location.href = '/';
             }
         } catch (error) {
             console.error('Auth check error:', error);
-            // Network errors: retry a few times before redirecting
-            this._authRetryCount = (this._authRetryCount || 0) + 1;
-            if (this._authRetryCount <= 3) {
-                const delayMs = 800 * this._authRetryCount;
-                setTimeout(() => this.checkFarmerAuth(), delayMs);
-                return;
-            }
-            redirectHome('?login=1');
+            window.location.href = '/';
         }
     }
 
@@ -1169,12 +1112,15 @@ class FarmerDashboard {
             });
         });
 
-        // Initial section should default to overview on every fresh farmer login.
-        // Allow hash overrides for deep links only.
+        // Initial section based on saved state, hash, or default
         const validSections = new Set(['overview', 'products', 'orders', 'chat']);
+        const savedSectionRaw = localStorage.getItem('farmerActiveSection');
+        const savedSection = String(savedSectionRaw || '').trim();
         const hash = String((window.location.hash || '')).replace('#', '').trim();
 
-        const initialSection = validSections.has(hash) ? hash : 'overview';
+        const initialSection = validSections.has(savedSection)
+            ? savedSection
+            : (validSections.has(hash) ? hash : 'overview');
 
         this.showSection(initialSection);
     }
@@ -2255,8 +2201,8 @@ class FarmerDashboard {
             const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
             const status = !isAvailable ? 'disabled' : (stock <= 0 ? 'no_stock' : 'available');
             const displayStatus = !isAvailable ? 'Disabled' : (stock <= 0 ? 'No Stock' : 'Available');
-            const reviewCount = Number(product.total_reviews || product.reviews_count || product.review_count || (product.reviews && product.reviews.length) || 0);
-            const avgRating = this.fmtNumber(product.average_rating || product.avg_rating || product.rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            const reviewCount = Number(product.total_reviews || 0);
+            const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
             const categoryName = String(product.category_name || '').trim();
             return `
             <div class="product-card" data-status="${status}" data-stock-quantity="${stock}" data-category="${this.escapeAttr(categoryName)}" data-price="${Number(product.price || 0)}" data-rating="${Number(product.average_rating || 0)}" data-reviews="${reviewCount}" data-created-at="${this.escapeAttr(product.created_at || '')}" onclick="farmerDashboard.openMyProductPreview(${product.id})" style="cursor:pointer;">
@@ -2359,20 +2305,6 @@ class FarmerDashboard {
     async handleAddProduct(e) {
         e.preventDefault();
 
-        if (this._addingProduct) {
-            // Prevent duplicate concurrent submissions
-            return;
-        }
-        this._addingProduct = true;
-
-        const formEl = e.target || document.getElementById('add-product-form');
-        let submitBtn = formEl ? formEl.querySelector('button[type="submit"]') : null;
-        const prevBtnText = submitBtn ? submitBtn.textContent : null;
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Adding...';
-        }
-
         const name = document.getElementById('product-name').value;
         const description = document.getElementById('product-description').value;
         const price = document.getElementById('product-price').value;
@@ -2390,19 +2322,33 @@ class FarmerDashboard {
             return;
         }
 
+        // Handle image upload to Cloudinary
+        let imageUrl = '';
         const imageFile = document.getElementById('product-image').files[0];
-        let compressedBlob = null;
         if (imageFile) {
+            const cloudData = new FormData();
+            cloudData.append('file', imageFile);
+            cloudData.append('upload_preset', 'agricatch');
+            cloudData.append('folder', 'products');
             try {
-                compressedBlob = await this.compressImage(imageFile, 2048, 0.82);
+                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dwv7lhgvm/image/upload', {
+                    method: 'POST',
+                    body: cloudData
+                });
+                const cloudJson = await cloudRes.json();
+                if (cloudJson.secure_url) {
+                    imageUrl = cloudJson.secure_url;
+                } else {
+                    this.showMessage('Image upload failed: ' + (cloudJson.error?.message || 'Unknown error'), 'error');
+                    return;
+                }
             } catch (err) {
-                console.warn('Image compression failed, uploading original', err);
-                compressedBlob = imageFile;
+                this.showMessage('Image upload failed: ' + err.message, 'error');
+                return;
             }
         }
 
-        // Send product data and optional image file to backend.
-        // Backend is responsible for uploading images to Cloudinary.
+        // Now send product data to backend
         const formData = new FormData();
         formData.append('name', name);
         formData.append('description', description);
@@ -2413,7 +2359,7 @@ class FarmerDashboard {
         formData.append('location', location);
         formData.append('harvest_date', harvestDate);
         formData.append('expiry_date', expiryDate);
-        if (imageFile) formData.append('image', compressedBlob, imageFile.name);
+        if (imageUrl) formData.append('image_url', imageUrl);
 
         try {
             const response = await fetch(`${this.apiBase}/products`, {
@@ -2439,13 +2385,6 @@ class FarmerDashboard {
         } catch (error) {
             console.error('Error adding product:', error);
             this.showMessage('Error adding product', 'error');
-        } finally {
-            // Re-enable submit button and clear in-flight flag
-            this._addingProduct = false;
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                try { submitBtn.textContent = prevBtnText || 'Add Product'; } catch (_) {}
-            }
         }
     }
 
@@ -2482,14 +2421,7 @@ class FarmerDashboard {
 
         const imageFile = document.getElementById('edit-product-image').files[0];
         if (imageFile) {
-            let compressedEditBlob = null;
-            try {
-                compressedEditBlob = await this.compressImage(imageFile, 2048, 0.82);
-            } catch (err) {
-                console.warn('Edit image compression failed, uploading original', err);
-                compressedEditBlob = imageFile;
-            }
-            formData.append('image', compressedEditBlob, imageFile.name);
+            formData.append('image', imageFile);
         }
 
         try {
@@ -2546,37 +2478,6 @@ class FarmerDashboard {
             preview.appendChild(img);
         };
         reader.readAsDataURL(file);
-    }
-
-    // Lightweight client-side image compressor: returns a Blob (JPEG) resized to maxDimension
-    compressImage(file, maxDimension = 2048, quality = 0.82) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onerror = (e) => reject(e);
-            reader.onload = (ev) => {
-                const img = new Image();
-                img.onerror = (e) => reject(e);
-                img.onload = () => {
-                    let { width, height } = img;
-                    if (width > maxDimension || height > maxDimension) {
-                        const scale = Math.max(width, height) / maxDimension;
-                        width = Math.round(width / scale);
-                        height = Math.round(height / scale);
-                    }
-                    const canvas = document.createElement('canvas');
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    canvas.toBlob((blob) => {
-                        if (blob) resolve(blob);
-                        else reject(new Error('Compression produced no blob'));
-                    }, 'image/jpeg', Math.max(0.5, Math.min(quality, 0.95)));
-                };
-                img.src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
     }
 
     async toggleProductStatus(productId, newStatus) {
@@ -3122,8 +3023,6 @@ class FarmerDashboard {
                 this.loadOrdersByStatus('delivered'),
                 this.loadOrdersByStatus('cancelled')
             ]);
-            // Update tab counters after loading all statuses
-            this.updateOrderTabCounts();
         } catch (error) {
             console.error('Error loading all orders:', error);
         }
@@ -3395,25 +3294,6 @@ class FarmerDashboard {
         return labels[status] || status;
     }
 
-    updateOrderTabCounts() {
-        try {
-            const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
-            statuses.forEach(status => {
-                const count = (this.lastOrdersByStatus[status] || []).length || 0;
-                const tab = document.getElementById(`${status}-orders-tab`);
-                if (!tab) return;
-                const label = this.formatStatusLabel(status);
-                if (count > 0) {
-                    tab.innerHTML = `${label} <span class="tab-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">${count}</span>`;
-                } else {
-                    tab.textContent = label;
-                }
-            });
-        } catch (e) {
-            // ignore DOM errors
-        }
-    }
-
     applyTopSearch() {
         const q = (document.getElementById('farmer-search-input')?.value || '').trim().toLowerCase();
 
@@ -3609,7 +3489,7 @@ class FarmerDashboard {
             padding: 1rem 1.5rem;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 110000;
+            z-index: 10000;
             max-width: 300px;
         `;
 
