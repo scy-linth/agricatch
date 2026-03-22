@@ -472,11 +472,18 @@ class FarmerDashboard {
                 this.loadShopProfile();
                 this.loadOverviewMetrics({ force: true });
             } else {
-                window.location.href = '/';
+                // If token is invalid/expired, clear it and send user to login instead of homepage
+                if (response.status === 401) {
+                    try { localStorage.removeItem('token'); } catch (e) {}
+                    window.location.href = '/?login=1';
+                } else {
+                    window.location.href = '/';
+                }
             }
         } catch (error) {
             console.error('Auth check error:', error);
-            window.location.href = '/';
+            try { localStorage.removeItem('token'); } catch (e) {}
+            window.location.href = '/?login=1';
         }
     }
 
