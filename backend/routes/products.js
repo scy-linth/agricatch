@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { productUpload } = require('../middleware/upload');
 const { deleteFileIfExists, resolvePublicPath } = require('../utils/fileUtils');
 const { broadcastEvent } = require('../utils/realtime');
+const cloudinary = require('../utils/cloudinary');
 const { pool } = require('../utils/db');
 
 const router = express.Router();
@@ -1075,9 +1076,27 @@ router.delete('/:id', async (req, res) => {
       throw deleteError;
     }
 
-    const oldPath = resolvePublicPath(productResult.rows[0].image_url);
+    const imageUrl = productResult.rows[0].image_url;
+    const oldPath = resolvePublicPath(imageUrl);
     if (oldPath) {
       deleteFileIfExists(oldPath);
+    }
+
+    // If the image is hosted on Cloudinary, attempt to remove it there as well.
+    try {
+      if (imageUrl && /^https:\/\/res\.cloudinary\.com\//.test(String(imageUrl))) {
+        const match = String(imageUrl).match(/^https:\/\/res\.cloudinary\.com\/[^\/]+\/(?:image|video)\/upload\/(?:[^\/]+\/)*?(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?(?:\?.*)?$/);
+        const publicId = match && match[1] ? match[1] : null;
+        if (publicId) {
+          try {
+            await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+          } catch (cloudErr) {
+            console.warn('Cloudinary deletion failed for', publicId, cloudErr && (cloudErr.message || cloudErr));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Cloudinary deletion check failed:', e && (e.message || e));
     }
 
     broadcastEvent('product.updated', {
