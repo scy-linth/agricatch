@@ -36,6 +36,7 @@ class FarmerDashboard {
         this.catalogProductNames = [];
         this.ordersSearchActiveIndex = -1;
         this.productNameActiveIndex = { add: -1, edit: -1 };
+        this.realtimeSource = null;
 
         if (!this.token) {
             window.location.href = '/?login=1';
@@ -374,8 +375,14 @@ class FarmerDashboard {
     setupRealtime() {
         try {
             if (!this.token || !this.userId) return;
-            const url = `/api/events?token=${encodeURIComponent(this.token)}`;
+            if (this.realtimeSource) {
+                try { this.realtimeSource.close(); } catch (_) {}
+                this.realtimeSource = null;
+            }
+
+            const url = `${this.apiBase}/events?token=${encodeURIComponent(this.token)}`;
             const es = new EventSource(url);
+            this.realtimeSource = es;
             es.addEventListener('order.updated', (evt) => {
                 try {
                     const data = JSON.parse(evt.data || '{}');
@@ -405,6 +412,13 @@ class FarmerDashboard {
                     }
                 } catch (_) {
                     // ignore
+                }
+            });
+
+            es.addEventListener('error', async () => {
+                const switched = await this.resolveWorkingApiBase();
+                if (switched) {
+                    this.setupRealtime();
                 }
             });
         } catch (_) {
@@ -883,12 +897,16 @@ class FarmerDashboard {
 
     async loadProductCatalogNames(categoryId = null) {
         try {
-            const fetchNames = async (targetCategoryId = null) => {
+            const fetchNames = async (targetCategoryId = null, retryOn404 = true) => {
                 const params = new URLSearchParams();
                 if (targetCategoryId) params.set('category_id', String(targetCategoryId));
                 const response = await fetch(`${this.apiBase}/products/catalog/names${params.toString() ? `?${params.toString()}` : ''}`, {
                     headers: { 'Authorization': `Bearer ${this.token}` }
                 });
+                if (response.status === 404 && retryOn404) {
+                    const switched = await this.resolveWorkingApiBase();
+                    if (switched) return fetchNames(targetCategoryId, false);
+                }
                 if (!response.ok) return [];
                 const data = await response.json().catch(() => ({}));
                 return Array.isArray(data.names) ? data.names : [];
@@ -1006,6 +1024,12 @@ class FarmerDashboard {
             const response = await fetch(`${this.apiBase}/products/categories`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
+            if (response.status === 404) {
+                const switched = await this.resolveWorkingApiBase();
+                if (switched) {
+                    return this.loadCategories();
+                }
+            }
             if (!response.ok) return;
 
             const data = await response.json();
@@ -1043,6 +1067,7 @@ class FarmerDashboard {
 
         const hasCategory = !!String(categoryInput?.value || '').trim();
         nameInput.disabled = !hasCategory;
+        nameInput.readOnly = true;
         if (!hasCategory) {
             nameInput.value = '';
             nameInput.placeholder = 'Choose category first';
@@ -1062,22 +1087,24 @@ class FarmerDashboard {
         const editCategory = document.getElementById('edit-product-category');
 
         if (addName) {
+            addName.readOnly = true;
             addName.addEventListener('change', () => this.updatePriceSuggestion('add'));
             addName.addEventListener('blur', () => this.updatePriceSuggestion('add'));
-            addName.addEventListener('input', () => this.renderProductNameSuggestions('add'));
             addName.addEventListener('focus', () => this.renderProductNameSuggestions('add', true));
             addName.addEventListener('keydown', (e) => this.handleProductNameKeydown('add', e));
+            addName.addEventListener('click', () => this.renderProductNameSuggestions('add', true));
             addName.addEventListener('blur', () => setTimeout(() => {
                 const list = document.getElementById('product-name-suggestions');
                 if (list) list.classList.remove('open');
             }, 120));
         }
         if (editName) {
+            editName.readOnly = true;
             editName.addEventListener('change', () => this.updatePriceSuggestion('edit'));
             editName.addEventListener('blur', () => this.updatePriceSuggestion('edit'));
-            editName.addEventListener('input', () => this.renderProductNameSuggestions('edit'));
             editName.addEventListener('focus', () => this.renderProductNameSuggestions('edit', true));
             editName.addEventListener('keydown', (e) => this.handleProductNameKeydown('edit', e));
+            editName.addEventListener('click', () => this.renderProductNameSuggestions('edit', true));
             editName.addEventListener('blur', () => setTimeout(() => {
                 const list = document.getElementById('edit-product-name-suggestions');
                 if (list) list.classList.remove('open');
