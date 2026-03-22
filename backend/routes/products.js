@@ -617,7 +617,8 @@ router.get('/:id', async (req, res) => {
              COALESCE(u.average_rating, 0) as farmer_average_rating,
              COALESCE(u.total_reviews, 0) as farmer_total_reviews,
              (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) as average_rating,
-             (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) as total_reviews,
+            (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) as total_reviews,
+            p.cloudinary_public_id as cloudinary_public_id,
              ${userId ? `EXISTS (SELECT 1 FROM wishlist w WHERE w.user_id = $2 AND w.product_id = p.id)` : 'false'} as is_in_wishlist
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
