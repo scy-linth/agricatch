@@ -1,12 +1,22 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { pool } = require('../utils/db');
+const { Pool } = require('pg');
 const { productUpload } = require('../middleware/upload');
 const { deleteFileIfExists, resolvePublicPath } = require('../utils/fileUtils');
 const { broadcastEvent } = require('../utils/realtime');
-const cloudinary = require('../utils/cloudinary');
 
 const router = express.Router();
+const pgSsl = String(process.env.DB_HOST || '').includes('render.com')
+  ? { rejectUnauthorized: false }
+  : false;
+const pool = new Pool({
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'agricatch',
+  password: process.env.DB_PASSWORD || 'password',
+  port: process.env.DB_PORT || 5432,
+  ssl: pgSsl,
+});
 
 const getUserFromToken = (req) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -688,9 +698,97 @@ router.get('/:id/similar-sellers', async (req, res) => {
       return res.json({ similar });
     }
 
-    // No real similar products found — do not create placeholder products.
-    // Return an empty similar list so the UI doesn't display fabricated listings.
-    return res.json({ similar: [] });
+    const farmersResult = await pool.query(
+      `
+        SELECT id, full_name,
+               COALESCE(average_rating, 0) AS farmer_average_rating,
+               COALESCE(total_reviews, 0) AS farmer_total_reviews
+        FROM users
+        WHERE role = 'farmer'
+          AND id <> $1
+        ORDER BY id ASC
+        LIMIT 3
+      `,
+      [target.farmer_id]
+    );
+
+    if (!farmersResult.rows.length) {
+      return res.json({ similar: [] });
+    }
+
+    const templates = [
+      { price: 64, stock: 23, sales: 31 },
+      { price: 68, stock: 20, sales: 22 },
+      { price: 72, stock: 17, sales: 19 }
+    ];
+
+    const ensuredProducts = [];
+    for (let index = 0; index < farmersResult.rows.length; index++) {
+      const farmer = farmersResult.rows[index];
+      const tpl = templates[index] || templates[templates.length - 1];
+
+      const existing = await pool.query(
+        `
+          SELECT p.id, p.name, p.price, p.unit, p.stock_quantity, p.sales_count, p.image_url, p.farmer_id
+          FROM products p
+          WHERE p.farmer_id = $1
+            AND LOWER(p.name) = LOWER($2)
+            AND p.is_available = true
+            AND ${NON_EXPIRED_PRODUCT_SQL}
+          ORDER BY p.created_at DESC
+          LIMIT 1
+        `,
+        [farmer.id, target.name]
+      );
+
+      let productRow = existing.rows[0];
+      if (!productRow) {
+        const inserted = await pool.query(
+          `
+            INSERT INTO products (
+              name, description, price, category_id, farmer_id, stock_quantity,
+              unit, image_url, sales_count, is_available
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+            RETURNING id, name, price, unit, stock_quantity, sales_count, image_url, farmer_id
+          `,
+          [
+            target.name,
+            'Placeholder listing created for prototype similar-shop preview.',
+            tpl.price,
+            target.category_id,
+            farmer.id,
+            tpl.stock,
+            'kg',
+            '/images/logo.png',
+            tpl.sales
+          ]
+        );
+        productRow = inserted.rows[0];
+      }
+
+      ensuredProducts.push({
+        ...productRow,
+        farmer_name: farmer.full_name,
+        farmer_average_rating: Number(farmer.farmer_average_rating || 0),
+        farmer_total_reviews: Number(farmer.farmer_total_reviews || 0),
+        average_rating: Number(farmer.farmer_average_rating || 0),
+        total_reviews: Number(farmer.farmer_total_reviews || 0)
+      });
+    }
+
+    const ensuredLowestPrice = ensuredProducts.length ? Math.min(...ensuredProducts.map(r => Number(r.price) || 0)) : null;
+    const ensuredHighestSales = ensuredProducts.length ? Math.max(...ensuredProducts.map(r => Number(r.sales_count) || 0)) : null;
+
+    const fallbackWithBadges = ensuredProducts.map((item) => {
+      const badges = [];
+      if (ensuredLowestPrice !== null && Number(item.price) === Number(ensuredLowestPrice)) badges.push('Lowest Price');
+      if (ensuredHighestSales !== null && Number(item.sales_count) === Number(ensuredHighestSales) && ensuredHighestSales > 0) badges.push('Best Selling');
+      if (Number(item.average_rating || 0) >= 4.5) badges.push('Top Rated');
+      return { ...item, badges };
+    });
+
+    return res.json({ similar: fallbackWithBadges });
   } catch (error) {
     console.error('Similar sellers error:', error);
     return res.status(500).json({ message: 'Server error fetching similar sellers' });
@@ -703,7 +801,9 @@ router.get('/farmer/:farmerId', async (req, res) => {
     const { farmerId } = req.params;
 
     const result = await pool.query(`
-      SELECT p.*, c.name as category_name
+      SELECT p.*, c.name as category_name,
+             (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) AS average_rating,
+             (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) AS total_reviews
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.farmer_id = $1
@@ -764,29 +864,13 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'Invalid category. Fishery categories are not allowed.' });
     }
 
-    // Determine image URL: prefer explicit `image_url`, otherwise upload file to Cloudinary
+    // Determine image URL: prefer explicit `image_url`, otherwise use uploaded file
     let imageUrl = null;
     if (image_url && String(image_url).trim() !== '') {
       imageUrl = image_url;
-    } else if (req.file && req.file.path) {
-      try {
-        const uploaded = await cloudinary.uploader.upload(req.file.path, {
-          folder: 'products',
-          use_filename: true,
-          unique_filename: false,
-          resource_type: 'image',
-          transformation: [
-            { width: 1200, crop: 'limit', quality: 'auto' },
-            { fetch_format: 'auto' }
-          ]
-        });
-        imageUrl = uploaded.secure_url;
-      } catch (uploadError) {
-        console.error('Cloudinary upload failed:', uploadError);
-        return res.status(500).json({ message: 'Image upload failed' });
-      } finally {
-        deleteFileIfExists(req.file.path);
-      }
+    } else if (req.file && req.file.filename) {
+      const dateFolder = new Date().toISOString().split('T')[0];
+      imageUrl = `/images/uploads/products/${dateFolder}/${req.file.filename}`;
     }
 
     // Auto-populate location with shop address if not provided
@@ -888,29 +972,13 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'Invalid category. Fishery categories are not allowed.' });
     }
 
-    // Determine image URL: prefer explicit `image_url`, otherwise upload file to Cloudinary, otherwise keep current
+    // Determine image URL: prefer explicit `image_url`, otherwise use uploaded file, otherwise keep current
     let imageUrl = current.image_url;
     if (typeof image_url !== 'undefined' && image_url !== null && String(image_url).trim() !== '') {
       imageUrl = image_url;
-    } else if (req.file && req.file.path) {
-      try {
-        const uploaded = await cloudinary.uploader.upload(req.file.path, {
-          folder: 'products',
-          use_filename: true,
-          unique_filename: false,
-          resource_type: 'image',
-          transformation: [
-            { width: 1200, crop: 'limit', quality: 'auto' },
-            { fetch_format: 'auto' }
-          ]
-        });
-        imageUrl = uploaded.secure_url;
-      } catch (uploadError) {
-        console.error('Cloudinary upload failed:', uploadError);
-        return res.status(500).json({ message: 'Image upload failed' });
-      } finally {
-        deleteFileIfExists(req.file.path);
-      }
+    } else if (req.file && req.file.filename) {
+      const dateFolder = new Date().toISOString().split('T')[0];
+      imageUrl = `/images/uploads/products/${dateFolder}/${req.file.filename}`;
     }
 
     // If a new file was uploaded and an old image exists on disk, delete the old file
