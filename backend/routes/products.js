@@ -197,7 +197,10 @@ router.get('/categories', async (_req, res) => {
     return res.json({ categories: ordered });
   } catch (error) {
     console.error('Get categories error:', error);
-    return res.status(500).json({ message: 'Server error fetching categories' });
+    return res.status(500).json({
+      message: 'Server error fetching categories',
+      debug: String(error?.message || error)
+    });
   }
 });
 
@@ -455,7 +458,10 @@ router.get('/catalog/names', async (_req, res) => {
     return res.json({ names });
   } catch (error) {
     console.error('Catalog names error:', error);
-    return res.status(500).json({ message: 'Server error fetching catalog names' });
+    return res.status(500).json({
+      message: 'Server error fetching catalog names',
+      debug: String(error?.message || error)
+    });
   }
 });
 
@@ -600,7 +606,10 @@ router.get('/featured', async (req, res) => {
     });
   } catch (error) {
     console.error('Featured products error:', error);
-    return res.status(500).json({ message: 'Server error fetching featured products' });
+    return res.status(500).json({
+      message: 'Server error fetching featured products',
+      debug: String(error?.message || error)
+    });
   }
 });
 
@@ -812,7 +821,10 @@ router.get('/farmer/:farmerId', async (req, res) => {
 
   } catch (error) {
     console.error('Get farmer products error:', error);
-    res.status(500).json({ message: 'Server error fetching farmer products' });
+    res.status(500).json({
+      message: 'Server error fetching farmer products',
+      debug: String(error?.message || error)
+    });
   }
 });
 
