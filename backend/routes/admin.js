@@ -588,6 +588,7 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
     } = req.body;
 
     let image_url = req.body.image_url;
+    let imagePublicId = null;
     if (req.file && req.file.path) {
       try {
         const uploaded = await cloudinary.uploader.upload(req.file.path, {
@@ -601,6 +602,7 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
           ]
         });
         image_url = uploaded.secure_url;
+        imagePublicId = uploaded.public_id;
       } catch (uploadError) {
         console.error('Cloudinary upload failed:', uploadError);
         return res.status(500).json({ message: 'Image upload failed' });
@@ -608,6 +610,9 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
         deleteFileIfExists(req.file.path);
       }
     }
+
+    // Ensure products table has cloudinary_public_id column
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS cloudinary_public_id VARCHAR(255)");
 
     const productResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
     if (productResult.rows.length === 0) {
@@ -671,6 +676,17 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
     if (image_url !== undefined && image_url !== null && image_url !== "") {
       updates.push(`image_url = $${paramIndex}`);
       values.push(image_url);
+      paramIndex++;
+    }
+    // If we uploaded to Cloudinary during this request, store the public_id too
+    if (imagePublicId) {
+      updates.push(`cloudinary_public_id = $${paramIndex}`);
+      values.push(imagePublicId);
+      paramIndex++;
+    } else if (req.body.cloudinary_public_id) {
+      // Or accept an explicit public_id from the client
+      updates.push(`cloudinary_public_id = $${paramIndex}`);
+      values.push(req.body.cloudinary_public_id);
       paramIndex++;
     }
 
