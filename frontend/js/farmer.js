@@ -472,18 +472,23 @@ class FarmerDashboard {
                 this.loadShopProfile();
                 this.loadOverviewMetrics({ force: true });
             } else {
-                // If token is invalid/expired, clear it and send user to login instead of homepage
-                if (response.status === 401) {
+                // Never bounce farmer users to home on transient backend errors (causes redirect loop).
+                // Only force-login on unauthorized/forbidden responses.
+                if (response.status === 401 || response.status === 403) {
                     try { localStorage.removeItem('token'); } catch (e) {}
                     window.location.href = '/?login=1';
-                } else {
-                    window.location.href = '/';
+                    return;
                 }
+
+                console.warn('Farmer auth check failed with status:', response.status);
+                this.showMessage('Connection issue while verifying account. Staying on dashboard and retrying...', 'error');
+                setTimeout(() => this.checkFarmerAuth(), 2500);
             }
         } catch (error) {
             console.error('Auth check error:', error);
-            try { localStorage.removeItem('token'); } catch (e) {}
-            window.location.href = '/?login=1';
+            // Network hiccups should not throw the user back to home/login repeatedly.
+            this.showMessage('Unable to verify account right now. Retrying...', 'error');
+            setTimeout(() => this.checkFarmerAuth(), 2500);
         }
     }
 
