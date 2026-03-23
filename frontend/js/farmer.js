@@ -2330,10 +2330,19 @@ class FarmerDashboard {
             const reviewCount = Number(product.total_reviews || 0);
             const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
             const categoryName = String(product.category_name || '').trim();
+            // Normalize image URL (handle relative paths and placeholder-like strings)
+            let productImageUrl = product.image_url || '';
+            if (productImageUrl && !productImageUrl.startsWith('http') && !productImageUrl.startsWith('/')) {
+                productImageUrl = '/' + productImageUrl;
+            }
+            if (!productImageUrl || productImageUrl === 'null' || productImageUrl === 'undefined') {
+                productImageUrl = '/images/logo.png';
+            }
+
             return `
             <div class="product-card" data-status="${status}" data-stock-quantity="${stock}" data-category="${this.escapeAttr(categoryName)}" data-price="${Number(product.price || 0)}" data-rating="${Number(product.average_rating || 0)}" data-reviews="${reviewCount}" data-created-at="${this.escapeAttr(product.created_at || '')}" onclick="farmerDashboard.openMyProductPreview(${product.id})" style="cursor:pointer;">
-                <img src="${product.image_url || '/images/logo.png'}"
-                     alt="${product.name}" class="product-image" onerror="this.src='/images/logo.png'">
+                <img src="${this.escapeAttr(productImageUrl)}"
+                     alt="${this.escapeAttr(product.name)}" class="product-image" onerror="this.src='/images/logo.png'">
                 <div class="product-info">
                     <h3 class="product-name">${product.name}</h3>
                     <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit}</div>
@@ -2393,9 +2402,18 @@ class FarmerDashboard {
         const modal = document.getElementById('farmer-product-preview-modal');
         if (!(body && modal)) return;
 
+            // Normalize product image for preview
+            let previewImageUrl = product.image_url || '';
+            if (previewImageUrl && !previewImageUrl.startsWith('http') && !previewImageUrl.startsWith('/')) {
+                previewImageUrl = '/' + previewImageUrl;
+            }
+            if (!previewImageUrl || previewImageUrl === 'null' || previewImageUrl === 'undefined') {
+                previewImageUrl = '/images/logo.png';
+            }
+
         body.innerHTML = `
             <div class="farmer-product-preview-grid" style="display:grid;grid-template-columns:minmax(220px,320px) 1fr;gap:1.15rem;align-items:start;">
-                <img src="${this.escapeAttr(product.image_url || '/images/logo.png')}" alt="${this.escapeAttr(product.name)}" style="width:100%;max-width:260px;border-radius:12px;border:1px solid #e2e8f0;object-fit:cover;" onerror="this.src='/images/logo.png'">
+                <img src="${this.escapeAttr(previewImageUrl)}" alt="${this.escapeAttr(product.name)}" style="width:100%;max-width:260px;border-radius:12px;border:1px solid #e2e8f0;object-fit:cover;" onerror="this.src='/images/logo.png'">
                 <div>
                     <h3 style="margin:0 0 0.5rem 0;">${this.escapeHtml(product.name)}</h3>
                     <div style="font-weight:700;color:var(--primary-color);margin-bottom:0.5rem;">${this.fmtCurrency(product.price)} per ${this.escapeHtml(product.unit || 'item')}</div>
@@ -2722,8 +2740,15 @@ class FarmerDashboard {
 
                 // Show current image
                 const preview = document.getElementById('edit-product-image-preview');
-                if (product.image_url) {
-                    preview.innerHTML = `<img src="${product.image_url}" alt="Current product image" style="max-width: 200px; margin-top: 10px;">`;
+                if (preview) {
+                    let editPreviewUrl = product.image_url || '';
+                    if (editPreviewUrl && !editPreviewUrl.startsWith('http') && !editPreviewUrl.startsWith('/')) {
+                        editPreviewUrl = '/' + editPreviewUrl;
+                    }
+                    if (!editPreviewUrl || editPreviewUrl === 'null' || editPreviewUrl === 'undefined') {
+                        editPreviewUrl = '/images/logo.png';
+                    }
+                    preview.innerHTML = `<img src="${this.escapeAttr(editPreviewUrl)}" alt="Current product image" style="max-width: 200px; margin-top: 10px;">`;
                 }
 
                 // Show modal
@@ -3208,7 +3233,13 @@ class FarmerDashboard {
             
             const item = (order.items && order.items[0]) || order;
             const currentStatus = item.status || order.status || 'pending';
-            const productImage = item.image_url || order.product_image || '/images/logo.png';
+            let productImage = item.image_url || order.product_image || '/images/logo.png';
+            if (productImage && !productImage.startsWith('http') && !productImage.startsWith('/')) {
+                productImage = '/' + productImage;
+            }
+            if (!productImage || productImage === 'null' || productImage === 'undefined') {
+                productImage = '/images/logo.png';
+            }
             const productName = item.product_name || order.product_name || 'Product';
             const quantity = item.quantity || order.quantity || 1;
             const price = item.price || order.price || 0;
