@@ -1716,9 +1716,12 @@ class FarmerDashboard {
         return data.imageUrl;
     }
 
-    async uploadProductImage(file) {
+    async uploadProductImage(file, metadata = {}) {
         const formData = new FormData();
         formData.append('image', file);
+        if (metadata.name) formData.append('name', metadata.name);
+        if (metadata.category_id) formData.append('category_id', metadata.category_id);
+        if (metadata.category_name) formData.append('category_name', metadata.category_name);
 
         const response = await fetch(`${this.apiBase}/upload/product-image`, {
             method: 'POST',
@@ -2506,7 +2509,12 @@ class FarmerDashboard {
         const imageFile = document.getElementById('product-image').files[0];
         if (imageFile) {
             try {
-                const uploaded = await this.uploadProductImage(imageFile);
+                const categorySelect = document.getElementById('product-category');
+                const uploaded = await this.uploadProductImage(imageFile, {
+                    name,
+                    category_id,
+                    category_name: categorySelect?.selectedOptions?.[0]?.text || ''
+                });
                 imageUrl = uploaded.imageUrl || '';
                 imagePublicId = uploaded.public_id || '';
             } catch (err) {
@@ -2611,7 +2619,14 @@ class FarmerDashboard {
         const imageFile = document.getElementById('edit-product-image').files[0];
         if (imageFile) {
             try {
-                const uploaded = await this.uploadProductImage(imageFile);
+                const editName = document.getElementById('edit-product-name').value;
+                const editCategoryId = document.getElementById('edit-product-category').value;
+                const editCategorySelect = document.getElementById('edit-product-category');
+                const uploaded = await this.uploadProductImage(imageFile, {
+                    name: editName,
+                    category_id: editCategoryId,
+                    category_name: editCategorySelect?.selectedOptions?.[0]?.text || ''
+                });
                 if (uploaded.imageUrl) formData.append('image_url', uploaded.imageUrl);
                 if (uploaded.public_id) formData.append('cloudinary_public_id', uploaded.public_id);
             } catch (err) {

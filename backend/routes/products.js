@@ -39,8 +39,24 @@ const extractCloudinaryPublicId = (url) => {
   return match && match[1] ? match[1] : null;
 };
 
-const deterministicProductPublicId = (productId, productName) => {
-  return cloudinary.publicIdForProduct(productId, productName, 'primary');
+const categorizedProductPublicId = ({ categoryName, productName, userId }) => {
+  return cloudinary.publicIdForCategorizedProduct({
+    categoryName,
+    productName,
+    userId,
+    extension: 'jpeg'
+  });
+};
+
+const categorizedProductPublicIdPrefix = ({ categoryName, productName, userId }) => {
+  return `agricatch/${cloudinary.slugify(categoryName || 'uncategorized')}/${cloudinary.slugify(productName || 'product')}/${String(userId || 'unknown').trim()}-`;
+};
+
+const loadCategoryNameById = async (categoryId) => {
+  const id = Number.parseInt(categoryId, 10);
+  if (!Number.isFinite(id) || id <= 0) return 'uncategorized';
+  const result = await pool.query('SELECT name FROM categories WHERE id = $1 LIMIT 1', [id]);
+  return String(result.rows?.[0]?.name || 'uncategorized').trim() || 'uncategorized';
 };
 
 const cloudinaryUrlForPublicId = (publicId) => {
@@ -51,13 +67,24 @@ const cloudinaryUrlForPublicId = (publicId) => {
   }
 };
 
-const rehomeProductImageToDeterministicId = async ({ productId, productName, imagePublicId, imageUrl }) => {
+const rehomeProductImageToCategorizedId = async ({
+  categoryName,
+  productName,
+  userId,
+  imagePublicId,
+  imageUrl
+}) => {
   const sourcePublicId = imagePublicId || extractCloudinaryPublicId(imageUrl);
   if (!sourcePublicId) {
     return { imagePublicId, imageUrl, changed: false };
   }
 
-  const targetPublicId = deterministicProductPublicId(productId, productName);
+  const targetPrefix = categorizedProductPublicIdPrefix({ categoryName, productName, userId });
+  if (sourcePublicId.startsWith(targetPrefix)) {
+    return { imagePublicId: sourcePublicId, imageUrl, changed: false };
+  }
+
+  const targetPublicId = categorizedProductPublicId({ categoryName, productName, userId });
   if (!targetPublicId || sourcePublicId === targetPublicId) {
     return { imagePublicId: sourcePublicId, imageUrl, changed: false };
   }
@@ -88,7 +115,7 @@ const rehomeProductImageToDeterministicId = async ({ productId, productName, ima
         // Fall through and keep existing DB values if neither source nor target is available.
       }
     }
-    console.warn('Failed to rehome product image to deterministic public_id:', sourcePublicId, '->', targetPublicId, message);
+    console.warn('Failed to rehome product image to categorized public_id:', sourcePublicId, '->', targetPublicId, message);
     return { imagePublicId: sourcePublicId, imageUrl, changed: false };
   }
 };
@@ -890,11 +917,13 @@ router.post('/', productUpload.single('image'), async (req, res) => {
 
     let createdProduct = result.rows[0];
 
-    // Ensure newly created products always use deterministic Cloudinary IDs.
+    // Ensure newly created products use categorized Cloudinary IDs.
     if (createdProduct && (createdProduct.cloudinary_public_id || createdProduct.image_url)) {
-      const moved = await rehomeProductImageToDeterministicId({
-        productId: createdProduct.id,
+      const categoryName = await loadCategoryNameById(createdProduct.category_id);
+      const moved = await rehomeProductImageToCategorizedId({
+        categoryName,
         productName: createdProduct.name,
+        userId: decoded.id,
         imagePublicId: createdProduct.cloudinary_public_id,
         imageUrl: createdProduct.image_url
       });
@@ -1005,7 +1034,12 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
     // a different Cloudinary-hosted image (to avoid orphaned assets).
     const oldPublicId = current.cloudinary_public_id || extractCloudinaryPublicId(current.image_url) || null;
     let newPublicId = imagePublicId;
-    const targetPublicId = deterministicProductPublicId(id, nextName);
+    const resolvedCategoryName = await loadCategoryNameById(nextCategoryId);
+    const targetPublicId = categorizedProductPublicId({
+      categoryName: resolvedCategoryName,
+      productName: nextName,
+      userId: decoded.id
+    });
 
     if (typeof image_url !== 'undefined' && image_url !== null && String(image_url).trim() !== '') {
       imageUrl = String(image_url).trim();
@@ -1030,30 +1064,23 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
         console.warn('Failed to delete old product image:', e.message || e);
       }
 
-      // Normalize explicit cloud image replacements to deterministic product path.
-      if (imagePublicId && imagePublicId !== targetPublicId) {
-        const moved = await rehomeProductImageToDeterministicId({
-          productId: id,
-          productName: nextName,
-          imagePublicId,
-          imageUrl
-        });
-        if (moved.imagePublicId) {
-          imagePublicId = moved.imagePublicId;
-          imageUrl = moved.imageUrl || imageUrl;
-        }
-      }
+      // Keep the provided Cloudinary image as-is when URL/public_id is explicitly provided.
     }
 
     if (req.file && req.file.path) {
       let uploaded;
       try {
         uploaded = await cloudinary.uploadFile(req.file.path, {
-          folder: 'agricatch/products',
           public_id: targetPublicId,
           overwrite: true,
           invalidate: true,
-          tags: ['app:agricatch', 'entity:product', `entity_id:${id}`, 'role:primary'],
+          tags: [
+            'app:agricatch',
+            'entity:product',
+            `entity_id:${id}`,
+            `category:${cloudinary.slugify(resolvedCategoryName)}`,
+            'role:primary'
+          ],
           resource_type: 'image',
           transformation: [
             { width: 1200, crop: 'limit', quality: 'auto' },

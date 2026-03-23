@@ -32,6 +32,14 @@ const manilaTimestamp = () => {
   return `${get('year')}${get('month')}${get('day')}-${get('hour')}${get('minute')}${get('second')}`;
 };
 
+const publicIdForCategorizedProduct = ({ categoryName, productName, userId, extension = 'jpeg' } = {}) => {
+  const categoryPart = slugify(categoryName || 'uncategorized');
+  const productPart = slugify(productName || 'product');
+  const userPart = String(userId || 'unknown').trim();
+  const ext = slugify(extension || 'jpeg').replace(/-/g, '') || 'jpeg';
+  return `agricatch/${categoryPart}/${productPart}/${userPart}-${manilaTimestamp()}.${ext}`;
+};
+
 const publicIdForProduct = (productId, productName, role = 'primary') => {
   const idPart = String(productId || 'unknown').trim();
   const namePart = slugify(productName || 'product');
@@ -74,6 +82,7 @@ const assertConfigured = () => {
 
 cloudinary.slugify = slugify;
 cloudinary.manilaTimestamp = manilaTimestamp;
+cloudinary.publicIdForCategorizedProduct = publicIdForCategorizedProduct;
 cloudinary.publicIdForProduct = publicIdForProduct;
 cloudinary.publicIdForUserPhoto = publicIdForUserPhoto;
 cloudinary.uploadFile = uploadFile;

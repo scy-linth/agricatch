@@ -60,22 +60,28 @@ const writeCsv = (rows, outputFile) => {
   return absPath;
 };
 
+const categorizedPrefix = ({ categoryName, productName, userId }) => {
+  return `agricatch/${cloudinary.slugify(categoryName || 'uncategorized')}/${cloudinary.slugify(productName || 'product')}/${String(userId || 'unknown').trim()}-`;
+};
+
 async function loadProducts(range) {
   if (range) {
     const result = await pool.query(
-      `SELECT id, name, image_url, cloudinary_public_id
-       FROM products
-       WHERE id BETWEEN $1 AND $2
-       ORDER BY id ASC`,
+      `SELECT p.id, p.name, p.image_url, p.cloudinary_public_id, p.farmer_id, c.name AS category_name
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.id BETWEEN $1 AND $2
+       ORDER BY p.id ASC`,
       [range.min, range.max]
     );
     return result.rows;
   }
 
   const result = await pool.query(
-    `SELECT id, name, image_url, cloudinary_public_id
-     FROM products
-     ORDER BY id ASC`
+    `SELECT p.id, p.name, p.image_url, p.cloudinary_public_id, p.farmer_id, c.name AS category_name
+     FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id
+     ORDER BY p.id ASC`
   );
   return result.rows;
 }
@@ -116,8 +122,19 @@ async function main() {
       continue;
     }
 
-    const targetPublicId = cloudinary.publicIdForProduct(product.id, product.name, 'primary');
-    if (currentPublicId === targetPublicId) {
+    const expectedPrefix = categorizedPrefix({
+      categoryName: product.category_name,
+      productName: product.name,
+      userId: product.farmer_id
+    });
+
+    const targetPublicId = cloudinary.publicIdForCategorizedProduct({
+      categoryName: product.category_name,
+      productName: product.name,
+      userId: product.farmer_id,
+      extension: 'jpeg'
+    });
+    if (currentPublicId === targetPublicId || currentPublicId.startsWith(expectedPrefix)) {
       alreadyArranged += 1;
       rows.push({
         product_id: product.id,
