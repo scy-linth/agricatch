@@ -6,6 +6,7 @@ class FarmerDashboard {
         this.apiBaseCandidates = ['/api', 'https://agricatch.onrender.com/api'];
         this.apiBase = this.getInitialApiBase();
         this.isResolvingApiBase = false;
+        this.apiBaseResolvePromise = null;
         this.authRetryAttempts = 0;
         this.token = this.normalizeAuthToken(localStorage.getItem('token'));
         if (this.token) {
@@ -66,10 +67,12 @@ class FarmerDashboard {
     }
 
     async resolveWorkingApiBase() {
-        if (this.isResolvingApiBase) return false;
-        this.isResolvingApiBase = true;
+        if (this.apiBaseResolvePromise) {
+            return this.apiBaseResolvePromise;
+        }
 
-        try {
+        this.isResolvingApiBase = true;
+        this.apiBaseResolvePromise = (async () => {
             const orderedCandidates = [this.apiBase, ...this.apiBaseCandidates]
                 .map((v) => String(v || '').trim())
                 .filter(Boolean)
@@ -92,7 +95,12 @@ class FarmerDashboard {
             }
 
             return false;
+        })();
+
+        try {
+            return await this.apiBaseResolvePromise;
         } finally {
+            this.apiBaseResolvePromise = null;
             this.isResolvingApiBase = false;
         }
     }
@@ -1414,6 +1422,7 @@ class FarmerDashboard {
     async loadFarmerStats({ skipProducts = false } = {}) {
         try {
             if (!skipProducts) {
+                if (!this.farmerId) return;
                 // Load my products count
                 const productsResponse = await fetch(`${this.apiBase}/products/farmer/${this.farmerId}`, {
                     headers: {
@@ -1717,6 +1726,7 @@ class FarmerDashboard {
 
     async loadMyProducts() {
         try {
+            if (!this.farmerId) return;
             const response = await fetch(`${this.apiBase}/products/farmer/${this.farmerId}`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
