@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { productUpload, bannerUpload, avatarUpload } = require('../middleware/upload');
 const cloudinary = require('../utils/cloudinary');
 const { deleteFileIfExists } = require('../utils/fileUtils');
+const { pool } = require('../utils/db');
 
 const router = express.Router();
 
@@ -41,6 +42,24 @@ const parseProductName = (req) => {
   return String(req.body?.name || req.body?.productName || req.query?.name || req.query?.productName || 'product').trim();
 };
 
+const parseCategoryName = async (req) => {
+  const directName = String(
+    req.body?.categoryName || req.body?.category_name || req.query?.categoryName || req.query?.category_name || ''
+  ).trim();
+  if (directName) return directName;
+
+  const rawId = req.body?.categoryId || req.body?.category_id || req.query?.categoryId || req.query?.category_id;
+  const categoryId = Number.parseInt(rawId, 10);
+  if (!Number.isFinite(categoryId) || categoryId <= 0) return 'uncategorized';
+
+  try {
+    const result = await pool.query('SELECT name FROM categories WHERE id = $1 LIMIT 1', [categoryId]);
+    return String(result.rows?.[0]?.name || 'uncategorized').trim() || 'uncategorized';
+  } catch (_) {
+    return 'uncategorized';
+  }
+};
+
 router.post('/product-image', ensureAuth, productUpload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Image is required' });
@@ -48,22 +67,28 @@ router.post('/product-image', ensureAuth, productUpload.single('image'), async (
 
   const productId = parseProductId(req);
   const productName = parseProductName(req);
+  const categoryName = await parseCategoryName(req);
   const requestedPublicId = String(req.body?.public_id || '').trim();
 
   try {
     const publicId = requestedPublicId
-      || (productId ? cloudinary.publicIdForProduct(productId, productName, 'primary') : null);
+      || cloudinary.publicIdForCategorizedProduct({
+        categoryName,
+        productName,
+        userId: req.user?.id,
+        extension: 'jpeg'
+      });
 
     const result = await cloudinary.uploadFile(req.file.path, {
-      folder: 'agricatch/products',
       public_id: publicId || undefined,
-      overwrite: Boolean(publicId),
-      invalidate: Boolean(publicId),
+      overwrite: Boolean(requestedPublicId),
+      invalidate: Boolean(requestedPublicId),
       resource_type: 'image',
       tags: [
         'app:agricatch',
         'entity:product',
         productId ? `entity_id:${productId}` : 'entity_id:unknown',
+        `category:${cloudinary.slugify(categoryName)}`,
         'role:primary'
       ],
       transformation: [
