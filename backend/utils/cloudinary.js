@@ -1,10 +1,76 @@
-// Cloudinary configuration for backend
+// Cloudinary configuration and upload helpers.
 const cloudinary = require('cloudinary').v2;
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dwv7lhgvm',
-  api_key: process.env.CLOUDINARY_API_KEY || '939952877662233',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'Q0b0NBx8dZkYA7tuFGXcpm_3h7Q',
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true
 });
+
+const slugify = (value) => {
+  const base = String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return base || 'item';
+};
+
+const manilaTimestamp = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).formatToParts(new Date());
+
+  const get = (type) => parts.find((part) => part.type === type)?.value || '00';
+  return `${get('year')}${get('month')}${get('day')}-${get('hour')}${get('minute')}${get('second')}`;
+};
+
+const publicIdForProduct = (productId, productName, role = 'primary') => {
+  const idPart = String(productId || 'unknown').trim();
+  const namePart = slugify(productName || 'product');
+  if (role === 'primary') {
+    return `agricatch/products/${idPart}/${namePart}`;
+  }
+  return `agricatch/products/${idPart}/gallery/${namePart}-${manilaTimestamp()}`;
+};
+
+const publicIdForUserPhoto = (userId, kind = 'avatar') => {
+  const safeKind = slugify(kind || 'avatar');
+  return `agricatch/users/${String(userId || 'unknown').trim()}/${safeKind}-${manilaTimestamp()}`;
+};
+
+const uploadFile = async (localPath, options = {}) => {
+  const uploadOptions = {
+    resource_type: 'image',
+    ...options
+  };
+  return cloudinary.uploader.upload(localPath, uploadOptions);
+};
+
+const getMissingCloudinaryEnv = () => {
+  const required = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
+  return required.filter((key) => !String(process.env[key] || '').trim());
+};
+
+const assertConfigured = () => {
+  const missing = getMissingCloudinaryEnv();
+  if (!missing.length) return;
+  throw new Error(`Missing Cloudinary env vars: ${missing.join(', ')}`);
+};
+
+cloudinary.slugify = slugify;
+cloudinary.manilaTimestamp = manilaTimestamp;
+cloudinary.publicIdForProduct = publicIdForProduct;
+cloudinary.publicIdForUserPhoto = publicIdForUserPhoto;
+cloudinary.uploadFile = uploadFile;
+cloudinary.getMissingCloudinaryEnv = getMissingCloudinaryEnv;
+cloudinary.assertConfigured = assertConfigured;
 
 module.exports = cloudinary;
