@@ -8,7 +8,11 @@
     "dev": "nodemon server.js",
     "seed:extra-products": "node scripts/seed_extra_products.js",
     "seed:refresh-catalog-smoke": "node scripts/refresh_catalog_and_smoke.js",
-    "clean:placeholders": "node scripts/clean_placeholder_products.js"
+    "clean:placeholders": "node scripts/clean_placeholder_products.js",
+    "clean:cloudinary-unused": "node scripts/cleanup_cloudinary_unused.js",
+    "clean:cloudinary-unused:confirm": "node scripts/cleanup_cloudinary_unused.js --confirm",
+    "tag:cloudinary-assets": "node scripts/tag_db_assets.js --dry-run --export=tmp/tagged_assets.csv",
+    "tag:cloudinary-assets:confirm": "node scripts/tag_db_assets.js --confirm --export=tmp/tagged_assets_confirm.csv"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
