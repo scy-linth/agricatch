@@ -10,8 +10,16 @@ const args = process.argv.slice(2);
 const doConfirm = args.includes('--confirm');
 const exportArg = args.find((arg) => arg.startsWith('--export='));
 const idRangeArg = args.find((arg) => arg.startsWith('--id-range='));
+const whereArg = args.find((arg) => arg.startsWith('--where='));
 
 const exportPath = exportArg ? exportArg.split('=').slice(1).join('=').trim() : null;
+
+const ALLOWED_WHERE_COLUMNS = new Map([
+  ['id', 'number'],
+  ['farmer_id', 'number'],
+  ['category_id', 'number'],
+  ['is_available', 'boolean']
+]);
 
 const parseIdRange = () => {
   if (!idRangeArg) return null;
@@ -23,6 +31,58 @@ const parseIdRange = () => {
     throw new Error('Invalid --id-range value. Use --id-range=min:max (positive integers).');
   }
   return { min, max };
+};
+
+const parseWhereFilter = () => {
+  if (!whereArg) return [];
+  const raw = whereArg.split('=').slice(1).join('=').trim();
+  if (!raw) {
+    throw new Error('Invalid --where value. Example: --where="farmer_id=12 AND is_available=true"');
+  }
+
+  const clauses = raw.split(/\s+AND\s+/i).map((part) => part.trim()).filter(Boolean);
+  if (!clauses.length) {
+    throw new Error('Invalid --where value. Expected one or more AND-separated predicates.');
+  }
+
+  return clauses.map((clause) => {
+    const match = clause.match(/^([a-z_][a-z0-9_]*)\s*(=|!=|>=|<=|>|<)\s*(.+)$/i);
+    if (!match) {
+      throw new Error(`Invalid --where predicate: "${clause}"`);
+    }
+
+    const column = match[1].toLowerCase();
+    const operator = match[2];
+    let rawValue = match[3].trim();
+    const expectedType = ALLOWED_WHERE_COLUMNS.get(column);
+
+    if (!expectedType) {
+      throw new Error(`Unsupported --where column: "${column}"`);
+    }
+
+    // Strip optional wrapping quotes for convenience.
+    if ((rawValue.startsWith('"') && rawValue.endsWith('"')) || (rawValue.startsWith("'") && rawValue.endsWith("'"))) {
+      rawValue = rawValue.slice(1, -1);
+    }
+
+    let value;
+    if (expectedType === 'number') {
+      value = Number.parseInt(rawValue, 10);
+      if (!Number.isFinite(value)) {
+        throw new Error(`Invalid numeric value in --where for ${column}: "${rawValue}"`);
+      }
+    } else if (expectedType === 'boolean') {
+      const normalized = rawValue.toLowerCase();
+      if (normalized !== 'true' && normalized !== 'false') {
+        throw new Error(`Invalid boolean value in --where for ${column}: "${rawValue}"`);
+      }
+      value = normalized === 'true';
+    } else {
+      value = rawValue;
+    }
+
+    return { column, operator, value };
+  });
 };
 
 const extractCloudinaryPublicId = (url) => {
@@ -61,22 +121,28 @@ const writeCsv = (rows, outputPath) => {
   return absPath;
 };
 
-async function fetchProducts(range) {
+async function fetchProducts(range, whereFilters) {
+  const whereClauses = [];
+  const params = [];
+
   if (range) {
-    const result = await pool.query(
-      `SELECT id, cloudinary_public_id, image_url
-       FROM products
-       WHERE id BETWEEN $1 AND $2
-       ORDER BY id ASC`,
-      [range.min, range.max]
-    );
-    return result.rows;
+    params.push(range.min);
+    params.push(range.max);
+    whereClauses.push(`id BETWEEN $${params.length - 1} AND $${params.length}`);
   }
 
+  for (const filter of whereFilters) {
+    params.push(filter.value);
+    whereClauses.push(`${filter.column} ${filter.operator} $${params.length}`);
+  }
+
+  const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
   const result = await pool.query(
     `SELECT id, cloudinary_public_id, image_url
      FROM products
-     ORDER BY id ASC`
+     ${whereSql}
+     ORDER BY id ASC`,
+    params
   );
   return result.rows;
 }
@@ -94,14 +160,25 @@ async function main() {
   cloudinary.assertConfigured();
 
   const range = parseIdRange();
+  const whereFilters = parseWhereFilter();
+
+  if (range && whereFilters.length) {
+    throw new Error('Use either --id-range or --where, not both.');
+  }
+
   console.log('Mode:', doConfirm ? 'confirm (apply tags)' : 'dry-run (report only)');
   if (range) {
     console.log(`Scope: products id ${range.min} to ${range.max}`);
+  } else if (whereFilters.length) {
+    const scopeText = whereFilters
+      .map((f) => `${f.column} ${f.operator} ${String(f.value)}`)
+      .join(' AND ');
+    console.log(`Scope: products where ${scopeText}`);
   } else {
     console.log('Scope: all products');
   }
 
-  const products = await fetchProducts(range);
+  const products = await fetchProducts(range, whereFilters);
   console.log('Products loaded:', products.length);
 
   let processed = 0;
