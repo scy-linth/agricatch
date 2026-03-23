@@ -1714,6 +1714,24 @@ class FarmerDashboard {
         return data.imageUrl;
     }
 
+    async uploadProductImage(file) {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const response = await fetch(`${this.apiBase}/upload/product-image`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${this.token}` },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.message || 'Product image upload failed');
+        }
+
+        return response.json();
+    }
+
     renderShopImagePreview(previewId, imageUrl) {
         const preview = document.getElementById(previewId);
         if (!preview || !imageUrl) return;
@@ -2466,28 +2484,15 @@ class FarmerDashboard {
             return;
         }
 
-        // Handle image upload to Cloudinary
+        // Upload image through backend so production domain always stores Cloudinary URLs consistently.
         let imageUrl = '';
+        let imagePublicId = '';
         const imageFile = document.getElementById('product-image').files[0];
         if (imageFile) {
-            const cloudData = new FormData();
-            cloudData.append('file', imageFile);
-            cloudData.append('upload_preset', 'agricatch');
-            cloudData.append('folder', 'products');
             try {
-                const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dwv7lhgvm/image/upload', {
-                    method: 'POST',
-                    body: cloudData
-                });
-                const cloudJson = await cloudRes.json();
-                if (cloudJson.secure_url) {
-                    imageUrl = cloudJson.secure_url;
-                    // include public_id so backend can store it for safe deletions
-                    var imagePublicId = cloudJson.public_id;
-                } else {
-                    this.showMessage('Image upload failed: ' + (cloudJson.error?.message || 'Unknown error'), 'error');
-                    return;
-                }
+                const uploaded = await this.uploadProductImage(imageFile);
+                imageUrl = uploaded.imageUrl || '';
+                imagePublicId = uploaded.public_id || '';
             } catch (err) {
                 this.showMessage('Image upload failed: ' + err.message, 'error');
                 return;
@@ -2568,7 +2573,14 @@ class FarmerDashboard {
 
         const imageFile = document.getElementById('edit-product-image').files[0];
         if (imageFile) {
-            formData.append('image', imageFile);
+            try {
+                const uploaded = await this.uploadProductImage(imageFile);
+                if (uploaded.imageUrl) formData.append('image_url', uploaded.imageUrl);
+                if (uploaded.public_id) formData.append('cloudinary_public_id', uploaded.public_id);
+            } catch (err) {
+                this.showMessage('Image upload failed: ' + err.message, 'error');
+                return;
+            }
         }
 
         try {

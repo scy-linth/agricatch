@@ -30,6 +30,26 @@ function normalizeDescription(value) {
   return cleaned;
 }
 
+const extractCloudinaryPublicId = (url) => {
+  if (!url) return null;
+  const value = String(url).trim();
+  const match = value.match(
+    /^https:\/\/res\.cloudinary\.com\/[^\/]+\/(?:image|video)\/upload\/(?:[^\/]+\/)*?(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?(?:\?.*)?$/
+  );
+  return match && match[1] ? match[1] : null;
+};
+
+const removeCloudinaryAssetIfAny = async (row) => {
+  try {
+    if (!row) return;
+    const publicId = row.cloudinary_public_id || extractCloudinaryPublicId(row.image_url);
+    if (!publicId) return;
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+  } catch (err) {
+    console.warn('Cloudinary cleanup warning:', err && (err.message || err));
+  }
+};
+
 const NON_EXPIRED_PRODUCT_SQL = `(p.expiry_date IS NULL OR p.expiry_date >= CURRENT_DATE)`;
 const PRODUCT_DESCRIPTION_MAX_LENGTH = 500;
 const FEATURED_CATEGORY_GROUPS = [
@@ -865,13 +885,34 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'Invalid category. Fishery categories are not allowed.' });
     }
 
-    // Determine image URL: prefer explicit `image_url`, otherwise use uploaded file
+    await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS cloudinary_public_id VARCHAR(255)');
+
+    // Determine image URL/public id: prefer explicit image_url, but any uploaded file is always sent to Cloudinary.
     let imageUrl = null;
+    let imagePublicId = null;
     if (image_url && String(image_url).trim() !== '') {
-      imageUrl = image_url;
-    } else if (req.file && req.file.filename) {
-      const dateFolder = new Date().toISOString().split('T')[0];
-      imageUrl = `/images/uploads/products/${dateFolder}/${req.file.filename}`;
+      imageUrl = String(image_url).trim();
+      imagePublicId = req.body?.cloudinary_public_id || extractCloudinaryPublicId(imageUrl) || null;
+    }
+
+    if (req.file && req.file.path) {
+      try {
+        const uploaded = await cloudinary.uploader.upload(req.file.path, {
+          folder: 'products',
+          resource_type: 'image',
+          transformation: [
+            { width: 1200, crop: 'limit', quality: 'auto' },
+            { fetch_format: 'auto' }
+          ]
+        });
+        imageUrl = uploaded.secure_url;
+        imagePublicId = uploaded.public_id;
+      } catch (uploadErr) {
+        deleteFileIfExists(req.file.path);
+        return res.status(500).json({ message: 'Cloudinary upload failed' });
+      } finally {
+        deleteFileIfExists(req.file.path);
+      }
     }
 
     // Auto-populate location with shop address if not provided
@@ -885,30 +926,19 @@ router.post('/', productUpload.single('image'), async (req, res) => {
     const harvestDateValue = (harvest_date && String(harvest_date).trim() !== '') ? harvest_date : null;
     const expiryDateValue = (expiry_date && String(expiry_date).trim() !== '') ? expiry_date : null;
 
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS cloudinary_public_id VARCHAR(255)");
-
     const result = await pool.query(`
       INSERT INTO products (name, description, price, category_id, farmer_id, stock_quantity,
-                           unit, image_url, location, harvest_date, expiry_date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                           unit, image_url, location, harvest_date, expiry_date, cloudinary_public_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `, [name, normalizedDescription, price, category_id, decoded.id, stock_quantity,
-         unit, imageUrl, productLocation, harvestDateValue, expiryDateValue]);
+         unit, imageUrl, productLocation, harvestDateValue, expiryDateValue, imagePublicId]);
 
     broadcastEvent('product.updated', {
       action: 'product.create',
       product_id: Number(result.rows[0].id),
       farmer_id: Number(decoded.id)
     });
-
-    // If client provided a Cloudinary public_id when creating via uploaded image, store it.
-    if (req.body && req.body.cloudinary_public_id) {
-      try {
-        await pool.query('UPDATE products SET cloudinary_public_id = $1 WHERE id = $2', [req.body.cloudinary_public_id, result.rows[0].id]);
-      } catch (e) {
-        console.warn('Failed to store cloudinary_public_id for new product:', e && (e.message || e));
-      }
-    }
 
     res.status(201).json({
       message: 'Product added successfully',
@@ -986,17 +1016,38 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'Invalid category. Fishery categories are not allowed.' });
     }
 
-    // Determine image URL: prefer explicit `image_url`, otherwise use uploaded file, otherwise keep current
+    // Determine image URL: use explicit cloud URL if provided, otherwise keep current.
+    // If a new file is uploaded, it is always uploaded to Cloudinary.
     let imageUrl = current.image_url;
+    let imagePublicId = current.cloudinary_public_id || extractCloudinaryPublicId(current.image_url) || null;
     if (typeof image_url !== 'undefined' && image_url !== null && String(image_url).trim() !== '') {
-      imageUrl = image_url;
-    } else if (req.file && req.file.filename) {
-      const dateFolder = new Date().toISOString().split('T')[0];
-      imageUrl = `/images/uploads/products/${dateFolder}/${req.file.filename}`;
+      imageUrl = String(image_url).trim();
+      imagePublicId = req.body?.cloudinary_public_id || extractCloudinaryPublicId(imageUrl) || null;
     }
 
-    // If a new file was uploaded and an old image exists on disk, delete the old file
-    if (req.file && current.image_url) {
+    if (req.file && req.file.path) {
+      let uploaded;
+      try {
+        uploaded = await cloudinary.uploader.upload(req.file.path, {
+          folder: 'products',
+          resource_type: 'image',
+          transformation: [
+            { width: 1200, crop: 'limit', quality: 'auto' },
+            { fetch_format: 'auto' }
+          ]
+        });
+      } catch (uploadErr) {
+        deleteFileIfExists(req.file.path);
+        return res.status(500).json({ message: 'Cloudinary upload failed' });
+      } finally {
+        deleteFileIfExists(req.file.path);
+      }
+
+      imageUrl = uploaded.secure_url;
+      imagePublicId = uploaded.public_id;
+
+      await removeCloudinaryAssetIfAny(current);
+
       try {
         const oldPath = resolvePublicPath(current.image_url);
         if (oldPath) deleteFileIfExists(oldPath);
@@ -1010,19 +1061,11 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
         name = $1, description = $2, price = $3, category_id = $4,
         stock_quantity = $5, unit = $6, image_url = $7, location = $8,
         harvest_date = $9, expiry_date = $10, is_available = $11,
+        cloudinary_public_id = $12,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $12
+      WHERE id = $13
     `, [nextName, nextDescription, nextPrice, nextCategoryId, nextStockQuantity, nextUnit,
-         imageUrl, nextLocation, nextHarvestDate, nextExpiryDate, nextIsAvailable, id]);
-
-    // If client provided a cloudinary public_id, store it. If a new local file was uploaded,
-    // clear any existing cloudinary_public_id for this product.
-    if (typeof req.body.cloudinary_public_id !== 'undefined') {
-      await pool.query('UPDATE products SET cloudinary_public_id = $1 WHERE id = $2', [req.body.cloudinary_public_id || null, id]);
-    } else if (req.file && productResult.rows[0] && productResult.rows[0].cloudinary_public_id) {
-      // Clearing stored public_id when replacing remote image with a local upload
-      await pool.query('UPDATE products SET cloudinary_public_id = NULL WHERE id = $1', [id]);
-    }
+         imageUrl, nextLocation, nextHarvestDate, nextExpiryDate, nextIsAvailable, imagePublicId, id]);
 
     broadcastEvent('product.updated', {
       action: 'product.update',
