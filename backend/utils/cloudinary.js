@@ -46,6 +46,13 @@ const publicIdForUserPhoto = (userId, kind = 'avatar') => {
   return `agricatch/users/${String(userId || 'unknown').trim()}/${safeKind}-${manilaTimestamp()}`;
 };
 
+// uploadFile(localPath, options)
+// Supported options mirror Cloudinary uploader options. Most common keys:
+// - folder: target folder path in Cloudinary
+// - public_id: deterministic asset identifier
+// - overwrite: replace existing asset at public_id when true
+// - resource_type: usually "image" for product/shop assets
+// - tags: string[] for governance and cleanup filters
 const uploadFile = async (localPath, options = {}) => {
   const uploadOptions = {
     resource_type: 'image',
