@@ -38,6 +38,46 @@ const loadCategoryNameById = async (categoryId) => {
   return String(result.rows?.[0]?.name || 'uncategorized').trim() || 'uncategorized';
 };
 
+const categorizedProductPublicIdPrefix = ({ categoryName, productName, userId }) => {
+  return `agricatch/${cloudinary.slugify(categoryName || 'uncategorized')}/${cloudinary.slugify(productName || 'product')}/${String(userId || 'unknown').trim()}-`;
+};
+
+const rehomeProductImageToCategorizedId = async ({ categoryName, productName, userId, imagePublicId, imageUrl }) => {
+  const sourcePublicId = imagePublicId || extractCloudinaryPublicId(imageUrl);
+  if (!sourcePublicId) {
+    return { imagePublicId, imageUrl, changed: false };
+  }
+
+  const targetPrefix = categorizedProductPublicIdPrefix({ categoryName, productName, userId });
+  if (sourcePublicId.startsWith(targetPrefix)) {
+    return { imagePublicId: sourcePublicId, imageUrl, changed: false };
+  }
+
+  const targetPublicId = cloudinary.publicIdForCategorizedProduct({
+    categoryName,
+    productName,
+    userId,
+    extension: 'jpeg'
+  });
+
+  try {
+    const renamed = await cloudinary.uploader.rename(sourcePublicId, targetPublicId, {
+      resource_type: 'image',
+      overwrite: true,
+      invalidate: true
+    });
+    return {
+      imagePublicId: renamed.public_id || targetPublicId,
+      imageUrl: renamed.secure_url || cloudinary.url(targetPublicId, { secure: true }) || imageUrl,
+      changed: true
+    };
+  } catch (err) {
+    const message = String(err && (err.message || err));
+    console.warn('Failed to rehome admin-updated product image:', sourcePublicId, '->', targetPublicId, message);
+    return { imagePublicId: sourcePublicId, imageUrl, changed: false };
+  }
+};
+
 const ensureCategoryAdminSchema = async () => {
   await pool.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS type VARCHAR(50)`);
   await pool.query(`
@@ -618,7 +658,7 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
     const nextName = String(name || current.name || '').trim();
     const nextCategoryId = Number.parseInt(category_id, 10) || Number.parseInt(current.category_id, 10) || null;
     const resolvedCategoryName = await loadCategoryNameById(nextCategoryId);
-    const uploaderUserId = req.user?.id || current.farmer_id || 'unknown';
+    const uploaderUserId = current.farmer_id || req.user?.id || 'unknown';
     const targetPublicId = cloudinary.publicIdForCategorizedProduct({
       categoryName: resolvedCategoryName,
       productName: nextName,
@@ -661,6 +701,21 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
         return res.status(500).json({ message: 'Image upload failed' });
       } finally {
         deleteFileIfExists(req.file.path);
+      }
+    }
+
+    if (!req.file && image_url && String(image_url).trim() !== '') {
+      const explicitPublicId = req.body.cloudinary_public_id || extractCloudinaryPublicId(image_url);
+      if (explicitPublicId) {
+        const moved = await rehomeProductImageToCategorizedId({
+          categoryName: resolvedCategoryName,
+          productName: nextName,
+          userId: uploaderUserId,
+          imagePublicId: explicitPublicId,
+          imageUrl: image_url
+        });
+        image_url = moved.imageUrl || image_url;
+        imagePublicId = moved.imagePublicId || explicitPublicId;
       }
     }
 

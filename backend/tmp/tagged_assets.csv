@@ -1,0 +1,9 @@
+product_id,public_id,exists,missing_tags,applied_tags,status
+1,products/1774240841566-21mufp2cfwqj,false,,,error:Must supply cloud_name
+7,products/1774240829797-otxet0huk4,false,,,error:Must supply cloud_name
+8,products/1774240813980-qjo8if1lmvs,false,,,error:Must supply cloud_name
+9,products/1774240782376-od9eifmyh4,false,,,error:Must supply cloud_name
+10,products/1774240768864-ne9ruvind4p,false,,,error:Must supply cloud_name
+11,products/gig7cbxg7pmwb3assihz,false,,,error:Must supply cloud_name
+12,products/1774240988509-ooie6bcvdj,false,,,error:Must supply cloud_name
+15,products/1774250214001-e173g903tym,false,,,error:Must supply cloud_name

@@ -1064,7 +1064,20 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
         console.warn('Failed to delete old product image:', e.message || e);
       }
 
-      // Keep the provided Cloudinary image as-is when URL/public_id is explicitly provided.
+      // Normalize explicit Cloudinary replacements to the required agricatch/category/product path.
+      if (imagePublicId) {
+        const moved = await rehomeProductImageToCategorizedId({
+          categoryName: resolvedCategoryName,
+          productName: nextName,
+          userId: decoded.id,
+          imagePublicId,
+          imageUrl
+        });
+        if (moved.imagePublicId) {
+          imagePublicId = moved.imagePublicId;
+          imageUrl = moved.imageUrl || imageUrl;
+        }
+      }
     }
 
     if (req.file && req.file.path) {
