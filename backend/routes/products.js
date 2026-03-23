@@ -677,6 +677,7 @@ router.get('/:id/similar-sellers', async (req, res) => {
     const similarRes = await pool.query(
       `
         SELECT p.id, p.name, p.price, p.unit, p.stock_quantity, p.sales_count, p.image_url,
+               COALESCE(s.sold_qty, 0)::int AS sold_qty,
                p.farmer_id, u.full_name AS farmer_name,
                COALESCE(u.average_rating, 0) as farmer_average_rating,
                COALESCE(u.total_reviews, 0) as farmer_total_reviews,
@@ -684,6 +685,12 @@ router.get('/:id/similar-sellers', async (req, res) => {
                (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) AS total_reviews
         FROM products p
         LEFT JOIN users u ON u.id = p.farmer_id
+        LEFT JOIN (
+          SELECT product_id, COALESCE(SUM(quantity), 0)::int AS sold_qty
+          FROM orders
+          WHERE status = 'delivered'
+          GROUP BY product_id
+        ) s ON s.product_id = p.id
         WHERE p.id <> $1
           AND p.farmer_id <> $2
           AND p.is_available = true
@@ -694,7 +701,7 @@ router.get('/:id/similar-sellers', async (req, res) => {
             OR p.name ILIKE $4
           )
           AND ($5::int IS NULL OR p.category_id = $5)
-        ORDER BY p.price ASC, p.sales_count DESC
+        ORDER BY p.price ASC, COALESCE(s.sold_qty, 0) DESC
         LIMIT 3
       `,
       [id, target.farmer_id, target.name, `${String(target.name || '').split('(')[0].trim()}%`, target.category_id || null]
@@ -702,12 +709,12 @@ router.get('/:id/similar-sellers', async (req, res) => {
 
     const rows = similarRes.rows || [];
     const lowestPrice = rows.length ? Math.min(...rows.map(r => Number(r.price) || 0)) : null;
-    const highestSales = rows.length ? Math.max(...rows.map(r => Number(r.sales_count) || 0)) : null;
+    const highestSales = rows.length ? Math.max(...rows.map(r => Number(r.sold_qty) || 0)) : null;
 
     const similar = rows.map((item) => {
       const badges = [];
       if (lowestPrice !== null && Number(item.price) === Number(lowestPrice)) badges.push('Lowest Price');
-      if (highestSales !== null && Number(item.sales_count) === Number(highestSales) && highestSales > 0) badges.push('Best Selling');
+      if (highestSales !== null && Number(item.sold_qty) === Number(highestSales) && highestSales > 0) badges.push('Best Selling');
       if (Number(item.average_rating || 0) >= 4.5) badges.push('Top Rated');
       return { ...item, badges };
     });
