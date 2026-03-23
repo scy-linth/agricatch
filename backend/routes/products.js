@@ -931,9 +931,35 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
     // If a new file is uploaded, it is always uploaded to Cloudinary.
     let imageUrl = current.image_url;
     let imagePublicId = current.cloudinary_public_id || extractCloudinaryPublicId(current.image_url) || null;
+
+    // Keep track of the current and incoming Cloudinary public IDs so we can
+    // remove the previous Cloudinary asset when the farmer explicitly sets
+    // a different Cloudinary-hosted image (to avoid orphaned assets).
+    const oldPublicId = current.cloudinary_public_id || extractCloudinaryPublicId(current.image_url) || null;
+    let newPublicId = imagePublicId;
+
     if (typeof image_url !== 'undefined' && image_url !== null && String(image_url).trim() !== '') {
       imageUrl = String(image_url).trim();
-      imagePublicId = req.body?.cloudinary_public_id || extractCloudinaryPublicId(imageUrl) || null;
+      newPublicId = req.body?.cloudinary_public_id || extractCloudinaryPublicId(imageUrl) || null;
+      imagePublicId = newPublicId;
+
+      // If replacing a Cloudinary-hosted image with a different Cloudinary asset,
+      // attempt to destroy the old one. Non-fatal: log warnings but do not block update.
+      if (oldPublicId && newPublicId && oldPublicId !== newPublicId) {
+        try {
+          await cloudinary.uploader.destroy(oldPublicId, { resource_type: 'image' });
+        } catch (destroyErr) {
+          console.warn('Failed to destroy previous Cloudinary asset:', oldPublicId, destroyErr && (destroyErr.message || destroyErr));
+        }
+      }
+
+      // If the previous image was stored locally, try to remove that file as well.
+      try {
+        const oldPath = resolvePublicPath(current.image_url);
+        if (oldPath) deleteFileIfExists(oldPath);
+      } catch (e) {
+        console.warn('Failed to delete old product image:', e.message || e);
+      }
     }
 
     if (req.file && req.file.path) {

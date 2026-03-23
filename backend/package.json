@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "seed:extra-products": "node scripts/seed_extra_products.js",
-    "seed:refresh-catalog-smoke": "node scripts/refresh_catalog_and_smoke.js"
+    "seed:refresh-catalog-smoke": "node scripts/refresh_catalog_and_smoke.js",
+    "clean:placeholders": "node scripts/clean_placeholder_products.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
