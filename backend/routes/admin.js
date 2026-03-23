@@ -22,6 +22,22 @@ let superAdminProfile = {
 
 const router = express.Router();
 
+const extractCloudinaryPublicId = (url) => {
+  if (!url) return null;
+  const value = String(url).trim();
+  const match = value.match(
+    /^https:\/\/res\.cloudinary\.com\/[^\/]+\/(?:image|video)\/upload\/(?:[^\/]+\/)*?(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?(?:\?.*)?$/
+  );
+  return match && match[1] ? match[1] : null;
+};
+
+const loadCategoryNameById = async (categoryId) => {
+  const id = Number.parseInt(categoryId, 10);
+  if (!Number.isFinite(id) || id <= 0) return 'uncategorized';
+  const result = await pool.query('SELECT name FROM categories WHERE id = $1 LIMIT 1', [id]);
+  return String(result.rows?.[0]?.name || 'uncategorized').trim() || 'uncategorized';
+};
+
 const ensureCategoryAdminSchema = async () => {
   await pool.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS type VARCHAR(50)`);
   await pool.query(`
@@ -587,15 +603,44 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
       is_available
     } = req.body;
 
+    // Ensure products table has cloudinary_public_id column
+    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS cloudinary_public_id VARCHAR(255)");
+
+    const productResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const current = productResult.rows[0];
     let image_url = req.body.image_url;
     let imagePublicId = null;
+
+    const nextName = String(name || current.name || '').trim();
+    const nextCategoryId = Number.parseInt(category_id, 10) || Number.parseInt(current.category_id, 10) || null;
+    const resolvedCategoryName = await loadCategoryNameById(nextCategoryId);
+    const uploaderUserId = req.user?.id || current.farmer_id || 'unknown';
+    const targetPublicId = cloudinary.publicIdForCategorizedProduct({
+      categoryName: resolvedCategoryName,
+      productName: nextName,
+      userId: uploaderUserId,
+      extension: 'jpeg'
+    });
+    const oldPublicId = current.cloudinary_public_id || extractCloudinaryPublicId(current.image_url) || null;
+
     if (req.file && req.file.path) {
       try {
-        const uploaded = await cloudinary.uploader.upload(req.file.path, {
-          folder: 'products',
-          use_filename: true,
-          unique_filename: false,
+        const uploaded = await cloudinary.uploadFile(req.file.path, {
+          public_id: targetPublicId,
+          overwrite: true,
+          invalidate: true,
           resource_type: 'image',
+          tags: [
+            'app:agricatch',
+            'entity:product',
+            `entity_id:${id}`,
+            `category:${cloudinary.slugify(resolvedCategoryName)}`,
+            'role:primary'
+          ],
           transformation: [
             { width: 1200, crop: 'limit', quality: 'auto' },
             { fetch_format: 'auto' }
@@ -603,20 +648,20 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
         });
         image_url = uploaded.secure_url;
         imagePublicId = uploaded.public_id;
+
+        if (oldPublicId && imagePublicId && oldPublicId !== imagePublicId) {
+          try {
+            await cloudinary.uploader.destroy(oldPublicId, { resource_type: 'image' });
+          } catch (destroyErr) {
+            console.warn('Failed to destroy previous Cloudinary asset:', oldPublicId, destroyErr && (destroyErr.message || destroyErr));
+          }
+        }
       } catch (uploadError) {
         console.error('Cloudinary upload failed:', uploadError);
         return res.status(500).json({ message: 'Image upload failed' });
       } finally {
         deleteFileIfExists(req.file.path);
       }
-    }
-
-    // Ensure products table has cloudinary_public_id column
-    await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS cloudinary_public_id VARCHAR(255)");
-
-    const productResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
-    if (productResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Product not found' });
     }
 
     const updates = [];
