@@ -1,0 +1,11 @@
+product_id,name,from_public_id,to_public_id,status
+1,Ampalaya,agricatch/products/1/ampalaya,agricatch/vegetables/ampalaya/8-20260323-222747.jpeg,would_migrate
+7,Calamansi,agricatch/products/7/calamansi,agricatch/fruits/calamansi/8-20260323-222747.jpeg,would_migrate
+8,Ampalaya,agricatch/products/8/ampalaya,agricatch/vegetables/ampalaya/8-20260323-222747.jpeg,would_migrate
+9,Bawang,agricatch/products/9/bawang,agricatch/vegetables/bawang/8-20260323-222747.jpeg,would_migrate
+10,Bawang,agricatch/products/10/bawang,agricatch/vegetables/bawang/8-20260323-222747.jpeg,would_migrate
+11,Kangkong,agricatch/products/11/kangkong,agricatch/vegetables/kangkong/8-20260323-222747.jpeg,would_migrate
+12,Brown rice,agricatch/products/12/brown-rice,agricatch/rice-grains-staples/brown-rice/20-20260323-222747.jpeg,would_migrate
+15,Chico,agricatch/products/15/chico,agricatch/fruits/chico/8-20260323-222747.jpeg,would_migrate
+16,Baboy - Atay,agricatch/products/16/baboy-atay,agricatch/meat-poultry/baboy-atay/8-20260323-222747.jpeg,would_migrate
+17,Baboy - Atay,agricatch/products/17/baboy-atay,agricatch/meat-poultry/baboy-atay/8-20260323-222747.jpeg,would_migrate

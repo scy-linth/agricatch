@@ -2581,10 +2581,7 @@ class FarmerDashboard {
         const submitBtn = document.querySelector('#edit-product-form button[type="submit"]');
         const originalSubmitText = submitBtn ? submitBtn.textContent : '';
         this.isSubmittingEditProduct = true;
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Updating...';
-        }
+        this.setEditModalBusyState(true, originalSubmitText || 'Update Product');
 
         try {
 
@@ -2660,10 +2657,7 @@ class FarmerDashboard {
         }
         } finally {
             this.isSubmittingEditProduct = false;
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalSubmitText || 'Update Product';
-            }
+            this.setEditModalBusyState(false, originalSubmitText || 'Update Product');
         }
     }
 
@@ -2823,6 +2817,7 @@ class FarmerDashboard {
                 }
 
                 // Show modal
+                this.setEditModalBusyState(false, 'Update Product');
                 document.getElementById('edit-product-modal').classList.add('open');
                 this.switchTab('list-products');
             } else {
@@ -2835,9 +2830,38 @@ class FarmerDashboard {
     }
 
     closeEditModal() {
+        if (this.isSubmittingEditProduct) {
+            return;
+        }
+        this.setEditModalBusyState(false, 'Update Product');
         document.getElementById('edit-product-modal').classList.remove('open');
         document.getElementById('edit-product-form').reset();
         document.getElementById('edit-product-image-preview').innerHTML = '';
+    }
+
+    setEditModalBusyState(isBusy, submitLabel = 'Update Product') {
+        const modalEl = document.getElementById('edit-product-modal');
+        const submitBtn = document.querySelector('#edit-product-form button[type="submit"]');
+        const cancelBtn = document.getElementById('cancel-edit-btn');
+        const closeBtn = document.querySelector('#edit-product-modal .close-btn');
+
+        if (modalEl) {
+            modalEl.classList.toggle('busy', Boolean(isBusy));
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = Boolean(isBusy);
+            submitBtn.textContent = isBusy ? 'Updating...' : submitLabel;
+            submitBtn.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+        }
+        if (cancelBtn) {
+            cancelBtn.disabled = Boolean(isBusy);
+            cancelBtn.setAttribute('aria-disabled', isBusy ? 'true' : 'false');
+        }
+        if (closeBtn) {
+            closeBtn.disabled = Boolean(isBusy);
+            closeBtn.setAttribute('aria-disabled', isBusy ? 'true' : 'false');
+        }
     }
 
     switchTab(tabName) {

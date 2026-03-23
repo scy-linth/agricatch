@@ -7960,12 +7960,19 @@ textarea.invalid:focus {
     width: min(94vw, 980px);
     max-width: 980px;
     max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 #edit-product-modal .modal-header {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     color: var(--white);
     padding: 1rem 1.25rem;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    flex-shrink: 0;
 }
 
 #edit-product-modal .modal-header h3,
@@ -7977,6 +7984,9 @@ textarea.invalid:focus {
 #edit-product-modal .product-form {
     padding: 1.25rem 1.3rem;
     font-size: 1rem;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 #edit-product-modal .product-form label {
@@ -8003,6 +8013,22 @@ textarea.invalid:focus {
     padding: 0.6rem 1rem;
     font-size: 0.98rem;
     font-weight: 700;
+}
+
+#edit-product-modal .close-btn:disabled,
+#edit-product-modal #cancel-edit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+#edit-product-modal.busy .close-btn,
+#edit-product-modal.busy #cancel-edit-btn,
+#edit-product-modal .close-btn[aria-disabled="true"],
+#edit-product-modal #cancel-edit-btn[aria-disabled="true"] {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 @media (max-width: 900px) {
