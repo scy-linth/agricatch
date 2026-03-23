@@ -572,6 +572,7 @@ router.get('/featured', async (req, res) => {
     const result = await pool.query(
       `
         SELECT p.*, u.full_name AS farmer_name,
+               COALESCE(s.sold_qty, 0)::int AS sold_qty,
                COALESCE(u.average_rating, 0) as farmer_average_rating,
                COALESCE(u.total_reviews, 0) as farmer_total_reviews,
                (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) AS average_rating,
@@ -579,9 +580,15 @@ router.get('/featured', async (req, res) => {
         FROM products p
         LEFT JOIN users u ON u.id = p.farmer_id
         LEFT JOIN categories c ON c.id = p.category_id
+        LEFT JOIN (
+          SELECT product_id, COALESCE(SUM(quantity), 0)::int AS sold_qty
+          FROM orders
+          WHERE status = 'delivered'
+          GROUP BY product_id
+        ) s ON s.product_id = p.id
         WHERE p.is_available = true
           AND p.stock_quantity > 0
-          AND COALESCE(p.sales_count, 0) > 0
+          AND COALESCE(s.sold_qty, 0) > 0
           AND ${NON_EXPIRED_PRODUCT_SQL}
           AND (
             c.id IS NULL
@@ -594,7 +601,7 @@ router.get('/featured', async (req, res) => {
             AND (p.description IS NULL OR p.description !~* '${FISHERY_KEYWORDS_PATTERN}')
           )
           ${categoryFilterSql}
-        ORDER BY p.price ASC, p.sales_count DESC, p.created_at DESC
+        ORDER BY p.price ASC, COALESCE(s.sold_qty, 0) DESC, p.created_at DESC
         LIMIT $1
       `,
       params
@@ -604,16 +611,7 @@ router.get('/featured', async (req, res) => {
       return res.json({ products: result.rows });
     }
 
-    return res.json({
-      products: [
-        { id: null, name: 'Kamatis (tomato)', price: 65, unit: 'kg', sales_count: 38, farmer_name: 'Mendoza Farm', image_url: '/images/logo.png' },
-        { id: null, name: 'Talong (eggplant)', price: 70, unit: 'kg', sales_count: 35, farmer_name: 'Santos Growers', image_url: '/images/logo.png' },
-        { id: null, name: 'Bawang (garlic)', price: 150, unit: 'kg', sales_count: 30, farmer_name: 'Ilocos Agro', image_url: '/images/logo.png' },
-        { id: null, name: 'Brown rice', price: 58, unit: 'kg', sales_count: 52, farmer_name: 'Nueva Ecija Rice Hub', image_url: '/images/logo.png' },
-        { id: null, name: 'Luya (ginger)', price: 120, unit: 'kg', sales_count: 24, farmer_name: 'Bukidnon Fresh', image_url: '/images/logo.png' },
-        { id: null, name: 'Native chicken eggs', price: 11, unit: 'pieces', sales_count: 58, farmer_name: 'San Jose Poultry', image_url: '/images/logo.png' }
-      ]
-    });
+    return res.json({ products: [] });
   } catch (error) {
     console.error('Featured products error:', error);
     return res.status(500).json({
@@ -714,101 +712,7 @@ router.get('/:id/similar-sellers', async (req, res) => {
       return { ...item, badges };
     });
 
-    if (similar.length > 0) {
-      return res.json({ similar });
-    }
-
-    const farmersResult = await pool.query(
-      `
-        SELECT id, full_name,
-               COALESCE(average_rating, 0) AS farmer_average_rating,
-               COALESCE(total_reviews, 0) AS farmer_total_reviews
-        FROM users
-        WHERE role = 'farmer'
-          AND id <> $1
-        ORDER BY id ASC
-        LIMIT 3
-      `,
-      [target.farmer_id]
-    );
-
-    if (!farmersResult.rows.length) {
-      return res.json({ similar: [] });
-    }
-
-    const templates = [
-      { price: 64, stock: 23, sales: 31 },
-      { price: 68, stock: 20, sales: 22 },
-      { price: 72, stock: 17, sales: 19 }
-    ];
-
-    const ensuredProducts = [];
-    for (let index = 0; index < farmersResult.rows.length; index++) {
-      const farmer = farmersResult.rows[index];
-      const tpl = templates[index] || templates[templates.length - 1];
-
-      const existing = await pool.query(
-        `
-          SELECT p.id, p.name, p.price, p.unit, p.stock_quantity, p.sales_count, p.image_url, p.farmer_id
-          FROM products p
-          WHERE p.farmer_id = $1
-            AND LOWER(p.name) = LOWER($2)
-            AND p.is_available = true
-            AND ${NON_EXPIRED_PRODUCT_SQL}
-          ORDER BY p.created_at DESC
-          LIMIT 1
-        `,
-        [farmer.id, target.name]
-      );
-
-      let productRow = existing.rows[0];
-      if (!productRow) {
-        const inserted = await pool.query(
-          `
-            INSERT INTO products (
-              name, description, price, category_id, farmer_id, stock_quantity,
-              unit, image_url, sales_count, is_available
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
-            RETURNING id, name, price, unit, stock_quantity, sales_count, image_url, farmer_id
-          `,
-          [
-            target.name,
-            'Placeholder listing created for prototype similar-shop preview.',
-            tpl.price,
-            target.category_id,
-            farmer.id,
-            tpl.stock,
-            'kg',
-            '/images/logo.png',
-            tpl.sales
-          ]
-        );
-        productRow = inserted.rows[0];
-      }
-
-      ensuredProducts.push({
-        ...productRow,
-        farmer_name: farmer.full_name,
-        farmer_average_rating: Number(farmer.farmer_average_rating || 0),
-        farmer_total_reviews: Number(farmer.farmer_total_reviews || 0),
-        average_rating: Number(farmer.farmer_average_rating || 0),
-        total_reviews: Number(farmer.farmer_total_reviews || 0)
-      });
-    }
-
-    const ensuredLowestPrice = ensuredProducts.length ? Math.min(...ensuredProducts.map(r => Number(r.price) || 0)) : null;
-    const ensuredHighestSales = ensuredProducts.length ? Math.max(...ensuredProducts.map(r => Number(r.sales_count) || 0)) : null;
-
-    const fallbackWithBadges = ensuredProducts.map((item) => {
-      const badges = [];
-      if (ensuredLowestPrice !== null && Number(item.price) === Number(ensuredLowestPrice)) badges.push('Lowest Price');
-      if (ensuredHighestSales !== null && Number(item.sales_count) === Number(ensuredHighestSales) && ensuredHighestSales > 0) badges.push('Best Selling');
-      if (Number(item.average_rating || 0) >= 4.5) badges.push('Top Rated');
-      return { ...item, badges };
-    });
-
-    return res.json({ similar: fallbackWithBadges });
+    return res.json({ similar });
   } catch (error) {
     console.error('Similar sellers error:', error);
     return res.status(500).json({ message: 'Server error fetching similar sellers' });

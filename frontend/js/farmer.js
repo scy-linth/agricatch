@@ -27,6 +27,8 @@ class FarmerDashboard {
         this.overviewCustomTo = null;   // YYYY-MM-DD
         this.overviewCharts = { sales: null, status: null, topProducts: null };
         this.overviewMetrics = null;
+        this.isSubmittingAddProduct = false;
+        this.isSubmittingEditProduct = false;
         this.overviewRecentOrdersCache = [];
         this.recentOrdersPage = 1;
         this.recentOrdersPerPage = 8;
@@ -2467,6 +2469,20 @@ class FarmerDashboard {
     async handleAddProduct(e) {
         e.preventDefault();
 
+        if (this.isSubmittingAddProduct) {
+            return;
+        }
+
+        const submitBtn = document.querySelector('#add-product-form button[type="submit"]');
+        const originalSubmitText = submitBtn ? submitBtn.textContent : '';
+        this.isSubmittingAddProduct = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding...';
+        }
+
+        try {
+
         const name = document.getElementById('product-name').value;
         const description = document.getElementById('product-description').value;
         const price = document.getElementById('product-price').value;
@@ -2538,10 +2554,31 @@ class FarmerDashboard {
             console.error('Error adding product:', error);
             this.showMessage('Error adding product', 'error');
         }
+        } finally {
+            this.isSubmittingAddProduct = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalSubmitText || 'Add Product';
+            }
+        }
     }
 
     async handleEditProduct(e) {
         e.preventDefault();
+
+        if (this.isSubmittingEditProduct) {
+            return;
+        }
+
+        const submitBtn = document.querySelector('#edit-product-form button[type="submit"]');
+        const originalSubmitText = submitBtn ? submitBtn.textContent : '';
+        this.isSubmittingEditProduct = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Updating...';
+        }
+
+        try {
 
         const productId = document.getElementById('edit-product-id').value;
         if (!productId) {
@@ -2605,6 +2642,13 @@ class FarmerDashboard {
         } catch (error) {
             console.error('Error updating product:', error);
             this.showMessage('Error updating product', 'error');
+        }
+        } finally {
+            this.isSubmittingEditProduct = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalSubmitText || 'Update Product';
+            }
         }
     }
 

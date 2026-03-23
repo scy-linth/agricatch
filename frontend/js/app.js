@@ -3571,6 +3571,7 @@ class AgricultureMarket {
                 const imageUrl = product.image_url && String(product.image_url).trim() !== ''
                     ? product.image_url
                     : window.__PLACEHOLDER_IMAGE__;
+                const soldCount = Number(product.sold_qty ?? product.sales_count ?? 0) || 0;
                 const itemLabel = product.id ? `onclick="app.showProductDetails(${product.id})" style="cursor:pointer;"` : '';
                 const productRating = Number(product.average_rating || 0);
                 const ratingValue = this.fmtNumber(productRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -3599,7 +3600,7 @@ class AgricultureMarket {
                                             Ships from ${shipFrom}
                                         </div>
                                         <div class="product-sold-left">
-                                            <span class="sold-count">Sold ${this.fmtNumber(product.sales_count || 0)}</span>
+                                            <span class="sold-count">Sold ${this.fmtNumber(soldCount)}</span>
                                         </div>
                                     </div>
                                 </div>
