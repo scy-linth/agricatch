@@ -230,77 +230,6 @@
                         <div id="my-products-grid" class="products-grid"></div>
                     </div>
 
-                    <div id="add-product-section" class="tab-content" data-tab-scope="products">
-                        <form id="add-product-form" class="product-form">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="product-category">Category *</label>
-                                    <select id="product-category" required>
-                                        <option value="">Select category</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="product-unit">Unit *</label>
-                                    <select id="product-unit" required>
-                                        <option value="kg">Kilogram (kg)</option>
-                                        <option value="pieces">Pieces</option>
-                                        <option value="boxes">Boxes</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="product-name">Product Name *</label>
-                                    <div class="product-name-field">
-                                        <input type="text" id="product-name" placeholder="Choose category first" autocomplete="off" disabled required>
-                                        <div id="product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product name suggestions"></div>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="product-price">Price (₱) *</label>
-                                    <input type="number" id="product-price" step="0.01" required>
-                                    <small id="product-price-suggestion" class="field-hint">Suggested lowest price: —</small>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="product-stock">Stock Quantity *</label>
-                                <input type="number" id="product-stock" min="0" required>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="product-description">Description</label>
-                                <textarea id="product-description" rows="3" maxlength="500" placeholder="Describe your fresh product..."></textarea>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="harvest-date">Harvest Date</label>
-                                        <input type="date" id="harvest-date" name="harvest_date">
-                                </div>
-                                <div class="form-group">
-                                    <label for="expiry-date">Expiry Date</label>
-                                        <input type="date" id="expiry-date" name="expiry_date">
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="product-location">Farm Location</label>
-                                <input type="text" id="product-location" placeholder="e.g., Laguna, Philippines">
-                                <small class="field-hint">Shipping fee is set by delivery distance and is paid by the customer during checkout.</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="product-image">Product Image</label>
-                                <input type="file" id="product-image" name="image" accept="image/*">
-                                <small>Upload a clear image of your fresh product</small>
-                                <div id="product-image-preview" class="image-preview"></div>
-                            </div>
-
-                            <button type="submit" class="btn btn-primary">Add Product</button>
-                        </form>
-                    </div>
                 </div>
             </section>
 
@@ -368,6 +297,87 @@
                 <div class="panel-placeholder">Select an order to view details</div>
             </div>
         </aside>
+    </div>
+
+    <div id="add-product-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Product</h3>
+                <button class="close-btn" id="close-add-product-modal" aria-label="Close">&times;</button>
+            </div>
+            <form id="add-product-form" class="product-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="product-category">Category *</label>
+                                    <select id="product-category" required>
+                                        <option value="">Select category</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="product-unit">Unit *</label>
+                                    <select id="product-unit" required>
+                                        <option value="kg">Kilogram (kg)</option>
+                                        <option value="pieces">Pieces</option>
+                                        <option value="boxes">Boxes</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="product-name">Product Name *</label>
+                                    <div class="product-name-field">
+                                        <input type="text" id="product-name" placeholder="Choose category first" autocomplete="off" disabled required>
+                                        <div id="product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product name suggestions"></div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="product-price">Price (₱) *</label>
+                                    <input type="number" id="product-price" step="0.01" required>
+                                    <small id="product-price-suggestion" class="field-hint">Suggested lowest price: —</small>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="product-stock">Stock Quantity *</label>
+                                <input type="number" id="product-stock" min="0" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="product-description">Description</label>
+                                <textarea id="product-description" rows="3" maxlength="500" placeholder="Describe your fresh product..."></textarea>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="harvest-date">Harvest Date</label>
+                                        <input type="date" id="harvest-date" name="harvest_date">
+                                </div>
+                                <div class="form-group">
+                                    <label for="expiry-date">Expiry Date</label>
+                                        <input type="date" id="expiry-date" name="expiry_date">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="product-location">Farm Location</label>
+                                <input type="text" id="product-location" placeholder="e.g., Laguna, Philippines">
+                                <small class="field-hint">Shipping fee is set by delivery distance and is paid by the customer during checkout.</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="product-image">Product Image</label>
+                                <input type="file" id="product-image" name="image" accept="image/*">
+                                <small>Upload a clear image of your fresh product</small>
+                                <div id="product-image-preview" class="image-preview"></div>
+                            </div>
+
+                <div class="form-actions">
+                    <button type="button" id="cancel-add-product-btn" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Product</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <div id="farmer-product-preview-modal" class="product-details-modal">
