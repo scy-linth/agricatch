@@ -7956,7 +7956,8 @@ textarea.invalid:focus {
     text-decoration: underline;
 }
 
-#edit-product-modal .modal-content {
+#edit-product-modal .modal-content,
+#add-product-modal .modal-content {
     width: min(94vw, 980px);
     max-width: 980px;
     max-height: 92vh;
@@ -7965,7 +7966,8 @@ textarea.invalid:focus {
     overflow: hidden;
 }
 
-#edit-product-modal .modal-header {
+#edit-product-modal .modal-header,
+#add-product-modal .modal-header {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     color: var(--white);
     padding: 1rem 1.25rem;
@@ -7976,12 +7978,15 @@ textarea.invalid:focus {
 }
 
 #edit-product-modal .modal-header h3,
-#edit-product-modal .modal-header .close-btn {
+#edit-product-modal .modal-header .close-btn,
+#add-product-modal .modal-header h3,
+#add-product-modal .modal-header .close-btn {
     color: var(--white);
     font-size: 1.15rem;
 }
 
-#edit-product-modal .product-form {
+#edit-product-modal .product-form,
+#add-product-modal .product-form {
     padding: 1.25rem 1.3rem;
     font-size: 1rem;
     flex: 1;
@@ -7989,26 +7994,32 @@ textarea.invalid:focus {
     overflow-y: auto;
 }
 
-#edit-product-modal .product-form label {
+#edit-product-modal .product-form label,
+#add-product-modal .product-form label {
     font-size: 0.95rem;
     font-weight: 700;
 }
 
 #edit-product-modal .product-form input,
 #edit-product-modal .product-form select,
-#edit-product-modal .product-form textarea {
+#edit-product-modal .product-form textarea,
+#add-product-modal .product-form input,
+#add-product-modal .product-form select,
+#add-product-modal .product-form textarea {
     font-size: 1rem;
     min-height: 42px;
 }
 
-#edit-product-modal .form-actions {
+#edit-product-modal .form-actions,
+#add-product-modal .form-actions {
     margin-top: 0.85rem;
     display: flex;
     gap: 0.7rem;
     justify-content: flex-end;
 }
 
-#edit-product-modal .form-actions .btn {
+#edit-product-modal .form-actions .btn,
+#add-product-modal .form-actions .btn {
     min-height: 42px;
     padding: 0.6rem 1rem;
     font-size: 0.98rem;

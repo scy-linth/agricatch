@@ -210,6 +210,25 @@ class FarmerDashboard {
         document.body.classList.remove('modal-open');
     }
 
+    openAddProductModal() {
+        const modal = document.getElementById('add-product-modal');
+        if (!modal) return;
+        modal.classList.add('open');
+        document.documentElement.classList.add('modal-open');
+        document.body.classList.add('modal-open');
+    }
+
+    closeAddProductModal(forceClose = false) {
+        if (this.isSubmittingAddProduct && !forceClose) {
+            return;
+        }
+        const modal = document.getElementById('add-product-modal');
+        if (!modal) return;
+        modal.classList.remove('open');
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+    }
+
     async loadRequestCategories() {
         try {
             const res = await fetch(`${this.apiBase}/products/categories`, {
@@ -823,8 +842,25 @@ class FarmerDashboard {
         // Tab switching
         document.getElementById('list-products-tab')?.addEventListener('click', () => this.switchTab('list-products'));
         document.getElementById('add-product-tab')?.addEventListener('click', () => {
-            this.switchTab('add-product');
+            this.openAddProductModal();
         });
+
+        const addProductModal = document.getElementById('add-product-modal');
+        const closeAddProductModalBtn = document.getElementById('close-add-product-modal');
+        const cancelAddProductBtn = document.getElementById('cancel-add-product-btn');
+        if (closeAddProductModalBtn) {
+            closeAddProductModalBtn.addEventListener('click', () => this.closeAddProductModal());
+        }
+        if (cancelAddProductBtn) {
+            cancelAddProductBtn.addEventListener('click', () => this.closeAddProductModal());
+        }
+        if (addProductModal) {
+            addProductModal.addEventListener('click', (e) => {
+                if (e.target === addProductModal) {
+                    this.closeAddProductModal();
+                }
+            });
+        }
 
         // Order status tabs - all 6 statuses
         document.getElementById('pending-orders-tab')?.addEventListener('click', () => this.switchOrderTab('pending'));
@@ -2553,6 +2589,7 @@ class FarmerDashboard {
                 document.getElementById('add-product-form').reset();
                 const preview = document.getElementById('product-image-preview');
                 if (preview) preview.innerHTML = '';
+                this.closeAddProductModal(true);
                 this.loadMyProducts();
                 this.loadFarmerStats();
             } else {
@@ -2645,7 +2682,7 @@ class FarmerDashboard {
 
             if (response.ok) {
                 this.showMessage('Product updated successfully!', 'success');
-                this.closeEditModal();
+                this.closeEditModal(true);
                 this.loadMyProducts();
                 this.loadFarmerStats();
             } else {
@@ -2829,8 +2866,8 @@ class FarmerDashboard {
         }
     }
 
-    closeEditModal() {
-        if (this.isSubmittingEditProduct) {
+    closeEditModal(forceClose = false) {
+        if (this.isSubmittingEditProduct && !forceClose) {
             return;
         }
         this.setEditModalBusyState(false, 'Update Product');
