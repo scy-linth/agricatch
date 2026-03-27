@@ -58,6 +58,8 @@ class AgricultureMarket {
         this.registrationStep = 1;
         this.maxRegistrationSteps = 4;
         this.isLoading = false; // For loading animations
+        this._authFocusTrapHandler = null;
+        this._authLastFocusedElement = null;
 
         this.init();
     }
@@ -2683,7 +2685,7 @@ class AgricultureMarket {
                 let phoneDigits = phone.replace(/\D/g, '');
                 if (phoneDigits.startsWith('0')) phoneDigits = phoneDigits.substring(1);
                 if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
-                    this.showMessage('Oops BOBO! Your contact number is not a valid number. Try again Bitch!', 'error');
+                    this.showMessage('Please enter a valid contact number (10 digits starting with 9).', 'error');
                     document.getElementById('auth-phone').focus();
                     return false;
                 }
@@ -4809,6 +4811,12 @@ class AgricultureMarket {
     openAuthFlow(options = {}) {
         // If no mode specified, restore the last used mode
         let { mode, role, returnUrl = null } = options;
+        const authModal = document.getElementById('auth-modal');
+        if (authModal && !authModal.classList.contains('open')) {
+            this._authLastFocusedElement = (document.activeElement instanceof HTMLElement)
+                ? document.activeElement
+                : null;
+        }
         // If caller requests customer-only (e.g., from checkout), honor it
         const customerOnly = !!options.customerOnly || !!this.pendingCheckout;
         
@@ -5027,6 +5035,97 @@ class AgricultureMarket {
             if (authModal && authModal.parentElement !== document.body) document.body.appendChild(authModal);
         } catch (e) {}
         authModal.classList.add('open');
+        this.activateAuthFocusTrap();
+        this.focusAuthModalPrimaryField(mode);
+    }
+
+    getAuthModalFocusableElements() {
+        const authModal = document.getElementById('auth-modal');
+        if (!authModal || !authModal.classList.contains('open')) return [];
+
+        const selector = [
+            'a[href]',
+            'button:not([disabled])',
+            'input:not([disabled]):not([type="hidden"])',
+            'select:not([disabled])',
+            'textarea:not([disabled])',
+            '[tabindex]:not([tabindex="-1"])'
+        ].join(',');
+
+        return Array.from(authModal.querySelectorAll(selector)).filter((el) => {
+            if (!(el instanceof HTMLElement)) return false;
+            if (el.getAttribute('aria-hidden') === 'true') return false;
+            const style = window.getComputedStyle(el);
+            if (style.visibility === 'hidden' || style.display === 'none') return false;
+            return el.getClientRects().length > 0;
+        });
+    }
+
+    focusAuthModalPrimaryField(mode) {
+        const preferredIds = mode === 'register'
+            ? ['auth-email-register', 'auth-username', 'auth-fullname']
+            : ['auth-email', 'auth-password'];
+
+        for (const id of preferredIds) {
+            const el = document.getElementById(id);
+            if (el && !el.disabled && el.getClientRects().length > 0) {
+                el.focus();
+                return;
+            }
+        }
+
+        const focusable = this.getAuthModalFocusableElements();
+        if (focusable.length > 0) {
+            focusable[0].focus();
+        }
+    }
+
+    activateAuthFocusTrap() {
+        const authModal = document.getElementById('auth-modal');
+        if (!authModal) return;
+
+        this.deactivateAuthFocusTrap();
+
+        this._authFocusTrapHandler = (event) => {
+            if (event.key !== 'Tab') return;
+            if (!authModal.classList.contains('open')) return;
+
+            const focusable = this.getAuthModalFocusableElements();
+            if (focusable.length === 0) {
+                event.preventDefault();
+                authModal.focus();
+                return;
+            }
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            const active = document.activeElement;
+
+            if (!authModal.contains(active)) {
+                event.preventDefault();
+                first.focus();
+                return;
+            }
+
+            if (event.shiftKey && active === first) {
+                event.preventDefault();
+                last.focus();
+                return;
+            }
+
+            if (!event.shiftKey && active === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        };
+
+        document.addEventListener('keydown', this._authFocusTrapHandler, true);
+    }
+
+    deactivateAuthFocusTrap() {
+        if (!this._authFocusTrapHandler) return;
+        document.removeEventListener('keydown', this._authFocusTrapHandler, true);
+        this._authFocusTrapHandler = null;
     }
 
     /** Disable/enable inputs in a mode container so hidden fields don't block validation or submit. */
@@ -5321,6 +5420,8 @@ class AgricultureMarket {
     }
 
     closeAuthFlow() {
+        this.deactivateAuthFocusTrap();
+
         // Save the current mode before closing
         if (this.authMode) {
             localStorage.setItem('last_auth_mode', this.authMode);
@@ -5353,6 +5454,12 @@ class AgricultureMarket {
         this.otpSent = false;
         this.otpVerified = false;
         this.otpEmail = null;
+
+        const focusTarget = this._authLastFocusedElement;
+        this._authLastFocusedElement = null;
+        if (focusTarget && typeof focusTarget.focus === 'function' && document.contains(focusTarget)) {
+            setTimeout(() => focusTarget.focus(), 0);
+        }
     }
 
     clearAuthForm() {
