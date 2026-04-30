@@ -756,23 +756,6 @@ try {
   // #endregion
 }
 
-// TEMPORARY QA FEATURE (Notepad) — remove when site is fully functional
-try {
-  app.use('/api/qa-notes', require('./routes/qa-notes'));
-  console.log('✅ QA Notepad route loaded successfully');
-} catch (error) {
-  console.error('❌ QA Notepad route failed to load:', error);
-
-  // Surface a clear error to clients instead of falling through to the default 404 handler.
-  // This makes it obvious in production logs/clients that the route module failed to load.
-  app.use('/api/qa-notes', (req, res) => {
-    res.status(500).json({
-      error: 'QA notepad route failed to load',
-      detail: String(error && error.message ? error.message : error),
-    });
-  });
-}
-
 // Test database connection route
 app.get('/api/test-db', async (req, res) => {
   try {
