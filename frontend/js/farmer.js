@@ -17,6 +17,7 @@ class FarmerDashboard {
         this.userId = this.getUserId();
         this.lastOrdersById = new Map();
         this.lastOrdersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
+        this.ordersCountByStatus = { pending: 0, confirmed: 0, preparing: 0, out_for_delivery: 0, delivered: 0, cancelled: 0 };
         this.activeSection = 'overview';
         this.currentShopProfile = null;
         this.isShopProfileEditing = false;
@@ -40,6 +41,7 @@ class FarmerDashboard {
         this.ordersSearchActiveIndex = -1;
         this.productNameActiveIndex = { add: -1, edit: -1 };
         this.realtimeSource = null;
+        this.customerRatingDraft = { orderId: null, rating: 0, hasExisting: false };
 
         if (!this.token) {
             window.location.href = '/?login=1';
@@ -158,6 +160,7 @@ class FarmerDashboard {
         this.loadCategories();
         this.loadProductCatalogNames();
         this.setupProductSuggestionListeners();
+        this.setupNonNegativeInputs();
         this.setupSidebarNavigation();
         this.setupDetailPanel();
         this.setupRealtime();
@@ -210,12 +213,43 @@ class FarmerDashboard {
         document.body.classList.remove('modal-open');
     }
 
-    openAddProductModal() {
+    async openAddProductModal() {
         const modal = document.getElementById('add-product-modal');
         if (!modal) return;
         modal.classList.add('open');
         document.documentElement.classList.add('modal-open');
         document.body.classList.add('modal-open');
+        await this.loadCategories();
+        await this.loadProductCatalogNames();
+    }
+
+    setupNonNegativeInputs() {
+        const inputIds = [
+            'product-price',
+            'product-stock',
+            'edit-product-price',
+            'edit-product-stock'
+        ];
+
+        const blockNegative = (input) => {
+            if (!input) return;
+            input.addEventListener('keydown', (e) => {
+                if (e.key === '-' || e.key === 'Minus') {
+                    e.preventDefault();
+                }
+            });
+            input.addEventListener('input', () => {
+                if (input.value.includes('-')) {
+                    input.value = input.value.replace(/-/g, '');
+                }
+                const value = Number(input.value);
+                if (Number.isFinite(value) && value < 0) {
+                    input.value = '';
+                }
+            });
+        };
+
+        inputIds.forEach((id) => blockNegative(document.getElementById(id)));
     }
 
     closeAddProductModal(forceClose = false) {
@@ -861,6 +895,34 @@ class FarmerDashboard {
                 }
             });
         }
+
+        const customerRatingModal = document.getElementById('customer-rating-modal');
+        const customerRatingClose = document.getElementById('customer-rating-close');
+        const customerRatingCancel = document.getElementById('customer-rating-cancel');
+        const customerRatingForm = document.getElementById('customer-rating-form');
+        if (customerRatingClose) {
+            customerRatingClose.addEventListener('click', () => this.closeCustomerRatingModal());
+        }
+        if (customerRatingCancel) {
+            customerRatingCancel.addEventListener('click', () => this.closeCustomerRatingModal());
+        }
+        if (customerRatingForm) {
+            customerRatingForm.addEventListener('submit', (e) => this.submitCustomerRatingForm(e));
+        }
+        if (customerRatingModal) {
+            customerRatingModal.addEventListener('click', (e) => {
+                if (e.target === customerRatingModal) {
+                    this.closeCustomerRatingModal();
+                }
+            });
+        }
+
+        document.querySelectorAll('#customer-rating-modal .order-rating-star-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const rating = Number(btn.getAttribute('data-rating') || 0);
+                this.setCustomerRatingValue(rating);
+            });
+        });
 
         // Order status tabs - all 6 statuses
         document.getElementById('pending-orders-tab')?.addEventListener('click', () => this.switchOrderTab('pending'));
@@ -1981,6 +2043,7 @@ class FarmerDashboard {
         }
 
         this.renderOverviewCharts(metrics);
+        this.renderOverviewStatusBreakdown(metrics);
         this.renderOverviewRecentOrders(metrics.recentOrders || []);
         this.renderOverviewTopProductsList(metrics.topProducts || []);
 
@@ -2034,6 +2097,24 @@ class FarmerDashboard {
                 </div>
             `;
         }).join('');
+    }
+
+    renderOverviewStatusBreakdown(metrics) {
+        const wrap = document.getElementById('overview-status-breakdown');
+        if (!wrap) return;
+
+        const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+        const cards = statuses.map((status) => {
+            const count = Number(metrics?.ordersByStatus?.[status] || 0);
+            return `
+                <div class="status-breakdown-pill" style="display:flex; align-items:center; gap:0.55rem; padding:0.55rem 0.75rem; border:1px solid #fecaca; border-radius:999px; background:#fff5f5; color:#7f1d1d; font-weight:700;">
+                    <span style="display:inline-flex; align-items:center; justify-content:center; min-width:2rem; padding:0.18rem 0.55rem; border-radius:999px; background:#ef4444; color:#fff; font-size:0.85rem;">${this.fmtNumber(count)}</span>
+                    <span>${this.formatStatusLabel(status)}</span>
+                </div>
+            `;
+        }).join('');
+
+        wrap.innerHTML = cards;
     }
 
     buildLastNDaysLabels(revenueByDay, days) {
@@ -2532,6 +2613,11 @@ class FarmerDashboard {
         const harvestDate = document.getElementById('harvest-date').value;
         const expiryDate = document.getElementById('expiry-date').value;
 
+        if (Number(price) < 0 || Number(stock_quantity) < 0) {
+            this.showMessage('Price and stock must be zero or higher.', 'error');
+            return;
+        }
+
         if (!this.validateProductDates({
             harvestEl: document.getElementById('harvest-date'),
             expiryEl: document.getElementById('expiry-date')
@@ -2639,6 +2725,13 @@ class FarmerDashboard {
 
         const harvestDate = document.getElementById('edit-harvest-date').value;
         const expiryDate = document.getElementById('edit-expiry-date').value;
+
+        const editPrice = Number(document.getElementById('edit-product-price').value);
+        const editStock = Number(document.getElementById('edit-product-stock').value);
+        if (editPrice < 0 || editStock < 0) {
+            this.showMessage('Price and stock must be zero or higher.', 'error');
+            return;
+        }
 
         if (!this.validateProductDates({
             harvestEl: document.getElementById('edit-harvest-date'),
@@ -2753,7 +2846,7 @@ class FarmerDashboard {
     }
 
     async deleteProduct(productId) {
-        if (!confirm('Are you sure you want to delete this product?')) {
+        if (!confirm('Are you sure you want to remove this product? Products with order history will be disabled.')) {
             return;
         }
 
@@ -2768,7 +2861,7 @@ class FarmerDashboard {
             const data = await response.json().catch(() => ({ message: 'Unknown error' }));
 
             if (response.ok) {
-                this.showMessage('Product deleted successfully!', 'success');
+                this.showMessage(data.message || 'Product updated successfully!', 'success');
                 this.loadMyProducts();
                 this.loadFarmerStats();
             } else {
@@ -3267,7 +3360,29 @@ class FarmerDashboard {
 
             if (response.ok) {
                 const data = await response.json();
-                this.renderOrders(data.orders || [], status);
+                const orders = Array.isArray(data.orders) ? data.orders : [];
+                if (status === 'cancelled' && orders.length === 0) {
+                    const fallbackResponse = await fetch(`${this.apiBase}/orders/farmer/${this.farmerId}?t=${Date.now()}`, {
+                        headers: {
+                            'Authorization': `Bearer ${this.token}`
+                        },
+                        cache: 'no-store'
+                    });
+
+                    if (fallbackResponse.ok) {
+                        const fallbackData = await fallbackResponse.json();
+                        const cancelledOrders = (Array.isArray(fallbackData.orders) ? fallbackData.orders : []).filter((order) => {
+                            const item = (order.items && order.items[0]) || order;
+                            return String(item.status || order.status || '').toLowerCase() === 'cancelled';
+                        });
+                        this.renderOrders(cancelledOrders, status);
+                        this.updateOrdersTabCounts();
+                        return;
+                    }
+                }
+
+                this.renderOrders(orders, status);
+                this.updateOrdersTabCounts();
             } else {
                 const errorData = await response.json();
                 console.error('Error loading orders:', errorData);
@@ -3293,6 +3408,7 @@ class FarmerDashboard {
                 container.innerHTML = `<div class="empty-state"><p>No ${statusLabel} orders found.</p></div>`;
             }
         });
+        this.updateOrdersTabCounts();
         
         // Force reload from server
         this.loadMyOrders();
@@ -3312,6 +3428,26 @@ class FarmerDashboard {
         } catch (error) {
             console.error('Error loading all orders:', error);
         }
+    }
+
+    updateOrdersTabCounts() {
+        const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+        statuses.forEach((status) => {
+            const tab = document.getElementById(`${status}-orders-tab`);
+            const badge = document.getElementById(`${status}-orders-count`);
+            const count = Array.isArray(this.lastOrdersByStatus[status]) ? this.lastOrdersByStatus[status].length : 0;
+
+            this.ordersCountByStatus[status] = count;
+            if (badge) {
+                badge.textContent = String(count);
+                badge.style.display = count > 0 ? 'inline-flex' : 'none';
+            } else if (tab) {
+                const label = this.formatStatusLabel(status);
+                tab.innerHTML = count > 0
+                    ? `${label} <span class="tab-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">${count}</span>`
+                    : label;
+            }
+        });
     }
 
     switchOrderTab(status, skipLoad = false) {
@@ -3351,6 +3487,7 @@ class FarmerDashboard {
         if (orders.length === 0) {
             const statusLabel = this.formatStatusLabel(status);
             container.innerHTML = `<div class="empty-state"><p>No ${statusLabel} orders found.</p></div>`;
+            this.updateOrdersTabCounts();
             return;
         }
 
@@ -3382,6 +3519,8 @@ class FarmerDashboard {
             const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString() : 'Not specified';
             const specialInstructions = String(order.special_instructions || '').trim();
             const customerName = String(order.customer_name || '—').trim();
+            const customerRating = Number(order.customer_average_rating || 0);
+            const customerTotalRatings = Number(order.customer_total_ratings || 0);
             const searchText = `${String(orderId)} ${productName} ${customerName}`.toLowerCase();
             const dateLabel = orderDate && !Number.isNaN(orderDate.getTime())
                 ? orderDate.toLocaleDateString()
@@ -3405,6 +3544,7 @@ class FarmerDashboard {
                     <div style="flex: 1;">
                         <div style="font-weight: 700; margin-bottom: 8px; font-size: 16px;">${this.escapeHtml(productName)}</div>
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Customer:</strong> ${this.escapeHtml(customerName)}</div>
+                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Customer Rating:</strong> ${this.fmtNumber(customerRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}★ (${this.fmtNumber(customerTotalRatings)})</div>
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Quantity:</strong> ${this.fmtNumber(quantity)} x ${this.fmtCurrency(price)} ${item.unit || order.unit || ''}</div>
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Total:</strong> ${this.fmtCurrency(totalAmount)}</div>
                         <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Delivery Date:</strong> ${this.escapeHtml(deliveryDate)}</div>
@@ -3438,6 +3578,9 @@ class FarmerDashboard {
 
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <button class="btn btn-secondary btn-small" type="button" data-action="chat-customer" data-customer-id="${order.customer_id || ''}" data-order-id="${orderId}">Chat Customer</button>
+                    ${currentStatus === 'delivered' ? `
+                        <button class="btn btn-small" type="button" data-action="rate-customer" data-order-id="${orderId}">Rate Customer</button>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -3445,6 +3588,15 @@ class FarmerDashboard {
 
         this.applyOrdersSearch();
         this.renderOrdersSearchDropdown();
+
+        container.querySelectorAll('[data-action="rate-customer"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const orderId = Number(btn.getAttribute('data-order-id') || 0);
+                this.rateCustomerForOrder(orderId);
+            });
+        });
+
+        this.updateOrdersTabCounts();
     }
 
     renderOrdersSearchDropdown() {
@@ -3742,6 +3894,129 @@ class FarmerDashboard {
         } catch (error) {
             console.error('Error updating order:', error);
             this.showMessage('Error updating order', 'error');
+        }
+    }
+
+    async rateCustomerForOrder(orderId) {
+        if (!orderId) return;
+
+        try {
+            const eligibilityRes = await fetch(`${this.apiBase}/orders/${orderId}/customer-rating/eligibility`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            const eligibility = await eligibilityRes.json().catch(() => ({}));
+            if (!eligibilityRes.ok || !eligibility?.can_rate) {
+                this.showMessage(eligibility?.reason || 'You can rate only delivered orders within 1 month.', 'error');
+                return;
+            }
+
+            const existingRating = eligibility?.my_rating?.rating || 0;
+            this.openCustomerRatingModal({
+                orderId,
+                rating: existingRating,
+                hasExisting: !!eligibility?.my_rating
+            });
+        } catch (error) {
+            console.error('Rate customer error:', error);
+            this.showMessage('Unable to submit rating right now.', 'error');
+        }
+    }
+
+    openCustomerRatingModal({ orderId, rating = 0, hasExisting = false }) {
+        this.customerRatingDraft = {
+            orderId: Number(orderId || 0),
+            rating: Number(rating || 0),
+            hasExisting: !!hasExisting
+        };
+
+        const orderLabel = document.getElementById('customer-rating-order');
+        if (orderLabel) {
+            orderLabel.textContent = `Order #${this.customerRatingDraft.orderId}`;
+        }
+
+        const submitBtn = document.getElementById('customer-rating-submit');
+        if (submitBtn) {
+            submitBtn.textContent = this.customerRatingDraft.hasExisting ? 'Update Rating' : 'Save Rating';
+        }
+
+        this.setCustomerRatingValue(this.customerRatingDraft.rating);
+
+        const modal = document.getElementById('customer-rating-modal');
+        if (modal) modal.classList.add('open');
+        document.documentElement.classList.add('modal-open');
+        document.body.classList.add('modal-open');
+    }
+
+    closeCustomerRatingModal() {
+        const modal = document.getElementById('customer-rating-modal');
+        if (modal) modal.classList.remove('open');
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+        this.customerRatingDraft = { orderId: null, rating: 0, hasExisting: false };
+    }
+
+    setCustomerRatingValue(value) {
+        const rating = Math.max(0, Math.min(5, Number(value || 0)));
+        this.customerRatingDraft.rating = rating;
+
+        document.querySelectorAll('#customer-rating-modal .order-rating-star-btn').forEach((button) => {
+            const starValue = Number(button.getAttribute('data-rating') || 0);
+            button.classList.toggle('active', starValue <= rating);
+        });
+
+        const valueEl = document.getElementById('customer-rating-value');
+        if (valueEl) {
+            valueEl.textContent = rating > 0 ? `${rating} star${rating > 1 ? 's' : ''}` : 'Select a rating';
+        }
+    }
+
+    async submitCustomerRatingForm(e) {
+        e.preventDefault();
+
+        const orderId = Number(this.customerRatingDraft.orderId || 0);
+        const rating = Number(this.customerRatingDraft.rating || 0);
+        if (!orderId) return;
+        if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+            this.showMessage('Rating must be between 1 and 5.', 'error');
+            return;
+        }
+
+        const submitBtn = document.getElementById('customer-rating-submit');
+        const originalText = submitBtn ? submitBtn.textContent : '';
+        try {
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Saving...';
+            }
+
+            const method = this.customerRatingDraft.hasExisting ? 'PUT' : 'POST';
+            const response = await fetch(`${this.apiBase}/orders/${orderId}/customer-rating`, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ rating })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Unable to submit rating.', 'error');
+                return;
+            }
+
+            this.showMessage('Customer rating saved.', 'success');
+            this.closeCustomerRatingModal();
+            await this.loadMyOrders();
+        } catch (error) {
+            console.error('Submit customer rating error:', error);
+            this.showMessage('Unable to submit rating right now.', 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText || 'Save Rating';
+            }
         }
     }
 

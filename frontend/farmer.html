@@ -157,6 +157,7 @@
                                     <div class="overview-chart-wrap">
                                         <canvas id="overview-status-chart" height="140"></canvas>
                                     </div>
+                                    <div id="overview-status-breakdown" class="overview-status-breakdown" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem;"></div>
                                 </div>
 
                                 <div class="overview-card">
@@ -241,12 +242,12 @@
                     </div>
                     <div id="orders-search-empty" class="empty-state" style="display:none;"><p>No orders found!:((</p></div>
                     <div class="order-tabs">
-                        <button id="pending-orders-tab" class="tab-btn active" type="button">Pending</button>
-                        <button id="confirmed-orders-tab" class="tab-btn" type="button">Confirmed</button>
-                        <button id="preparing-orders-tab" class="tab-btn" type="button">Preparing</button>
-                        <button id="out_for_delivery-orders-tab" class="tab-btn" type="button">Out for Delivery</button>
-                        <button id="delivered-orders-tab" class="tab-btn" type="button">Delivered</button>
-                        <button id="cancelled-orders-tab" class="tab-btn" type="button">Cancelled</button>
+                        <button id="pending-orders-tab" class="tab-btn active" type="button">Pending <span class="tab-count" id="pending-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;display:none;">0</span></button>
+                        <button id="confirmed-orders-tab" class="tab-btn" type="button">Confirmed <span class="tab-count" id="confirmed-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;display:none;">0</span></button>
+                        <button id="preparing-orders-tab" class="tab-btn" type="button">Preparing <span class="tab-count" id="preparing-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;display:none;">0</span></button>
+                        <button id="out_for_delivery-orders-tab" class="tab-btn" type="button">Out for Delivery <span class="tab-count" id="out_for_delivery-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;display:none;">0</span></button>
+                        <button id="delivered-orders-tab" class="tab-btn" type="button">Delivered <span class="tab-count" id="delivered-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;display:none;">0</span></button>
+                        <button id="cancelled-orders-tab" class="tab-btn" type="button">Cancelled <span class="tab-count" id="cancelled-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;display:none;">0</span></button>
                     </div>
 
                     <div id="pending-orders-section" class="tab-content active" data-tab-scope="orders">
@@ -333,14 +334,14 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="product-price">Price (₱) *</label>
-                                    <input type="number" id="product-price" step="0.01" required>
+                                    <input type="number" id="product-price" step="0.01" min="0" inputmode="decimal" required>
                                     <small id="product-price-suggestion" class="field-hint">Suggested lowest price: —</small>
                                 </div>
                             </div>
 
                             <div class="form-group">
                                 <label for="product-stock">Stock Quantity *</label>
-                                <input type="number" id="product-stock" min="0" required>
+                                <input type="number" id="product-stock" min="0" step="1" inputmode="numeric" required>
                             </div>
 
                             <div class="form-group">
@@ -410,7 +411,7 @@
                     </div>
                     <div class="form-group">
                         <label for="edit-product-price">Price (₱) *</label>
-                        <input type="number" id="edit-product-price" step="0.01" required>
+                        <input type="number" id="edit-product-price" step="0.01" min="0" inputmode="decimal" required>
                         <small id="edit-product-price-suggestion" class="field-hint">Suggested lowest price: —</small>
                     </div>
                 </div>
@@ -434,7 +435,7 @@
 
                 <div class="form-group">
                     <label for="edit-product-stock">Stock Quantity *</label>
-                    <input type="number" id="edit-product-stock" min="0" required>
+                    <input type="number" id="edit-product-stock" min="0" step="1" inputmode="numeric" required>
                 </div>
 
                 <div class="form-group">
@@ -515,6 +516,30 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="customer-rating-modal" class="modal">
+        <div class="modal-content order-rating-modal-content">
+            <div class="modal-header">
+                <h3>Rate Customer</h3>
+                <button class="close-btn" id="customer-rating-close" aria-label="Close">&times;</button>
+            </div>
+            <form id="customer-rating-form" class="product-form">
+                <p id="customer-rating-order" style="margin:0 0 0.5rem 0; color: var(--text-secondary);"></p>
+                <div class="order-rating-stars" style="display:flex; gap:0.4rem; margin: 0.75rem 0;">
+                    <button type="button" class="order-rating-star-btn" data-rating="1" aria-label="1 star"><i class="fas fa-star"></i></button>
+                    <button type="button" class="order-rating-star-btn" data-rating="2" aria-label="2 stars"><i class="fas fa-star"></i></button>
+                    <button type="button" class="order-rating-star-btn" data-rating="3" aria-label="3 stars"><i class="fas fa-star"></i></button>
+                    <button type="button" class="order-rating-star-btn" data-rating="4" aria-label="4 stars"><i class="fas fa-star"></i></button>
+                    <button type="button" class="order-rating-star-btn" data-rating="5" aria-label="5 stars"><i class="fas fa-star"></i></button>
+                </div>
+                <div id="customer-rating-value" class="order-rating-value">Select a rating</div>
+                <div class="form-actions" style="margin-top: 1rem;">
+                    <button type="button" class="btn btn-secondary" id="customer-rating-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="customer-rating-submit">Save Rating</button>
+                </div>
+            </form>
         </div>
     </div>
 
