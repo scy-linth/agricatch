@@ -19,7 +19,7 @@ class AgricultureMarket {
         // This avoids hard dependency on api.agricatch.store TLS/proxy setup.
         this.apiBase = isCustomFrontendHost
             ? 'https://agricatch.onrender.com/api'
-            : (isRenderHost ? '/api' : '/api');
+            : (isRenderHost ? '/api' : 'http://localhost:3000/api');
 
         // Expose resolved API base globally so other page scripts can reuse it
         try { window.API_BASE = this.apiBase; } catch (e) {}
@@ -657,9 +657,13 @@ class AgricultureMarket {
         }
 
         // Auth modals
-        const loginRegisterBtn = document.getElementById('login-register-btn');
-        if (loginRegisterBtn) {
-            loginRegisterBtn.addEventListener('click', () => this.openAuthFlow());
+        const loginBtn = document.getElementById('login-btn');
+        if (loginBtn) {
+            loginBtn.addEventListener('click', () => this.openAuthFlow({ mode: 'login' }));
+        }
+        const registerBtn = document.getElementById('register-btn');
+        if (registerBtn) {
+            registerBtn.addEventListener('click', () => this.openAuthFlow({ mode: 'register' }));
         }
         const superAdminPanelBtn = document.getElementById('super-admin-panel-btn');
         if (superAdminPanelBtn) {
@@ -872,15 +876,14 @@ class AgricultureMarket {
         const termsToggle = document.getElementById('terms-toggle');
         if (termsToggle) {
             termsToggle.addEventListener('click', () => {
+                const termsContainer = document.getElementById('terms-container');
                 const termsContent = document.getElementById('terms-content');
-                const icon = termsToggle.querySelector('i');
-                if (termsContent) {
-                    const isVisible = termsContent.style.display !== 'none';
-                    termsContent.style.display = isVisible ? 'none' : 'block';
-                    icon.classList.toggle('fa-chevron-down', !isVisible);
-                    icon.classList.toggle('fa-chevron-up', isVisible);
-                    termsToggle.querySelector('span').textContent = isVisible ? 'Read Terms' : 'Hide Terms';
-                }
+                const toggleText = termsToggle.querySelector('.terms-toggle-text');
+                if (!termsContainer || !termsContent) return;
+                const isOpen = termsContainer.classList.toggle('open');
+                termsToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                termsContent.hidden = !isOpen;
+                if (toggleText) toggleText.textContent = isOpen ? 'Hide Terms' : 'Read Terms';
             });
         }
 
@@ -4393,18 +4396,24 @@ class AgricultureMarket {
         
         checkoutBtn.style.opacity = '1';
 
-        cartItems.innerHTML = data.cartItems.map(item => `
+        cartItems.innerHTML = data.cartItems.map(item => {
+            const isUnavailable = item.is_available_for_checkout === false;
+            const badge = isUnavailable
+                ? `<span class="status-pill pending" style="margin-left:6px;">Unavailable</span>`
+                : '';
+            const disabledAttr = isUnavailable ? 'disabled' : '';
+            return `
             <div class="cart-item">
                 <img src="${item.image_url || '/images/logo.png'}"
                      alt="${item.name}" class="cart-item-image" onerror="this.src='/images/logo.png'">
                 <div class="cart-item-details">
-                    <div class="cart-item-name">${item.name}</div>
+                    <div class="cart-item-name">${item.name} ${badge}</div>
                     <div class="cart-item-price">${this.fmtCurrency(item.price)} ${item.unit ? 'per ' + item.unit : ''}</div>
                     ${item.farmer_name ? `<div class="cart-item-farmer">From ${item.farmer_name}</div>` : ''}
                     <div class="cart-item-stock">Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}</div>
                     <div class="cart-item-quantity">
                         <div class="quantity-controls">
-                            <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity - 1})" title="Decrease quantity">−</button>
+                            <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity - 1})" title="Decrease quantity" ${disabledAttr}>−</button>
                             <input
                                 type="number"
                                 class="quantity-value-input"
@@ -4414,8 +4423,8 @@ class AgricultureMarket {
                                 inputmode="numeric"
                                 aria-label="Cart quantity"
                                 onchange="app.handleCartQuantityInput(${item.id}, this.value, ${Math.max(1, Number(item.stock_quantity) || 1)}, this)"
-                                onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
-                            <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity + 1})" title="Increase quantity">+</button>
+                                onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}" ${disabledAttr}>
+                            <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity + 1})" title="Increase quantity" ${disabledAttr}>+</button>
                         </div>
                         <button class="remove-item" onclick="app.removeCartItem(${item.id})" title="Remove item">
                             <i class="fas fa-trash-alt"></i>
@@ -4423,10 +4432,13 @@ class AgricultureMarket {
                     </div>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         cartTotal.textContent = this.fmtNumber(data.summary.subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        checkoutBtn.disabled = false;
+        const hasUnavailable = !!data.summary?.has_unavailable_items;
+        checkoutBtn.disabled = hasUnavailable;
+        checkoutBtn.style.opacity = hasUnavailable ? '0.6' : '1';
     }
 
     closeCart() {
@@ -4569,6 +4581,11 @@ class AgricultureMarket {
                     return;
                 }
 
+                if (data.summary?.has_unavailable_items) {
+                    this.showMessage('Your cart has unavailable items. Please remove them before checkout.', 'error');
+                    return;
+                }
+
                 // Delivery date input was removed from the UI; skip min-date setup.
 
                 this.renderCheckout(data);
@@ -4595,6 +4612,11 @@ class AgricultureMarket {
         checkoutItems.innerHTML = data.cartItems.map(item => {
             const itemTotal = parseFloat(item.price) * item.quantity;
             const imageUrl = item.image_url || window.__PLACEHOLDER_IMAGE__;
+            const isUnavailable = item.is_available_for_checkout === false;
+            const disabledAttr = isUnavailable ? 'disabled' : '';
+            const badge = isUnavailable
+                ? `<small class="checkout-item-stock" style="color:#b91c1c; font-weight:600;">Unavailable</small>`
+                : '';
             return `
             <div class="checkout-item">
                 <div class="checkout-item-image">
@@ -4608,9 +4630,10 @@ class AgricultureMarket {
                         <small>${this.fmtCurrency(item.price)} per ${item.unit || 'item'}</small>
                         ${item.farmer_name ? `<small class="checkout-item-farmer">By ${item.farmer_name}</small>` : ''}
                         <small class="checkout-item-stock">Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}</small>
+                        ${badge}
                     </div>
                     <div class="checkout-item-controls">
-                        <button type="button" class="checkout-qty-btn" onclick="app.updateCheckoutItem(${item.id}, ${item.quantity - 1})" ${item.quantity <= 1 ? 'disabled' : ''} aria-label="Decrease quantity">
+                        <button type="button" class="checkout-qty-btn" onclick="app.updateCheckoutItem(${item.id}, ${item.quantity - 1})" ${(item.quantity <= 1 || isUnavailable) ? 'disabled' : ''} aria-label="Decrease quantity">
                             <i class="fas fa-minus"></i>
                         </button>
                         <input
@@ -4622,8 +4645,8 @@ class AgricultureMarket {
                             inputmode="numeric"
                             aria-label="Checkout quantity"
                             onchange="app.handleCheckoutQuantityInput(${item.id}, this.value, ${Math.max(1, Number(item.stock_quantity) || 1)}, this)"
-                            onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}">
-                        <button type="button" class="checkout-qty-btn" onclick="app.updateCheckoutItem(${item.id}, ${item.quantity + 1})" aria-label="Increase quantity">
+                            onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}" ${disabledAttr}>
+                        <button type="button" class="checkout-qty-btn" onclick="app.updateCheckoutItem(${item.id}, ${item.quantity + 1})" aria-label="Increase quantity" ${disabledAttr}>
                             <i class="fas fa-plus"></i>
                         </button>
                         <button type="button" class="checkout-remove-btn" onclick="app.removeCheckoutItem(${item.id})" aria-label="Remove item">
@@ -5035,6 +5058,7 @@ class AgricultureMarket {
             if (authModal && authModal.parentElement !== document.body) document.body.appendChild(authModal);
         } catch (e) {}
         authModal.classList.add('open');
+        this.setPageScrollLocked(true);
         this.activateAuthFocusTrap();
         this.focusAuthModalPrimaryField(mode);
     }
@@ -5446,6 +5470,7 @@ class AgricultureMarket {
         if (authModal) {
             authModal.classList.remove('open');
         }
+        this.setPageScrollLocked(false);
         // Reset state but keep form data
         this.selectedRole = null;
         this.authMode = null;

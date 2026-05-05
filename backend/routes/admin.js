@@ -78,8 +78,90 @@ const rehomeProductImageToCategorizedId = async ({ categoryName, productName, us
   }
 };
 
+const normalizeCategoryName = (value) => String(value || '').trim();
+const normalizeCategoryKey = (value) => normalizeCategoryName(value).toLowerCase();
+
+const tableColumnsCache = new Map();
+
+const getTableColumns = async (tableName) => {
+  const key = String(tableName || '').trim().toLowerCase();
+  if (!key) return new Set();
+  if (tableColumnsCache.has(key)) return tableColumnsCache.get(key);
+  const res = await pool.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
+    [key]
+  );
+  const cols = new Set((res.rows || []).map((row) => String(row.column_name || '').toLowerCase()));
+  tableColumnsCache.set(key, cols);
+  return cols;
+};
+
+const insertNotification = async (client, { userId, type, title, message, orderId = null, productId = null }) => {
+  try {
+    const cols = await getTableColumns('notifications');
+    if (!cols.has('user_id')) return;
+
+    const fields = [];
+    const values = [];
+    const push = (name, value) => {
+      if (!cols.has(name)) return;
+      fields.push(name);
+      values.push(value);
+    };
+
+    push('user_id', userId);
+    push('type', type);
+    push('title', title);
+    push('message', message);
+    push('order_id', orderId);
+    push('product_id', productId);
+
+    if (!fields.length) return;
+    const placeholders = fields.map((_, idx) => `$${idx + 1}`).join(', ');
+    await client.query(
+      `INSERT INTO notifications (${fields.join(', ')}) VALUES (${placeholders})`,
+      values
+    );
+  } catch (err) {
+    console.warn('Admin notification insert skipped:', err?.message || err);
+  }
+};
+
+const updateUserDisabledFields = async (client, userId, reason, isDisabled) => {
+  const cols = await getTableColumns('users');
+  const sets = [];
+  const values = [];
+
+  if (cols.has('is_disabled')) {
+    values.push(!!isDisabled);
+    sets.push(`is_disabled = $${values.length}`);
+  }
+  if (cols.has('disabled_at')) {
+    sets.push(isDisabled ? 'disabled_at = CURRENT_TIMESTAMP' : 'disabled_at = NULL');
+  }
+  if (cols.has('disabled_reason')) {
+    if (isDisabled) {
+      values.push(reason || null);
+      sets.push(`disabled_reason = $${values.length}`);
+    } else {
+      sets.push('disabled_reason = NULL');
+    }
+  }
+
+  if (!sets.length) {
+    throw new Error('Users table missing disable/enable columns');
+  }
+
+  values.push(userId);
+  await client.query(
+    `UPDATE users SET ${sets.join(', ')} WHERE id = $${values.length}`,
+    values
+  );
+};
+
 const ensureCategoryAdminSchema = async () => {
   await pool.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS type VARCHAR(50)`);
+  await pool.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT false`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS product_name_catalog (
       id SERIAL PRIMARY KEY,
@@ -147,6 +229,223 @@ const requireAdmin = async (req, res, next) => {
   }
 };
 
+const CANCELLED_STATUSES = ['delivered', 'cancelled'];
+
+const cancelOrdersForFarmer = async (client, farmerId, reason) => {
+  const cancelled = await client.query(
+    `
+      UPDATE orders o
+      SET status = 'cancelled',
+          cancelled_at = CURRENT_TIMESTAMP,
+          cancelled_by = 'admin',
+          cancellation_reason = $2
+      FROM products p
+      WHERE o.product_id = p.id
+        AND p.farmer_id = $1
+        AND o.status NOT IN ('delivered', 'cancelled')
+      RETURNING o.id, o.product_id, o.quantity, o.user_id AS customer_id
+    `,
+    [farmerId, reason]
+  );
+
+  const rows = cancelled.rows || [];
+  for (const row of rows) {
+    await client.query('UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2', [row.quantity, row.product_id]);
+    const message = `Order #${row.id} was cancelled because the farmer account was disabled.`;
+    await insertNotification(client, {
+      userId: row.customer_id,
+      type: 'order_update',
+      title: 'Order cancelled',
+      message,
+      orderId: row.id,
+      productId: row.product_id
+    });
+  }
+
+  return rows;
+};
+
+const cancelOrdersForCustomer = async (client, customerId, reason) => {
+  const cancelled = await client.query(
+    `
+      UPDATE orders o
+      SET status = 'cancelled',
+          cancelled_at = CURRENT_TIMESTAMP,
+          cancelled_by = 'admin',
+          cancellation_reason = $2
+      FROM products p
+      WHERE o.product_id = p.id
+        AND o.user_id = $1
+        AND o.status NOT IN ('delivered', 'cancelled')
+      RETURNING o.id, o.product_id, o.quantity, p.farmer_id
+    `,
+    [customerId, reason]
+  );
+
+  const rows = cancelled.rows || [];
+  for (const row of rows) {
+    await client.query('UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2', [row.quantity, row.product_id]);
+    const farmerMessage = `Order #${row.id} was cancelled because the customer account was disabled.`;
+    await insertNotification(client, {
+      userId: row.farmer_id,
+      type: 'order_update',
+      title: 'Order cancelled',
+      message: farmerMessage,
+      orderId: row.id,
+      productId: row.product_id
+    });
+  }
+
+  return rows;
+};
+
+const disableUserHandler = async (req, res, reasonOverride = null) => {
+  try {
+    const { id } = req.params;
+    const userId = parseInt(id, 10);
+
+    if (!userId && userId !== 0) {
+      return res.status(400).json({ message: 'Invalid user id' });
+    }
+
+    if (userId === req.user.id) {
+      return res.status(400).json({ message: 'You cannot disable your own account' });
+    }
+
+    if (userId === -1) {
+      return res.status(403).json({ message: 'Cannot disable super admin account' });
+    }
+
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const targetUser = userResult.rows[0];
+    if (targetUser.role === 'staff' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Cannot disable another staff account' });
+    }
+
+    if (targetUser.is_disabled) {
+      return res.json({ message: 'User already disabled' });
+    }
+
+    const reason = (reasonOverride || String(req.body?.reason || 'Account disabled by admin')).trim();
+
+    const client = await pool.connect();
+    let cancelledOrders = [];
+    try {
+      await client.query('BEGIN');
+
+      await updateUserDisabledFields(client, userId, reason, true);
+
+      await insertNotification(client, {
+        userId,
+        type: 'account_disabled',
+        title: 'Account disabled',
+        message: reason
+      });
+
+      if (targetUser.role === 'farmer') {
+        await client.query(
+          'UPDATE products SET is_admin_disabled = true, admin_disabled_at = CURRENT_TIMESTAMP WHERE farmer_id = $1',
+          [userId]
+        );
+        cancelledOrders = await cancelOrdersForFarmer(client, userId, reason);
+      } else if (targetUser.role === 'customer') {
+        cancelledOrders = await cancelOrdersForCustomer(client, userId, reason);
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) {}
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'user.disable',
+      entity: 'users',
+      entity_id: userId,
+      before: userResult.rows[0],
+      after: { id: userId, is_disabled: true }
+    });
+    broadcastEvent('admin.audit', { action: 'user.disable', entity: 'users', entity_id: userId, actor_admin_id: req.user.id });
+
+    for (const order of cancelledOrders) {
+      broadcastEvent('order.updated', {
+        order_id: Number(order.id),
+        new_status: 'cancelled'
+      });
+    }
+
+    return res.json({ message: 'User disabled', cancelled_orders: cancelledOrders.length });
+  } catch (error) {
+    console.error('Disable user error:', error);
+    return res.status(500).json({ message: 'Server error disabling user' });
+  }
+};
+
+const enableUserHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = parseInt(id, 10);
+
+    if (!userId && userId !== 0) {
+      return res.status(400).json({ message: 'Invalid user id' });
+    }
+
+    if (userId === -1) {
+      return res.status(403).json({ message: 'Cannot enable super admin account' });
+    }
+
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const targetUser = userResult.rows[0];
+    if (targetUser.role === 'staff' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Cannot enable another staff account' });
+    }
+
+    await updateUserDisabledFields(pool, userId, null, false);
+
+    if (targetUser.role === 'farmer') {
+      await pool.query(
+        'UPDATE products SET is_admin_disabled = false, admin_disabled_at = NULL WHERE farmer_id = $1',
+        [userId]
+      );
+    }
+
+    await insertNotification(pool, {
+      userId,
+      type: 'account_enabled',
+      title: 'Account enabled',
+      message: 'Your account has been enabled.'
+    });
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'user.enable',
+      entity: 'users',
+      entity_id: userId,
+      before: userResult.rows[0],
+      after: { id: userId, is_disabled: false }
+    });
+    broadcastEvent('admin.audit', { action: 'user.enable', entity: 'users', entity_id: userId, actor_admin_id: req.user.id });
+
+    return res.json({ message: 'User enabled' });
+  } catch (error) {
+    console.error('Enable user error:', error);
+    return res.status(500).json({ message: 'Server error enabling user' });
+  }
+};
+
 // Ensure audit log table exists (best effort)
 ensureAuditTable(pool).catch(() => {});
 
@@ -156,7 +455,7 @@ router.get('/users', requireAdmin, async (req, res) => {
     const result = await pool.query(
       // NOTE: password is returned as plain text because this project stores passwords in plain text
       // and the admin dashboard explicitly needs to view it. This is NOT secure for production.
-      'SELECT id, username, email, password, full_name, phone, role, is_verified, created_at FROM users ORDER BY created_at DESC'
+      'SELECT id, username, email, password, full_name, phone, role, is_verified, is_disabled, disabled_at, disabled_reason, created_at FROM users ORDER BY created_at DESC'
     );
 
     let users = result.rows;
@@ -585,10 +884,11 @@ router.post('/users/:id/generate-temp-password', requireAdmin, async (req, res) 
 router.get('/products', requireAdmin, async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT p.*, u.full_name as farmer_name, u.email as farmer_email
-            FROM products p
-            LEFT JOIN users u ON p.farmer_id = u.id
-            ORDER BY p.created_at DESC
+          SELECT p.*, u.full_name as farmer_name, u.email as farmer_email,
+               COALESCE(u.is_disabled, false) as farmer_is_disabled
+          FROM products p
+          LEFT JOIN users u ON p.farmer_id = u.id
+          ORDER BY p.created_at DESC
         `);
         res.json({ products: result.rows });
     } catch (error) {
@@ -907,7 +1207,7 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
   }
 });
 
-// Delete order (admin)
+// Disable order (admin)
 router.delete('/orders/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -922,25 +1222,54 @@ router.delete('/orders/:id', requireAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    await pool.query('DELETE FROM order_items WHERE order_id = $1', [orderId]);
-    await pool.query('DELETE FROM notifications WHERE order_id = $1', [orderId]);
-    await pool.query('DELETE FROM orders WHERE id = $1', [orderId]);
+    await pool.query(
+      'UPDATE orders SET is_disabled = true, disabled_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [orderId]
+    );
 
     await writeAdminAuditLog(pool, {
       actor_admin_id: req.user.id,
-      action: 'order.delete',
+      action: 'order.disable',
       entity: 'orders',
       entity_id: orderId,
       before: orderResult.rows[0],
-      after: null
+      after: { id: orderId, is_disabled: true }
     });
-    broadcastEvent('order.updated', { order_id: orderId, deleted: true });
-    broadcastEvent('admin.audit', { action: 'order.delete', entity: 'orders', entity_id: orderId, actor_admin_id: req.user.id });
+    broadcastEvent('order.updated', { order_id: orderId, disabled: true });
+    broadcastEvent('admin.audit', { action: 'order.disable', entity: 'orders', entity_id: orderId, actor_admin_id: req.user.id });
 
-    res.json({ message: 'Order deleted successfully' });
+    res.json({ message: 'Order disabled successfully' });
   } catch (error) {
-    console.error('Delete order error:', error);
-    res.status(500).json({ message: 'Server error deleting order' });
+    console.error('Disable order error:', error);
+    res.status(500).json({ message: 'Server error disabling order' });
+  }
+});
+
+router.put('/orders/:id/enable', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orderId = parseInt(id, 10);
+    if (!orderId) return res.status(400).json({ message: 'Invalid order id' });
+
+    const orderResult = await pool.query('SELECT * FROM orders WHERE id = $1', [orderId]);
+    if (!orderResult.rows.length) return res.status(404).json({ message: 'Order not found' });
+
+    await pool.query('UPDATE orders SET is_disabled = false, disabled_at = NULL WHERE id = $1', [orderId]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'order.enable',
+      entity: 'orders',
+      entity_id: orderId,
+      before: orderResult.rows[0],
+      after: { id: orderId, is_disabled: false }
+    });
+    broadcastEvent('admin.audit', { action: 'order.enable', entity: 'orders', entity_id: orderId, actor_admin_id: req.user.id });
+
+    res.json({ message: 'Order enabled successfully' });
+  } catch (error) {
+    console.error('Enable order error:', error);
+    res.status(500).json({ message: 'Server error enabling order' });
   }
 });
 
@@ -949,7 +1278,14 @@ router.get('/stats', requireAdmin, async (req, res) => {
   try {
     const [usersResult, productsResult, ordersResult, revenueResult] = await Promise.all([
       pool.query('SELECT COUNT(*) as count FROM users'),
-      pool.query('SELECT COUNT(*) as count FROM products WHERE is_available = true'),
+      pool.query(`
+        SELECT COUNT(*) as count
+        FROM products p
+        LEFT JOIN users u ON p.farmer_id = u.id
+        WHERE p.is_available = true
+          AND COALESCE(p.is_admin_disabled, false) = false
+          AND COALESCE(u.is_disabled, false) = false
+      `),
       pool.query('SELECT COUNT(*) as count FROM orders'),
       pool.query('SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status != \'cancelled\'')
     ]);
@@ -968,136 +1304,41 @@ router.get('/stats', requireAdmin, async (req, res) => {
   }
 });
 
-// Delete user
-router.delete('/users/:id', requireAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = parseInt(id, 10);
+// Disable/enable users
+router.put('/users/:id/disable', requireAdmin, disableUserHandler);
+router.put('/users/:id/enable', requireAdmin, enableUserHandler);
 
-    // Prevent deleting yourself or super admin
-    if (userId === req.user.id) {
-      return res.status(400).json({ message: 'You cannot delete your own account' });
-    }
-
-    // Prevent deleting super admin
-    if (userId === -1) {
-      return res.status(403).json({ message: 'Cannot delete super admin account' });
-    }
-
-    // Check if user exists
-    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    if (userResult.rows[0].role === 'staff') {
-      return res.status(403).json({ message: 'Cannot delete another staff account' });
-    }
-
-    // Delete user (cascade will handle related records if foreign keys are set up)
-    // Note: This will fail if foreign keys don't allow CASCADE DELETE
-    // In that case, we need to delete related records first
-    try {
-      // Delete related records first to avoid foreign key constraint errors
-      await pool.query('DELETE FROM cart WHERE user_id = $1', [userId]);
-      await pool.query('DELETE FROM wishlist WHERE user_id = $1', [userId]);
-      await pool.query('DELETE FROM reviews WHERE user_id = $1', [userId]);
-      await pool.query('DELETE FROM messages WHERE sender_id = $1 OR receiver_id = $1', [userId]);
-      await pool.query('DELETE FROM conversations WHERE farmer_id = $1 OR customer_id = $1', [userId]);
-      
-      // Delete order items first, then orders
-      await pool.query('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = $1)', [userId]);
-      await pool.query('DELETE FROM orders WHERE user_id = $1', [userId]);
-      
-      // If user is a farmer, delete their products
-      if (userResult.rows[0].role === 'farmer') {
-        await pool.query('DELETE FROM products WHERE farmer_id = $1', [userId]);
-      }
-      
-      // Finally delete the user
-      await pool.query('DELETE FROM users WHERE id = $1', [userId]);
-
-      await writeAdminAuditLog(pool, {
-        actor_admin_id: req.user.id,
-        action: 'user.delete',
-        entity: 'users',
-        entity_id: userId,
-        before: userResult.rows[0],
-        after: null
-      });
-      broadcastEvent('admin.audit', { action: 'user.delete', entity: 'users', entity_id: userId, actor_admin_id: req.user.id });
-      
-      res.json({ message: 'User deleted successfully' });
-    } catch (deleteError) {
-      console.error('Delete user error:', deleteError);
-      // If foreign key constraint error, provide helpful message
-      if (deleteError.code === '23503') {
-        return res.status(400).json({ 
-          message: 'Cannot delete user due to existing related records. Please remove related data first.' 
-        });
-      }
-      throw deleteError;
-    }
-  } catch (error) {
-    console.error('Delete user error:', error);
-    res.status(500).json({ message: 'Server error deleting user' });
-  }
-});
+// Legacy delete endpoint now disables the user
+router.delete('/users/:id', requireAdmin, async (req, res) => disableUserHandler(req, res, 'Account disabled by admin'));
 
 // Delete product
 router.delete('/products/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { deleteFileIfExists, resolvePublicPath } = require('../utils/fileUtils');
-
-    // Check if product exists
     const productResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
     if (productResult.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Delete related records first
-    try {
-      await pool.query('DELETE FROM cart WHERE product_id = $1', [id]);
-      await pool.query('DELETE FROM wishlist WHERE product_id = $1', [id]);
-      await pool.query('DELETE FROM reviews WHERE product_id = $1', [id]);
-      await pool.query('DELETE FROM order_items WHERE product_id = $1', [id]);
-      
-      // Delete product image if exists
-      const imageUrl = productResult.rows[0].image_url;
-      if (imageUrl) {
-        const imagePath = resolvePublicPath(imageUrl);
-        if (imagePath) {
-          deleteFileIfExists(imagePath);
-        }
-      }
-      
-      // Delete the product
-      await pool.query('DELETE FROM products WHERE id = $1', [id]);
+    await pool.query(
+      'UPDATE products SET is_admin_disabled = true, admin_disabled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [id]
+    );
 
-      await writeAdminAuditLog(pool, {
-        actor_admin_id: req.user.id,
-        action: 'product.delete',
-        entity: 'products',
-        entity_id: parseInt(id, 10),
-        before: productResult.rows[0],
-        after: null
-      });
-      broadcastEvent('admin.audit', { action: 'product.delete', entity: 'products', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
-      
-      res.json({ message: 'Product deleted successfully' });
-    } catch (deleteError) {
-      console.error('Delete product error:', deleteError);
-      if (deleteError.code === '23503') {
-        return res.status(400).json({ 
-          message: 'Cannot delete product due to existing related records (e.g., active orders).' 
-        });
-      }
-      throw deleteError;
-    }
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'product.disable',
+      entity: 'products',
+      entity_id: parseInt(id, 10),
+      before: productResult.rows[0],
+      after: { id: parseInt(id, 10), is_admin_disabled: true }
+    });
+    broadcastEvent('admin.audit', { action: 'product.disable', entity: 'products', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
+
+    res.json({ message: 'Product disabled successfully' });
   } catch (error) {
-    console.error('Delete product error:', error);
-    res.status(500).json({ message: 'Server error deleting product' });
+    console.error('Disable product error:', error);
+    res.status(500).json({ message: 'Server error disabling product' });
   }
 });
 
@@ -1105,34 +1346,42 @@ router.delete('/products/:id', requireAdmin, async (req, res) => {
 router.put('/products/:id/status', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { is_available } = req.body;
+    const { is_admin_disabled } = req.body;
 
-    if (typeof is_available !== 'boolean') {
-      return res.status(400).json({ message: 'is_available must be a boolean' });
+    if (typeof is_admin_disabled !== 'boolean') {
+      return res.status(400).json({ message: 'is_admin_disabled must be a boolean' });
     }
 
-    const productResult = await pool.query('SELECT id, is_available FROM products WHERE id = $1', [id]);
+    const productResult = await pool.query('SELECT id, is_admin_disabled FROM products WHERE id = $1', [id]);
     if (productResult.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
     const before = productResult.rows[0];
-    await pool.query('UPDATE products SET is_available = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [is_available, id]);
-    const afterRes = await pool.query('SELECT id, is_available FROM products WHERE id = $1', [id]);
+    await pool.query(
+      `UPDATE products
+       SET is_admin_disabled = $1,
+           admin_disabled_at = CASE WHEN $1 THEN CURRENT_TIMESTAMP ELSE NULL END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [is_admin_disabled, id]
+    );
+    const afterRes = await pool.query('SELECT id, is_admin_disabled FROM products WHERE id = $1', [id]);
 
+    const action = is_admin_disabled ? 'product.disable' : 'product.enable';
     await writeAdminAuditLog(pool, {
       actor_admin_id: req.user.id,
-      action: 'product.status.update',
+      action,
       entity: 'products',
       entity_id: parseInt(id, 10),
       before,
       after: afterRes.rows[0]
     });
-    broadcastEvent('admin.audit', { action: 'product.status.update', entity: 'products', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
+    broadcastEvent('admin.audit', { action, entity: 'products', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
 
-    res.json({ message: 'Product status updated successfully' });
+    res.json({ message: 'Product admin status updated successfully' });
   } catch (error) {
-    console.error('Toggle product status error:', error);
+    console.error('Toggle product admin status error:', error);
     res.status(500).json({ message: 'Server error updating product status' });
   }
 });
@@ -1142,7 +1391,7 @@ router.get('/categories', requireAdmin, async (_req, res) => {
   try {
     await ensureCategoryAdminSchema();
     const result = await pool.query(
-      `SELECT id, name, description, COALESCE(type, 'agricultural') AS type, created_at
+      `SELECT id, name, description, COALESCE(type, 'agricultural') AS type, is_disabled, created_at
        FROM categories
        ORDER BY name ASC`
     );
@@ -1156,11 +1405,21 @@ router.get('/categories', requireAdmin, async (_req, res) => {
 router.post('/categories', requireAdmin, async (req, res) => {
   try {
     await ensureCategoryAdminSchema();
-    const name = String(req.body?.name || '').trim();
+    const name = normalizeCategoryName(req.body?.name);
     const description = String(req.body?.description || '').trim();
     const type = String(req.body?.type || 'agricultural').trim().toLowerCase();
 
     if (!name) return res.status(400).json({ message: 'Category name is required' });
+
+    const existing = await pool.query('SELECT id, is_disabled FROM categories WHERE LOWER(name) = $1 LIMIT 1', [normalizeCategoryKey(name)]);
+    if (existing.rows.length) {
+      const isDisabled = !!existing.rows[0].is_disabled;
+      return res.status(409).json({
+        message: isDisabled
+          ? 'Category already exists and is disabled. Enable it instead.'
+          : 'Category already exists'
+      });
+    }
 
     const inserted = await pool.query(
       `INSERT INTO categories (name, description, type)
@@ -1195,7 +1454,10 @@ router.put('/categories/:id', requireAdmin, async (req, res) => {
     const id = Number(req.params.id || 0);
     if (!id) return res.status(400).json({ message: 'Invalid category id' });
 
-    const beforeRes = await pool.query('SELECT id, name, description, COALESCE(type, \'' + 'agricultural' + '\') AS type FROM categories WHERE id = $1', [id]);
+    const beforeRes = await pool.query(
+      "SELECT id, name, description, COALESCE(type, 'agricultural') AS type, is_disabled FROM categories WHERE id = $1",
+      [id]
+    );
     if (!beforeRes.rows.length) return res.status(404).json({ message: 'Category not found' });
 
     const name = req.body?.name;
@@ -1207,8 +1469,17 @@ router.put('/categories/:id', requireAdmin, async (req, res) => {
     let idx = 1;
 
     if (typeof name !== 'undefined') {
+      const trimmed = normalizeCategoryName(name);
+      if (!trimmed) return res.status(400).json({ message: 'Category name cannot be empty' });
+      const duplicate = await pool.query(
+        'SELECT id FROM categories WHERE LOWER(name) = $1 AND id <> $2 LIMIT 1',
+        [normalizeCategoryKey(trimmed), id]
+      );
+      if (duplicate.rows.length) {
+        return res.status(409).json({ message: 'Category name already exists' });
+      }
       updates.push(`name = $${idx++}`);
-      values.push(String(name).trim());
+      values.push(trimmed);
     }
     if (typeof description !== 'undefined') {
       updates.push(`description = $${idx++}`);
@@ -1252,28 +1523,53 @@ router.delete('/categories/:id', requireAdmin, async (req, res) => {
     const id = Number(req.params.id || 0);
     if (!id) return res.status(400).json({ message: 'Invalid category id' });
 
-    const inUse = await pool.query('SELECT COUNT(*)::int AS count FROM products WHERE category_id = $1', [id]);
-    if (Number(inUse.rows[0]?.count || 0) > 0) {
-      return res.status(400).json({ message: 'Cannot delete category with existing products' });
-    }
+    const beforeRes = await pool.query('SELECT id, name, is_disabled FROM categories WHERE id = $1', [id]);
+    if (!beforeRes.rows.length) return res.status(404).json({ message: 'Category not found' });
 
-    const deleted = await pool.query('DELETE FROM categories WHERE id = $1 RETURNING id, name', [id]);
-    if (!deleted.rows.length) return res.status(404).json({ message: 'Category not found' });
+    await pool.query('UPDATE categories SET is_disabled = true WHERE id = $1', [id]);
 
     await writeAdminAuditLog(pool, {
       actor_admin_id: req.user.id,
-      action: 'category.delete',
+      action: 'category.disable',
       entity: 'categories',
       entity_id: id,
-      before: deleted.rows[0],
-      after: null
+      before: beforeRes.rows[0],
+      after: { id, is_disabled: true }
     });
-    broadcastEvent('admin.audit', { action: 'category.delete', entity: 'categories', entity_id: id, actor_admin_id: req.user.id });
+    broadcastEvent('admin.audit', { action: 'category.disable', entity: 'categories', entity_id: id, actor_admin_id: req.user.id });
 
-    return res.json({ message: 'Category deleted' });
+    return res.json({ message: 'Category disabled' });
   } catch (error) {
-    console.error('Admin delete category error:', error);
-    return res.status(500).json({ message: 'Server error deleting category' });
+    console.error('Admin disable category error:', error);
+    return res.status(500).json({ message: 'Server error disabling category' });
+  }
+});
+
+router.put('/categories/:id/enable', requireAdmin, async (req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const id = Number(req.params.id || 0);
+    if (!id) return res.status(400).json({ message: 'Invalid category id' });
+
+    const beforeRes = await pool.query('SELECT id, name, is_disabled FROM categories WHERE id = $1', [id]);
+    if (!beforeRes.rows.length) return res.status(404).json({ message: 'Category not found' });
+
+    await pool.query('UPDATE categories SET is_disabled = false WHERE id = $1', [id]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'category.enable',
+      entity: 'categories',
+      entity_id: id,
+      before: beforeRes.rows[0],
+      after: { id, is_disabled: false }
+    });
+    broadcastEvent('admin.audit', { action: 'category.enable', entity: 'categories', entity_id: id, actor_admin_id: req.user.id });
+
+    return res.json({ message: 'Category enabled' });
+  } catch (error) {
+    console.error('Admin enable category error:', error);
+    return res.status(500).json({ message: 'Server error enabling category' });
   }
 });
 
@@ -1395,14 +1691,25 @@ router.put('/category-requests/:id/review', requireAdmin, async (req, res) => {
     const reviewerId = Number(req.user?.id || 0) > 0 ? Number(req.user.id) : null;
 
     if (newCategoryName) {
-      const createdCategory = await pool.query(
-        `INSERT INTO categories (name, description, type)
-         VALUES ($1, $2, 'agricultural')
-         ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
-         RETURNING id`,
-        [newCategoryName, `${newCategoryName} category`]
+      const normalizedName = normalizeCategoryName(newCategoryName);
+      const existingCategory = await pool.query(
+        'SELECT id, is_disabled FROM categories WHERE LOWER(name) = $1 LIMIT 1',
+        [normalizeCategoryKey(normalizedName)]
       );
-      nextCategoryId = Number(createdCategory.rows[0]?.id || 0);
+      if (existingCategory.rows.length) {
+        nextCategoryId = Number(existingCategory.rows[0]?.id || 0);
+        if (existingCategory.rows[0]?.is_disabled) {
+          await pool.query('UPDATE categories SET is_disabled = false WHERE id = $1', [nextCategoryId]);
+        }
+      } else {
+        const createdCategory = await pool.query(
+          `INSERT INTO categories (name, description, type)
+           VALUES ($1, $2, 'agricultural')
+           RETURNING id`,
+          [normalizedName, `${normalizedName} category`]
+        );
+        nextCategoryId = Number(createdCategory.rows[0]?.id || 0);
+      }
     }
 
     if (nextStatus === 'approved') {

@@ -178,6 +178,7 @@ async function updateUserPassword(userId, passwordValue) {
 async function getLoginSelectFields() {
   const columns = await getUserColumns();
   const fields = ['id', 'username', 'email', 'full_name', 'role'];
+  if (columns.has('is_disabled')) fields.push('is_disabled');
   if (columns.has('password')) fields.push('password');
   if (columns.has('password_hash')) fields.push('password_hash');
   return fields;
@@ -368,6 +369,10 @@ router.post('/login', async (req, res) => {
     }
 
     const user = result.rows[0];
+
+    if (user.is_disabled) {
+      return res.status(403).json({ message: 'Account disabled. Please contact support.' });
+    }
 
     // Check password (backward-compatible):
     // - If stored password is bcrypt hash, use bcrypt compare

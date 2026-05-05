@@ -7,11 +7,15 @@ class AdminDashboard {
     constructor() {
         // Resolve API base by host so dashboard pages work even without app.js.
         const host = window.location.hostname;
+        const isLocalHost = host === 'localhost' || host === '127.0.0.1' || window.location.protocol === 'file:';
         const isCustomFrontendHost = host === 'agricatch.store' ||
             host === 'www.agricatch.store' ||
             host.includes('agricatch.store') ||
             host === 'agricatch.page.dev';
-        this.apiBase = window.API_BASE || (isCustomFrontendHost ? 'https://agricatch.onrender.com/api' : '/api');
+        // Prefer explicit window.API_BASE, then local backend for dev/file pages, then render fallback, then relative /api
+        this.apiBase = window.API_BASE || (isLocalHost ? 'http://localhost:3000/api' : (isCustomFrontendHost ? 'https://agricatch.onrender.com/api' : '/api'));
+        // Ensure a global fallback so other scripts or console checks can read the resolved API base
+        try { if (!window.API_BASE) window.API_BASE = this.apiBase; } catch (e) {}
         this.token = localStorage.getItem('token');
         this.currentUserId = null;
         this.lastUsers = [];
@@ -530,7 +534,10 @@ class AdminDashboard {
             // Handle super admin (virtual user with id -1)
             const isSuperAdmin = user.id === -1 && user.role === 'super_admin';
             const canEditThisUser = this.currentUserRole === 'super_admin' || user.role !== 'staff';
-            const canDeleteThisUser = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId && !['staff', 'super_admin'].includes(user.role);
+            const canToggleDisable = this.currentUserRole === 'super_admin'
+                ? user.id !== this.currentUserId && user.id !== -1
+                : user.role !== 'staff' && user.id !== this.currentUserId && user.id !== -1;
+            const isDisabled = !!user.is_disabled;
 
             return `
                 <tr>
@@ -548,6 +555,7 @@ class AdminDashboard {
                                 <option value="staff" ${user.role === 'staff' ? 'selected' : ''}>Staff</option>
                             </select>`
                         }
+                        ${!isSuperAdmin ? `<div style="margin-top:6px;"><span class="status-pill ${isDisabled ? 'pending' : 'completed'}">${isDisabled ? 'Disabled' : 'Active'}</span></div>` : ''}
                     </td>
                     <td>
                         ${user.role === 'farmer' ? `
@@ -560,7 +568,9 @@ class AdminDashboard {
                     <td>${new Date(user.created_at).toLocaleDateString()}</td>
                     <td>
                         ${canEditThisUser ? `<button onclick="adminDashboard.openUserEdit(${user.id})" class="btn btn-small">Edit User</button>` : ''}
-                        <button onclick="adminDashboard.deleteUser(${user.id})" class="btn btn-small btn-danger" ${!canDeleteThisUser ? 'disabled' : ''}>Delete</button>
+                        <button onclick="adminDashboard.toggleUserDisabled(${user.id}, ${!isDisabled})" class="btn btn-small ${isDisabled ? '' : 'btn-danger'}" ${!canToggleDisable ? 'disabled' : ''}>
+                            ${isDisabled ? 'Enable' : 'Disable'}
+                        </button>
                     </td>
                 </tr>
             `;
@@ -636,20 +646,27 @@ class AdminDashboard {
 
     renderOrders(orders) {
         const tbody = document.getElementById('orders-tbody');
-        tbody.innerHTML = orders.map(order => `
+        tbody.innerHTML = orders.map(order => {
+            const isDisabled = !!order.is_disabled;
+            const statusClass = isDisabled ? 'pending' : this.getStatusClass(order.status);
+            const statusLabel = isDisabled ? 'Disabled' : this.formatStatus(order.status);
+            return `
             <tr>
                 <td><input type="checkbox" aria-label="Select order ${order.id}"></td>
                 <td>#${order.id}</td>
                 <td>${order.username || order.email}</td>
-                <td><span class="status-pill ${this.getStatusClass(order.status)}">${this.formatStatus(order.status)}</span></td>
+                <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
                 <td>${this.fmtCurrency(order.total_amount)}</td>
                 <td>${new Date(order.created_at).toLocaleDateString()}</td>
                 <td>
                     <button onclick="adminDashboard.viewOrderDetails(${order.id})" class="btn btn-small">View</button>
-                    <button onclick="adminDashboard.deleteOrder(${order.id})" class="btn btn-small btn-danger">Delete</button>
+                    <button onclick="adminDashboard.toggleOrderDisabled(${order.id}, ${!isDisabled})" class="btn btn-small ${isDisabled ? '' : 'btn-danger'}">
+                        ${isDisabled ? 'Enable' : 'Disable'}
+                    </button>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
     }
 
     async loadProducts() {
@@ -672,7 +689,16 @@ class AdminDashboard {
 
     renderProducts(products) {
         const tbody = document.getElementById('products-tbody');
-        tbody.innerHTML = products.map(product => `
+        tbody.innerHTML = products.map(product => {
+            const isAdminDisabled = !!product.is_admin_disabled;
+            const isFarmerDisabled = !!product.farmer_is_disabled;
+            const statusLabel = isAdminDisabled
+                ? 'Admin Disabled'
+                : isFarmerDisabled
+                    ? 'Farmer Disabled'
+                    : (product.is_available ? 'Available' : 'Unavailable');
+            const statusClass = (isAdminDisabled || isFarmerDisabled || !product.is_available) ? 'pending' : 'completed';
+            return `
             <tr>
                 <td>${product.id}</td>
                 <td>${product.name}</td>
@@ -682,16 +708,16 @@ class AdminDashboard {
                     <div>${product.farmer_name || 'Unassigned'}</div>
                     ${product.farmer_email ? `<div style="color:#64748b;font-size:0.85rem;">${product.farmer_email}</div>` : ''}
                 </td>
-                <td><span class="status-pill ${product.is_available ? 'completed' : 'pending'}">${product.is_available ? 'Available' : 'Unavailable'}</span></td>
+                <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
                 <td>
                     <button onclick="adminDashboard.openProductEdit(${product.id})" class="btn btn-small">Edit</button>
-                    <button onclick="adminDashboard.toggleProductStatus(${product.id}, ${!product.is_available})" class="btn btn-small">
-                        ${product.is_available ? 'Disable' : 'Enable'}
+                    <button onclick="adminDashboard.toggleProductStatus(${product.id}, ${!isAdminDisabled})" class="btn btn-small ${isAdminDisabled ? '' : 'btn-danger'}">
+                        ${isAdminDisabled ? 'Enable' : 'Disable'}
                     </button>
-                    <button onclick="adminDashboard.deleteProduct(${product.id})" class="btn btn-small btn-danger">Delete</button>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
     }
 
     async loadCategories() {
@@ -714,22 +740,29 @@ class AdminDashboard {
         const tbody = document.getElementById('categories-tbody');
         if (!tbody) return;
 
-        tbody.innerHTML = (categories || []).map((category) => `
+        tbody.innerHTML = (categories || []).map((category) => {
+            const isDisabled = !!category.is_disabled;
+            const statusPill = `<span class="status-pill ${isDisabled ? 'pending' : 'completed'}" style="margin-left:6px;">${isDisabled ? 'Disabled' : 'Active'}</span>`;
+            return `
             <tr>
                 <td>${category.id}</td>
                 <td>${this.escapeHtml(category.name || '')}</td>
                 <td>${this.escapeHtml(category.description || '—')}</td>
+                <td>${statusPill}</td>
                 <td>
                     <button class="btn btn-small" onclick="adminDashboard.editCategory(${category.id})">Edit</button>
-                    <button class="btn btn-small btn-danger" onclick="adminDashboard.deleteCategory(${category.id})">Delete</button>
+                    <button class="btn btn-small ${isDisabled ? '' : 'btn-danger'}" onclick="adminDashboard.toggleCategoryDisabled(${category.id}, ${!isDisabled})">
+                        ${isDisabled ? 'Enable' : 'Disable'}
+                    </button>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
 
         const catalogCategorySelect = document.getElementById('catalog-category-select');
         if (catalogCategorySelect) {
             const options = ['<option value="">Select category</option>']
-                .concat((categories || []).map((category) => `<option value="${category.id}">${this.escapeHtml(category.name || '')}</option>`));
+                .concat((categories || []).filter(c => !c.is_disabled).map((category) => `<option value="${category.id}">${this.escapeHtml(category.name || '')}</option>`));
             catalogCategorySelect.innerHTML = options.join('');
         }
     }
@@ -923,7 +956,7 @@ class AdminDashboard {
     }
 
     async deleteCategory(categoryId) {
-        if (!confirm('Delete this category?')) return;
+        if (!confirm('Disable this category?')) return;
 
         try {
             const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}`, {
@@ -934,14 +967,14 @@ class AdminDashboard {
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                this.showMessage(data.message || 'Failed to delete category', 'error');
+                this.showMessage(data.message || 'Failed to disable category', 'error');
                 return;
             }
-            this.showMessage('Category deleted', 'success');
+            this.showMessage('Category disabled', 'success');
             this.loadCategories();
         } catch (error) {
             console.error('Delete category error:', error);
-            this.showMessage('Failed to delete category', 'error');
+            this.showMessage('Failed to disable category', 'error');
         }
     }
 
@@ -1142,57 +1175,11 @@ class AdminDashboard {
     }
 
     async deleteUser(userId) {
-        if (!confirm(`Are you sure you want to delete this user? This action cannot be undone.`)) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`${this.apiBase}/admin/users/${userId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-
-            if (response.ok) {
-                this.showMessage('User deleted successfully!', 'success');
-                this.loadUsers();
-                this.loadDashboardStats();
-            } else {
-                const errorData = await response.json();
-                this.showMessage(errorData.message || 'Failed to delete user', 'error');
-            }
-        } catch (error) {
-            console.error('Error deleting user:', error);
-            this.showMessage('Error deleting user', 'error');
-        }
+        return this.toggleUserDisabled(userId, true);
     }
 
     async deleteProduct(productId) {
-        if (!confirm(`Are you sure you want to delete this product? This action cannot be undone.`)) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`${this.apiBase}/admin/products/${productId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-
-            if (response.ok) {
-                this.showMessage('Product deleted successfully!', 'success');
-                this.loadProducts();
-                this.loadDashboardStats();
-            } else {
-                const errorData = await response.json();
-                this.showMessage(errorData.message || 'Failed to delete product', 'error');
-            }
-        } catch (error) {
-            console.error('Error deleting product:', error);
-            this.showMessage('Error deleting product', 'error');
-        }
+        return this.toggleProductStatus(productId, true);
     }
 
     async toggleProductStatus(productId, isAvailable) {
@@ -1203,11 +1190,11 @@ class AdminDashboard {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify({ is_available: isAvailable })
+                body: JSON.stringify({ is_admin_disabled: isAvailable })
             });
 
             if (response.ok) {
-                this.showMessage(`Product ${isAvailable ? 'enabled' : 'disabled'} successfully!`, 'success');
+                this.showMessage(`Product ${isAvailable ? 'disabled' : 'enabled'} successfully!`, 'success');
                 this.loadProducts();
                 this.loadDashboardStats();
             } else {
@@ -1601,29 +1588,89 @@ class AdminDashboard {
     }
 
     async deleteOrder(orderId) {
-        if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+        return this.toggleOrderDisabled(orderId, true);
+    }
+
+    async toggleUserDisabled(userId, disable) {
+        const label = disable ? 'disable' : 'enable';
+        if (!confirm(`Are you sure you want to ${label} this user?`)) {
             return;
         }
 
         try {
-            const response = await fetch(`${this.apiBase}/admin/orders/${orderId}`, {
-                method: 'DELETE',
+            const response = await fetch(`${this.apiBase}/admin/users/${userId}/${disable ? 'disable' : 'enable'}`, {
+                method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${this.token}`
                 }
             });
 
+            const data = await response.json().catch(() => ({}));
             if (response.ok) {
-                this.showMessage('Order deleted successfully!', 'success');
+                this.showMessage(`User ${disable ? 'disabled' : 'enabled'} successfully!`, 'success');
+                this.loadUsers();
+                this.loadDashboardStats();
+            } else {
+                this.showMessage(data.message || `Failed to ${label} user`, 'error');
+            }
+        } catch (error) {
+            console.error(`Error trying to ${label} user:`, error);
+            this.showMessage(`Error trying to ${label} user`, 'error');
+        }
+    }
+
+    async toggleOrderDisabled(orderId, disable) {
+        const label = disable ? 'disable' : 'enable';
+        if (!confirm(`Are you sure you want to ${label} this order?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/orders/${orderId}${disable ? '' : '/enable'}`, {
+                method: disable ? 'DELETE' : 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (response.ok) {
+                this.showMessage(`Order ${disable ? 'disabled' : 'enabled'} successfully!`, 'success');
                 this.loadOrders();
                 this.loadDashboardStats();
             } else {
-                const errorData = await response.json();
-                this.showMessage(errorData.message || 'Failed to delete order', 'error');
+                this.showMessage(data.message || `Failed to ${label} order`, 'error');
             }
         } catch (error) {
-            console.error('Error deleting order:', error);
-            this.showMessage('Error deleting order', 'error');
+            console.error(`Error trying to ${label} order:`, error);
+            this.showMessage(`Error trying to ${label} order`, 'error');
+        }
+    }
+
+    async toggleCategoryDisabled(categoryId, disable) {
+        const label = disable ? 'disable' : 'enable';
+        if (!confirm(`Are you sure you want to ${label} this category?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}${disable ? '' : '/enable'}`, {
+                method: disable ? 'DELETE' : 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (response.ok) {
+                this.showMessage(`Category ${disable ? 'disabled' : 'enabled'} successfully!`, 'success');
+                this.loadCategories();
+            } else {
+                this.showMessage(data.message || `Failed to ${label} category`, 'error');
+            }
+        } catch (error) {
+            console.error(`Error trying to ${label} category:`, error);
+            this.showMessage(`Error trying to ${label} category`, 'error');
         }
     }
 

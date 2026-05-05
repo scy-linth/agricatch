@@ -37,6 +37,7 @@ router.get('/', async (req, res) => {
       JOIN products p ON o.product_id = p.id
       LEFT JOIN users f ON p.farmer_id = f.id
       WHERE o.user_id = $1
+        AND COALESCE(o.is_disabled, false) = false
       ORDER BY o.created_at DESC
     `, [decoded.id]);
 
@@ -122,6 +123,8 @@ router.get('/farmer/:farmerId', async (req, res) => {
         o.updated_at,
         u.full_name as customer_name,
         o.user_id as customer_id,
+        COALESCE(u.customer_average_rating, 0) as customer_average_rating,
+        COALESCE(u.customer_total_ratings, 0) as customer_total_ratings,
         p.name as product_name,
         p.unit,
         p.image_url,
@@ -131,6 +134,7 @@ router.get('/farmer/:farmerId', async (req, res) => {
       JOIN products p ON o.product_id = p.id
       LEFT JOIN users u ON o.user_id = u.id
       WHERE p.farmer_id = $1
+        AND COALESCE(o.is_disabled, false) = false
     `;
 
     const params = [farmerId];
@@ -152,6 +156,8 @@ router.get('/farmer/:farmerId', async (req, res) => {
       id: row.id,
       customer_id: row.customer_id,
       customer_name: row.customer_name,
+      customer_average_rating: row.customer_average_rating,
+      customer_total_ratings: row.customer_total_ratings,
       product_id: row.product_id,
       quantity: row.quantity,
       price: row.price,
@@ -223,6 +229,7 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
     // Get order with product info (per-item order)
     const orderResult = await pool.query(`
             SELECT o.id, o.product_id, o.quantity, o.total_amount, o.status, o.user_id as customer_id,
+             o.is_disabled,
              p.farmer_id
       FROM orders o
       JOIN products p ON o.product_id = p.id
@@ -234,6 +241,9 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
     }
 
     const order = orderResult.rows[0];
+    if (order.is_disabled) {
+      return res.status(400).json({ message: 'Order is disabled and cannot be updated' });
+    }
     if (role !== 'staff' && Number(order.farmer_id) !== Number(decoded.id)) {
       return res.status(403).json({ message: 'You can only update your own orders' });
     }
@@ -375,6 +385,7 @@ router.get('/:id', async (req, res) => {
       JOIN products p ON o.product_id = p.id
       LEFT JOIN users f ON p.farmer_id = f.id
       WHERE o.id = $1 AND o.user_id = $2
+        AND COALESCE(o.is_disabled, false) = false
     `, [id, decoded.id]);
 
     if (result.rows.length === 0) {
@@ -441,16 +452,22 @@ router.post('/', async (req, res) => {
 
       // Get user's cart items INSIDE transaction (include cart_id for deletion)
       const userCartQuery = `
-        SELECT c.id as cart_id, c.quantity, p.id as product_id, p.price, p.stock_quantity, p.name
+        SELECT c.id as cart_id, c.quantity, p.id as product_id, p.price, p.stock_quantity, p.name,
+               p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+               p.expiry_date, COALESCE(u.is_disabled, false) as farmer_is_disabled
         FROM cart c
         JOIN products p ON c.product_id = p.id
-        WHERE c.user_id = $1 AND p.is_available = true
+        LEFT JOIN users u ON p.farmer_id = u.id
+        WHERE c.user_id = $1
       `;
       const sessionCartQuery = `
-        SELECT c.id as cart_id, c.quantity, p.id as product_id, p.price, p.stock_quantity, p.name
+        SELECT c.id as cart_id, c.quantity, p.id as product_id, p.price, p.stock_quantity, p.name,
+               p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+               p.expiry_date, COALESCE(u.is_disabled, false) as farmer_is_disabled
         FROM cart c
         JOIN products p ON c.product_id = p.id
-        WHERE c.session_id = $1 AND p.is_available = true
+        LEFT JOIN users u ON p.farmer_id = u.id
+        WHERE c.session_id = $1
       `;
       let cartResult = await client.query(userCartQuery, [decoded.id]);
 
@@ -462,6 +479,22 @@ router.post('/', async (req, res) => {
         await client.query('ROLLBACK');
         client.release();
         return res.status(400).json({ message: 'Cart is empty' });
+      }
+
+      const today = new Date(new Date().toDateString());
+      const unavailableItems = cartResult.rows.filter((item) => {
+        const expired = item.expiry_date && new Date(item.expiry_date) < today;
+        return !item.is_available || item.is_admin_disabled || item.farmer_is_disabled || expired;
+      });
+
+      if (unavailableItems.length > 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        const names = unavailableItems.map((item) => item.name).filter(Boolean);
+        return res.status(400).json({
+          message: 'Your cart has unavailable items. Please remove them before checkout.',
+          unavailable_items: names
+        });
       }
 
       // Validate cart items have all required fields

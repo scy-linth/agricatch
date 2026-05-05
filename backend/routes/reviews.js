@@ -40,6 +40,27 @@ async function refreshFarmerRatingForProduct(productId) {
   );
 }
 
+async function refreshCustomerRatingForUser(customerId) {
+  if (!customerId) return;
+  const ratingResult = await pool.query(
+    `
+      SELECT COALESCE(AVG(r.rating), 0) AS avg_rating,
+             COUNT(r.id)::int AS total_ratings
+      FROM customer_ratings r
+      WHERE r.customer_id = $1
+    `,
+    [customerId]
+  );
+
+  const avgRating = Number(ratingResult.rows?.[0]?.avg_rating || 0);
+  const totalRatings = Number(ratingResult.rows?.[0]?.total_ratings || 0);
+
+  await pool.query(
+    'UPDATE users SET customer_average_rating = $1, customer_total_ratings = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+    [avgRating, totalRatings, customerId]
+  );
+}
+
 async function getRatingEligibility(userId, productId) {
   const deliveredOrderResult = await pool.query(
     `
@@ -84,6 +105,54 @@ async function getRatingEligibility(userId, productId) {
   return {
     allowed: true,
     editableUntil
+  };
+}
+
+async function getCustomerRatingEligibility(farmerId, orderId) {
+  const orderResult = await pool.query(
+    `
+      SELECT o.id, o.user_id AS customer_id, o.status,
+             COALESCE(o.delivered_at, o.updated_at, o.created_at) AS delivered_ref
+      FROM orders o
+      JOIN products p ON p.id = o.product_id
+      WHERE o.id = $1
+        AND p.farmer_id = $2
+        AND COALESCE(o.is_disabled, false) = false
+      LIMIT 1
+    `,
+    [orderId, farmerId]
+  );
+
+  if (!orderResult.rows.length) {
+    return { allowed: false, reason: 'Order not found for this farmer.' };
+  }
+
+  const orderRow = orderResult.rows[0];
+  if (orderRow.status !== 'delivered') {
+    return { allowed: false, reason: 'You can rate a customer only after delivery.' };
+  }
+
+  const deliveredRef = new Date(orderRow.delivered_ref);
+  const editableUntil = new Date(deliveredRef.getTime());
+  editableUntil.setMonth(editableUntil.getMonth() + 1);
+
+  if (Number.isNaN(editableUntil.getTime())) {
+    return { allowed: false, reason: 'Unable to validate delivery date for rating eligibility.' };
+  }
+
+  const now = new Date();
+  if (now > editableUntil) {
+    return {
+      allowed: false,
+      reason: 'Rating window has ended. Ratings are editable for 1 month after delivery.',
+      editableUntil
+    };
+  }
+
+  return {
+    allowed: true,
+    editableUntil,
+    customerId: orderRow.customer_id
   };
 }
 
@@ -242,6 +311,142 @@ router.delete('/reviews/:id', async (req, res) => {
   } catch (error) {
     console.error('Delete review error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Farmer rates customer (per delivered order)
+router.get('/orders/:id/customer-rating/eligibility', async (req, res) => {
+  try {
+    const user = getUserFromToken(req);
+    if (!user) return res.status(401).json({ message: 'Authentication required' });
+
+    const orderId = Number(req.params.id || 0);
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      return res.status(400).json({ message: 'Invalid order id' });
+    }
+
+    const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [user.id]);
+    const role = roleResult.rows[0]?.role;
+    if (role !== 'farmer') {
+      return res.status(403).json({ message: 'Only farmers can rate customers' });
+    }
+
+    const eligibility = await getCustomerRatingEligibility(user.id, orderId);
+    const myRating = await pool.query(
+      `SELECT id, rating, created_at, updated_at
+       FROM customer_ratings
+       WHERE order_id = $1 AND farmer_id = $2
+       LIMIT 1`,
+      [orderId, user.id]
+    );
+
+    return res.json({
+      can_rate: eligibility.allowed,
+      reason: eligibility.reason || null,
+      editable_until: eligibility.editableUntil ? eligibility.editableUntil.toISOString() : null,
+      my_rating: myRating.rows[0] || null
+    });
+  } catch (error) {
+    console.error('Customer rating eligibility error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/orders/:id/customer-rating', async (req, res) => {
+  try {
+    const user = getUserFromToken(req);
+    if (!user) return res.status(401).json({ message: 'Authentication required' });
+
+    const orderId = Number(req.params.id || 0);
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      return res.status(400).json({ message: 'Invalid order id' });
+    }
+
+    const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [user.id]);
+    const role = roleResult.rows[0]?.role;
+    if (role !== 'farmer') {
+      return res.status(403).json({ message: 'Only farmers can rate customers' });
+    }
+
+    const rating = Number(req.body?.rating || 0);
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    }
+
+    const eligibility = await getCustomerRatingEligibility(user.id, orderId);
+    if (!eligibility.allowed) {
+      return res.status(400).json({ message: eligibility.reason || 'You are not eligible to rate this customer.' });
+    }
+
+    const existing = await pool.query(
+      'SELECT id FROM customer_ratings WHERE order_id = $1 AND farmer_id = $2 LIMIT 1',
+      [orderId, user.id]
+    );
+    if (existing.rows.length) {
+      return res.status(409).json({ message: 'You already rated this customer for this order' });
+    }
+
+    const created = await pool.query(
+      `INSERT INTO customer_ratings (order_id, farmer_id, customer_id, rating)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, rating, created_at, updated_at`,
+      [orderId, user.id, eligibility.customerId, rating]
+    );
+
+    await refreshCustomerRatingForUser(eligibility.customerId);
+
+    return res.status(201).json({ rating: created.rows[0] });
+  } catch (error) {
+    console.error('Create customer rating error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/orders/:id/customer-rating', async (req, res) => {
+  try {
+    const user = getUserFromToken(req);
+    if (!user) return res.status(401).json({ message: 'Authentication required' });
+
+    const orderId = Number(req.params.id || 0);
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      return res.status(400).json({ message: 'Invalid order id' });
+    }
+
+    const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [user.id]);
+    const role = roleResult.rows[0]?.role;
+    if (role !== 'farmer') {
+      return res.status(403).json({ message: 'Only farmers can rate customers' });
+    }
+
+    const rating = Number(req.body?.rating || 0);
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    }
+
+    const eligibility = await getCustomerRatingEligibility(user.id, orderId);
+    if (!eligibility.allowed) {
+      return res.status(400).json({ message: eligibility.reason || 'Rating update window has ended.' });
+    }
+
+    const existing = await pool.query(
+      'SELECT id, customer_id FROM customer_ratings WHERE order_id = $1 AND farmer_id = $2 LIMIT 1',
+      [orderId, user.id]
+    );
+    if (!existing.rows.length) {
+      return res.status(404).json({ message: 'Customer rating not found' });
+    }
+
+    await pool.query(
+      'UPDATE customer_ratings SET rating = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [rating, existing.rows[0].id]
+    );
+
+    await refreshCustomerRatingForUser(existing.rows[0].customer_id);
+
+    return res.json({ message: 'Customer rating updated' });
+  } catch (error) {
+    console.error('Update customer rating error:', error);
+    return res.status(500).json({ message: 'Server error' });
   }
 });
 

@@ -26,13 +26,28 @@ router.get('/', async (req, res) => {
       query = `
         SELECT c.id, c.quantity, c.added_at,
                p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
-               f.full_name as farmer_name, p.location as farm_location
+               p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+               p.expiry_date,
+               COALESCE(f.is_disabled, false) as farmer_is_disabled,
+               f.full_name as farmer_name, p.location as farm_location,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN false
+                 WHEN COALESCE(f.is_disabled, false) THEN false
+                 WHEN p.is_available = false THEN false
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN false
+                 ELSE true
+               END AS is_available_for_checkout,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN 'admin_disabled'
+                 WHEN COALESCE(f.is_disabled, false) THEN 'farmer_disabled'
+                 WHEN p.is_available = false THEN 'farmer_unavailable'
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN 'expired'
+                 ELSE 'available'
+               END AS availability_status
         FROM cart c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN users f ON p.farmer_id = f.id
         WHERE c.user_id = $1
-          AND p.is_available = true
-          AND (p.expiry_date IS NULL OR p.expiry_date >= CURRENT_DATE)
         ORDER BY c.added_at DESC
       `;
       params = [userId];
@@ -41,13 +56,28 @@ router.get('/', async (req, res) => {
       query = `
         SELECT c.id, c.quantity, c.added_at,
                p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
-               f.full_name as farmer_name, p.location as farm_location
+               p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+               p.expiry_date,
+               COALESCE(f.is_disabled, false) as farmer_is_disabled,
+               f.full_name as farmer_name, p.location as farm_location,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN false
+                 WHEN COALESCE(f.is_disabled, false) THEN false
+                 WHEN p.is_available = false THEN false
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN false
+                 ELSE true
+               END AS is_available_for_checkout,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN 'admin_disabled'
+                 WHEN COALESCE(f.is_disabled, false) THEN 'farmer_disabled'
+                 WHEN p.is_available = false THEN 'farmer_unavailable'
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN 'expired'
+                 ELSE 'available'
+               END AS availability_status
         FROM cart c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN users f ON p.farmer_id = f.id
         WHERE c.session_id = $1
-          AND p.is_available = true
-          AND (p.expiry_date IS NULL OR p.expiry_date >= CURRENT_DATE)
         ORDER BY c.added_at DESC
       `;
       params = [sessionId];
@@ -59,14 +89,18 @@ router.get('/', async (req, res) => {
 
     // Calculate totals
     const cartItems = result.rows;
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const availableItems = cartItems.filter(item => item.is_available_for_checkout);
+    const subtotal = availableItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const unavailableCount = cartItems.filter(item => !item.is_available_for_checkout).length;
 
     res.json({
       cartItems,
       summary: {
         subtotal: subtotal.toFixed(2),
         itemCount: cartItems.length,
-        totalQuantity: cartItems.reduce((sum, item) => sum + item.quantity, 0)
+        totalQuantity: cartItems.reduce((sum, item) => sum + item.quantity, 0),
+        has_unavailable_items: unavailableCount > 0,
+        unavailable_count: unavailableCount
       }
     });
 
@@ -98,7 +132,12 @@ router.post('/', async (req, res) => {
 
     // Check if product exists and is available
     const productResult = await pool.query(
-      'SELECT id, stock_quantity, is_available, expiry_date FROM products WHERE id = $1',
+      `SELECT p.id, p.stock_quantity, p.is_available, p.expiry_date,
+              COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+              COALESCE(u.is_disabled, false) as farmer_is_disabled
+       FROM products p
+       LEFT JOIN users u ON p.farmer_id = u.id
+       WHERE p.id = $1`,
       [productId]
     );
 
@@ -107,6 +146,14 @@ router.post('/', async (req, res) => {
     }
 
     const product = productResult.rows[0];
+    if (product.is_admin_disabled) {
+      return res.status(400).json({ message: 'Product is not available' });
+    }
+
+    if (product.farmer_is_disabled) {
+      return res.status(400).json({ message: 'Product is not available' });
+    }
+
     if (!product.is_available) {
       return res.status(400).json({ message: 'Product is not available' });
     }
@@ -251,10 +298,22 @@ router.put('/:id', async (req, res) => {
     const sessionId = req.body.sessionId;
 
     if (userId) {
-      cartQuery = 'SELECT c.*, p.stock_quantity FROM cart c JOIN products p ON c.product_id = p.id WHERE c.id = $1 AND c.user_id = $2';
+      cartQuery = `SELECT c.*, p.stock_quantity, p.is_available, p.expiry_date,
+             COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+             COALESCE(u.is_disabled, false) as farmer_is_disabled
+           FROM cart c
+           JOIN products p ON c.product_id = p.id
+           LEFT JOIN users u ON p.farmer_id = u.id
+           WHERE c.id = $1 AND c.user_id = $2`;
       cartParams = [id, userId];
     } else if (sessionId) {
-      cartQuery = 'SELECT c.*, p.stock_quantity FROM cart c JOIN products p ON c.product_id = p.id WHERE c.id = $1 AND c.session_id = $2';
+      cartQuery = `SELECT c.*, p.stock_quantity, p.is_available, p.expiry_date,
+             COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+             COALESCE(u.is_disabled, false) as farmer_is_disabled
+           FROM cart c
+           JOIN products p ON c.product_id = p.id
+           LEFT JOIN users u ON p.farmer_id = u.id
+           WHERE c.id = $1 AND c.session_id = $2`;
       cartParams = [id, sessionId];
     } else {
       return res.status(401).json({ message: 'Authentication or session required' });
@@ -267,6 +326,14 @@ router.put('/:id', async (req, res) => {
     }
 
     const cartItem = cartResult.rows[0];
+    if (cartItem.is_admin_disabled || cartItem.farmer_is_disabled || !cartItem.is_available) {
+      return res.status(400).json({ message: 'Product is not available' });
+    }
+
+    if (cartItem.expiry_date && new Date(cartItem.expiry_date) < new Date(new Date().toDateString())) {
+      return res.status(400).json({ message: 'Product is already expired' });
+    }
+
     if (quantity > cartItem.stock_quantity) {
       return res.status(400).json({ message: 'Not enough stock available' });
     }

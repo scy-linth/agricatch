@@ -23,6 +23,11 @@ CREATE TABLE IF NOT EXISTS users (
     cancellation_rate DECIMAL(5,2) DEFAULT 0,
     total_reviews INTEGER DEFAULT 0,
     average_rating DECIMAL(3,2) DEFAULT 0,
+    customer_total_ratings INTEGER DEFAULT 0,
+    customer_average_rating DECIMAL(3,2) DEFAULT 0,
+    is_disabled BOOLEAN DEFAULT false,
+    disabled_at TIMESTAMP,
+    disabled_reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -32,6 +37,8 @@ CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
     name VARCHAR(50) UNIQUE NOT NULL,
     description TEXT,
+    type VARCHAR(50) DEFAULT 'agricultural',
+    is_disabled BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -48,6 +55,8 @@ CREATE TABLE IF NOT EXISTS products (
     image_url VARCHAR(255),
     sales_count INTEGER DEFAULT 0,
     is_available BOOLEAN DEFAULT true,
+    is_admin_disabled BOOLEAN DEFAULT false,
+    admin_disabled_at TIMESTAMP,
     location VARCHAR(100), -- farm location
     harvest_date DATE,
     expiry_date DATE,
@@ -76,6 +85,8 @@ CREATE TABLE IF NOT EXISTS orders (
     price DECIMAL(10, 2) NOT NULL, -- price at time of order
     total_amount DECIMAL(10, 2) NOT NULL, -- quantity * price
     status VARCHAR(20) DEFAULT 'pending', -- pending, confirmed, preparing, out_for_delivery, delivered, cancelled
+    is_disabled BOOLEAN DEFAULT false,
+    disabled_at TIMESTAMP,
     payment_method VARCHAR(20) DEFAULT 'cash_on_delivery',
     delivery_address TEXT,
     delivery_date DATE,
@@ -113,6 +124,18 @@ CREATE TABLE IF NOT EXISTS reviews (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (product_id, user_id)
+);
+
+-- Customer ratings (farmer rates customer per delivered order)
+CREATE TABLE IF NOT EXISTS customer_ratings (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id),
+    farmer_id INTEGER REFERENCES users(id),
+    customer_id INTEGER REFERENCES users(id),
+    rating INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (order_id, farmer_id)
 );
 
 -- Wishlist table
@@ -232,3 +255,5 @@ CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_product ON orders(product_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE UNIQUE INDEX IF NOT EXISTS categories_name_lower_unique ON categories(LOWER(name));
+CREATE INDEX IF NOT EXISTS idx_orders_disabled ON orders(is_disabled);

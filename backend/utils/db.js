@@ -7,7 +7,7 @@ if (process.env.DB_SSL === 'true') {
   pgSsl = { rejectUnauthorized: false };
 } else {
   const hostHint = String(process.env.DB_HOST || process.env.DATABASE_URL || '').toLowerCase();
-  if (hostHint.includes('render.com') || hostHint.includes('supabase.co')) {
+  if (hostHint.includes('render.com') || hostHint.includes('supabase.co') || hostHint.includes('supabase.com')) {
     pgSsl = { rejectUnauthorized: false };
   }
 }

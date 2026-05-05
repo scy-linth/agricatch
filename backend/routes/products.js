@@ -161,11 +161,14 @@ const SUGGESTED_PRICE_BASELINE = {
 const isAllowedFarmCategoryId = async (categoryId) => {
   if (typeof categoryId === 'undefined' || categoryId === null || categoryId === '') return false;
   try {
-    const result = await pool.query('SELECT name, type FROM categories WHERE id = $1', [categoryId]);
+    const result = await pool.query('SELECT name, type, is_disabled FROM categories WHERE id = $1', [categoryId]);
     if (result.rows.length === 0) return false;
 
     const name = String(result.rows[0].name || '').trim();
     const type = String(result.rows[0].type || '').trim().toLowerCase();
+    const isDisabled = !!result.rows[0].is_disabled;
+
+    if (isDisabled) return false;
 
     // Farm-only system: explicitly block fishery categories
     if (type === 'fishery') return false;
@@ -179,6 +182,7 @@ const isAllowedFarmCategoryId = async (categoryId) => {
 
 const ensureProductCatalogSchema = async () => {
   await pool.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS type VARCHAR(50)`);
+  await pool.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT false`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS product_name_catalog (
@@ -251,6 +255,7 @@ router.get('/categories', async (_req, res) => {
       `SELECT id, name
        FROM categories
        WHERE COALESCE(LOWER(type), 'agricultural') <> 'fishery'
+         AND COALESCE(is_disabled, false) = false
          AND name NOT ILIKE '%fish%'
          AND name NOT ILIKE '%seafood%'
        ORDER BY name ASC`
@@ -312,6 +317,20 @@ router.post('/category-requests', async (req, res) => {
     if (name.length > 120) return res.status(400).json({ message: 'Product name is too long (max 120 chars)' });
 
     await ensureProductCatalogSchema();
+
+    if (requestedCategoryName) {
+      const existingCategory = await pool.query(
+        'SELECT id, is_disabled FROM categories WHERE LOWER(name) = $1 LIMIT 1',
+        [requestedCategoryName.toLowerCase()]
+      );
+      if (existingCategory.rows.length) {
+        return res.status(409).json({
+          message: existingCategory.rows[0].is_disabled
+            ? 'Category already exists but is disabled. Please contact support.'
+            : 'Category already exists. Please select it instead.'
+        });
+      }
+    }
 
     let validCategoryId = null;
     if (categoryId) {
@@ -415,10 +434,13 @@ router.get('/', async (req, res) => {
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN users u ON p.farmer_id = u.id
       WHERE p.is_available = true
+        AND COALESCE(p.is_admin_disabled, false) = false
+        AND COALESCE(u.is_disabled, false) = false
         AND ${NON_EXPIRED_PRODUCT_SQL}
         AND (
           c.id IS NULL
-          OR (COALESCE(LOWER(c.type), 'agricultural') <> 'fishery'
+          OR (COALESCE(c.is_disabled, false) = false
+              AND COALESCE(LOWER(c.type), 'agricultural') <> 'fishery'
               AND c.name NOT ILIKE '%fish%'
               AND c.name NOT ILIKE '%seafood%')
         )
@@ -657,12 +679,15 @@ router.get('/featured', async (req, res) => {
           GROUP BY product_id
         ) s ON s.product_id = p.id
         WHERE p.is_available = true
+          AND COALESCE(p.is_admin_disabled, false) = false
+          AND COALESCE(u.is_disabled, false) = false
           AND p.stock_quantity > 0
           AND COALESCE(s.sold_qty, 0) > 0
           AND ${NON_EXPIRED_PRODUCT_SQL}
           AND (
             c.id IS NULL
-            OR (COALESCE(LOWER(c.type), 'agricultural') <> 'fishery'
+            OR (COALESCE(c.is_disabled, false) = false
+                AND COALESCE(LOWER(c.type), 'agricultural') <> 'fishery'
                 AND c.name NOT ILIKE '%fish%'
                 AND c.name NOT ILIKE '%seafood%')
           )
@@ -698,6 +723,31 @@ router.get('/:id', async (req, res) => {
     const user = getUserFromToken(req);
     const userId = user?.id;
 
+    const availabilityFilter = `p.is_available = true
+      AND COALESCE(p.is_admin_disabled, false) = false
+      AND COALESCE(u.is_disabled, false) = false
+      AND ${NON_EXPIRED_PRODUCT_SQL}`;
+
+    let whereClause = 'WHERE p.id = $1';
+    const params = [id];
+
+    if (userId === -1) {
+      // Super admin can view all products
+    } else if (userId) {
+      const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+      const role = roleResult.rows[0]?.role;
+      if (role === 'staff' || role === 'super_admin') {
+        // Staff can view all products
+      } else if (role === 'farmer') {
+        whereClause += ` AND (p.farmer_id = $2 OR (${availabilityFilter}))`;
+        params.push(userId);
+      } else {
+        whereClause += ` AND ${availabilityFilter}`;
+      }
+    } else {
+      whereClause += ` AND ${availabilityFilter}`;
+    }
+
     const result = await pool.query(`
       SELECT p.*, c.name as category_name, u.full_name as farmer_name, u.phone as farmer_phone,
              COALESCE(p.location, u.address) as farm_location, u.email as farmer_email,
@@ -707,14 +757,12 @@ router.get('/:id', async (req, res) => {
              (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) as average_rating,
             (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) as total_reviews,
             p.cloudinary_public_id as cloudinary_public_id,
-             ${userId ? `EXISTS (SELECT 1 FROM wishlist w WHERE w.user_id = $2 AND w.product_id = p.id)` : 'false'} as is_in_wishlist
+             ${userId ? `EXISTS (SELECT 1 FROM wishlist w WHERE w.user_id = $${params.length + 1} AND w.product_id = p.id)` : 'false'} as is_in_wishlist
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN users u ON p.farmer_id = u.id
-      WHERE p.id = $1
-        AND p.is_available = true
-        AND ${NON_EXPIRED_PRODUCT_SQL}
-    `, userId ? [id, userId] : [id]);
+      ${whereClause}
+    `, userId ? [...params, userId] : params);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
@@ -764,6 +812,8 @@ router.get('/:id/similar-sellers', async (req, res) => {
         WHERE p.id <> $1
           AND p.farmer_id <> $2
           AND p.is_available = true
+          AND COALESCE(p.is_admin_disabled, false) = false
+          AND COALESCE(u.is_disabled, false) = false
           AND p.stock_quantity > 0
           AND ${NON_EXPIRED_PRODUCT_SQL}
           AND (
@@ -1173,17 +1223,24 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ message: 'You can only delete your own products' });
     }
 
-    // Check if product has active orders (not delivered or cancelled)
-    const activeOrdersCheck = await pool.query(
-      `SELECT COUNT(*) as count FROM orders 
-       WHERE product_id = $1 AND status NOT IN ('delivered', 'cancelled')`,
+    const orderHistoryCheck = await pool.query(
+      `SELECT COUNT(*) as count FROM orders WHERE product_id = $1`,
       [id]
     );
-    
-    if (parseInt(activeOrdersCheck.rows[0].count) > 0) {
-      return res.status(400).json({ 
-        message: 'Cannot delete product because it has active orders. Please cancel or complete all orders first.' 
+
+    if (parseInt(orderHistoryCheck.rows[0].count, 10) > 0) {
+      await pool.query(
+        'UPDATE products SET is_available = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+        [id]
+      );
+
+      broadcastEvent('product.updated', {
+        action: 'product.disable',
+        product_id: Number(id),
+        farmer_id: Number(decoded.id)
       });
+
+      return res.json({ message: 'Product disabled because order history exists.' });
     }
 
     // Delete related records first to avoid foreign key constraint errors

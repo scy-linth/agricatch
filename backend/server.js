@@ -123,6 +123,37 @@ app.use(session({
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 hours
 }));
 
+const getTokenFromRequest = (req) => {
+  const header = req.headers.authorization || '';
+  if (header.startsWith('Bearer ')) return header.slice('Bearer '.length).trim();
+  return null;
+};
+
+// Block disabled accounts on any request with a valid token
+app.use(async (req, res, next) => {
+  const token = getTokenFromRequest(req);
+  if (!token) return next();
+  let decoded = null;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+  } catch (_) {
+    return next();
+  }
+
+  if (!decoded || decoded.id === -1) return next();
+
+  try {
+    const userResult = await pool.query('SELECT is_disabled FROM users WHERE id = $1', [decoded.id]);
+    if (userResult.rows.length && userResult.rows[0].is_disabled) {
+      return res.status(403).json({ message: 'Account disabled. Please contact support.' });
+    }
+  } catch (error) {
+    console.error('Disabled-user check failed:', error.message || error);
+  }
+
+  return next();
+});
+
 // DB migrations (best-effort)
 // Ensure OTP table exists
 (async () => {
@@ -211,6 +242,12 @@ app.use(session({
         "UPDATE users SET username = CONCAT(regexp_replace(split_part(email,'@',1),'[^a-zA-Z0-9_]', '_', 'g'), '_', id) WHERE username IS NULL OR username = ''"
       );
 
+      await safeQuery('users.is_disabled column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT false');
+      await safeQuery('users.disabled_at column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMP');
+      await safeQuery('users.disabled_reason column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_reason TEXT');
+      await safeQuery('users.customer_total_ratings column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_total_ratings INTEGER DEFAULT 0');
+      await safeQuery('users.customer_average_rating column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_average_rating DECIMAL(3,2) DEFAULT 0');
+
       await safeQuery('users username unique index', 'CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users (username)');
 
       await safeQuery(
@@ -221,11 +258,15 @@ app.use(session({
             name VARCHAR(50) UNIQUE NOT NULL,
             description TEXT,
             type VARCHAR(50) DEFAULT 'agricultural',
+            is_disabled BOOLEAN DEFAULT false,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           )
         `
       );
       await safeQuery('categories unique index', 'CREATE UNIQUE INDEX IF NOT EXISTS categories_name_unique ON categories (name)');
+      await safeQuery('categories name lower index', 'CREATE UNIQUE INDEX IF NOT EXISTS categories_name_lower_unique ON categories (LOWER(name))');
+      await safeQuery('categories.type column', "ALTER TABLE categories ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'agricultural'");
+      await safeQuery('categories.is_disabled column', 'ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT false');
       await safeQuery(
         'default category',
         `
@@ -250,11 +291,35 @@ app.use(session({
             image_url VARCHAR(255),
             sales_count INTEGER DEFAULT 0,
             is_available BOOLEAN DEFAULT true,
+            is_admin_disabled BOOLEAN DEFAULT false,
+            admin_disabled_at TIMESTAMP,
             location VARCHAR(100),
             harvest_date DATE,
             expiry_date DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `
+      );
+
+      await safeQuery('products.is_admin_disabled column', 'ALTER TABLE products ADD COLUMN IF NOT EXISTS is_admin_disabled BOOLEAN DEFAULT false');
+      await safeQuery('products.admin_disabled_at column', 'ALTER TABLE products ADD COLUMN IF NOT EXISTS admin_disabled_at TIMESTAMP');
+
+      await safeQuery('orders.is_disabled column', 'ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT false');
+      await safeQuery('orders.disabled_at column', 'ALTER TABLE orders ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMP');
+
+      await safeQuery(
+        'customer_ratings table',
+        `
+          CREATE TABLE IF NOT EXISTS customer_ratings (
+            id SERIAL PRIMARY KEY,
+            order_id INTEGER REFERENCES orders(id),
+            farmer_id INTEGER REFERENCES users(id),
+            customer_id INTEGER REFERENCES users(id),
+            rating INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (order_id, farmer_id)
           )
         `
       );
@@ -342,6 +407,8 @@ app.use(session({
             price DECIMAL(10, 2) NOT NULL,
             total_amount DECIMAL(10, 2) NOT NULL,
             status VARCHAR(20) DEFAULT 'pending',
+            is_disabled BOOLEAN DEFAULT false,
+            disabled_at TIMESTAMP,
             payment_method VARCHAR(20) DEFAULT 'cash_on_delivery',
             delivery_address TEXT,
             delivery_date DATE,
@@ -504,6 +571,7 @@ app.use(session({
       await safeQuery('idx_orders_user', 'CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)');
       await safeQuery('idx_orders_product', 'CREATE INDEX IF NOT EXISTS idx_orders_product ON orders(product_id)');
       await safeQuery('idx_orders_status', 'CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
+      await safeQuery('idx_orders_disabled', 'CREATE INDEX IF NOT EXISTS idx_orders_disabled ON orders(is_disabled)');
       await safeQuery('idx_order_items_order', 'CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)');
     }
 
@@ -790,12 +858,18 @@ app.get('/api/test-db', async (req, res) => {
 
 // Server-Sent Events (SSE) endpoint for real-time updates
 // Note: EventSource cannot send Authorization headers reliably, so we accept token via query param.
-app.get('/api/events', (req, res) => {
+app.get('/api/events', async (req, res) => {
   try {
     const token = req.query.token || req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).end();
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    if (decoded?.id !== -1) {
+      const result = await pool.query('SELECT is_disabled FROM users WHERE id = $1', [decoded.id]);
+      if (result.rows.length && result.rows[0].is_disabled) {
+        return res.status(403).end();
+      }
+    }
 
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
