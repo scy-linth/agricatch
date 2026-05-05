@@ -841,6 +841,8 @@ class AgricultureMarket {
                     const otpSection = document.getElementById('register-otp-section');
                     if (otpSection) otpSection.style.display = 'none';
                 }
+                // Clear validation state while user edits the email so input is not persistently red
+                registerEmailInput.classList.remove('invalid', 'valid');
                 // Update button text
                 this.updateRegisterStep1ButtonText();
                 // Persist email to localStorage
@@ -2321,8 +2323,8 @@ class AgricultureMarket {
         // Remove previous validation classes
         field.classList.remove('valid', 'invalid');
 
-        // Skip validation if field is empty (handled by required attribute)
-        if (!field.value.trim() && !field.hasAttribute('required')) {
+        // If the field is empty, leave it neutral (no red/green) — avoid marking required empty fields as invalid immediately
+        if (!field.value.trim()) {
             return;
         }
 
@@ -3002,7 +3004,14 @@ class AgricultureMarket {
                 let errorMessage = data.message || 'Failed to send OTP';
                 // Check for specific error cases
                 if (data.message && data.message.includes('already registered')) {
-                    errorMessage = 'This email is already registered. Please use a different email or try logging in instead.';
+                    // Short, clear message for already-registered emails
+                    errorMessage = 'This email is already registered.';
+                    // Mark the email input as invalid so it shows red and focus it
+                    const emailInputEl = document.getElementById('auth-email-register');
+                    if (emailInputEl) {
+                        emailInputEl.classList.add('invalid');
+                        try { emailInputEl.focus(); } catch (e) {}
+                    }
                 } else if (data.error) {
                     console.error('OTP send error details:', data.error);
                     if (data.error.includes('Invalid login') || data.error.includes('authentication failed')) {
@@ -3359,7 +3368,6 @@ class AgricultureMarket {
         const safeCategories = Array.isArray(categories) ? categories : [];
         const allButton = `
             <button class="btn btn-small btn-secondary ${this.currentCategory === '' ? 'active' : ''}" data-product-category="">
-                <i class="fas fa-layer-group" aria-hidden="true"></i>
                 <span>All</span>
             </button>
         `;
@@ -3367,11 +3375,9 @@ class AgricultureMarket {
         const categoryButtons = safeCategories.map((category) => {
             const categoryName = String(category.name || '').trim();
             if (!categoryName) return '';
-            const iconClass = this.getCategoryIconClass(categoryName);
             const activeClass = this.currentCategory === categoryName ? 'active' : '';
             return `
                 <button class="btn btn-small btn-secondary ${activeClass}" data-product-category="${categoryName}">
-                    <i class="${iconClass}" aria-hidden="true"></i>
                     <span>${categoryName}</span>
                 </button>
             `;
