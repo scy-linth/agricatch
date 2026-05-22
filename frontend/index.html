@@ -405,7 +405,7 @@
                     <div class="form-group forgot-password-group" style="margin-top: -0.35rem;">
                         <a href="#" id="forgot-password-link">Forgot password?</a>
                     </div>
-                    
+
                     <!-- Role selector removed for login — server determines account type -->
                     
                     <!-- OTP Section removed from login - login now works with email/password only -->
@@ -473,7 +473,7 @@
                                 <small class="field-hint">Check your email for the 6-digit verification code</small>
                             </div>
                         </div>
-                        
+
                         <div class="step-actions">
                             <button type="button" class="btn btn-primary btn-full" id="register-next-1">
                                 <span class="btn-text" id="register-next-1-text">Send Verification Code</span>
@@ -481,6 +481,11 @@
                                     <i class="fas fa-spinner fa-spin"></i> Sending...
                                 </span>
                             </button>
+                        </div>
+
+                        <div id="auth-recaptcha-wrap" class="form-group" style="margin-top: 12px;">
+                            <div id="auth-recaptcha"></div>
+                            <small id="auth-recaptcha-error" class="field-hint" style="display: none; color: #d32f2f; margin-top: 6px;"></small>
                         </div>
                     </div>
 
@@ -537,12 +542,25 @@
                     <div class="registration-step" id="register-step-3" data-step="3" style="display: none;">
                         <h4 class="step-title">Complete Your Profile</h4>
                         <div class="form-group">
-                            <label for="auth-fullname">
-                                Full Name
+                            <label for="auth-firstname">
+                                First Name
                                 <span class="required-indicator">*</span>
                             </label>
-                            <input type="text" id="auth-fullname" placeholder="Enter your full name" required>
-                            <small class="field-hint" id="fullname-hint">For farmers, this will be your shop/farm name</small>
+                            <input type="text" id="auth-firstname" placeholder="Enter your first name" pattern="[A-Za-z\s]+" title="Letters only" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="auth-middlename">
+                                Middle Name (Optional)
+                            </label>
+                            <input type="text" id="auth-middlename" placeholder="Enter your middle name" pattern="[A-Za-z\s]+" title="Letters only">
+                        </div>
+                        <div class="form-group">
+                            <label for="auth-lastname">
+                                Last Name
+                                <span class="required-indicator">*</span>
+                            </label>
+                            <input type="text" id="auth-lastname" placeholder="Enter your last name" pattern="[A-Za-z\s]+" title="Letters only" required>
+                            <small class="field-hint" id="fullname-hint">For farmers, enter your shop/farm name in First Name.</small>
                         </div>
                         <div class="form-group">
                             <label for="auth-phone">
@@ -560,8 +578,19 @@
                                 Address
                                 <span class="required-indicator">*</span>
                             </label>
-                            <textarea id="auth-address" rows="3" placeholder="Enter your complete address" required></textarea>
-                            <small class="field-hint">Street, City, Province, Postal Code</small>
+                            <div class="address-selector-card">
+                                <button type="button" class="btn btn-primary btn-full address-selector-btn" id="open-address-selector-btn">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    <span class="address-btn-title">Select Barangay / City / Province</span>
+                                </button>
+                            </div>
+                            <textarea id="auth-address" class="form-textarea readonly-display" rows="3" placeholder="Selected address will appear here" readonly required></textarea>
+                            <input type="hidden" id="auth-street">
+                            <input type="hidden" id="auth-island-group">
+                            <input type="hidden" id="auth-province">
+                            <input type="hidden" id="auth-city">
+                            <input type="hidden" id="auth-barangay">
+                            <small class="field-hint">Street/house no. + Barangay, City/Municipality, Province</small>
                         </div>
                         <div class="step-actions">
                             <button type="button" class="btn btn-outline" id="register-back-3">Back</button>
@@ -612,65 +641,11 @@
 
                         <!-- Terms and Conditions -->
                         <div class="form-group">
-                            <div class="terms-container-compact" id="terms-container">
-                                <button type="button" class="terms-header" id="terms-toggle" aria-expanded="false">
-                                    <h5>Terms and Conditions (Data Privacy Act of 2012)</h5>
-                                    <span class="terms-toggle-text">Read Terms</span>
-                                    <i class="fas fa-chevron-down"></i>
-                                </button>
-                                <div class="terms-content-compact" id="terms-content" hidden>
-                                    <p><strong>Last Updated:</strong> May 2026</p>
-
-                                    <h6>1. Acceptance of Terms</h6>
-                                    <p>By creating an account or using AgriCatch, you agree to these Terms and our Privacy Policy. If you do not agree, do not use the platform.</p>
-
-                                    <h6>2. Eligibility</h6>
-                                    <p>You must be at least 18 years old or have legal capacity to enter into a binding agreement to use AgriCatch.</p>
-
-                                    <h6>3. Account Registration and Security</h6>
-                                    <p>You are responsible for keeping your login credentials secure and for all activity on your account. Notify us immediately of any unauthorized use.</p>
-
-                                    <h6>4. Marketplace Role</h6>
-                                    <p>AgriCatch provides a marketplace platform that connects buyers and sellers. We are not a party to transactions between users.</p>
-
-                                    <h6>5. Listings, Pricing, and Availability</h6>
-                                    <p>Farmers must provide accurate product descriptions, pricing, and availability. We may remove listings that violate policies or laws.</p>
-
-                                    <h6>6. Orders and Payments</h6>
-                                    <p>Orders are subject to acceptance by the seller. Prices, fees, and payment methods are shown at checkout. You agree to pay all charges for orders you place.</p>
-
-                                    <h6>7. Cancellations, Returns, and Refunds</h6>
-                                    <p>Perishable goods are generally non-refundable. Any exceptions are at the seller's discretion and must comply with applicable laws.</p>
-
-                                    <h6>8. User Content and Reviews</h6>
-                                    <p>You are responsible for the content you post, including reviews and messages. Content must be lawful, accurate, and not misleading.</p>
-
-                                    <h6>9. Prohibited Activities</h6>
-                                    <p>You must not use the platform for unlawful activity, fraud, harassment, scraping, or interference with platform security or operations.</p>
-
-                                    <h6>10. Privacy and Data Protection</h6>
-                                    <p>We process personal data according to our Privacy Policy and applicable laws. For users in the Philippines, AgriCatch complies with the Data Privacy Act of 2012 (Republic Act No. 10173) and its implementing rules. You may request access, correction, or deletion of your personal data, subject to lawful limitations.</p>
-
-                                    <h6>11. Third-Party Services</h6>
-                                    <p>AgriCatch may link to or use third-party services. We are not responsible for their content, policies, or practices.</p>
-
-                                    <h6>12. Limitation of Liability</h6>
-                                    <p>To the extent permitted by law, AgriCatch is not liable for indirect, incidental, special, or consequential damages arising from your use of the platform.</p>
-
-                                    <h6>13. Indemnity</h6>
-                                    <p>You agree to indemnify and hold AgriCatch harmless from claims arising out of your use of the platform or violation of these Terms.</p>
-
-                                    <h6>14. Changes to Terms</h6>
-                                    <p>We may update these Terms from time to time. Continued use of AgriCatch after changes means you accept the updated Terms.</p>
-
-                                
-                                </div>
-                                <label class="checkbox-label-enhanced terms-checkbox">
-                                    <input type="checkbox" id="auth-terms-checkbox" required>
-                                    <span>I have read and agree to the <strong>Terms and Conditions</strong> and <strong>Privacy Policy</strong></span>
-                                    <span class="required-indicator">*</span>
-                                </label>
-                            </div>
+                            <label class="checkbox-label-enhanced terms-checkbox-inline" id="terms-trigger">
+                                <input type="checkbox" id="auth-terms-checkbox" required>
+                                <span>I have read and agree to the <strong>Terms and Conditions</strong> and <strong>Privacy Policy</strong></span>
+                                <span class="required-indicator">*</span>
+                            </label>
                         </div>
                         
                         <div class="step-actions">
@@ -683,14 +658,130 @@
                             </button>
                         </div>
                     </div>
+
                 </div>
                 
                 <button type="submit" class="btn btn-primary btn-full" id="auth-submit-btn">Login</button>
+                <div id="auth-login-recaptcha-wrap" class="form-group" style="margin-top: 12px;">
+                    <div id="auth-recaptcha-login"></div>
+                    <small id="auth-recaptcha-login-error" class="field-hint" style="display: none; color: #d32f2f; margin-top: 6px;"></small>
+                </div>
             </form>
             <div class="modal-footer">
                 <p id="auth-mode-toggle">
                     <!-- Will be populated by JavaScript -->
                 </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="address-selector-modal" class="modal">
+        <div class="modal-content modal-medium address-selector-modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-map-marker-alt"></i> Select Address</h3>
+                <button class="close-btn" id="close-address-selector-btn">&times;</button>
+            </div>
+            <div class="modal-body address-selector-body">
+                <div class="form-group">
+                    <label for="address-island-group">Luzon Area (Metro/North/South)</label>
+                    <select id="address-island-group" class="form-input">
+                        <option value="">Select Luzon Area</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="address-province">Province (Luzon)</label>
+                    <select id="address-province" class="form-input" disabled>
+                        <option value="">Select Province</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="address-city">Municipality / City</label>
+                    <select id="address-city" class="form-input" disabled>
+                        <option value="">Select Municipality / City</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="address-barangay">Barangay</label>
+                    <select id="address-barangay" class="form-input" disabled>
+                        <option value="">Select Barangay</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="address-street-input">Street / Building / House No.</label>
+                    <input type="text" id="address-street-input" class="form-input" placeholder="House no., building, street">
+                    <small class="field-hint">Example: 123 ABC Bldg, Rizal St.</small>
+                </div>
+                <div class="address-selection-preview" id="address-selection-preview">
+                    Select values to preview the address.
+                </div>
+            </div>
+            <div class="modal-footer address-selector-footer">
+                <button type="button" class="btn btn-primary" id="address-selector-apply">Use Selected Address</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="terms-modal" class="modal">
+        <div class="modal-content modal-medium terms-modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-contract"></i> Terms and Conditions</h3>
+                <button class="close-btn" id="close-terms-modal">&times;</button>
+            </div>
+            <div class="modal-body terms-modal-body">
+                <p><strong>Last Updated:</strong> May 2026</p>
+
+                <h6>1. Acceptance of Terms</h6>
+                <p>By creating an account or using AgriCatch, you agree to these Terms and our Privacy Policy. If you do not agree, do not use the platform.</p>
+
+                <h6>2. Eligibility</h6>
+                <p>You must be at least 18 years old or have legal capacity to enter into a binding agreement to use AgriCatch.</p>
+
+                <h6>3. Account Registration and Security</h6>
+                <p>You are responsible for keeping your login credentials secure and for all activity on your account. Notify us immediately of any unauthorized use.</p>
+
+                <h6>4. Marketplace Role</h6>
+                <p>AgriCatch provides a marketplace platform that connects buyers and sellers. We are not a party to transactions between users.</p>
+
+                <h6>5. Listings, Pricing, and Availability</h6>
+                <p>Farmers must provide accurate product descriptions, pricing, and availability. We may remove listings that violate policies or laws.</p>
+
+                <h6>6. Orders and Payments</h6>
+                <p>Orders are subject to acceptance by the seller. Prices, fees, and payment methods are shown at checkout. You agree to pay all charges for orders you place.</p>
+
+                <h6>7. Cancellations, Returns, and Refunds</h6>
+                <p>Perishable goods are generally non-refundable. Any exceptions are at the seller's discretion and must comply with applicable laws.</p>
+
+                <h6>8. User Content and Reviews</h6>
+                <p>You are responsible for the content you post, including reviews and messages. Content must be lawful, accurate, and not misleading.</p>
+
+                <h6>9. Prohibited Activities</h6>
+                <p>You must not use the platform for unlawful activity, fraud, harassment, scraping, or interference with platform security or operations.</p>
+
+                <h6>10. Privacy and Data Protection</h6>
+                <p>We process personal data according to our Privacy Policy and applicable laws. For users in the Philippines, AgriCatch complies with the Data Privacy Act of 2012 (Republic Act No. 10173) and its implementing rules. You may request access, correction, or deletion of your personal data, subject to lawful limitations.</p>
+
+                <h6>11. Third-Party Services</h6>
+                <p>AgriCatch may link to or use third-party services. We are not responsible for their content, policies, or practices.</p>
+
+                <h6>12. Limitation of Liability</h6>
+                <p>To the extent permitted by law, AgriCatch is not liable for indirect, incidental, special, or consequential damages arising from your use of the platform.</p>
+
+                <h6>13. Indemnity</h6>
+                <p>You agree to indemnify and hold AgriCatch harmless from claims arising out of your use of the platform or violation of these Terms.</p>
+
+                <h6>14. Changes to Terms</h6>
+                <p>We may update these Terms from time to time. Continued use of AgriCatch after changes means you accept the updated Terms.</p>
+                <div class="terms-modal-actions">
+                    <label class="checkbox-label-enhanced terms-modal-checkbox">
+                        <input type="checkbox" id="terms-modal-checkbox">
+                        <span>I have read and agree to the <strong>Terms and Conditions</strong> and <strong>Privacy Policy</strong></span>
+                    </label>
+                    <div class="terms-modal-footer">
+                        <button type="button" class="btn btn-primary" id="terms-modal-done" disabled>
+                            Done
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -710,6 +801,10 @@
                         <label for="forgot-email">Email Address</label>
                         <input type="email" id="forgot-email" placeholder="your.email@example.com" autocomplete="email">
                         <small class="field-hint">We’ll send a 6-digit verification code to your email.</small>
+                    </div>
+                    <div class="form-group">
+                        <div id="forgot-recaptcha"></div>
+                        <small id="forgot-recaptcha-error" class="field-hint" style="display: none; color: #d32f2f;"></small>
                     </div>
                     <div class="step-actions">
                         <button type="button" class="btn btn-outline" id="forgot-back-to-login">Back</button>
@@ -934,7 +1029,19 @@
                     <label for="floating-address-full">
                         Address <span class="required">*</span>
                     </label>
-                    <textarea id="floating-address-full" class="form-textarea" rows="3" placeholder="Enter your complete address (street, barangay, city, province)" required></textarea>
+                    <div class="address-selector-card">
+                        <button type="button" class="btn btn-primary btn-full address-selector-btn" id="open-address-selector-btn-floating">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span class="address-btn-title">Select Barangay / City / Province</span>
+                        </button>
+                    </div>
+                    <textarea id="floating-address-full" class="form-textarea readonly-display" rows="3" placeholder="Selected address will appear here" readonly required></textarea>
+                    <input type="hidden" id="floating-address-street">
+                    <input type="hidden" id="floating-address-island-group">
+                    <input type="hidden" id="floating-address-province">
+                    <input type="hidden" id="floating-address-city">
+                    <input type="hidden" id="floating-address-barangay">
+                    <small class="form-hint">Street/house no. + Barangay, City/Municipality, Province</small>
                 </div>
 
                 <div class="form-group checkbox-group">
@@ -997,7 +1104,7 @@
                         <span>Metro Manila, Philippines</span>
                     </div>
                     <div class="contact-message" style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #e0e0e0; font-size: 0.95rem; color: #666; line-height: 1.6;">
-                        <p>When you reach out to us through this website, your message is carefully reviewed and routed to the appropriate department that can best assist you. While we may not be able to respond to every inquiry individually due to the volume of messages we receive, we assure you that all submissions are received, reviewed, and forwarded to the concerned team. We are committed to listening to your feedback and continuously improving our services based on your suggestions.</p>
+                        <p>When you reach out to us through this website, your message is carefully reviewed and routed to the appropriate department that can best assist you. While we may not be able to respond to every inquiry individually, but we assure you that all submissions are received and reviewed.</p>
                     </div>
                 </div>
                 <form class="contact-form">
@@ -1059,6 +1166,14 @@
 
     <!-- Scripts -->
     <script src="/js/format.js"></script>
+    <script>
+        window.agriCatchRecaptchaOnLoad = function() {
+            if (window.agriCatchApp && typeof window.agriCatchApp.renderRecaptchaWidgets === 'function') {
+                window.agriCatchApp.renderRecaptchaWidgets();
+            }
+        };
+    </script>
+    <script src="https://www.google.com/recaptcha/api.js?onload=agriCatchRecaptchaOnLoad&render=explicit" defer></script>
     <script src="/js/app.js"></script>
     <script>
         // Handle hero video loading - ensure full video loads before playing

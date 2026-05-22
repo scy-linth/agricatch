@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../utils/db');
 const { sendOtpEmail } = require('../utils/emailService');
+const { verifyRecaptchaToken } = require('../utils/recaptcha');
 require('dotenv').config();
 
 const router = express.Router();
@@ -12,6 +13,16 @@ function generateOtp() {
 router.post('/send', async (req, res) => {
   try {
     console.log('📧 OTP send request received:', { email: req.body.email, purpose: req.body.purpose });
+    const isResend = req.body?.resend === true || req.body?.resend === 'true';
+    if (!isResend) {
+      const captcha = await verifyRecaptchaToken(req.body?.['g-recaptcha-response'] || req.body?.gRecaptchaResponse || '', {
+        remoteip: req.ip || req.connection?.remoteAddress || undefined
+      });
+      if (!captcha.ok) {
+        return res.status(captcha.status || 403).json({ message: captcha.message || 'CAPTCHA verification failed' });
+      }
+    }
+
     const { email, purpose = 'login' } = req.body;
 
     if (!email) {

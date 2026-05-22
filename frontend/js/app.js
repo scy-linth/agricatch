@@ -60,6 +60,11 @@ class AgricultureMarket {
         this.isLoading = false; // For loading animations
         this._authFocusTrapHandler = null;
         this._authLastFocusedElement = null;
+        this.recaptchaWidgetIds = { authLogin: null, authRegister: null, forgot: null };
+        this.psgcData = null;
+        this.addressSelector = null;
+
+        try { window.agriCatchApp = this; } catch (e) {}
 
         this.init();
     }
@@ -187,6 +192,7 @@ class AgricultureMarket {
             }
 
             this.setupEventListeners();
+            this.setupAddressSelector();
             this.checkAuthStatus();
             this.loadProductCategories();
             
@@ -221,6 +227,7 @@ class AgricultureMarket {
             });
             // Update when hash changes (clicking footer links or manual hash changes)
             window.addEventListener('hashchange', () => this.updateActiveNavLink());
+            this.renderRecaptchaWidgets();
         } catch (error) {
             console.error('Error during app initialization:', error);
             // Try to at least load products even if other things fail
@@ -793,7 +800,7 @@ class AgricultureMarket {
                 if (resendRegisterOtpBtn.disabled) return;
                 this.startResendOtpCooldown(60);
                 if (this.authMode === 'register' || document.getElementById('auth-register-fields').style.display !== 'none') {
-                    this.sendOtpForRegistration();
+                    this.sendOtpForRegistration({ resend: true });
                 } else {
                     this.sendOtp();
                 }
@@ -874,18 +881,62 @@ class AgricultureMarket {
             }
         }
 
-        // Terms toggle button
-        const termsToggle = document.getElementById('terms-toggle');
-        if (termsToggle) {
-            termsToggle.addEventListener('click', () => {
-                const termsContainer = document.getElementById('terms-container');
-                const termsContent = document.getElementById('terms-content');
-                const toggleText = termsToggle.querySelector('.terms-toggle-text');
-                if (!termsContainer || !termsContent) return;
-                const isOpen = termsContainer.classList.toggle('open');
-                termsToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-                termsContent.hidden = !isOpen;
-                if (toggleText) toggleText.textContent = isOpen ? 'Hide Terms' : 'Read Terms';
+        // Terms modal
+        const termsModal = document.getElementById('terms-modal');
+        const closeTermsBtn = document.getElementById('close-terms-modal');
+        const termsModalCheckbox = document.getElementById('terms-modal-checkbox');
+        const termsModalDone = document.getElementById('terms-modal-done');
+        const mainTermsCheckbox = document.getElementById('auth-terms-checkbox');
+        const termsTrigger = document.getElementById('terms-trigger');
+
+        const openTermsModal = () => {
+            if (!termsModal) return;
+            if (termsModalCheckbox && mainTermsCheckbox) {
+                termsModalCheckbox.checked = mainTermsCheckbox.checked;
+            }
+            if (termsModalDone) {
+                termsModalDone.disabled = !termsModalCheckbox?.checked;
+            }
+            termsModal.classList.add('open');
+            this.setPageScrollLocked(true);
+        };
+
+        if (termsTrigger && mainTermsCheckbox) {
+            termsTrigger.addEventListener('click', (event) => {
+                event.preventDefault();
+                openTermsModal();
+            });
+            mainTermsCheckbox.addEventListener('click', (event) => {
+                event.preventDefault();
+                openTermsModal();
+            });
+        }
+        if (closeTermsBtn && termsModal) {
+            closeTermsBtn.addEventListener('click', () => {
+                termsModal.classList.remove('open');
+                this.setPageScrollLocked(false);
+            });
+        }
+        if (termsModal) {
+            termsModal.addEventListener('click', (event) => {
+                if (event.target === termsModal) {
+                    termsModal.classList.remove('open');
+                    this.setPageScrollLocked(false);
+                }
+            });
+        }
+        if (termsModalCheckbox && termsModalDone) {
+            termsModalCheckbox.addEventListener('change', () => {
+                termsModalDone.disabled = !termsModalCheckbox.checked;
+            });
+        }
+        if (termsModalDone && termsModalCheckbox && mainTermsCheckbox) {
+            termsModalDone.addEventListener('click', () => {
+                mainTermsCheckbox.checked = termsModalCheckbox.checked;
+                if (termsModal) {
+                    termsModal.classList.remove('open');
+                }
+                this.setPageScrollLocked(false);
             });
         }
 
@@ -930,6 +981,33 @@ class AgricultureMarket {
         // Save form data as user types (for persistence)
         this.setupFormPersistence();
 
+        // Restrict name inputs to letters and spaces only
+        ['auth-firstname', 'auth-middlename', 'auth-lastname'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input', (e) => {
+                const cleaned = el.value.replace(/[^A-Za-z\s]/g, '');
+                if (cleaned !== el.value) {
+                    el.value = cleaned;
+                }
+            });
+        });
+
+        // Restrict username to letters, numbers and underscores only
+        const usernameEl = document.getElementById('auth-username');
+        if (usernameEl) {
+            usernameEl.addEventListener('input', () => {
+                const cleaned = usernameEl.value.replace(/[^A-Za-z0-9_]/g, '');
+                if (cleaned !== usernameEl.value) {
+                    usernameEl.value = cleaned;
+                }
+            });
+            // Prevent spaces on keydown for convenience
+            usernameEl.addEventListener('keydown', (ev) => {
+                if (ev.key === ' ' || ev.key === 'Spacebar') ev.preventDefault();
+            });
+        }
+
         // Password toggle for register
         const toggleRegisterPassword = document.getElementById('toggle-register-password');
         if (toggleRegisterPassword) {
@@ -950,7 +1028,7 @@ class AgricultureMarket {
 
         // Password strength indicator removed
 
-        // Dynamic fullname hint based on role
+        // Dynamic name hint based on role
         document.addEventListener('click', (e) => {
             // Support both old .role-box and new .role-box-enhanced
             const roleBox = e.target.closest('.role-box') || e.target.closest('.role-box-enhanced');
@@ -959,16 +1037,16 @@ class AgricultureMarket {
                 const fullnameHint = document.getElementById('fullname-hint');
                 if (fullnameHint) {
                     if (role === 'farmer') {
-                        fullnameHint.textContent = 'Enter your shop or farm name (this will be displayed to customers)';
+                        fullnameHint.textContent = 'For farmers, enter your shop/farm name in First Name.';
                     } else {
-                        fullnameHint.textContent = 'Enter your full name';
+                        fullnameHint.textContent = 'Enter your first, middle (optional), and last name.';
                     }
                 }
             }
         });
 
         // Real-time form validation feedback
-        const registerFields = ['auth-username', 'auth-email-register', 'auth-password-register', 'auth-fullname'];
+        const registerFields = ['auth-username', 'auth-email-register', 'auth-password-register', 'auth-firstname', 'auth-lastname'];
         registerFields.forEach(fieldId => {
             const field = document.getElementById(fieldId);
             if (field) {
@@ -1367,6 +1445,7 @@ class AgricultureMarket {
         this.forgotEmail = null;
         this.forgotOtp = null;
         this.stopForgotCooldown();
+        this.resetRecaptcha('forgot');
 
         const stepEmail = document.getElementById('forgot-step-email');
         const stepOtp = document.getElementById('forgot-step-otp');
@@ -1423,6 +1502,7 @@ class AgricultureMarket {
         this.stopForgotCooldown();
         this.forgotEmail = null;
         this.forgotOtp = null;
+        this.resetRecaptcha('forgot');
     }
 
     startForgotCooldown(seconds) {
@@ -1504,6 +1584,13 @@ class AgricultureMarket {
             return;
         }
 
+        const recaptchaResponse = this.getRecaptchaResponse('forgot');
+        if (!recaptchaResponse) {
+            this.setRecaptchaError('forgot', 'Please complete the CAPTCHA before continuing.');
+            this.showMessage('Please complete the CAPTCHA before continuing.', 'error');
+            return;
+        }
+
         if (sendBtn) {
             sendBtn.disabled = true;
             sendBtn.style.opacity = '0.7';
@@ -1513,9 +1600,11 @@ class AgricultureMarket {
             const response = await fetch(`${this.apiBase}/auth/forgot`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
+                body: JSON.stringify({ email, 'g-recaptcha-response': recaptchaResponse })
             });
             const data = await response.json().catch(() => ({}));
+
+            this.resetRecaptcha('forgot');
 
             if (response.status === 429) {
                 const retryAfter = Number(data.retryAfter || data.cooldownSeconds || 60);
@@ -1542,6 +1631,7 @@ class AgricultureMarket {
             }
         } catch (error) {
             console.error('Forgot password send error:', error);
+            this.resetRecaptcha('forgot');
             this.showMessage('Failed to send code. Please try again.', 'error');
         } finally {
             if (sendBtn) {
@@ -1558,6 +1648,13 @@ class AgricultureMarket {
             return;
         }
 
+        const recaptchaResponse = this.getRecaptchaResponse('forgot');
+        if (!recaptchaResponse) {
+            this.setRecaptchaError('forgot', 'Please complete the CAPTCHA before resending the code.');
+            this.showMessage('Please complete the CAPTCHA before resending the code.', 'error');
+            return;
+        }
+
         const resendBtn = document.getElementById('forgot-resend-btn');
         if (resendBtn && resendBtn.disabled) return;
 
@@ -1565,9 +1662,11 @@ class AgricultureMarket {
             const response = await fetch(`${this.apiBase}/auth/forgot/resend`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
+                body: JSON.stringify({ email, 'g-recaptcha-response': recaptchaResponse })
             });
             const data = await response.json().catch(() => ({}));
+
+            this.resetRecaptcha('forgot');
 
             if (response.status === 429) {
                 const retryAfter = Number(data.retryAfter || data.cooldownSeconds || 60);
@@ -1582,6 +1681,7 @@ class AgricultureMarket {
             }
         } catch (error) {
             console.error('Forgot password resend error:', error);
+            this.resetRecaptcha('forgot');
             this.showMessage('Failed to resend code. Please try again.', 'error');
         }
     }
@@ -2155,80 +2255,7 @@ class AgricultureMarket {
     }
 
     async sendOtp() {
-        // OTP is only used for registration now - login no longer requires OTP
-        const mode = 'register';
-        let email = document.getElementById('auth-email-register').value;
-
-        if (!email) {
-            this.showMessage('Please enter your email first', 'error');
-            return;
-        }
-
-        // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            this.showMessage('Please enter a valid email address', 'error');
-            return;
-        }
-
-        try {
-            const response = await fetch(`${this.apiBase}/otp/send`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    email: email,
-                    purpose: mode
-                })
-            });
-
-            const data = await response.json();
-
-            // Handle rate limiting (cooldown)
-            if (response.status === 429) {
-                const cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
-                this.showMessage(data.message || `Please wait ${cooldownSeconds} seconds before requesting another OTP`, 'error');
-                return;
-            }
-
-            if (response.ok) {
-                this.otpSent = true;
-                this.otpEmail = email;
-                // Reset OTP verified state when resending
-                this.otpVerified = false;
-                
-                // This function is now only for registration
-                // Registration OTP handling is done in sendOtpForRegistration()
-                // This function should not be called for login anymore
-            } else {
-                // Show more detailed error message
-                let errorMessage = data.message || 'Failed to send OTP';
-                if (data.error) {
-                    console.error('OTP send error details:', data.error);
-                    // Provide user-friendly error messages
-                    if (data.error.includes('Invalid login') || data.error.includes('authentication failed')) {
-                        errorMessage = 'SMTP authentication failed. Please check email configuration.';
-                    } else if (data.error.includes('ECONNREFUSED') || data.error.includes('connection')) {
-                        errorMessage = 'Cannot connect to email server. Please check your internet connection.';
-                    } else if (data.error.includes('timeout')) {
-                        errorMessage = 'Email server timeout. Please try again in a moment.';
-                    } else {
-                        errorMessage = `${errorMessage}. Error: ${data.error}`;
-                    }
-                }
-                this.showMessage(errorMessage, 'error');
-            }
-        } catch (error) {
-            console.error('Send OTP error:', error);
-            let errorMessage = 'Failed to send OTP. ';
-            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                errorMessage += 'Cannot connect to server. Please check if the server is running.';
-            } else {
-                errorMessage += 'Please try again.';
-            }
-            this.showMessage(errorMessage, 'error');
-        }
+        return this.sendOtpForRegistration();
     }
 
     async verifyOtp() {
@@ -2336,6 +2363,114 @@ class AgricultureMarket {
         }
     }
 
+    getRecaptchaSiteKey() {
+        return '6Ldmst0sAAAAAAV8rDvnnbsHQ1nJvvaiy2xfOZWj';
+    }
+
+    resolveRecaptchaScope(scope = 'auth') {
+        if (scope !== 'auth') return scope;
+        const loginFields = document.getElementById('auth-login-fields');
+        const mode = this.authMode || (loginFields && loginFields.style.display !== 'none' ? 'login' : 'register');
+        return mode === 'login' ? 'authLogin' : 'authRegister';
+    }
+
+    getRecaptchaErrorElementId(scope = 'auth') {
+        const resolvedScope = this.resolveRecaptchaScope(scope);
+        if (resolvedScope === 'forgot') return 'forgot-recaptcha-error';
+        return resolvedScope === 'authLogin' ? 'auth-recaptcha-login-error' : 'auth-recaptcha-error';
+    }
+
+    renderRecaptchaWidgets() {
+        if (!window.grecaptcha || typeof window.grecaptcha.render !== 'function') {
+            return false;
+        }
+
+        const renderWidget = (scope, containerId) => {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            if (this.recaptchaWidgetIds[scope] !== null) return;
+
+            try {
+                this.recaptchaWidgetIds[scope] = window.grecaptcha.render(containerId, {
+                    sitekey: this.getRecaptchaSiteKey(),
+                    callback: () => this.clearRecaptchaError(scope),
+                    'expired-callback': () => this.setRecaptchaError(scope, 'CAPTCHA expired. Please verify again.'),
+                    'error-callback': () => this.setRecaptchaError(scope, 'CAPTCHA failed to load. Please refresh and try again.')
+                });
+            } catch (error) {
+                console.error(`Failed to render ${scope} reCAPTCHA:`, error);
+            }
+        };
+
+        if (window.grecaptcha.ready) {
+            window.grecaptcha.ready(() => {
+                renderWidget('authLogin', 'auth-recaptcha-login');
+                renderWidget('authRegister', 'auth-recaptcha');
+                renderWidget('forgot', 'forgot-recaptcha');
+            });
+        } else {
+            renderWidget('authLogin', 'auth-recaptcha-login');
+            renderWidget('authRegister', 'auth-recaptcha');
+            renderWidget('forgot', 'forgot-recaptcha');
+        }
+
+        return true;
+    }
+
+    getRecaptchaResponse(scope = 'auth') {
+        if (!window.grecaptcha || typeof window.grecaptcha.getResponse !== 'function') {
+            return '';
+        }
+        const resolvedScope = this.resolveRecaptchaScope(scope);
+        if (this.recaptchaWidgetIds[resolvedScope] === null) {
+            this.renderRecaptchaWidgets();
+        }
+        const widgetId = this.recaptchaWidgetIds[resolvedScope];
+        if (widgetId === null || widgetId === undefined) {
+            return '';
+        }
+        return String(window.grecaptcha.getResponse(widgetId) || '').trim();
+    }
+
+    resetRecaptcha(scope = 'auth') {
+        const scopes = scope === 'auth' ? ['authLogin', 'authRegister'] : [this.resolveRecaptchaScope(scope)];
+        scopes.forEach((resolvedScope) => {
+            const widgetId = this.recaptchaWidgetIds[resolvedScope];
+            if (widgetId === null || widgetId === undefined) return;
+            if (window.grecaptcha && typeof window.grecaptcha.reset === 'function') {
+                try {
+                    window.grecaptcha.reset(widgetId);
+                } catch (error) {
+                    console.warn(`Failed to reset ${resolvedScope} reCAPTCHA:`, error);
+                }
+            }
+            this.clearRecaptchaError(resolvedScope);
+        });
+    }
+
+    setRecaptchaError(scope = 'auth', message) {
+        const errorEl = document.getElementById(this.getRecaptchaErrorElementId(scope));
+        if (!errorEl) return;
+        if (message) {
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        } else {
+            errorEl.textContent = '';
+            errorEl.style.display = 'none';
+        }
+    }
+
+    clearRecaptchaError(scope = 'auth') {
+        this.setRecaptchaError(scope, '');
+    }
+
+    setRegisterRecaptchaVisible(visible) {
+        const wrap = document.getElementById('auth-recaptcha-wrap');
+        if (wrap) {
+            wrap.style.display = visible ? 'block' : 'none';
+        }
+    }
+
     async handleLogin(e) {
         e.preventDefault();
 
@@ -2347,8 +2482,15 @@ class AgricultureMarket {
             return;
         }
 
+        const recaptchaResponse = this.getRecaptchaResponse('auth');
+        if (!recaptchaResponse) {
+            this.setRecaptchaError('auth', 'Please complete the CAPTCHA before logging in.');
+            this.showMessage('Please complete the CAPTCHA before logging in.', 'error');
+            return;
+        }
+
         // Prepare payload without sending a client-chosen role
-        const payload = { email, password };
+        const payload = { email, password, 'g-recaptcha-response': recaptchaResponse };
 
         try {
             const response = await fetch(`${this.apiBase}/auth/login`, {
@@ -2363,6 +2505,7 @@ class AgricultureMarket {
                 data = await response.json();
             } else {
                 const text = await response.text();
+                this.resetRecaptcha('auth');
                 if (!response.ok) {
                     this.showMessage(text || 'Login failed', 'error');
                     return;
@@ -2372,6 +2515,7 @@ class AgricultureMarket {
             }
 
             if (response.ok) {
+                this.resetRecaptcha('auth');
                 const userRole = data.user?.role;
 
                 this.token = data.token;
@@ -2413,6 +2557,7 @@ class AgricultureMarket {
 
                 return;
             } else {
+                this.resetRecaptcha('auth');
                 // If login failed due to OTP verification, reset OTP state
                 if (data.message && (data.message.includes('OTP verification') || data.message.includes('OTP'))) {
                     this.otpVerified = false;
@@ -2424,6 +2569,7 @@ class AgricultureMarket {
             }
         } catch (error) {
             console.error('Login error:', error);
+            this.resetRecaptcha('auth');
             this.showMessage('Login failed. Please try again.', 'error');
         }
     }
@@ -2672,13 +2818,24 @@ class AgricultureMarket {
                 return true;
                 
             case 3:
-                const fullname = document.getElementById('auth-fullname').value.trim();
+                const firstName = document.getElementById('auth-firstname').value.trim();
+                const middleName = document.getElementById('auth-middlename').value.trim();
+                const lastName = document.getElementById('auth-lastname').value.trim();
                 const phone = document.getElementById('auth-phone').value.trim();
-                const address = document.getElementById('auth-address').value.trim();
+                const street = document.getElementById('auth-street').value.trim();
+                const islandGroup = document.getElementById('auth-island-group')?.value.trim();
+                const province = document.getElementById('auth-province')?.value.trim();
+                const city = document.getElementById('auth-city')?.value.trim();
+                const barangay = document.getElementById('auth-barangay')?.value.trim();
                 
-                if (!fullname) {
-                    this.showMessage('Please enter your full name', 'error');
-                    document.getElementById('auth-fullname').focus();
+                if (!firstName) {
+                    this.showMessage('Please enter your first name', 'error');
+                    document.getElementById('auth-firstname').focus();
+                    return false;
+                }
+                if (!lastName) {
+                    this.showMessage('Please enter your last name', 'error');
+                    document.getElementById('auth-lastname').focus();
                     return false;
                 }
                 if (!phone) {
@@ -2694,6 +2851,18 @@ class AgricultureMarket {
                     document.getElementById('auth-phone').focus();
                     return false;
                 }
+                if (!street) {
+                    this.showMessage('Please enter your street/building/house number', 'error');
+                    document.getElementById('open-address-selector-btn')?.focus();
+                    return false;
+                }
+                if (!islandGroup || !province || !city || !barangay) {
+                    this.showMessage('Please select your address from the dropdowns', 'error');
+                    document.getElementById('open-address-selector-btn')?.focus();
+                    return false;
+                }
+                this.updateRegistrationAddressPreview();
+                const address = document.getElementById('auth-address').value.trim();
                 if (!address) {
                     this.showMessage('Please enter your address', 'error');
                     document.getElementById('auth-address').focus();
@@ -2781,6 +2950,7 @@ class AgricultureMarket {
         const emailInput = document.getElementById('auth-email-register');
         const otpInput = document.getElementById('register-otp');
         const otpSection = document.getElementById('register-otp-section');
+        this.setRegisterRecaptchaVisible(step === 1 && !this.otpVerified && (!otpSection || otpSection.style.display === 'none'));
         
         if (this.otpVerified && step >= 2) {
             if (emailInput) {
@@ -2900,8 +3070,9 @@ class AgricultureMarket {
         }
     }
 
-    async sendOtpForRegistration() {
+    async sendOtpForRegistration(options = {}) {
         const email = document.getElementById('auth-email-register').value.trim();
+        const requireRecaptcha = !options.resend;
 
         if (!email) {
             this.setButtonLoading('register-next-1', false);
@@ -2918,11 +3089,23 @@ class AgricultureMarket {
             return;
         }
 
+        let recaptchaResponse = '';
+        if (requireRecaptcha) {
+            recaptchaResponse = this.getRecaptchaResponse('auth');
+            if (!recaptchaResponse) {
+                this.setButtonLoading('register-next-1', false);
+                this.setRecaptchaError('auth', 'Please complete the CAPTCHA before sending the verification code.');
+                this.showMessage('Please complete the CAPTCHA before sending the verification code.', 'error');
+                return;
+            }
+        }
+
         // Show OTP section immediately when button is clicked (before API call)
         const otpSection = document.getElementById('register-otp-section');
         if (otpSection) {
             otpSection.style.display = 'block';
         }
+        this.setRegisterRecaptchaVisible(false);
 
         // Clear the OTP input field
         const otpInput = document.getElementById('register-otp');
@@ -2944,12 +3127,14 @@ class AgricultureMarket {
             const response = await fetch(`${this.apiBase}/otp/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, purpose: 'register' })
+                body: JSON.stringify({ email, purpose: 'register', resend: !!options.resend, 'g-recaptcha-response': recaptchaResponse })
             });
             
             console.log('OTP response status:', response.status);
             const data = await response.json();
             console.log('OTP response data:', data);
+
+            this.resetRecaptcha('auth');
             
             this.setButtonLoading('register-next-1', false);
             let cooldownSeconds = 60;
@@ -2957,7 +3142,7 @@ class AgricultureMarket {
             if (response.status === 429) {
                 cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
                 this.showMessage(data.message || `Please wait ${cooldownSeconds} seconds before requesting another OTP`, 'error');
-                startResendOtpCooldown(cooldownSeconds);
+                this.startResendOtpCooldown(cooldownSeconds);
                 // Keep OTP section visible even on cooldown
                 return;
             }
@@ -2996,7 +3181,7 @@ class AgricultureMarket {
                 }
                 // Start cooldown if provided by backend
                 cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
-                startResendOtpCooldown(cooldownSeconds);
+                this.startResendOtpCooldown(cooldownSeconds);
                 // Don't navigate - stay on step 1, just show OTP section
                 this.setButtonLoading('register-next-1', false);
             } else {
@@ -3033,19 +3218,20 @@ class AgricultureMarket {
                 }
                 // Start cooldown if provided by backend
                 cooldownSeconds = data.cooldownSeconds || data.retryAfter || 60;
-                startResendOtpCooldown(cooldownSeconds);
+                this.startResendOtpCooldown(cooldownSeconds);
                 // Keep OTP section visible even on error (user already clicked, they expect to see it)
             }
         } catch (error) {
             this.setButtonLoading('register-next-1', false);
             console.error('Send OTP error:', error);
+            this.resetRecaptcha('auth');
             // Keep OTP section visible and set button text to 'Confirm OTP' even on network error
             const nextButtonText = document.getElementById('register-next-1-text');
             if (nextButtonText) {
                 nextButtonText.textContent = 'Confirm OTP';
             }
             // Start default cooldown on error
-            startResendOtpCooldown(60);
+            this.startResendOtpCooldown(60);
             // Keep OTP section visible even on network error
         }
     }
@@ -3109,6 +3295,7 @@ class AgricultureMarket {
                 if (otpSection) {
                     otpSection.style.display = 'none';
                 }
+                this.setRegisterRecaptchaVisible(false);
                 
                 // Update button text in case user goes back to step 1
                 this.updateRegisterStep1ButtonText();
@@ -3141,9 +3328,33 @@ class AgricultureMarket {
         const email = document.getElementById('auth-email-register').value.trim();
         const username = document.getElementById('auth-username').value.trim();
         const password = document.getElementById('auth-password-register').value;
-        const fullname = document.getElementById('auth-fullname').value.trim();
+        const fullname = this.buildRegistrationFullName();
+        const firstName = document.getElementById('auth-firstname')?.value.trim() || '';
+        const middleName = document.getElementById('auth-middlename')?.value.trim() || '';
+        const lastName = document.getElementById('auth-lastname')?.value.trim() || '';
+
+        // Enforce letters and spaces only for name fields
+        const nameRegex = /^[A-Za-z\s]+$/;
+        if (firstName && !nameRegex.test(firstName)) {
+            this.setButtonLoading('register-submit-btn', false);
+            this.showMessage('First name may contain letters and spaces only', 'error');
+            document.getElementById('auth-firstname').focus();
+            return;
+        }
+        if (middleName && !nameRegex.test(middleName)) {
+            this.setButtonLoading('register-submit-btn', false);
+            this.showMessage('Middle name may contain letters and spaces only', 'error');
+            document.getElementById('auth-middlename').focus();
+            return;
+        }
+        if (lastName && !nameRegex.test(lastName)) {
+            this.setButtonLoading('register-submit-btn', false);
+            this.showMessage('Last name may contain letters and spaces only', 'error');
+            document.getElementById('auth-lastname').focus();
+            return;
+        }
         let phone = document.getElementById('auth-phone').value.trim();
-        const address = document.getElementById('auth-address').value.trim();
+        const address = this.buildRegistrationAddress();
 
         // Validate phone number: must be exactly 10 digits
         const phoneDigits = phone.replace(/\D/g, '');
@@ -3194,10 +3405,13 @@ class AgricultureMarket {
             return;
         }
         if (!fullname) {
-            this.showMessage('Please enter your full name', 'error');
-            document.getElementById('auth-fullname').focus();
+            this.showMessage('Please enter your name details', 'error');
+            document.getElementById('auth-firstname').focus();
             return;
         }
+
+        // Ensure reCAPTCHA widgets are attempted to render (OTP step already enforces CAPTCHA).
+        try { this.renderRecaptchaWidgets(); } catch (err) { /* noop */ }
 
         // If OTP not sent yet, send it
         if (!this.otpSent) {
@@ -3227,6 +3441,9 @@ class AgricultureMarket {
             email: email,
             password: password,
             full_name: fullname,
+            first_name: firstName,
+            middle_name: middleName,
+            last_name: lastName,
             phone: phone, // Already includes +63 prefix
             address: address,
             role: this.selectedRole || 'customer'
@@ -3242,6 +3459,8 @@ class AgricultureMarket {
             });
 
             const data = await response.json();
+
+            this.resetRecaptcha('auth');
 
             if (response.ok) {
                 this.token = data.token;
@@ -3282,6 +3501,7 @@ class AgricultureMarket {
                 }
             } else {
                 this.setButtonLoading('register-submit-btn', false);
+                this.resetRecaptcha('auth');
                 // Provide user-friendly error messages
                 let errorMessage = data.message || 'Registration failed';
                 if (errorMessage.includes('already exists') || errorMessage.includes('User already exists')) {
@@ -3300,6 +3520,7 @@ class AgricultureMarket {
         } catch (error) {
             this.setButtonLoading('register-submit-btn', false);
             console.error('Registration error:', error);
+            this.resetRecaptcha('auth');
             this.showMessage('Registration failed. Please try again.', 'error');
         }
     }
@@ -4912,9 +5133,9 @@ class AgricultureMarket {
         const fullnameHint = document.getElementById('fullname-hint');
         if (fullnameHint && mode === 'register' && this.registrationStep >= 3) {
             if (role === 'farmer') {
-                fullnameHint.textContent = 'Enter your shop or farm name (this will be displayed to customers)';
+                fullnameHint.textContent = 'For farmers, enter your shop/farm name in First Name.';
             } else {
-                fullnameHint.textContent = 'Enter your full name';
+                fullnameHint.textContent = 'Enter your first, middle (optional), and last name.';
             }
         }
     }
@@ -4927,6 +5148,7 @@ class AgricultureMarket {
         const authSubmitBtn = document.getElementById('auth-submit-btn');
         const sendOtpBtn = document.getElementById('send-otp-btn');
         const authModeToggle = document.getElementById('auth-mode-toggle');
+        const authLoginRecaptchaWrap = document.getElementById('auth-login-recaptcha-wrap');
         const loginFields = document.getElementById('auth-login-fields');
         const registerFields = document.getElementById('auth-register-fields');
         const loginOtpSection = document.getElementById('login-otp-section');
@@ -4936,6 +5158,12 @@ class AgricultureMarket {
         this.otpSent = false;
         this.otpVerified = false;
         this.otpEmail = null;
+        this.resetRecaptcha('auth');
+        this.setRegisterRecaptchaVisible(mode === 'register');
+
+        // Reset registration UI before restoring step state so step 1 recalculates cleanly.
+        if (loginOtpSection) loginOtpSection.style.display = 'none';
+        if (registerOtpSection) registerOtpSection.style.display = 'none';
         
         // Always start registration from step 1 on page load/refresh (clear saved state)
         if (mode === 'register') {
@@ -4968,10 +5196,6 @@ class AgricultureMarket {
         }
         this.selectedRole = role;
 
-        // Hide OTP sections
-        if (loginOtpSection) loginOtpSection.style.display = 'none';
-        if (registerOtpSection) registerOtpSection.style.display = 'none';
-
         // Show Send OTP button, hide initially
         if (sendOtpBtn) sendOtpBtn.style.display = 'block';
 
@@ -4992,6 +5216,9 @@ class AgricultureMarket {
             if (authSubmitBtn) {
                 authSubmitBtn.style.display = 'block';
                 authSubmitBtn.textContent = 'Login';
+            }
+            if (authLoginRecaptchaWrap) {
+                authLoginRecaptchaWrap.style.display = 'block';
             }
             if (sendOtpBtn) {
                 sendOtpBtn.style.display = 'none';
@@ -5014,6 +5241,9 @@ class AgricultureMarket {
             // Hide main submit button during registration (we use step navigation instead)
             if (authSubmitBtn) {
                 authSubmitBtn.style.display = 'none';
+            }
+            if (authLoginRecaptchaWrap) {
+                authLoginRecaptchaWrap.style.display = 'none';
             }
             if (sendOtpBtn) {
                 sendOtpBtn.style.display = 'none';
@@ -5093,7 +5323,7 @@ class AgricultureMarket {
 
     focusAuthModalPrimaryField(mode) {
         const preferredIds = mode === 'register'
-            ? ['auth-email-register', 'auth-username', 'auth-fullname']
+            ? ['auth-email-register', 'auth-username', 'auth-firstname']
             : ['auth-email', 'auth-password'];
 
         for (const id of preferredIds) {
@@ -5305,8 +5535,11 @@ class AgricultureMarket {
         const registerPassword = document.getElementById('auth-password-register');
         const registerPasswordConfirm = document.getElementById('auth-password-confirm');
         const registerUsername = document.getElementById('auth-username');
-        const registerFullname = document.getElementById('auth-fullname');
+        const registerFirstName = document.getElementById('auth-firstname');
+        const registerMiddleName = document.getElementById('auth-middlename');
+        const registerLastName = document.getElementById('auth-lastname');
         const registerPhone = document.getElementById('auth-phone');
+        const registerStreet = document.getElementById('auth-street');
         const registerAddress = document.getElementById('auth-address');
 
         if (registerEmail) {
@@ -5329,9 +5562,19 @@ class AgricultureMarket {
                 this.saveFormData('register', { username: registerUsername.value });
             });
         }
-        if (registerFullname) {
-            registerFullname.addEventListener('input', () => {
-                this.saveFormData('register', { fullname: registerFullname.value });
+        if (registerFirstName) {
+            registerFirstName.addEventListener('input', () => {
+                this.saveFormData('register', { firstName: registerFirstName.value });
+            });
+        }
+        if (registerMiddleName) {
+            registerMiddleName.addEventListener('input', () => {
+                this.saveFormData('register', { middleName: registerMiddleName.value });
+            });
+        }
+        if (registerLastName) {
+            registerLastName.addEventListener('input', () => {
+                this.saveFormData('register', { lastName: registerLastName.value });
             });
         }
         if (registerPhone) {
@@ -5339,6 +5582,12 @@ class AgricultureMarket {
                 // Save only the digits (10 digits max, no +63 prefix, no spaces in storage)
                 const phoneDigits = registerPhone.value.replace(/\D/g, '').substring(0, 10);
                 this.saveFormData('register', { phone: phoneDigits });
+            });
+        }
+        if (registerStreet) {
+            registerStreet.addEventListener('input', () => {
+                this.saveFormData('register', { street: registerStreet.value });
+                this.updateRegistrationAddressPreview();
             });
         }
         if (registerAddress) {
@@ -5384,8 +5633,22 @@ class AgricultureMarket {
                 if (saved.username && document.getElementById('auth-username')) {
                     document.getElementById('auth-username').value = saved.username;
                 }
-                if (saved.fullname && document.getElementById('auth-fullname')) {
-                    document.getElementById('auth-fullname').value = saved.fullname;
+                if (saved.firstName && document.getElementById('auth-firstname')) {
+                    document.getElementById('auth-firstname').value = saved.firstName;
+                }
+                if (saved.middleName && document.getElementById('auth-middlename')) {
+                    document.getElementById('auth-middlename').value = saved.middleName;
+                }
+                if (saved.lastName && document.getElementById('auth-lastname')) {
+                    document.getElementById('auth-lastname').value = saved.lastName;
+                }
+                if (saved.fullname && document.getElementById('auth-firstname')) {
+                    if (!saved.firstName && !saved.lastName) {
+                        document.getElementById('auth-firstname').value = saved.fullname;
+                    }
+                }
+                if (saved.street && document.getElementById('auth-street')) {
+                    document.getElementById('auth-street').value = saved.street;
                 }
                 if (saved.phone && document.getElementById('auth-phone')) {
                     // Remove +63 prefix if present and format with spaces
@@ -5407,6 +5670,10 @@ class AgricultureMarket {
                 if (saved.address && document.getElementById('auth-address')) {
                     document.getElementById('auth-address').value = saved.address;
                 }
+                if (saved.addressParts) {
+                    this.setRegistrationAddressParts(saved.addressParts);
+                }
+                this.updateRegistrationAddressPreview();
             }
         } catch (e) {
             console.error('Error restoring form data:', e);
@@ -5419,6 +5686,504 @@ class AgricultureMarket {
             localStorage.removeItem(key);
         } catch (e) {
             console.error('Error clearing form data:', e);
+        }
+    }
+
+    setupAddressSelector() {
+        const modal = document.getElementById('address-selector-modal');
+        if (!modal) return;
+
+        if (modal.parentElement !== document.body) {
+            try {
+                document.body.appendChild(modal);
+            } catch (e) {
+                console.warn('Could not move address selector modal to body:', e);
+            }
+        }
+
+        const openBtnRegister = document.getElementById('open-address-selector-btn');
+        const openBtnCheckout = document.getElementById('open-address-selector-btn-floating');
+        const closeBtn = document.getElementById('close-address-selector-btn');
+        const applyBtn = document.getElementById('address-selector-apply');
+        const islandSelect = document.getElementById('address-island-group');
+        const provinceSelect = document.getElementById('address-province');
+        const citySelect = document.getElementById('address-city');
+        const barangaySelect = document.getElementById('address-barangay');
+        const previewEl = document.getElementById('address-selection-preview');
+        const modalStreetInput = document.getElementById('address-street-input');
+        const registerStreetHidden = document.getElementById('auth-street');
+        const checkoutStreetHidden = document.getElementById('floating-address-street');
+        const registerStreetPreview = document.getElementById('address-btn-street-preview');
+        const checkoutStreetPreview = document.getElementById('address-btn-street-preview-floating');
+
+        this.addressSelector = {
+            modal,
+            openBtnRegister,
+            openBtnCheckout,
+            closeBtn,
+            applyBtn,
+            islandSelect,
+            provinceSelect,
+            citySelect,
+            barangaySelect,
+            previewEl,
+            modalStreetInput,
+            registerStreetHidden,
+            checkoutStreetHidden,
+            registerStreetPreview,
+            checkoutStreetPreview
+        };
+
+        if (openBtnRegister) {
+            openBtnRegister.addEventListener('click', () => {
+                this.openAddressSelectorModal('register');
+            });
+        }
+
+        if (openBtnCheckout) {
+            openBtnCheckout.addEventListener('click', () => {
+                this.openAddressSelectorModal('checkout');
+            });
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.closeAddressSelectorModal());
+        }
+
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                this.closeAddressSelectorModal();
+            }
+        });
+
+        if (applyBtn) {
+            applyBtn.addEventListener('click', () => this.applyAddressSelection());
+        }
+
+        if (islandSelect) {
+            islandSelect.addEventListener('change', () => {
+                this.handleIslandGroupChange();
+            });
+        }
+
+        if (provinceSelect) {
+            provinceSelect.addEventListener('change', () => {
+                this.handleProvinceChange();
+            });
+        }
+
+        if (citySelect) {
+            citySelect.addEventListener('change', () => {
+                this.handleCityChange();
+            });
+        }
+
+        if (barangaySelect) {
+            barangaySelect.addEventListener('change', () => {
+                this.updateAddressSelectionPreview();
+            });
+        }
+
+        if (modalStreetInput) {
+            modalStreetInput.addEventListener('input', () => this.updateAddressSelectionPreview());
+        }
+
+        this.addressSelectorContext = 'register';
+    }
+
+    async loadPsgcData() {
+        if (this.psgcData) return this.psgcData;
+        const response = await fetch('/js/psgc_luzon.json', { cache: 'force-cache' });
+        if (!response.ok) {
+            throw new Error('Failed to load address data');
+        }
+        const data = await response.json();
+        this.psgcData = data;
+        return data;
+    }
+
+    async openAddressSelectorModal(context = 'register') {
+        if (!this.addressSelector?.modal) return;
+        this.addressSelectorContext = context;
+        try {
+            await this.loadPsgcData();
+            this.populateIslandGroupOptions();
+            this.applySavedAddressPartsToSelector(context);
+            this.applySavedStreetToSelector(context);
+        } catch (error) {
+            console.error('Address data load error:', error);
+            this.showMessage('Failed to load address list. Please try again.', 'error');
+            return;
+        }
+
+        this.addressSelector.modal.classList.add('open');
+        this.setPageScrollLocked(true);
+        if (this.addressSelector.modalStreetInput) {
+            this.addressSelector.modalStreetInput.focus();
+        } else if (this.addressSelector.islandSelect) {
+            this.addressSelector.islandSelect.focus();
+        }
+    }
+
+    closeAddressSelectorModal() {
+        if (!this.addressSelector?.modal) return;
+        this.addressSelector.modal.classList.remove('open');
+        this.setPageScrollLocked(false);
+    }
+
+    populateIslandGroupOptions() {
+        if (!this.addressSelector?.islandSelect || !this.psgcData?.islandGroups) return;
+        const islandSelect = this.addressSelector.islandSelect;
+        const current = islandSelect.value;
+        const islandGroups = ['Metro Manila', 'North Luzon', 'South Luzon'];
+
+        islandSelect.innerHTML = '<option value="">Select Luzon Area</option>' +
+            islandGroups.map(group => `<option value="${this.escapeHtml(group)}">${this.escapeHtml(group)}</option>`).join('');
+
+        if (current && islandGroups.includes(current)) {
+            islandSelect.value = current;
+        }
+    }
+
+    handleIslandGroupChange() {
+        if (!this.addressSelector) return;
+        const islandGroup = this.addressSelector.islandSelect?.value || '';
+        const provinceSelect = this.addressSelector.provinceSelect;
+        const citySelect = this.addressSelector.citySelect;
+        const barangaySelect = this.addressSelector.barangaySelect;
+
+        if (!islandGroup || !this.psgcData?.islandGroups?.[islandGroup]) {
+            this.setSelectOptions(provinceSelect, [], 'Select Province');
+            this.setSelectOptions(citySelect, [], 'Select Municipality / City');
+            this.setSelectOptions(barangaySelect, [], 'Select Barangay');
+            this.updateAddressSelectionPreview();
+            return;
+        }
+
+        const provinces = Object.keys(this.psgcData.islandGroups[islandGroup].provinces || {});
+        this.setSelectOptions(provinceSelect, provinces, 'Select Province');
+        this.setSelectOptions(citySelect, [], 'Select Municipality / City');
+        this.setSelectOptions(barangaySelect, [], 'Select Barangay');
+        this.updateAddressSelectionPreview();
+    }
+
+    handleProvinceChange() {
+        if (!this.addressSelector) return;
+        const islandGroup = this.addressSelector.islandSelect?.value || '';
+        const province = this.addressSelector.provinceSelect?.value || '';
+        const citySelect = this.addressSelector.citySelect;
+        const barangaySelect = this.addressSelector.barangaySelect;
+
+        const provinceData = this.psgcData?.islandGroups?.[islandGroup]?.provinces?.[province];
+        const cities = provinceData ? Object.keys(provinceData.cities || {}) : [];
+
+        this.setSelectOptions(citySelect, cities, 'Select Municipality / City');
+        this.setSelectOptions(barangaySelect, [], 'Select Barangay');
+        this.updateAddressSelectionPreview();
+    }
+
+    handleCityChange() {
+        if (!this.addressSelector) return;
+        const islandGroup = this.addressSelector.islandSelect?.value || '';
+        const province = this.addressSelector.provinceSelect?.value || '';
+        const city = this.addressSelector.citySelect?.value || '';
+        const barangaySelect = this.addressSelector.barangaySelect;
+
+        const barangays = this.psgcData?.islandGroups?.[islandGroup]?.provinces?.[province]?.cities?.[city] || [];
+        this.setSelectOptions(barangaySelect, barangays, 'Select Barangay');
+        this.updateAddressSelectionPreview();
+    }
+
+    setSelectOptions(selectEl, items, placeholder) {
+        if (!selectEl) return;
+        const safeItems = Array.isArray(items) ? items : [];
+        selectEl.innerHTML = `<option value="">${this.escapeHtml(placeholder)}</option>` +
+            safeItems.map(item => `<option value="${this.escapeHtml(item)}">${this.escapeHtml(item)}</option>`).join('');
+        selectEl.disabled = safeItems.length === 0;
+    }
+
+    resetAddressSelector() {
+        if (!this.addressSelector) return;
+        if (this.addressSelector.islandSelect) this.addressSelector.islandSelect.value = '';
+        this.setSelectOptions(this.addressSelector.provinceSelect, [], 'Select Province');
+        this.setSelectOptions(this.addressSelector.citySelect, [], 'Select Municipality / City');
+        this.setSelectOptions(this.addressSelector.barangaySelect, [], 'Select Barangay');
+        this.updateAddressSelectionPreview();
+    }
+
+    getRegistrationAddressParts() {
+        const islandGroup = document.getElementById('auth-island-group')?.value || '';
+        const province = document.getElementById('auth-province')?.value || '';
+        const city = document.getElementById('auth-city')?.value || '';
+        const barangay = document.getElementById('auth-barangay')?.value || '';
+        if (islandGroup || province || city || barangay) {
+            return { islandGroup, province, city, barangay };
+        }
+        try {
+            const saved = JSON.parse(localStorage.getItem('auth_form_register') || '{}');
+            return saved.addressParts || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    setRegistrationAddressParts(parts = {}) {
+        const islandGroup = parts.islandGroup || '';
+        const province = parts.province || '';
+        const city = parts.city || '';
+        const barangay = parts.barangay || '';
+
+        const islandInput = document.getElementById('auth-island-group');
+        const provinceInput = document.getElementById('auth-province');
+        const cityInput = document.getElementById('auth-city');
+        const barangayInput = document.getElementById('auth-barangay');
+
+        if (islandInput) islandInput.value = islandGroup;
+        if (provinceInput) provinceInput.value = province;
+        if (cityInput) cityInput.value = city;
+        if (barangayInput) barangayInput.value = barangay;
+
+        this.saveFormData('register', { addressParts: { islandGroup, province, city, barangay } });
+    }
+
+    applySavedAddressPartsToSelector(context = 'register') {
+        if (!this.addressSelector) return;
+        const parts = context === 'checkout'
+            ? this.getCheckoutAddressParts()
+            : this.getRegistrationAddressParts();
+        if (!parts) return;
+
+        const islandSelect = this.addressSelector.islandSelect;
+        const provinceSelect = this.addressSelector.provinceSelect;
+        const citySelect = this.addressSelector.citySelect;
+        const barangaySelect = this.addressSelector.barangaySelect;
+
+        if (islandSelect && parts.islandGroup) {
+            islandSelect.value = parts.islandGroup;
+            this.handleIslandGroupChange();
+        }
+
+        if (provinceSelect && parts.province) {
+            provinceSelect.value = parts.province;
+            this.handleProvinceChange();
+        }
+
+        if (citySelect && parts.city) {
+            citySelect.value = parts.city;
+            this.handleCityChange();
+        }
+
+        if (barangaySelect && parts.barangay) {
+            barangaySelect.value = parts.barangay;
+        }
+
+        this.updateAddressSelectionPreview();
+    }
+
+    buildRegistrationAddress() {
+        const street = document.getElementById('auth-street')?.value.trim() || '';
+        const parts = this.getRegistrationAddressParts() || {};
+        const addressParts = [street, parts.barangay, parts.city, parts.province].filter(Boolean);
+        const composed = addressParts.join(', ');
+        const addressInput = document.getElementById('auth-address');
+        if (addressInput) {
+            addressInput.value = composed;
+        }
+        this.saveFormData('register', {
+            address: composed,
+            street,
+            addressParts: {
+                islandGroup: parts.islandGroup || '',
+                province: parts.province || '',
+                city: parts.city || '',
+                barangay: parts.barangay || ''
+            }
+        });
+        return composed;
+    }
+
+    buildRegistrationFullName() {
+        const firstName = document.getElementById('auth-firstname')?.value.trim() || '';
+        const middleName = document.getElementById('auth-middlename')?.value.trim() || '';
+        const lastName = document.getElementById('auth-lastname')?.value.trim() || '';
+        return [firstName, middleName, lastName].filter(Boolean).join(' ').trim();
+    }
+
+    applySavedStreetToSelector(context = 'register') {
+        if (!this.addressSelector?.modalStreetInput) return;
+        const streetValue = context === 'checkout'
+            ? (this.addressSelector.checkoutStreetHidden?.value || '')
+            : (this.addressSelector.registerStreetHidden?.value || '');
+        this.addressSelector.modalStreetInput.value = streetValue;
+        this.updateAddressButtonStreetPreview(context, streetValue);
+    }
+
+    updateAddressButtonStreetPreview(context, street) {
+        const label = street ? street : 'Street / Building / House No.';
+        if (context === 'checkout') {
+            if (this.addressSelector?.checkoutStreetPreview) {
+                this.addressSelector.checkoutStreetPreview.textContent = label;
+            }
+        } else {
+            if (this.addressSelector?.registerStreetPreview) {
+                this.addressSelector.registerStreetPreview.textContent = label;
+            }
+        }
+    }
+
+    getCheckoutAddressParts() {
+        const islandGroup = document.getElementById('floating-address-island-group')?.value || '';
+        const province = document.getElementById('floating-address-province')?.value || '';
+        const city = document.getElementById('floating-address-city')?.value || '';
+        const barangay = document.getElementById('floating-address-barangay')?.value || '';
+        if (islandGroup || province || city || barangay) {
+            return { islandGroup, province, city, barangay };
+        }
+        return null;
+    }
+
+    setCheckoutAddressParts(parts = {}) {
+        const islandGroup = parts.islandGroup || '';
+        const province = parts.province || '';
+        const city = parts.city || '';
+        const barangay = parts.barangay || '';
+
+        const islandInput = document.getElementById('floating-address-island-group');
+        const provinceInput = document.getElementById('floating-address-province');
+        const cityInput = document.getElementById('floating-address-city');
+        const barangayInput = document.getElementById('floating-address-barangay');
+
+        if (islandInput) islandInput.value = islandGroup;
+        if (provinceInput) provinceInput.value = province;
+        if (cityInput) cityInput.value = city;
+        if (barangayInput) barangayInput.value = barangay;
+    }
+
+    buildCheckoutAddress() {
+        const street = document.getElementById('floating-address-street')?.value.trim() || '';
+        const parts = this.getCheckoutAddressParts() || {};
+        const addressParts = [street, parts.barangay, parts.city, parts.province].filter(Boolean);
+        const composed = addressParts.join(', ');
+        const addressInput = document.getElementById('floating-address-full');
+        if (addressInput) {
+            addressInput.value = composed;
+        }
+        return composed;
+    }
+
+    updateCheckoutAddressPreview() {
+        const previewEl = this.addressSelector?.previewEl;
+        const modalOpen = !!this.addressSelector?.modal?.classList.contains('open');
+        const modalStreet = this.addressSelector?.modalStreetInput?.value.trim() || '';
+        const storedStreet = document.getElementById('floating-address-street')?.value.trim() || '';
+        const street = modalOpen ? modalStreet : storedStreet;
+        const parts = modalOpen
+            ? {
+                islandGroup: this.addressSelector?.islandSelect?.value || '',
+                province: this.addressSelector?.provinceSelect?.value || '',
+                city: this.addressSelector?.citySelect?.value || '',
+                barangay: this.addressSelector?.barangaySelect?.value || ''
+            }
+            : (this.getCheckoutAddressParts() || {});
+        const hasSelection = parts.islandGroup && parts.province && parts.city && parts.barangay;
+
+        this.updateAddressButtonStreetPreview('checkout', street);
+
+        if (previewEl) {
+            if (hasSelection && street) {
+                previewEl.textContent = `${street}, ${parts.barangay}, ${parts.city}, ${parts.province}`;
+            } else if (hasSelection) {
+                previewEl.textContent = `${parts.barangay}, ${parts.city}, ${parts.province} (add street/building)`;
+            } else {
+                previewEl.textContent = 'Select values to preview the address.';
+            }
+        }
+
+        if (!modalOpen && hasSelection && street) {
+            this.buildCheckoutAddress();
+        }
+    }
+
+    updateAddressSelectionPreview() {
+        if (this.addressSelectorContext === 'checkout') {
+            this.updateCheckoutAddressPreview();
+        } else {
+            this.updateRegistrationAddressPreview();
+        }
+    }
+
+    updateRegistrationAddressPreview() {
+        const previewEl = this.addressSelector?.previewEl;
+        const modalOpen = !!this.addressSelector?.modal?.classList.contains('open');
+        const modalStreet = this.addressSelector?.modalStreetInput?.value.trim() || '';
+        const storedStreet = document.getElementById('auth-street')?.value.trim() || '';
+        const street = modalOpen ? modalStreet : storedStreet;
+        const parts = modalOpen
+            ? {
+                islandGroup: this.addressSelector?.islandSelect?.value || '',
+                province: this.addressSelector?.provinceSelect?.value || '',
+                city: this.addressSelector?.citySelect?.value || '',
+                barangay: this.addressSelector?.barangaySelect?.value || ''
+            }
+            : (this.getRegistrationAddressParts() || {});
+        const hasSelection = parts.islandGroup && parts.province && parts.city && parts.barangay;
+
+        this.updateAddressButtonStreetPreview('register', street);
+
+        if (previewEl) {
+            if (hasSelection && street) {
+                previewEl.textContent = `${street}, ${parts.barangay}, ${parts.city}, ${parts.province}`;
+            } else if (hasSelection) {
+                previewEl.textContent = `${parts.barangay}, ${parts.city}, ${parts.province} (add street/building)`;
+            } else {
+                previewEl.textContent = 'Select values to preview the address.';
+            }
+        }
+
+        if (!modalOpen && hasSelection && street) {
+            this.buildRegistrationAddress();
+        }
+    }
+
+    applyAddressSelection() {
+        if (!this.addressSelector) return;
+        const islandGroup = this.addressSelector.islandSelect?.value || '';
+        const province = this.addressSelector.provinceSelect?.value || '';
+        const city = this.addressSelector.citySelect?.value || '';
+        const barangay = this.addressSelector.barangaySelect?.value || '';
+
+        if (!islandGroup || !province || !city || !barangay) {
+            this.showMessage('Please complete all address selections', 'error');
+            return;
+        }
+
+        const streetValue = this.addressSelector?.modalStreetInput?.value.trim() || '';
+        if (!streetValue) {
+            this.showMessage('Please enter your street/building/house number', 'error');
+            this.addressSelector?.modalStreetInput?.focus();
+            return;
+        }
+
+        if (this.addressSelectorContext === 'checkout') {
+            if (this.addressSelector?.checkoutStreetHidden) {
+                this.addressSelector.checkoutStreetHidden.value = streetValue;
+            }
+            this.setCheckoutAddressParts({ islandGroup, province, city, barangay });
+            this.updateAddressButtonStreetPreview('checkout', streetValue);
+            this.buildCheckoutAddress();
+            this.closeAddressSelectorModal();
+            const addressInput = document.getElementById('floating-address-full');
+            if (addressInput) addressInput.focus();
+        } else {
+            if (this.addressSelector?.registerStreetHidden) {
+                this.addressSelector.registerStreetHidden.value = streetValue;
+            }
+            this.setRegistrationAddressParts({ islandGroup, province, city, barangay });
+            this.updateAddressButtonStreetPreview('register', streetValue);
+            this.buildRegistrationAddress();
+            this.closeAddressSelectorModal();
+            const addressInput = document.getElementById('auth-address');
+            if (addressInput) addressInput.focus();
         }
     }
 
@@ -5485,6 +6250,8 @@ class AgricultureMarket {
         this.otpSent = false;
         this.otpVerified = false;
         this.otpEmail = null;
+        this.setRegisterRecaptchaVisible(false);
+        this.clearMessage();
 
         const focusTarget = this._authLastFocusedElement;
         this._authLastFocusedElement = null;
@@ -5508,6 +6275,7 @@ class AgricultureMarket {
                 field.value = '';
             });
         }
+        this.setRegisterRecaptchaVisible(true);
         
         // Clear OTP inputs
         const loginOtp = document.getElementById('login-otp');
@@ -5525,6 +6293,8 @@ class AgricultureMarket {
         this.otpSent = false;
         this.otpVerified = false;
         this.otpEmail = null;
+        this.resetRecaptcha('auth');
+        this.clearMessage();
     }
 
     openAddAddressModal() {
@@ -5565,6 +6335,16 @@ class AgricultureMarket {
             if (form) {
                 form.reset();
             }
+            this.setCheckoutAddressParts({});
+            const addressPreview = document.getElementById('floating-address-full');
+            if (addressPreview) {
+                addressPreview.value = '';
+            }
+            const streetHidden = document.getElementById('floating-address-street');
+            if (streetHidden) {
+                streetHidden.value = '';
+            }
+            this.updateAddressButtonStreetPreview('checkout', '');
             // Ensure checkout modal stays open
             const checkoutModal = document.getElementById('checkout-modal');
             if (checkoutModal && !checkoutModal.classList.contains('open')) {
@@ -5579,7 +6359,10 @@ class AgricultureMarket {
         const fullName = document.getElementById('floating-address-fullname').value.trim();
         const phone = document.getElementById('floating-address-phone').value.trim();
         const phoneDigits = phone.replace(/\D/g, '');
+        const street = document.getElementById('floating-address-street').value.trim();
         const address = document.getElementById('floating-address-full').value.trim();
+        const addressParts = this.getCheckoutAddressParts() || {};
+        const hasSelection = addressParts.islandGroup && addressParts.province && addressParts.city && addressParts.barangay;
         
         // Validation
         if (!fullName) {
@@ -5594,8 +6377,19 @@ class AgricultureMarket {
             return;
         }
         
+        if (!street) {
+            this.showMessage('Please enter your street/building/house number', 'error');
+            document.getElementById('open-address-selector-btn-floating')?.focus();
+            return;
+        }
+
+        if (!hasSelection) {
+            this.showMessage('Please select your barangay, city, and province', 'error');
+            return;
+        }
+
         if (!address) {
-            this.showMessage('Please enter your address', 'error');
+            this.showMessage('Please confirm your address selection', 'error');
             document.getElementById('floating-address-full').focus();
             return;
         }
@@ -5608,10 +6402,10 @@ class AgricultureMarket {
             label: '',
             full_name: fullName,
             phone: phoneWithPrefix,
-            address_line1: address,
-            address_line2: '',
-            city: '',
-            province: '',
+            address_line1: street,
+            address_line2: addressParts.barangay || '',
+            city: addressParts.city || '',
+            province: addressParts.province || '',
             postal_code: '',
             is_default: document.getElementById('floating-address-default').checked
         };
@@ -5775,6 +6569,10 @@ class AgricultureMarket {
         setTimeout(() => {
             toast.remove();
         }, 3000);
+    }
+
+    clearMessage() {
+        document.querySelectorAll('.toast').forEach((toast) => toast.remove());
     }
 
     goToAdminPanel() {

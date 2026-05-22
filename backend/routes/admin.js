@@ -1517,7 +1517,7 @@ router.put('/categories/:id', requireAdmin, async (req, res) => {
   }
 });
 
-router.delete('/categories/:id', requireAdmin, async (req, res) => {
+router.put('/categories/:id/disable', requireAdmin, async (req, res) => {
   try {
     await ensureCategoryAdminSchema();
     const id = Number(req.params.id || 0);
@@ -1542,6 +1542,49 @@ router.delete('/categories/:id', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('Admin disable category error:', error);
     return res.status(500).json({ message: 'Server error disabling category' });
+  }
+});
+
+router.delete('/categories/:id', requireAdmin, async (req, res) => {
+  try {
+    await ensureCategoryAdminSchema();
+    const id = Number(req.params.id || 0);
+    if (!id) return res.status(400).json({ message: 'Invalid category id' });
+
+    const beforeRes = await pool.query('SELECT id, name, description, COALESCE(type, \'agricultural\') AS type, is_disabled FROM categories WHERE id = $1', [id]);
+    if (!beforeRes.rows.length) return res.status(404).json({ message: 'Category not found' });
+
+    const usageResult = await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM products WHERE category_id = $1) AS product_count,
+         (SELECT COUNT(*)::int FROM product_name_requests WHERE category_id = $1) AS request_count,
+         (SELECT COUNT(*)::int FROM product_name_catalog WHERE category_id = $1) AS catalog_count`,
+      [id]
+    );
+    const usage = usageResult.rows[0] || { product_count: 0, request_count: 0, catalog_count: 0 };
+    const inUseCount = Number(usage.product_count || 0) + Number(usage.request_count || 0) + Number(usage.catalog_count || 0);
+    if (inUseCount > 0) {
+      return res.status(409).json({
+        message: 'Category cannot be deleted because it is still used by products or requests. Disable it instead.'
+      });
+    }
+
+    await pool.query('DELETE FROM categories WHERE id = $1', [id]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'category.delete',
+      entity: 'categories',
+      entity_id: id,
+      before: beforeRes.rows[0],
+      after: null
+    });
+    broadcastEvent('admin.audit', { action: 'category.delete', entity: 'categories', entity_id: id, actor_admin_id: req.user.id });
+
+    return res.json({ message: 'Category deleted' });
+  } catch (error) {
+    console.error('Admin delete category error:', error);
+    return res.status(500).json({ message: 'Server error deleting category' });
   }
 });
 

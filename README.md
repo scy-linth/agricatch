@@ -91,9 +91,13 @@ npm install
    JWT_SECRET=your_jwt_secret_key_here
    SESSION_SECRET=your_session_secret_here
    PORT=3000
+   RECAPTCHA_SITE_KEY=your_recaptcha_site_key
+   RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key
    ```
 
-### 4. Initialize Database Schema
+4. **Configure Google reCAPTCHA**: Register your production and staging/local domains in the Google reCAPTCHA admin console, then place the site key in the frontend and the secret key in backend environment variables.
+
+### 5. Initialize Database Schema
 
 Run the schema script to create tables:
 
@@ -107,7 +111,7 @@ npm install
 node seed.js
 ```
 
-### 5. Start the Server
+### 6. Start the Server
 
 From the backend directory:
 
@@ -117,7 +121,7 @@ npm start
 
 The server will start on `http://localhost:3000`
 
-### 6. Open the Website
+### 7. Open the Website
 
 Open your web browser and navigate to:
 ```

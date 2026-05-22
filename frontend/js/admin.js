@@ -754,6 +754,7 @@ class AdminDashboard {
                     <button class="btn btn-small ${isDisabled ? '' : 'btn-danger'}" onclick="adminDashboard.toggleCategoryDisabled(${category.id}, ${!isDisabled})">
                         ${isDisabled ? 'Enable' : 'Disable'}
                     </button>
+                    <button class="btn btn-small btn-danger" onclick="adminDashboard.deleteCategory(${category.id})">Delete</button>
                 </td>
             </tr>
         `;
@@ -956,7 +957,7 @@ class AdminDashboard {
     }
 
     async deleteCategory(categoryId) {
-        if (!confirm('Disable this category?')) return;
+        if (!confirm('Delete this category permanently? This cannot be undone.')) return;
 
         try {
             const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}`, {
@@ -967,14 +968,14 @@ class AdminDashboard {
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                this.showMessage(data.message || 'Failed to disable category', 'error');
+                this.showMessage(data.message || 'Failed to delete category', 'error');
                 return;
             }
-            this.showMessage('Category disabled', 'success');
+            this.showMessage('Category deleted', 'success');
             this.loadCategories();
         } catch (error) {
             console.error('Delete category error:', error);
-            this.showMessage('Failed to disable category', 'error');
+            this.showMessage('Failed to delete category', 'error');
         }
     }
 
@@ -1654,8 +1655,8 @@ class AdminDashboard {
         }
 
         try {
-            const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}${disable ? '' : '/enable'}`, {
-                method: disable ? 'DELETE' : 'PUT',
+            const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}${disable ? '/disable' : '/enable'}`, {
+                method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${this.token}`
                 }

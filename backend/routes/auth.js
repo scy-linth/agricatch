@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { pool } = require('../utils/db');
 
 const { sendOtpEmail } = require('../utils/emailService');
+const { verifyRecaptchaToken } = require('../utils/recaptcha');
 
 const router = express.Router();
 
@@ -53,6 +54,16 @@ function getClientIp(req) {
   const xf = req.headers['x-forwarded-for'];
   if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
   return req.ip || req.connection?.remoteAddress || 'unknown';
+}
+
+async function requireRecaptcha(req, res) {
+  const token = req.body?.['g-recaptcha-response'] || req.body?.gRecaptchaResponse || '';
+  const result = await verifyRecaptchaToken(token, { remoteip: getClientIp(req) });
+  if (!result.ok) {
+    res.status(result.status || 403).json({ message: result.message || 'CAPTCHA verification failed' });
+    return false;
+  }
+  return true;
 }
 
 // Very small in-memory rate limiter to avoid account enumeration via different responses.
@@ -113,7 +124,7 @@ async function getUserColumns() {
   return USER_COLUMNS_CACHE;
 }
 
-async function insertUserRecord({ username, email, fullName, phone, address, role, passwordValue }) {
+async function insertUserRecord({ username, email, fullName, firstName, middleName, lastName, phone, address, role, passwordValue }) {
   const columns = await getUserColumns();
   const fieldNames = [];
   const values = [];
@@ -127,6 +138,9 @@ async function insertUserRecord({ username, email, fullName, phone, address, rol
   pushField('username', username);
   pushField('email', email);
   pushField('full_name', fullName);
+  pushField('first_name', firstName);
+  pushField('middle_name', middleName);
+  pushField('last_name', lastName);
   pushField('phone', phone || null);
   pushField('address', address || null);
   pushField('role', role);
@@ -232,7 +246,9 @@ router.get('/check-username/:username', async (req, res) => {
 // This will be displayed in chat conversations and shop profiles
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password, full_name, phone, address, role = 'customer' } = req.body;
+  // Registration relies on prior OTP verification (which enforces CAPTCHA when sending OTP),
+  // so we do not require a separate reCAPTCHA token here to avoid blocking the final submit.
+  const { username, email, password, full_name, first_name, middle_name, last_name, phone, address, role = 'customer' } = req.body;
 
     // Check if user already exists
     const userExists = await pool.query(
@@ -296,6 +312,9 @@ router.post('/register', async (req, res) => {
       username,
       email,
       fullName: full_name,
+      firstName: first_name,
+      middleName: middle_name,
+      lastName: last_name,
       phone,
       address,
       role: userRole,
@@ -335,6 +354,8 @@ let superAdminProfile = {
 // Login user
 router.post('/login', async (req, res) => {
   try {
+    if (!(await requireRecaptcha(req, res))) return;
+
     const { email, password, requestedRole } = req.body;
     const normalizedRequestedRole = String(requestedRole || '').toLowerCase() === 'admin' ? 'staff' : requestedRole;
     const loginIdentifier = email; // Can be either username or email
@@ -565,6 +586,8 @@ router.put('/profile', async (req, res) => {
 router.post('/forgot', async (req, res) => {
   const genericMessage = "If that email exists, we've sent a verification code.";
   try {
+    if (!(await requireRecaptcha(req, res))) return;
+
     await ensurePasswordResetsTable();
 
     const email = normalizeEmail(req.body?.email);
@@ -625,6 +648,8 @@ router.post('/forgot', async (req, res) => {
 router.post('/forgot/resend', async (req, res) => {
   const genericMessage = "If that email exists, we've sent a verification code.";
   try {
+    if (!(await requireRecaptcha(req, res))) return;
+
     await ensurePasswordResetsTable();
 
     const email = normalizeEmail(req.body?.email);
