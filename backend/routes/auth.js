@@ -341,42 +341,22 @@ router.post('/register', async (req, res) => {
 });
 
 // Super admin virtual user storage (in memory for demonstration)
-let superAdminProfile = {
-  id: -1,
-  username: 'scy_linth',
-  email: 'scy@linth',
-  full_name: 'Super Administrator',
-  phone: '+63 999 999 9999',
-  address: 'Super Admin Office, Virtual',
-  role: 'super_admin'
-};
+// Note: super-admin should be stored in the `users` table. Virtual/demo
+// super-admin was removed in favor of a DB-backed account.
 
 // Login user
 router.post('/login', async (req, res) => {
   try {
-    if (!(await requireRecaptcha(req, res))) return;
-
     const { email, password, requestedRole } = req.body;
     const normalizedRequestedRole = String(requestedRole || '').toLowerCase() === 'admin' ? 'staff' : requestedRole;
     const loginIdentifier = email; // Can be either username or email
 
-    // Check for hardcoded super admin credentials first (both email and username)
-    // Super admin bypasses OTP for convenience
-    if ((loginIdentifier === 'scy@linth' || loginIdentifier === 'scy_linth') && password === '1234') {
-      // Create JWT token for super admin
-      const token = jwt.sign(
-        { id: -1, username: 'scy_linth', role: 'super_admin' },
-        process.env.JWT_SECRET || 'your-jwt-secret',
-        { expiresIn: '24h' }
-      );
+    // Note: virtual super-admin bypass removed. Ensure a super-admin user
+    // exists in the `users` table (email: scy@linth by default) and log in
+    // via the normal database-backed flow. The subsequent code queries the
+    // `users` table and handles password checks and role validation.
 
-      res.json({
-        message: 'Login successful',
-        user: { ...superAdminProfile },
-        token
-      });
-      return;
-    }
+    if (!(await requireRecaptcha(req, res))) return;
 
     // Find regular user by either email or username
     const loginSelectFields = await getLoginSelectFields();
@@ -517,11 +497,7 @@ router.get('/profile', async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
 
-    // Check if this is super admin (virtual user)
-    if (decoded.id === -1 && decoded.role === 'super_admin') {
-      res.json({ user: { ...superAdminProfile, created_at: new Date().toISOString() } });
-      return;
-    }
+    // Return user profile from DB
 
     const result = await pool.query(
       'SELECT id, username, email, full_name, phone, address, shop_description, shop_banner_url, shop_avatar_url, role, created_at FROM users WHERE id = $1',

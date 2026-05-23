@@ -140,7 +140,7 @@ app.use(async (req, res, next) => {
     return next();
   }
 
-  if (!decoded || decoded.id === -1) return next();
+  if (!decoded) return next();
 
   try {
     const userResult = await pool.query('SELECT is_disabled FROM users WHERE id = $1', [decoded.id]);

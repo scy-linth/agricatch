@@ -147,6 +147,22 @@ http://localhost:3000
 The database includes sample farmer accounts:
 - **Email**: juan@farm.ph / **Password**: password123 (Farmer)
 
+### Super Admin Setup
+
+Create or update a super-admin user in the database with the provided script:
+
+```bash
+cd backend
+# Optional: set custom credentials
+# set SUPERADMIN_EMAIL=scy@linth
+# set SUPERADMIN_USERNAME=scy_linth
+# set SUPERADMIN_PASSWORD=your-strong-password
+node scripts/create_superadmin.js
+```
+
+This script writes the super-admin to the `users` table (role = `super_admin`).
+Login uses the normal `/api/auth/login` flow and still requires reCAPTCHA.
+
 ## API Endpoints
 
 ### Authentication

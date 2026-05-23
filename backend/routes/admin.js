@@ -204,18 +204,12 @@ const requireAdmin = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
 
-    // Check if user is staff or super_admin
-    let userRole;
-    if (decoded.id === -1 && decoded.role === 'super_admin') {
-      // Virtual super admin user
-      userRole = 'super_admin';
-    } else {
-      const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
-      if (!userResult.rows[0]) {
-        return res.status(403).json({ message: 'Staff access required' });
-      }
-      userRole = userResult.rows[0].role;
+    // Check if user is staff or super_admin (DB-backed)
+    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
+    if (!userResult.rows[0]) {
+      return res.status(403).json({ message: 'Staff access required' });
     }
+    const userRole = userResult.rows[0].role;
 
     if (!['staff', 'super_admin'].includes(userRole)) {
       return res.status(403).json({ message: 'Staff access required' });
