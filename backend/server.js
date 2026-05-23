@@ -14,13 +14,6 @@ const PORT = process.env.PORT || 3000;
 // Health route for uptime pings
 const healthRouter = require('./routes/health');
 app.use('/_health', healthRouter);
-// Temporary debug route (returns non-sensitive DB host/database info only)
-try {
-  app.use('/_debug', require('./routes/debug'));
-} catch (e) {
-  console.warn('Debug route not available:', e.message);
-}
-
 // Local ingest logger helper (disabled in production by default)
 const _INGEST_URL = 'http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c';
 const shouldSendIngest = process.env.NODE_ENV !== 'production' && process.env.ENABLE_INGEST !== 'false';

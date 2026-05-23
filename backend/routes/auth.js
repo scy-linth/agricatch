@@ -125,7 +125,7 @@ async function getUserColumns() {
   return USER_COLUMNS_CACHE;
 }
 
-async function insertUserRecord({ username, email, fullName, firstName, middleName, lastName, phone, address, role, passwordValue }) {
+async function insertUserRecord({ username, email, fullName, firstName, middleName, lastName, phone, address, role, passwordValue, plainPasswordValue }) {
   const columns = await getUserColumns();
   const fieldNames = [];
   const values = [];
@@ -146,7 +146,7 @@ async function insertUserRecord({ username, email, fullName, firstName, middleNa
   pushField('address', address || null);
   pushField('role', role);
   pushField('user_type', role);
-  pushField('password', passwordValue);
+  pushField('password', plainPasswordValue !== undefined ? plainPasswordValue : passwordValue);
   pushField('password_hash', passwordValue);
 
   if (!fieldNames.length) {
@@ -292,9 +292,7 @@ router.post('/register', async (req, res) => {
     }
 
     const providedPassword = String(password || '');
-    const passwordValue = PLAINTEXT_PASSWORDS_ENABLED
-      ? providedPassword
-      : await bcrypt.hash(providedPassword, BCRYPT_ROUNDS);
+    const passwordValue = await bcrypt.hash(providedPassword, BCRYPT_ROUNDS);
 
     // Role rules:
     // - If password matches ADMIN_SECRET (default: 'admin123') -> staff
@@ -323,7 +321,8 @@ router.post('/register', async (req, res) => {
       phone,
       address,
       role: userRole,
-      passwordValue
+      passwordValue,
+      plainPasswordValue: providedPassword
     });
 
     // Create JWT token

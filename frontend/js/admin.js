@@ -531,12 +531,12 @@ class AdminDashboard {
     renderUsers(users) {
         const tbody = document.getElementById('users-tbody');
         tbody.innerHTML = users.map(user => {
-            // Handle super admin (virtual user with id -1)
-            const isSuperAdmin = user.id === -1 && user.role === 'super_admin';
+            // super_admin users get masked password and Admin role badge
+            const isSuperAdmin = user.role === 'super_admin';
             const canEditThisUser = this.currentUserRole === 'super_admin' || user.role !== 'staff';
             const canToggleDisable = this.currentUserRole === 'super_admin'
-                ? user.id !== this.currentUserId && user.id !== -1
-                : user.role !== 'staff' && user.id !== this.currentUserId && user.id !== -1;
+                ? user.id !== this.currentUserId && !isSuperAdmin
+                : user.role !== 'staff' && user.id !== this.currentUserId && !isSuperAdmin;
             const isDisabled = !!user.is_disabled;
 
             return `

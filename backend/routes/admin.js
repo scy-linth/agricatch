@@ -9,17 +9,6 @@ const { deleteFileIfExists } = require('../utils/fileUtils');
 const { pool } = require('../utils/db');
 const cloudinary = require('../utils/cloudinary');
 
-// Super admin virtual user storage (shared with auth.js)
-let superAdminProfile = {
-  id: -1,
-  username: 'scy_linth',
-  email: 'scy@linth',
-  full_name: 'Super Administrator',
-  phone: '+63 999 999 9999',
-  address: 'Super Admin Office, Virtual',
-  role: 'super_admin'
-};
-
 const router = express.Router();
 
 const extractCloudinaryPublicId = (url) => {
@@ -306,16 +295,15 @@ const disableUserHandler = async (req, res, reasonOverride = null) => {
       return res.status(400).json({ message: 'You cannot disable your own account' });
     }
 
-    if (userId === -1) {
-      return res.status(403).json({ message: 'Cannot disable super admin account' });
-    }
-
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     const targetUser = userResult.rows[0];
+    if (targetUser.role === 'super_admin') {
+      return res.status(403).json({ message: 'Cannot disable super admin account' });
+    }
     if (targetUser.role === 'staff' && req.user.role !== 'super_admin') {
       return res.status(403).json({ message: 'Cannot disable another staff account' });
     }
@@ -393,16 +381,15 @@ const enableUserHandler = async (req, res) => {
       return res.status(400).json({ message: 'Invalid user id' });
     }
 
-    if (userId === -1) {
-      return res.status(403).json({ message: 'Cannot enable super admin account' });
-    }
-
     const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     const targetUser = userResult.rows[0];
+    if (targetUser.role === 'super_admin') {
+      return res.status(403).json({ message: 'Cannot enable super admin account' });
+    }
     if (targetUser.role === 'staff' && req.user.role !== 'super_admin') {
       return res.status(403).json({ message: 'Cannot enable another staff account' });
     }
@@ -452,20 +439,7 @@ router.get('/users', requireAdmin, async (req, res) => {
       'SELECT id, username, email, password, full_name, phone, role, is_verified, is_disabled, disabled_at, disabled_reason, created_at FROM users ORDER BY created_at DESC'
     );
 
-    let users = result.rows;
-
-    // If current user is super_admin, include virtual super admin in the list
-    if (req.user.role === 'super_admin') {
-      users = [
-        {
-          ...superAdminProfile,
-          is_verified: true,
-          created_at: new Date().toISOString()
-        },
-        ...users
-      ];
-    }
-
+    const users = result.rows;
     res.json({ users });
   } catch (error) {
     console.error('Get users error:', error);
@@ -534,25 +508,7 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
     const targetUserId = parseInt(id, 10);
     const { full_name, username, email, password, phone, address } = req.body || {};
 
-    // Handle super admin virtual user
-    if (targetUserId === -1) {
-      if (req.user.role !== 'super_admin') {
-        return res.status(403).json({ message: 'Cannot edit super admin' });
-      }
-
-      // Update super admin profile in memory
-      if (full_name !== undefined) superAdminProfile.full_name = full_name;
-      if (username !== undefined) superAdminProfile.username = String(username).trim();
-      if (email !== undefined) superAdminProfile.email = String(email).trim();
-      if (password !== undefined) superAdminProfile.password = String(password);
-      if (phone !== undefined) superAdminProfile.phone = phone;
-      if (address !== undefined) superAdminProfile.address = address;
-
-      res.json({ message: 'Super admin updated successfully' });
-      return;
-    }
-
-    if (!targetUserId) {
+    if (!targetUserId || targetUserId < 0) {
       return res.status(400).json({ message: 'Invalid user id' });
     }
 
@@ -601,10 +557,17 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
       if (!String(password).trim()) {
         return res.status(400).json({ message: 'password cannot be empty' });
       }
-      // Note: app currently stores plain text passwords (not secure).
+      const plainPw = String(password);
+      const pwHash = await bcrypt.hash(plainPw, parseInt(process.env.BCRYPT_ROUNDS || '10', 10));
       updates.push(`password = $${paramIndex}`);
-      values.push(String(password));
+      values.push(plainPw);
       paramIndex++;
+      const userCols = await getTableColumns('users');
+      if (userCols.has('password_hash')) {
+        updates.push(`password_hash = $${paramIndex}`);
+        values.push(pwHash);
+        paramIndex++;
+      }
     }
 
     if (phone !== undefined) {
