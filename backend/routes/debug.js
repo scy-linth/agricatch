@@ -37,13 +37,13 @@ router.post('/login-check', async (req, res) => {
     if (!identifier || !password) return res.status(400).json({ message: 'email and password required' });
 
     const q = await pool.query(
-      `SELECT id, username, email, password, password_hash, encrypted_password FROM users WHERE email = $1 OR username = $2 LIMIT 1`,
+      `SELECT id, username, email, password, password_hash FROM users WHERE email = $1 OR username = $2 LIMIT 1`,
       [identifier, identifier]
     );
 
     if (q.rows.length === 0) return res.status(404).json({ found: false });
     const user = q.rows[0];
-    const stored = user.password_hash || user.password || user.encrypted_password || '';
+    const stored = user.password_hash || user.password || '';
 
     const isBcrypt = typeof stored === 'string' && stored.startsWith('$2');
     let matches = false;
