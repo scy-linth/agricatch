@@ -349,7 +349,8 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password, requestedRole } = req.body;
     const normalizedRequestedRole = String(requestedRole || '').toLowerCase() === 'admin' ? 'staff' : requestedRole;
-    const loginIdentifier = email; // Can be either username or email
+    const loginIdentifier = String(email || '').trim(); // Can be either username or email
+    const loginIdentifierLower = loginIdentifier.toLowerCase();
 
     // Note: virtual super-admin bypass removed. Ensure a super-admin user
     // exists in the `users` table (email: scy@linth by default) and log in
@@ -361,8 +362,8 @@ router.post('/login', async (req, res) => {
     // Find regular user by either email or username
     const loginSelectFields = await getLoginSelectFields();
     const result = await pool.query(
-      `SELECT ${loginSelectFields.join(', ')} FROM users WHERE email = $1 OR username = $1`,
-      [loginIdentifier]
+      `SELECT ${loginSelectFields.join(', ')} FROM users WHERE username = $1 OR email = $1 OR LOWER(email) = $2`,
+      [loginIdentifier, loginIdentifierLower]
     );
 
     if (result.rows.length === 0) {

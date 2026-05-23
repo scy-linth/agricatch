@@ -2474,7 +2474,7 @@ class AgricultureMarket {
     async handleLogin(e) {
         e.preventDefault();
 
-        const email = document.getElementById('auth-email').value;
+        const email = document.getElementById('auth-email').value.trim();
         const password = document.getElementById('auth-password').value;
 
         if (!email || !password) {
