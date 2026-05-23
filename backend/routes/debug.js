@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../utils/db');
 
+// Debug routes are mounted before the main body parser, so add one locally
+router.use(express.json());
+
 // Returns non-sensitive DB information: host, port, and database name only.
 // This endpoint is temporary and should be removed after verification.
 router.get('/db-info', async (req, res) => {
