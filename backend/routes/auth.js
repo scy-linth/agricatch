@@ -117,8 +117,9 @@ async function ensurePasswordResetsTable() {
 let USER_COLUMNS_CACHE = null;
 async function getUserColumns() {
   if (USER_COLUMNS_CACHE) return USER_COLUMNS_CACHE;
+  // Scope to public schema to avoid picking up Supabase's auth.users columns
   const result = await pool.query(
-    `SELECT column_name FROM information_schema.columns WHERE table_name = 'users'`
+    `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users'`
   );
   USER_COLUMNS_CACHE = new Set(result.rows.map((row) => row.column_name));
   return USER_COLUMNS_CACHE;
@@ -191,10 +192,14 @@ async function updateUserPassword(userId, passwordValue) {
 
 async function getLoginSelectFields() {
   const columns = await getUserColumns();
+  // Always include password fields — they are required for auth and must not be dropped
+  // even if getUserColumns() returns an incomplete cache.
   const fields = ['id', 'username', 'email', 'full_name', 'role'];
   if (columns.has('is_disabled')) fields.push('is_disabled');
-  if (columns.has('password')) fields.push('password');
-  if (columns.has('password_hash')) fields.push('password_hash');
+  // Unconditionally include both password columns; if they don't exist the SELECT
+  // will throw a clear SQL error rather than silently skipping password verification.
+  fields.push('password');
+  fields.push('password_hash');
   return fields;
 }
 
