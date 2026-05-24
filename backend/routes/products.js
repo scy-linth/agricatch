@@ -749,8 +749,8 @@ router.get('/:id', async (req, res) => {
     }
 
     const result = await pool.query(`
-      SELECT p.*, c.name as category_name, u.full_name as farmer_name, u.phone as farmer_phone,
-             COALESCE(p.location, u.address) as farm_location, u.email as farmer_email,
+      SELECT p.*, c.name as category_name, u.full_name as farmer_name,
+             COALESCE(p.location, u.address) as farm_location,
              COALESCE(u.is_verified, false) as farmer_verified,
              COALESCE(u.average_rating, 0) as farmer_average_rating,
              COALESCE(u.total_reviews, 0) as farmer_total_reviews,
