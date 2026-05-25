@@ -6,9 +6,9 @@ const router = express.Router();
 
 const REQUIRED_DATA_FILES = ['provinces.json', 'cities.json', 'municipalities.json', 'tree.json'];
 const DATA_DIR_CANDIDATES = [
-  path.resolve(__dirname, '../../tempodayry/psgc2-master'),
-  path.resolve(process.cwd(), 'tempodayry/psgc2-master'),
-  path.resolve(process.cwd(), '../tempodayry/psgc2-master')
+  path.resolve(__dirname, '../PSGC2-MASTER'),
+  path.resolve(process.cwd(), 'PSGC2-MASTER'),
+  path.resolve(process.cwd(), 'backend/PSGC2-MASTER')
 ];
 const NCR_PROVINCE_NAME = 'Metro Manila (NCR)';
 const TREE_METADATA_KEYS = new Set(['class', 'cityClass', 'population', 'notes', 'code', 'region', 'province']);

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const sourcePath = path.resolve(__dirname, '..', 'tempodayry', 'psgc2-master', 'tree.json');
+const sourcePath = path.resolve(__dirname, '..', 'backend', 'PSGC2-MASTER', 'tree.json');
 const outputPath = path.resolve(__dirname, '..', 'frontend', 'js', 'psgc_luzon.json');
 
 const REGION_TO_GROUP = {
