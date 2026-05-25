@@ -24,6 +24,13 @@ const readJson = (dataDir, fileName) => {
 
 const normalizeName = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
+const toPlainCityName = (value) => String(value || '')
+  .replace(/\s*\([^)]*\)\s*/g, ' ')
+  .replace(/^city\s+of\s+/i, '')
+  .replace(/\s+city$/i, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 const state = {
   provinces: [],
   citiesByProvince: new Map(),
@@ -47,9 +54,16 @@ const walkTree = (node) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
 
     if (value.class === 'City' || value.class === 'Municipality') {
+      const barangays = collectBarangaysFromCityNode(value);
       const normalizedCity = normalizeName(key);
+      const normalizedPlainCity = normalizeName(toPlainCityName(key));
+
       if (!state.barangaysByCity.has(normalizedCity)) {
-        state.barangaysByCity.set(normalizedCity, collectBarangaysFromCityNode(value));
+        state.barangaysByCity.set(normalizedCity, barangays);
+      }
+
+      if (normalizedPlainCity && !state.barangaysByCity.has(normalizedPlainCity)) {
+        state.barangaysByCity.set(normalizedPlainCity, barangays);
       }
       continue;
     }
@@ -84,7 +98,8 @@ const loadData = () => {
   const appendCity = (provinceName, cityName) => {
     const key = normalizeName(provinceName);
     const existing = state.citiesByProvince.get(key) || new Map();
-    existing.set(normalizeName(cityName), cityName);
+    const plainCityName = toPlainCityName(cityName) || String(cityName || '').trim();
+    existing.set(normalizeName(plainCityName), plainCityName);
     state.citiesByProvince.set(key, existing);
   };
 
