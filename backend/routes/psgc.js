@@ -4,6 +4,7 @@ const path = require('path');
 
 const router = express.Router();
 
+const REQUIRED_DATA_FILES = ['provinces.json', 'cities.json', 'municipalities.json', 'tree.json'];
 const DATA_DIR_CANDIDATES = [
   path.resolve(__dirname, '../../tempodayry/psgc2-master'),
   path.resolve(process.cwd(), 'tempodayry/psgc2-master'),
@@ -12,7 +13,9 @@ const DATA_DIR_CANDIDATES = [
 const NCR_PROVINCE_NAME = 'Metro Manila (NCR)';
 const TREE_METADATA_KEYS = new Set(['class', 'cityClass', 'population', 'notes', 'code', 'region', 'province']);
 
-const getDataDir = () => DATA_DIR_CANDIDATES.find((dirPath) => fs.existsSync(path.join(dirPath, 'provinces.json')));
+const getDataDir = () => DATA_DIR_CANDIDATES.find((dirPath) => REQUIRED_DATA_FILES.every((fileName) => fs.existsSync(path.join(dirPath, fileName))));
+
+const getMissingDataFiles = (dataDir) => REQUIRED_DATA_FILES.filter((fileName) => !fs.existsSync(path.join(dataDir, fileName)));
 
 const readJson = (dataDir, fileName) => {
   const filePath = path.join(dataDir, fileName);
@@ -121,6 +124,23 @@ const ensureDataLoaded = () => {
   }
 };
 
+const getDiagnostics = () => ({
+  initialized: state.initialized,
+  dataDir: state.dataDir,
+  loadError: state.loadError ? state.loadError.message : null,
+  checkedPaths: DATA_DIR_CANDIDATES.map((dirPath) => ({
+    path: dirPath,
+    missingFiles: getMissingDataFiles(dirPath)
+  }))
+});
+
+router.preload = () => {
+  ensureDataLoaded();
+  return getDiagnostics();
+};
+
+router.getDiagnostics = getDiagnostics;
+
 // Luzon-only zone-to-region mapping
 const ZONE_REGIONS = {
   northluzon: new Set([
@@ -140,6 +160,7 @@ router.get('/provinces', (req, res) => {
   try {
     ensureDataLoaded();
   } catch (error) {
+    console.error('PSGC data unavailable:', error.message);
     return res.status(500).json({ message: 'PSGC data unavailable' });
   }
 
@@ -164,6 +185,7 @@ router.get('/cities', (req, res) => {
   try {
     ensureDataLoaded();
   } catch (error) {
+    console.error('PSGC data unavailable:', error.message);
     return res.status(500).json({ message: 'PSGC data unavailable' });
   }
 
@@ -195,6 +217,7 @@ router.get('/barangays', (req, res) => {
   try {
     ensureDataLoaded();
   } catch (error) {
+    console.error('PSGC data unavailable:', error.message);
     return res.status(500).json({ message: 'PSGC data unavailable' });
   }
 

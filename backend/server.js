@@ -1,12 +1,20 @@
-const express = require('express');
+﻿const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const { addSseClient, broadcastEvent } = require('./utils/realtime');
 require('dotenv').config();
 const { pool } = require('./utils/db');
+
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is required');
+}
+if (!process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET is required');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -84,7 +92,7 @@ const isTrustedAgricatchOrigin = (origin) => {
 // CORS configuration
 if (process.env.PERMISSIVE_CORS === 'true') {
   // Opt-in permissive mode: echo origin and allow credentials
-  console.warn('⚠️ PERMISSIVE_CORS enabled - allowing any origin (use only for short-term debugging)');
+  console.warn('âš ï¸ PERMISSIVE_CORS enabled - allowing any origin (use only for short-term debugging)');
   app.use(cors({ origin: true, credentials: true }));
 } else {
   app.use(cors({
@@ -116,10 +124,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 } // 24 hours
 }));
 
 const getTokenFromRequest = (req) => {
@@ -134,7 +142,7 @@ app.use(async (req, res, next) => {
   if (!token) return next();
   let decoded = null;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch (_) {
     return next();
   }
@@ -184,10 +192,10 @@ app.use(async (req, res, next) => {
           const code = String(e?.code || '');
           const isExpectedSchemaGap = code === '42703' || code === '42P01';
           if (isExpectedSchemaGap) {
-            console.log(`ℹ️ Core init note (${label}): ${e.message}`);
+            console.log(`â„¹ï¸ Core init note (${label}): ${e.message}`);
             return;
           }
-          console.warn(`⚠️ Core init issue (${label}):`, e.message);
+          console.warn(`âš ï¸ Core init issue (${label}):`, e.message);
         }
       };
 
@@ -491,6 +499,33 @@ app.use(async (req, res, next) => {
           )
         `
       );
+      await safeQuery('notifications.type column', 'ALTER TABLE notifications ADD COLUMN IF NOT EXISTS type VARCHAR(50)');
+      await safeQuery(
+        'feature_flags table',
+        `
+          CREATE TABLE IF NOT EXISTS feature_flags (
+            key         VARCHAR(100) PRIMARY KEY,
+            name        VARCHAR(200) NOT NULL,
+            description TEXT,
+            enabled     BOOLEAN NOT NULL DEFAULT false,
+            updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `
+      );
+      await safeQuery(
+        'feature_flags defaults',
+        `
+          INSERT INTO feature_flags (key, name, description, enabled)
+          VALUES
+            ('guest_cart', 'Guest Cart', 'Allow unauthenticated users to add items to cart', true),
+            ('product_reviews', 'Product Reviews', 'Allow customers to leave reviews on products', true),
+            ('price_drop_alerts', 'Price Drop Alerts', 'Notify users when wishlist items drop in price', true),
+            ('farmer_chat', 'Farmer-Customer Chat', 'Enable direct messaging between farmers and customers', true),
+            ('otp_verification', 'OTP Verification', 'Require OTP email verification on registration', true),
+            ('platform_announce', 'Platform Announcements', 'Show platform-wide announcements to farmers', false)
+          ON CONFLICT (key) DO NOTHING
+        `
+      );
       await safeQuery(
         'notifications.order_id foreign key repair',
         `
@@ -588,7 +623,7 @@ app.use(async (req, res, next) => {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_otps_email_purpose ON otps(email, purpose)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps(expires_at)`);
-    console.log('✅ OTP table verified/created');
+    console.log('âœ… OTP table verified/created');
 
     // Ensure password reset OTP table exists
     await pool.query(`
@@ -610,7 +645,7 @@ app.use(async (req, res, next) => {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_user_created ON password_resets(user_id, created_at DESC)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_expires ON password_resets(expires_at)`);
-    console.log('✅ Password reset table verified/created');
+    console.log('âœ… Password reset table verified/created');
 
     // Ensure chat tables exist (conversations/messages)
     try {
@@ -639,12 +674,12 @@ app.use(async (req, res, next) => {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_sender_receiver ON messages(sender_id, receiver_id)`);
-      console.log('✅ Chat tables verified/created');
+      console.log('âœ… Chat tables verified/created');
     } catch (e) {
-      console.warn('⚠️ Chat tables check failed:', e.message);
+      console.warn('âš ï¸ Chat tables check failed:', e.message);
     }
   } catch (error) {
-    console.error('⚠️ OTP table creation check failed:', error.message);
+    console.error('âš ï¸ OTP table creation check failed:', error.message);
   }
 })();
 
@@ -669,12 +704,53 @@ pool.connect((err, client, release) => {
 });
 
 // Routes
+// Rate limiters for sensitive endpoints
+const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' }
+});
+const otpRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many OTP requests. Please try again later.' }
+});
+
 // #region agent log
 sendIngest({location:'server.js:47',message:'Loading routes',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
 // #endregion
 
+const mountRoute = ({ basePath, modulePath, label, middlewares = [], critical = false, afterMount = null }) => {
+  try {
+    const routeModule = require(modulePath);
+    if (typeof routeModule.preload === 'function') {
+      const diagnostics = routeModule.preload();
+      console.log(`[startup] ${label} preload ok`, diagnostics);
+    }
+    app.use(basePath, ...middlewares, routeModule);
+    console.log(`[startup] ${label} route mounted on ${basePath}`);
+    if (typeof afterMount === 'function') {
+      afterMount(routeModule);
+    }
+    return routeModule;
+  } catch (error) {
+    console.error(`[startup] ${label} route failed to mount on ${basePath}:`, error.message);
+    if (error && error.stack) {
+      console.error(error.stack);
+    }
+    if (critical) {
+      throw error;
+    }
+    return null;
+  }
+};
+
 try {
-  app.use('/api/auth', require('./routes/auth'));
+  app.use('/api/auth', authRateLimit, require('./routes/auth'));
   // #region agent log
   sendIngest({location:'server.js:49',message:'Auth route loaded successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion
@@ -685,10 +761,10 @@ try {
 }
 
 try {
-  app.use('/api/otp', require('./routes/otp'));
-  console.log('✅ OTP route loaded successfully');
+  app.use('/api/otp', otpRateLimit, require('./routes/otp'));
+  console.log('âœ… OTP route loaded successfully');
 } catch (error) {
-  console.error('❌ OTP route failed to load:', error);
+  console.error('âŒ OTP route failed to load:', error);
 }
 
 try {
@@ -781,6 +857,7 @@ try {
 
 try {
   app.use('/api/admin', require('./routes/admin'));
+  require('./routes/admin').ensureCategoryAdminSchema().catch((e) => console.warn('âš ï¸ ensureCategoryAdminSchema failed:', e.message));
   // #region agent log
   sendIngest({location:'server.js:57',message:'Admin route loaded successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion
@@ -789,6 +866,20 @@ try {
   sendIngest({location:'server.js:57',message:'Admin route failed to load',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion
 }
+
+try {
+  app.use('/api/superadmin', require('./routes/superadmin'));
+  console.log('âœ… Superadmin route loaded successfully');
+} catch (error) {
+  console.error('âŒ Superadmin route failed to load:', error.message);
+}
+
+mountRoute({
+  basePath: '/api/psgc',
+  modulePath: './routes/psgc',
+  label: 'PSGC',
+  critical: process.env.NODE_ENV === 'production'
+});
 
 try {
   app.use('/api/upload', require('./routes/upload'));
@@ -840,7 +931,7 @@ app.get('/api/test-db', async (req, res) => {
     }
 
     res.json({
-      status: '✅ Database Connected Successfully!',
+      status: 'âœ… Database Connected Successfully!',
       now: now.rows[0].now,
       user_count: userCount,
       sample_users: sampleUsers,
@@ -848,7 +939,7 @@ app.get('/api/test-db', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      status: '❌ Database Connection Failed',
+      status: 'âŒ Database Connection Failed',
       error: error.message,
       message: 'Check your PostgreSQL connection and .env file'
     });
@@ -862,7 +953,7 @@ app.get('/api/events', async (req, res) => {
     const token = req.query.token || req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).end();
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded?.id !== -1) {
       const result = await pool.query('SELECT is_disabled FROM users WHERE id = $1', [decoded.id]);
       if (result.rows.length && result.rows[0].is_disabled) {
@@ -969,16 +1060,16 @@ app.get('/', (req, res) => {
       <html>
       <head><title>AgriCatch</title></head>
       <body>
-        <h1>Welcome to AgriCatch! 🛒</h1>
+        <h1>Welcome to AgriCatch! ðŸ›’</h1>
         <p>Your website is almost ready!</p>
         <p>Server is running on port 3000.</p>
         <p>Frontend file path: ${indexPath}</p>
         <h2>Available Features:</h2>
         <ul>
-          <li>✅ Browse Agricultural Products (Vegetables, Fruits, Grains)</li>
-          <li>✅ Guest shopping cart</li>
-          <li>✅ User registration and login</li>
-          <li>✅ Cash on delivery payment</li>
+          <li>âœ… Browse Agricultural Products (Vegetables, Fruits, Grains)</li>
+          <li>âœ… Guest shopping cart</li>
+          <li>âœ… User registration and login</li>
+          <li>âœ… Cash on delivery payment</li>
         </ul>
         <h2>Test Accounts:</h2>
         <ul>
