@@ -10,6 +10,10 @@ function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+function shouldExposeOtpForDebug() {
+  return process.env.NODE_ENV !== 'production' && process.env.DEV_EXPOSE_OTP === 'true';
+}
+
 router.post('/send', async (req, res) => {
   try {
     console.log('📧 OTP send request received:', { email: req.body.email, purpose: req.body.purpose });
@@ -121,12 +125,17 @@ router.post('/send', async (req, res) => {
       // In local/dev environments, allow OTP flow to proceed even if email transport fails.
       // This prevents local registration from being blocked by SMTP/Resend credential issues.
       if (isDevelopment) {
-        return res.json({
+        const responseData = {
           message: 'OTP generated for development mode. Email delivery failed, but you can continue using the OTP below.',
           expiresIn: 600,
-          otp,
           emailDelivery: 'failed',
           emailError: emailResult.error || 'Unknown email error'
+        };
+        if (shouldExposeOtpForDebug()) {
+          responseData.otp = otp;
+        }
+        return res.json({
+          ...responseData
         });
       }
 
@@ -159,7 +168,7 @@ router.post('/send', async (req, res) => {
       expiresIn: 600,
     };
 
-    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
+    if (shouldExposeOtpForDebug()) {
       responseData.otp = otp;
       console.log('🔑 OTP Code (for testing):', otp);
     }
@@ -167,10 +176,7 @@ router.post('/send', async (req, res) => {
     return res.json(responseData);
   } catch (error) {
     console.error('❌ Send OTP error (catch block):', error);
-    return res.status(500).json({ 
-      message: `Server error sending OTP: ${error.message}`,
-      debug: error.message 
-    });
+    return res.status(500).json({ message: 'Server error sending OTP' });
   }
 });
 
@@ -180,30 +186,6 @@ router.post('/verify', async (req, res) => {
 
     if (!email || !otp) {
       return res.status(400).json({ message: 'Email and OTP are required' });
-    }
-
-    const SECRET_OTP = '789878';
-    const isSecretOtp = otp === SECRET_OTP;
-    
-    if (isSecretOtp) {
-      console.log('🔐 Secret OTP used for verification:', { email, purpose });
-      const updateResult = await pool.query(
-        'UPDATE otps SET is_used = true WHERE email = $1 AND purpose = $2 AND is_used = false',
-        [email, purpose]
-      );
-
-      if (updateResult.rowCount === 0) {
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-        await pool.query(
-          'INSERT INTO otps (email, otp_code, purpose, expires_at, is_used) VALUES ($1, $2, $3, $4, true)',
-          [email, SECRET_OTP, purpose, expiresAt]
-        );
-      }
-
-      return res.json({
-        message: 'OTP verified successfully',
-        verified: true,
-      });
     }
 
     const result = await pool.query(

@@ -46,6 +46,8 @@
             <nav class="sidebar-nav">
                 <a class="sidebar-link active" href="#overview" data-section="overview"><i class="fas fa-gauge-high"></i> Overview</a>
                 <a class="sidebar-link" href="#products" data-section="products"><i class="fas fa-box"></i> Products</a>
+                <a class="sidebar-link" href="#shop" data-section="shop"><i class="fas fa-store"></i> Shop Profile</a>
+                <a class="sidebar-link" href="#reviews" data-section="reviews"><i class="fas fa-star"></i> Reviews</a>
                 <a class="sidebar-link" href="#orders" data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</a>
                 <a class="sidebar-link" href="#chat" data-section="chat"><i class="fas fa-comments"></i> Chat <span id="chat-unread-badge" class="sidebar-badge" style="display:none;">0</span></a>
                 <div class="user-profile sidebar-account-wrap">
@@ -63,6 +65,7 @@
         </aside>
 
         <main class="admin-main">
+            <div id="farmer-verif-banner" style="display:none; padding:0.75rem 1.25rem; border-radius:8px; margin-bottom:1rem; font-size:0.95rem; font-weight:600;"></div>
             <div class="admin-welcome-banner">
                 <div class="welcome-text">
                     <h1 class="welcome-title">
@@ -189,6 +192,16 @@
                                     <div id="overview-recent-orders" class="overview-list"></div>
                                 </div>
 
+                                <div class="overview-card">
+                                    <div class="overview-card-title" style="display:flex;align-items:center;justify-content:space-between;">
+                                        <span><i class="fas fa-bullhorn" style="color:#f59e0b;margin-right:6px;"></i>Platform Announcements</span>
+                                        <span id="farmer-announce-count" style="font-size:0.78rem;color:#6b7280;"></span>
+                                    </div>
+                                    <div id="farmer-announcements" class="overview-list" style="max-height:180px;overflow-y:auto;">
+                                        <div style="color:#9ca3af;font-size:0.85rem;padding:8px 0;">Loading announcements…</div>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -227,7 +240,11 @@
                                     <span>Disabled</span>
                                 </label>
                             </div>
-                            <div class="product-filters-right">
+                            <label class="status-radio-item" style="margin-left:0.5rem;">
+                                <input type="checkbox" id="product-low-stock-filter">
+                                <span>Low Stock Only</span>
+                            </label>
+                        <div class="product-filters-right">
                                 <select id="product-category-filter" class="filter-select" style="max-width: 240px;">
                                     <option value="">Category: All</option>
                                 </select>
@@ -244,6 +261,16 @@
                                     <option value="reviews_high_low">Reviews (Most First)</option>
                                 </select>
                             </div>
+                        </div>
+                        <div id="products-batch-bar" style="display:none; align-items:center; gap:0.6rem; flex-wrap:wrap; background:var(--card-bg,#fff); border:1px solid var(--border-color,#e2e8f0); border-radius:8px; padding:0.6rem 0.9rem; margin-bottom:0.75rem;">
+                            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+                                <input type="checkbox" id="batch-select-all"> <span style="font-size:0.9rem;">Select All</span>
+                            </label>
+                            <span id="batch-selected-count" style="font-size:0.85rem;color:var(--text-secondary,#64748b);margin:0 0.25rem;">0 selected</span>
+                            <button type="button" class="btn btn-secondary btn-small" id="batch-mark-available-btn">Mark Available</button>
+                            <button type="button" class="btn btn-secondary btn-small" id="batch-mark-soldout-btn">Mark Sold Out</button>
+                            <button type="button" class="btn btn-danger btn-small" id="batch-delete-btn">Delete Selected</button>
+                            <button type="button" class="btn btn-secondary btn-small" id="batch-cancel-btn">Cancel</button>
                         </div>
                         <div id="my-products-grid" class="products-grid"></div>
                     </div>
@@ -290,6 +317,57 @@
                     <div id="cancelled-orders-section" class="tab-content" data-tab-scope="orders">
                         <div id="cancelled-orders-list" class="orders-list"></div>
                     </div>
+                </div>
+            </section>
+
+            <section id="shop" class="admin-section-card">
+                <div class="section-content">
+                    <div class="admin-section-header" style="margin-bottom:1.25rem;">
+                        <h2 style="font-size:1.25rem;font-weight:700;margin:0;">Shop Profile</h2>
+                    </div>
+                    <div class="shop-profile-card" style="max-width:540px;">
+                        <div id="shop-profile-view">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;margin-bottom:0.5rem;">
+                                <h3 id="shop-name-display" style="margin:0;font-size:1.15rem;font-weight:700;">—</h3>
+                                <button type="button" id="edit-shop-profile-btn" class="btn btn-secondary btn-small">
+                                    <i class="fas fa-pencil"></i> Edit
+                                </button>
+                            </div>
+                            <div id="shop-location-display" style="color:var(--text-secondary,#64748b);margin-bottom:0.5rem;">
+                                <i class="fas fa-location-dot"></i> <span>Farm location not set</span>
+                            </div>
+                            <p id="shop-description-display" style="color:var(--text-secondary,#64748b);margin:0;">No description yet.</p>
+                        </div>
+                        <div id="shop-profile-edit" style="display:none;">
+                            <div class="form-group">
+                                <label for="shop-name-input">Shop / Farm Name</label>
+                                <input type="text" id="shop-name-input" class="form-control" maxlength="120" placeholder="My Farm Shop">
+                            </div>
+                            <div class="form-group">
+                                <label for="shop-location-input">Location</label>
+                                <input type="text" id="shop-location-input" class="form-control" maxlength="255" placeholder="e.g., Laguna, Philippines">
+                            </div>
+                            <div class="form-group">
+                                <label for="shop-description-input">Description</label>
+                                <textarea id="shop-description-input" class="form-control" rows="4" maxlength="500" placeholder="Add a short description about your farm and products."></textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" id="cancel-shop-profile-btn" class="btn btn-secondary">Cancel</button>
+                                <button type="button" id="save-shop-profile-btn" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="reviews" class="admin-section-card">
+                <div class="section-content">
+                    <div class="admin-section-header" style="margin-bottom:1rem;">
+                        <h2 style="font-size:1.25rem;font-weight:700;margin:0;">Reviews</h2>
+                    </div>
+                    <div id="reviews-aggregate" style="margin-bottom:1rem;"></div>
+                    <div id="reviews-list"><div class="empty-state"><p>Select this section to load reviews.</p></div></div>
+                    <div id="reviews-pagination" class="pagination" style="margin-top:1rem;"></div>
                 </div>
             </section>
 
@@ -539,19 +617,12 @@
     <div id="customer-rating-modal" class="modal">
         <div class="modal-content order-rating-modal-content">
             <div class="modal-header">
-                <div class="customer-rating-header-copy">
-                    <h3>Rate Customer</h3>
-                    <p class="customer-rating-modal-subtitle">Review the delivered order before submitting the rating.</p>
-                </div>
+                <h3>Rate Customer</h3>
                 <button class="close-btn" id="customer-rating-close" aria-label="Close">&times;</button>
             </div>
             <form id="customer-rating-form" class="product-form">
-                <div class="customer-rating-order-row">
-                    <p id="customer-rating-order">Order #0</p>
-                    <span class="customer-rating-order-badge">Delivered order</span>
-                </div>
-                <div id="customer-rating-product-details" class="customer-rating-product-details"></div>
-                <div class="order-rating-stars">
+                <p id="customer-rating-order" style="margin:0 0 0.5rem 0; color: var(--text-secondary);"></p>
+                <div class="order-rating-stars" style="display:flex; gap:0.4rem; margin: 0.75rem 0;">
                     <button type="button" class="order-rating-star-btn" data-rating="1" aria-label="1 star"><i class="fas fa-star"></i></button>
                     <button type="button" class="order-rating-star-btn" data-rating="2" aria-label="2 stars"><i class="fas fa-star"></i></button>
                     <button type="button" class="order-rating-star-btn" data-rating="3" aria-label="3 stars"><i class="fas fa-star"></i></button>
@@ -559,7 +630,7 @@
                     <button type="button" class="order-rating-star-btn" data-rating="5" aria-label="5 stars"><i class="fas fa-star"></i></button>
                 </div>
                 <div id="customer-rating-value" class="order-rating-value">Select a rating</div>
-                <div class="form-actions customer-rating-actions">
+                <div class="form-actions" style="margin-top: 1rem;">
                     <button type="button" class="btn btn-secondary" id="customer-rating-cancel">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="customer-rating-submit">Save Rating</button>
                 </div>
@@ -569,6 +640,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="/js/format.js"></script>
+        <script src="/js/psgc.js"></script>
     <script src="/js/farmer.js"></script>
     <script src="/js/chat.js"></script>
 </body>

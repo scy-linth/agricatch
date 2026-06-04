@@ -1,4 +1,6 @@
-﻿const express = require('express');
+﻿// AgriCatch Backend Server
+// Auto-reload trigger
+const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
@@ -710,6 +712,10 @@ const authRateLimit = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    const path = String(req.path || '').toLowerCase();
+    return !(req.method === 'POST' && (path === '/login' || path === '/recover-admin'));
+  },
   message: { error: 'Too many requests. Please try again later.' }
 });
 const otpRateLimit = rateLimit({
@@ -991,6 +997,15 @@ app.get('/api/events', async (req, res) => {
   }
 });
 
+// Server time endpoint for accurate time display
+app.get('/api/time', (req, res) => {
+  res.json({
+    timestamp: new Date().toISOString(),
+    timezone: 'Asia/Manila',
+    unix: Date.now()
+  });
+});
+
 // Serve specific HTML pages BEFORE static middleware
 // This ensures these routes take precedence
 app.get('/admin.html', (req, res) => {
@@ -1021,7 +1036,15 @@ app.get('/clear_ui_orders.html', (req, res) => {
 // #region agent log
 sendIngest({location:'server.js:148',message:'Setting up static file serving',data:{path:'../public'},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'C'});
 // #endregion
-app.use(express.static(path.join(__dirname, '..', 'frontend')));
+app.use(express.static(path.join(__dirname, '..', 'frontend'), {
+  maxAge: 0,
+  etag: false,
+  setHeaders: (res, path) => {
+    if (path.endsWith('admin.js')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    }
+  }
+}));
 
 // Additional CORS headers (backup - main CORS is handled above)
 app.use((req, res, next) => {

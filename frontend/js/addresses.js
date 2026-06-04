@@ -1,27 +1,91 @@
 class AddressesPage {
     constructor() {
-        // Use relative /api so Netlify can proxy to Render.
         this.apiBase = '/api';
         this.token = localStorage.getItem('token');
         this.init();
     }
 
-    init() {
+    async init() {
         if (!this.token) {
             window.location.href = '/?login=1';
             return;
         }
-        this.loadAddresses();
+
         document.getElementById('address-form').addEventListener('submit', (e) => this.saveAddress(e));
         document.getElementById('cancel-edit').addEventListener('click', () => this.cancelEdit());
-        
-        // Phone number input - only allow digits
+        document.getElementById('address-zone').addEventListener('change', () => this.handleZoneChange());
+        document.getElementById('address-province').addEventListener('change', () => this.handleProvinceChange());
+        document.getElementById('address-city').addEventListener('change', () => this.handleCityChange());
+        document.getElementById('address-barangay').addEventListener('change', () => this.updateAddressPreview());
+        document.getElementById('address-street').addEventListener('input', () => this.updateAddressPreview());
+
         const phoneInput = document.getElementById('address-phone');
         if (phoneInput) {
             phoneInput.addEventListener('input', (e) => {
                 e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
             });
         }
+
+        await this.setupPsgcForm();
+        await this.loadAddresses();
+    }
+
+    async setupPsgcForm(address = null) {
+        const zoneSelect = document.getElementById('address-zone');
+        const provinceSelect = document.getElementById('address-province');
+        const citySelect = document.getElementById('address-city');
+        const barangaySelect = document.getElementById('address-barangay');
+
+        if (!zoneSelect || !window.PSGC) return;
+
+        window.PSGC.loadZones(zoneSelect);
+        window.PSGC.setSelectOptions(provinceSelect, [], 'Select Province');
+        provinceSelect.disabled = true;
+        window.PSGC.setSelectOptions(citySelect, [], 'Select City / Municipality');
+        citySelect.disabled = true;
+        window.PSGC.setSelectOptions(barangaySelect, [], 'Select Barangay');
+        barangaySelect.disabled = true;
+
+        document.getElementById('address-street').value = address?.street || '';
+        this.updateAddressPreview();
+    }
+
+    async handleZoneChange() {
+        const zone = document.getElementById('address-zone').value;
+        const provinceEl = document.getElementById('address-province');
+        const cityEl = document.getElementById('address-city');
+        const barangayEl = document.getElementById('address-barangay');
+        await window.PSGC.onZoneChange(zone, { provinceEl, cityEl, barangayEl });
+        this.updateAddressPreview();
+    }
+
+    async handleProvinceChange() {
+        const province = document.getElementById('address-province').value;
+        const cityEl = document.getElementById('address-city');
+        const barangayEl = document.getElementById('address-barangay');
+        await window.PSGC.onProvinceChange(province, { cityEl, barangayEl });
+        this.updateAddressPreview();
+    }
+
+    async handleCityChange() {
+        const city = document.getElementById('address-city').value;
+        await window.PSGC.loadBarangays(city, document.getElementById('address-barangay'));
+        this.updateAddressPreview();
+    }
+
+    getFormAddress() {
+        return {
+            province: document.getElementById('address-province').value.trim(),
+            city: document.getElementById('address-city').value.trim(),
+            barangay: document.getElementById('address-barangay').value.trim(),
+            street: document.getElementById('address-street').value.trim()
+        };
+    }
+
+    updateAddressPreview() {
+        const preview = document.getElementById('address-preview');
+        if (!preview) return;
+        preview.value = window.PSGC.formatAddress(this.getFormAddress());
     }
 
     async loadAddresses() {
@@ -48,17 +112,13 @@ class AddressesPage {
         }
 
         list.innerHTML = addresses.map(addr => {
-            // Combine all address parts into a single address string
-            const addressParts = [
-                addr.address_line1,
-                addr.address_line2,
-                addr.city,
-                addr.province,
-                addr.postal_code
-            ].filter(part => part && part.trim());
-            const fullAddress = addressParts.join(', ');
-            
-            // Format phone with +63 prefix
+            const fullAddress = addr.formatted_address || window.PSGC.formatAddress({
+                street: addr.street || addr.address_line1 || '',
+                barangay: addr.barangay || addr.address_line2 || '',
+                city: addr.city || '',
+                province: addr.province || ''
+            });
+
             let phoneDisplay = addr.phone || '';
             if (phoneDisplay && !phoneDisplay.startsWith('+63')) {
                 phoneDisplay = '+63' + phoneDisplay;
@@ -95,41 +155,43 @@ class AddressesPage {
         
         const fullName = document.getElementById('address-fullname').value.trim();
         const phone = document.getElementById('address-phone').value.trim();
-        const address = document.getElementById('address-full').value.trim();
+        const { province, city, barangay, street } = this.getFormAddress();
+        const formattedAddress = window.PSGC.formatAddress({ province, city, barangay, street });
         
-        // Validation
         if (!fullName) {
-            alert('Please enter your full name');
+            this.showMessage('Please enter your full name', 'error');
             document.getElementById('address-fullname').focus();
             return;
         }
         
         if (!phone || phone.length !== 10) {
-            alert('Please enter a valid 10-digit phone number');
+            this.showMessage('Please enter a valid 10-digit phone number', 'error');
             document.getElementById('address-phone').focus();
             return;
         }
         
-        if (!address) {
-            alert('Please enter your address');
-            document.getElementById('address-full').focus();
+        if (!province || !city || !barangay || !street) {
+            this.showMessage('Please complete the province, city, barangay, and street fields', 'error');
+            if (!province) document.getElementById('address-province').focus();
+            else if (!city) document.getElementById('address-city').focus();
+            else if (!barangay) document.getElementById('address-barangay').focus();
+            else document.getElementById('address-street').focus();
             return;
         }
         
         const id = document.getElementById('address-id').value;
-        
-        // Format phone with +63 prefix for storage
         const phoneWithPrefix = phone.startsWith('+63') ? phone : '+63' + phone;
-        
-        // Store the full address in address_line1, other fields empty
+
         const payload = {
-            label: '', // Not used in simplified version
+            label: '',
             full_name: fullName,
             phone: phoneWithPrefix,
-            address_line1: address,
-            address_line2: '',
-            city: '',
-            province: '',
+            street,
+            barangay,
+            city,
+            province,
+            address_line1: street,
+            address_line2: barangay,
             postal_code: '',
             is_default: document.getElementById('address-default').checked
         };
@@ -145,13 +207,9 @@ class AddressesPage {
             });
             
             if (response.ok) {
-                const data = await response.json();
-                document.getElementById('address-form').reset();
-                document.getElementById('address-id').value = '';
-                document.getElementById('cancel-edit').style.display = 'none';
-                this.loadAddresses();
-                
-                // Show success message
+                await response.json().catch(() => ({}));
+                await this.resetForm();
+                await this.loadAddresses();
                 const message = id ? 'Address updated successfully!' : 'Address saved successfully!';
                 this.showMessage(message, 'success');
             } else {
@@ -198,30 +256,22 @@ class AddressesPage {
                 // Set form values
                 document.getElementById('address-id').value = addr.id;
                 document.getElementById('address-fullname').value = addr.full_name || '';
-                
-                // Extract phone number (remove +63 prefix if present)
+
                 let phone = addr.phone || '';
                 if (phone.startsWith('+63')) {
                     phone = phone.substring(3);
                 }
                 document.getElementById('address-phone').value = phone;
-                
-                // Combine all address parts into single field
-                const addressParts = [
-                    addr.address_line1,
-                    addr.address_line2,
-                    addr.city,
-                    addr.province,
-                    addr.postal_code
-                ].filter(part => part && part.trim());
-                document.getElementById('address-full').value = addressParts.join(', ');
-                
+
+                await this.setupPsgcForm({
+                    province: addr.province || '',
+                    city: addr.city || '',
+                    barangay: addr.barangay || addr.address_line2 || '',
+                    street: addr.street || addr.address_line1 || ''
+                });
                 document.getElementById('address-default').checked = !!addr.is_default;
-                
-                // Show cancel button
                 document.getElementById('cancel-edit').style.display = 'inline-block';
-                
-                // Scroll to form
+
                 document.getElementById('address-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         } catch (error) {
@@ -230,14 +280,19 @@ class AddressesPage {
         }
     }
     
-    cancelEdit() {
+    async resetForm() {
         document.getElementById('address-form').reset();
         document.getElementById('address-id').value = '';
         document.getElementById('cancel-edit').style.display = 'none';
+        await this.setupPsgcForm();
+    }
+
+    async cancelEdit() {
+        await this.resetForm();
     }
 
     async deleteAddress(id) {
-        if (!confirm('Are you sure you want to delete this address? This action cannot be undone.')) return;
+        if (!await showConfirm('Are you sure you want to delete this address? This action cannot be undone.', { title: 'Delete Address', okLabel: 'Delete', danger: true })) return;
         try {
             const response = await fetch(`${this.apiBase}/addresses/${id}`, {
                 method: 'DELETE',

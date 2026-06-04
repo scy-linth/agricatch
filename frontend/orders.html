@@ -30,6 +30,12 @@
             <div class="orders-header">
                 <h2>Order Management</h2>
                 <p>Track your orders and view order details.</p>
+                <div class="orders-search-bar" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                    <input type="search" id="orders-search-input" placeholder="Search by product name or order ID..." style="flex:1;min-width:220px;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.95rem;">
+                    <input type="date" id="orders-date-from" title="From date" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                    <input type="date" id="orders-date-to" title="To date" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                    <button type="button" id="orders-search-clear" class="btn btn-secondary btn-small" style="white-space:nowrap;">Clear</button>
+                </div>
             </div>
             <div class="order-tabs">
                 <button id="pending-orders-tab" class="tab-btn active" type="button">Pending</button>

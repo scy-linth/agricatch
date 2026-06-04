@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { productUpload } = require('../middleware/upload');
 const { deleteFileIfExists, resolvePublicPath } = require('../utils/fileUtils');
@@ -12,7 +12,7 @@ const getUserFromToken = (req) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return null;
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    return jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     return null;
   }
@@ -197,6 +197,7 @@ const ensureProductCatalogSchema = async () => {
       reviewed_at TIMESTAMP
     )
   `);
+  await pool.query(`ALTER TABLE product_name_catalog ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT false`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS product_name_requests (
@@ -879,7 +880,7 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Check if user is a farmer
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
@@ -1018,7 +1019,7 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const { id } = req.params;
 
     // Check if product belongs to the farmer
@@ -1210,7 +1211,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const { id } = req.params;
 
     // Check if product belongs to the farmer

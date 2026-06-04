@@ -61,8 +61,6 @@ class AgricultureMarket {
         this._authFocusTrapHandler = null;
         this._authLastFocusedElement = null;
         this.recaptchaWidgetIds = { authLogin: null, authRegister: null, forgot: null };
-        this.psgcData = null;
-        this.addressSelector = null;
 
         try { window.agriCatchApp = this; } catch (e) {}
 
@@ -111,6 +109,46 @@ class AgricultureMarket {
         if (digits.length <= 3) return digits;
         if (digits.length <= 6) return `${digits.slice(0, 3)} ${digits.slice(3)}`;
         return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+    }
+
+    deriveNameParts(profile = {}) {
+        const explicit = {
+            firstName: String(profile.first_name || '').trim(),
+            middleName: String(profile.middle_name || '').trim(),
+            lastName: String(profile.last_name || '').trim()
+        };
+        if (explicit.firstName || explicit.middleName || explicit.lastName) {
+            return explicit;
+        }
+
+        const tokens = String(profile.full_name || '').trim().split(/\s+/).filter(Boolean);
+        if (tokens.length <= 1) {
+            return { firstName: tokens[0] || '', middleName: '', lastName: '' };
+        }
+
+        return {
+            firstName: tokens[0] || '',
+            middleName: tokens.slice(1, -1).join(' '),
+            lastName: tokens[tokens.length - 1] || ''
+        };
+    }
+
+    waitForPsgc(timeoutMs = 2500) {
+        if (window.PSGC) return Promise.resolve(window.PSGC);
+        return new Promise((resolve) => {
+            const start = Date.now();
+            const timer = window.setInterval(() => {
+                if (window.PSGC) {
+                    window.clearInterval(timer);
+                    resolve(window.PSGC);
+                    return;
+                }
+                if (Date.now() - start >= timeoutMs) {
+                    window.clearInterval(timer);
+                    resolve(null);
+                }
+            }, 100);
+        });
     }
 
     setPageScrollLocked(locked) {
@@ -192,7 +230,6 @@ class AgricultureMarket {
             }
 
             this.setupEventListeners();
-            this.setupAddressSelector();
             this.checkAuthStatus();
             this.loadProductCategories();
             
@@ -749,6 +786,18 @@ class AgricultureMarket {
             closeMyAccountBtn.addEventListener('click', () => this.closeMyAccountModal());
         }
 
+        // My Account address PSGC cascading
+        const myAccountZone = document.getElementById('my-account-zone');
+        const myAccountProvince = document.getElementById('my-account-province');
+        const myAccountCity = document.getElementById('my-account-city');
+        const myAccountBarangay = document.getElementById('my-account-barangay');
+        const myAccountStreet = document.getElementById('my-account-street');
+        if (myAccountZone) myAccountZone.addEventListener('change', () => this.handleMyAccountZoneChange());
+        if (myAccountProvince) myAccountProvince.addEventListener('change', () => this.handleMyAccountProvinceChange());
+        if (myAccountCity) myAccountCity.addEventListener('change', () => this.handleMyAccountCityChange());
+        if (myAccountBarangay) myAccountBarangay.addEventListener('change', () => this.updateMyAccountAddressPreview());
+        if (myAccountStreet) myAccountStreet.addEventListener('input', () => this.updateMyAccountAddressPreview());
+
         const myAccountModal = document.getElementById('my-account-modal');
         if (myAccountModal) {
             myAccountModal.addEventListener('mousedown', (e) => {
@@ -847,6 +896,8 @@ class AgricultureMarket {
                     this.otpEmail = null;
                     const otpSection = document.getElementById('register-otp-section');
                     if (otpSection) otpSection.style.display = 'none';
+                    const otpInput = document.getElementById('register-otp');
+                    if (otpInput) otpInput.value = '';
                 }
                 // Clear validation state while user edits the email so input is not persistently red
                 registerEmailInput.classList.remove('invalid', 'valid');
@@ -1253,6 +1304,53 @@ class AgricultureMarket {
         if (addAddressForm) {
             addAddressForm.addEventListener('submit', (e) => this.saveAddressFromCheckout(e));
         }
+
+        const floatingZone = document.getElementById('floating-address-zone');
+        const floatingProvince = document.getElementById('floating-address-province');
+        const floatingCity = document.getElementById('floating-address-city');
+        const floatingBarangay = document.getElementById('floating-address-barangay');
+        const floatingStreet = document.getElementById('floating-address-street');
+        const registerZone = document.getElementById('auth-zone');
+        const registerProvince = document.getElementById('auth-province');
+        const registerCity = document.getElementById('auth-city');
+        const registerBarangay = document.getElementById('auth-barangay');
+        const registerStreet = document.getElementById('auth-street');
+        if (floatingZone) {
+            floatingZone.addEventListener('change', () => this.handleFloatingAddressZoneChange());
+        }
+        if (floatingProvince) {
+            floatingProvince.addEventListener('change', () => this.handleFloatingAddressProvinceChange());
+        }
+        if (floatingCity) {
+            floatingCity.addEventListener('change', () => this.handleFloatingAddressCityChange());
+        }
+        if (floatingBarangay) {
+            floatingBarangay.addEventListener('change', () => this.buildCheckoutAddress());
+        }
+        if (floatingStreet) {
+            floatingStreet.addEventListener('input', () => this.buildCheckoutAddress());
+        }
+        if (registerZone) {
+            registerZone.addEventListener('change', () => this.handleRegistrationZoneChange());
+        }
+        if (registerProvince) {
+            registerProvince.addEventListener('change', () => this.handleRegistrationProvinceChange());
+        }
+        if (registerCity) {
+            registerCity.addEventListener('change', () => this.handleRegistrationCityChange());
+        }
+        if (registerBarangay) {
+            registerBarangay.addEventListener('change', () => this.updateRegistrationAddressPreview());
+        }
+        if (registerStreet) {
+            registerStreet.addEventListener('input', () => this.updateRegistrationAddressPreview());
+        }
+        this.setupRegistrationAddressForm().catch((error) => {
+            console.error('Registration PSGC setup error:', error);
+        });
+        this.setupFloatingAddressForm().catch((error) => {
+            console.error('Floating PSGC setup error:', error);
+        });
 
         // Cancel add address
         const cancelAddAddressBtn = document.getElementById('cancel-add-address');
@@ -1953,7 +2051,7 @@ class AgricultureMarket {
             const productLabel = note.product_name ? `<small class="notification-product">${note.product_name}</small>` : '';
             const noteDate = note.created_at ? new Date(note.created_at) : null;
             const dateLabel = noteDate && !Number.isNaN(noteDate.getTime())
-                ? noteDate.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                ? noteDate.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
                 : '';
             return `
             <div class="notification-item ${note.is_read ? '' : 'unread'}" data-id="${note.id}" data-order-id="${note.order_id || ''}">
@@ -2068,25 +2166,115 @@ class AgricultureMarket {
         }
     }
 
-    openMyAccountModal() {
+    async openMyAccountModal() {
         const modal = document.getElementById('my-account-modal');
         if (!modal || !this.currentUserProfile) return;
 
         const profile = this.currentUserProfile;
         const usernameEl = document.getElementById('my-account-username');
-        const fullNameEl = document.getElementById('my-account-fullname');
+        const firstNameEl = document.getElementById('my-account-firstname');
+        const middleNameEl = document.getElementById('my-account-middlename');
+        const lastNameEl = document.getElementById('my-account-lastname');
         const emailEl = document.getElementById('my-account-email');
         const phoneEl = document.getElementById('my-account-phone');
-        const addressEl = document.getElementById('my-account-address');
+        const provinceEl = document.getElementById('my-account-province');
+        const cityEl = document.getElementById('my-account-city');
+        const barangayEl = document.getElementById('my-account-barangay');
+        const streetEl = document.getElementById('my-account-street');
+        const addressPreviewEl = document.getElementById('my-account-address');
+        const nameParts = this.deriveNameParts(profile);
 
         if (usernameEl) usernameEl.value = profile.username || '';
-        if (fullNameEl) fullNameEl.value = profile.full_name || '';
+        if (firstNameEl) firstNameEl.value = nameParts.firstName || '';
+        if (middleNameEl) middleNameEl.value = nameParts.middleName || '';
+        if (lastNameEl) lastNameEl.value = nameParts.lastName || '';
         if (emailEl) emailEl.value = profile.email || '';
         if (phoneEl) phoneEl.value = this.formatPhoneInputValue(String(profile.phone || '').replace(/^\+63/, ''));
-        if (addressEl) addressEl.value = profile.address || '';
-        this.clearMyAccountPasswordFields();
 
+        // Reset address selects
+        const zoneEl = document.getElementById('my-account-zone');
+        if (zoneEl) {
+            zoneEl.disabled = true;
+            zoneEl.innerHTML = '<option value="">Loading address options...</option>';
+        }
+        if (cityEl) { cityEl.innerHTML = '<option value="">Select City / Municipality</option>'; cityEl.disabled = true; }
+        if (barangayEl) { barangayEl.innerHTML = '<option value="">Select Barangay</option>'; barangayEl.disabled = true; }
+        if (provinceEl) { provinceEl.innerHTML = '<option value="">Select Province</option>'; provinceEl.disabled = true; }
+        if (streetEl) streetEl.value = '';
+        // Show existing address as preview until user re-selects
+        if (addressPreviewEl) addressPreviewEl.value = profile.address || '';
+
+        this.clearMyAccountPasswordFields();
         modal.classList.add('open');
+
+        const psgc = await this.waitForPsgc();
+        if (zoneEl && psgc) {
+            psgc.loadZones(zoneEl);
+            zoneEl.value = '';
+            zoneEl.disabled = false;
+        } else if (zoneEl) {
+            zoneEl.innerHTML = '<option value="">Address options unavailable</option>';
+            zoneEl.disabled = true;
+        }
+    }
+
+    async handleMyAccountZoneChange() {
+        if (!window.PSGC) return;
+        const zone = document.getElementById('my-account-zone')?.value || '';
+        const provinceEl = document.getElementById('my-account-province');
+        const cityEl = document.getElementById('my-account-city');
+        const barangayEl = document.getElementById('my-account-barangay');
+        await window.PSGC.onZoneChange(zone, { provinceEl, cityEl, barangayEl }).catch(() => {});
+        this.updateMyAccountAddressPreview();
+    }
+
+    async handleMyAccountProvinceChange() {
+        const provinceEl = document.getElementById('my-account-province');
+        const cityEl = document.getElementById('my-account-city');
+        const barangayEl = document.getElementById('my-account-barangay');
+        if (!provinceEl || !cityEl || !barangayEl || !window.PSGC) return;
+        const province = provinceEl.value;
+        if (province) {
+            await window.PSGC.loadCities(province, cityEl).catch(() => {});
+            cityEl.disabled = false;
+        } else {
+            cityEl.innerHTML = '<option value="">Select City / Municipality</option>';
+            cityEl.disabled = true;
+        }
+        barangayEl.innerHTML = '<option value="">Select Barangay</option>';
+        barangayEl.disabled = true;
+        this.updateMyAccountAddressPreview();
+    }
+
+    async handleMyAccountCityChange() {
+        const cityEl = document.getElementById('my-account-city');
+        const barangayEl = document.getElementById('my-account-barangay');
+        if (!cityEl || !barangayEl || !window.PSGC) return;
+        const city = cityEl.value;
+        if (city) {
+            await window.PSGC.loadBarangays(city, barangayEl).catch(() => {});
+            barangayEl.disabled = false;
+        } else {
+            barangayEl.innerHTML = '<option value="">Select Barangay</option>';
+            barangayEl.disabled = true;
+        }
+        this.updateMyAccountAddressPreview();
+    }
+
+    updateMyAccountAddressPreview() {
+        const province = document.getElementById('my-account-province')?.value?.trim() || '';
+        const city = document.getElementById('my-account-city')?.value?.trim() || '';
+        const barangay = document.getElementById('my-account-barangay')?.value?.trim() || '';
+        const street = document.getElementById('my-account-street')?.value?.trim() || '';
+        const previewEl = document.getElementById('my-account-address');
+        if (!previewEl) return;
+        if (province || city || barangay || street) {
+            previewEl.value = window.PSGC
+                ? window.PSGC.formatAddress({ street, barangay, city, province })
+                : [street, barangay, city, province].filter(Boolean).join(', ');
+        } else {
+            // Keep existing address text as preview when no new selections made
+        }
     }
 
     closeMyAccountModal() {
@@ -2163,15 +2351,43 @@ class AgricultureMarket {
     }
 
     async saveMyAccount() {
-        const full_name = document.getElementById('my-account-fullname')?.value?.trim() || '';
+        const first_name = document.getElementById('my-account-firstname')?.value?.trim() || '';
+        const middle_name = document.getElementById('my-account-middlename')?.value?.trim() || '';
+        const last_name = document.getElementById('my-account-lastname')?.value?.trim() || '';
         const phoneRaw = document.getElementById('my-account-phone')?.value || '';
-        const address = document.getElementById('my-account-address')?.value?.trim() || '';
+        const province = document.getElementById('my-account-province')?.value?.trim() || '';
+        const city = document.getElementById('my-account-city')?.value?.trim() || '';
+        const barangay = document.getElementById('my-account-barangay')?.value?.trim() || '';
+        const street = document.getElementById('my-account-street')?.value?.trim() || '';
         const phoneDigits = String(phoneRaw).replace(/\D/g, '');
+        const full_name = [first_name, middle_name, last_name].filter(Boolean).join(' ').trim();
 
-        if (!full_name || !address || phoneDigits.length !== 10) {
-            this.showMessage('Please complete full name, 10-digit phone, and address.', 'error');
+        // If any address field is touched, all four must be filled
+        let address = null;
+        const anyAddressFilled = province || city || barangay || street;
+        if (anyAddressFilled) {
+            if (!province || !city || !barangay || !street) {
+                this.showMessage('Please complete all address fields: province, city, barangay, and street.', 'error');
+                return;
+            }
+            address = window.PSGC
+                ? window.PSGC.formatAddress({ street, barangay, city, province })
+                : [street, barangay, city, province].filter(Boolean).join(', ');
+        }
+
+        if (!first_name || !last_name || phoneDigits.length !== 10) {
+            this.showMessage('Please complete first name, last name, and a 10-digit phone number.', 'error');
             return;
         }
+
+        const payload = {
+            full_name,
+            first_name,
+            middle_name: middle_name || null,
+            last_name,
+            phone: `+63${phoneDigits}`
+        };
+        if (address !== null) payload.address = address;
 
         try {
             const response = await fetch(`${this.apiBase}/auth/profile`, {
@@ -2180,11 +2396,7 @@ class AgricultureMarket {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify({
-                    full_name,
-                    phone: `+63${phoneDigits}`,
-                    address
-                })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json().catch(() => ({}));
@@ -2364,7 +2576,7 @@ class AgricultureMarket {
     }
 
     getRecaptchaSiteKey() {
-        return '6Ldmst0sAAAAAAV8rDvnnbsHQ1nJvvaiy2xfOZWj';
+        return window.agriCatchConfig?.RECAPTCHA_SITE_KEY || '6Ldmst0sAAAAAAV8rDvnnbsHQ1nJvvaiy2xfOZWj';
     }
 
     resolveRecaptchaScope(scope = 'auth') {
@@ -2823,10 +3035,10 @@ class AgricultureMarket {
                 const lastName = document.getElementById('auth-lastname').value.trim();
                 const phone = document.getElementById('auth-phone').value.trim();
                 const street = document.getElementById('auth-street').value.trim();
-                const islandGroup = document.getElementById('auth-island-group')?.value.trim();
                 const province = document.getElementById('auth-province')?.value.trim();
                 const city = document.getElementById('auth-city')?.value.trim();
                 const barangay = document.getElementById('auth-barangay')?.value.trim();
+                const zone = document.getElementById('auth-zone')?.value.trim();
                 
                 if (!firstName) {
                     this.showMessage('Please enter your first name', 'error');
@@ -2853,12 +3065,12 @@ class AgricultureMarket {
                 }
                 if (!street) {
                     this.showMessage('Please enter your street/building/house number', 'error');
-                    document.getElementById('open-address-selector-btn')?.focus();
+                    document.getElementById('auth-street')?.focus();
                     return false;
                 }
-                if (!islandGroup || !province || !city || !barangay) {
-                    this.showMessage('Please select your address from the dropdowns', 'error');
-                    document.getElementById('open-address-selector-btn')?.focus();
+                if (!province || !city || !barangay) {
+                    this.showMessage('Please select your zone, province, city, and barangay from the dropdowns', 'error');
+                    document.getElementById('auth-zone')?.focus();
                     return false;
                 }
                 this.updateRegistrationAddressPreview();
@@ -3119,9 +3331,6 @@ class AgricultureMarket {
             nextButtonText.textContent = 'Confirm OTP';
         }
 
-        // Start resend OTP cooldown immediately when sending verification
-        this.startResendOtpCooldown(60);
-        
         try {
             console.log('Sending OTP request:', { email, purpose: 'register', apiBase: this.apiBase });
             const response = await fetch(`${this.apiBase}/otp/send`, {
@@ -3429,13 +3638,6 @@ class AgricultureMarket {
 
         // OTP verified, proceed with registration
 
-        // Ensure OTP is verified
-        if (!this.otpVerified) {
-            this.showMessage('Please verify your OTP first', 'error');
-            this.goToRegistrationStep(2);
-            return;
-        }
-
         const formData = {
             username: username,
             email: email,
@@ -3544,7 +3746,7 @@ class AgricultureMarket {
         if (!this.token) return;
 
         try {
-            await fetch(`${this.apiBase}/cart/migrate`, {
+            await fetch(`${this.apiBase}/cart/merge`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
@@ -4029,7 +4231,7 @@ class AgricultureMarket {
             if (product.harvest_date) {
                 try {
                     const harvest = new Date(product.harvest_date);
-                    harvestDate = harvest.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                    harvestDate = harvest.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });
                 } catch (e) {
                     harvestDate = product.harvest_date; // Use raw value if date parsing fails
                 }
@@ -4039,7 +4241,7 @@ class AgricultureMarket {
             if (product.expiry_date) {
                 try {
                     const expiry = new Date(product.expiry_date);
-                    expiryDate = expiry.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                    expiryDate = expiry.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });
                 } catch (e) {
                     expiryDate = product.expiry_date; // Use raw value if date parsing fails
                 }
@@ -4816,8 +5018,6 @@ class AgricultureMarket {
                 // Delivery date input was removed from the UI; skip min-date setup.
 
                 this.renderCheckout(data);
-                // Always reload saved addresses to get the latest list
-                await this.loadSavedAddresses();
                 document.getElementById('checkout-modal').classList.add('open');
                 this.setPageScrollLocked(true);
             }
@@ -4900,15 +5100,17 @@ class AgricultureMarket {
         }
 
         const subtotal = parseFloat(data.summary.subtotal) || 0;
-        
+        const DELIVERY_FEE = 35;
+        const grandTotal = subtotal + DELIVERY_FEE;
+
         if (checkoutSubtotal) {
             checkoutSubtotal.textContent = this.fmtNumber(subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         if (checkoutTotal) {
-            checkoutTotal.textContent = this.fmtNumber(subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            checkoutTotal.textContent = this.fmtNumber(grandTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         if (checkoutTotalFooter) {
-            checkoutTotalFooter.textContent = this.fmtNumber(subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            checkoutTotalFooter.textContent = this.fmtNumber(grandTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
     }
 
@@ -4973,16 +5175,6 @@ class AgricultureMarket {
             }
             phoneInput.value = this.formatPhoneInputValue(phone);
         }
-        
-        // Populate address
-        const fullAddress = [
-            address.address_line1,
-            address.address_line2,
-            address.city,
-            address.province,
-            address.postal_code
-        ].filter(Boolean).join(', ');
-        document.getElementById('delivery-address').value = fullAddress;
     }
 
     async handleCheckout(e) {
@@ -4991,7 +5183,7 @@ class AgricultureMarket {
         const fullName = document.getElementById('checkout-fullname').value.trim();
         const phone = document.getElementById('checkout-phone').value.trim();
         const phoneDigits = phone.replace(/\D/g, '');
-        const deliveryAddress = document.getElementById('delivery-address').value.trim();
+        const deliveryAddress = 'Trabajo Market, M. Dela Fuente St., Sampaloc, Manila, Metro Manila';
         // Delivery date removed from UI; send today's date to satisfy backend requirement
         const deliveryDate = (new Date()).toISOString().split('T')[0];
         const specialInstructions = document.getElementById('special-instructions').value.trim();
@@ -5006,12 +5198,6 @@ class AgricultureMarket {
         if (!phoneDigits || phoneDigits.length !== 10) {
             this.showMessage('Please enter a valid 10-digit phone number', 'error');
             document.getElementById('checkout-phone').focus();
-            return;
-        }
-
-        if (!deliveryAddress) {
-            this.showMessage('Please enter a delivery address', 'error');
-            document.getElementById('delivery-address').focus();
             return;
         }
 
@@ -5265,7 +5451,7 @@ class AgricultureMarket {
             // Clear registration fields visually (but keep in storage)
             const registerFields = document.getElementById('auth-register-fields');
             if (registerFields) {
-                registerFields.querySelectorAll('input, textarea').forEach(field => {
+                registerFields.querySelectorAll('input, textarea, select').forEach(field => {
                     field.value = '';
                 });
             }
@@ -5391,7 +5577,7 @@ class AgricultureMarket {
     /** Disable/enable inputs in a mode container so hidden fields don't block validation or submit. */
     setAuthFieldsDisabled(container, disabled) {
         if (!container) return;
-        container.querySelectorAll('input, textarea').forEach(field => {
+        container.querySelectorAll('input, textarea, select').forEach(field => {
             field.disabled = disabled;
         });
     }
@@ -5670,10 +5856,15 @@ class AgricultureMarket {
                 if (saved.address && document.getElementById('auth-address')) {
                     document.getElementById('auth-address').value = saved.address;
                 }
-                if (saved.addressParts) {
-                    this.setRegistrationAddressParts(saved.addressParts);
-                }
-                this.updateRegistrationAddressPreview();
+                this.setupRegistrationAddressForm({
+                    province: saved.addressParts?.province || '',
+                    city: saved.addressParts?.city || '',
+                    barangay: saved.addressParts?.barangay || '',
+                    street: saved.street || ''
+                }).catch((error) => {
+                    console.error('Registration PSGC restore error:', error);
+                    this.updateRegistrationAddressPreview();
+                });
             }
         } catch (e) {
             console.error('Error restoring form data:', e);
@@ -5689,302 +5880,102 @@ class AgricultureMarket {
         }
     }
 
-    setupAddressSelector() {
-        const modal = document.getElementById('address-selector-modal');
-        if (!modal) return;
-
-        if (modal.parentElement !== document.body) {
-            try {
-                document.body.appendChild(modal);
-            } catch (e) {
-                console.warn('Could not move address selector modal to body:', e);
-            }
-        }
-
-        const openBtnRegister = document.getElementById('open-address-selector-btn');
-        const openBtnCheckout = document.getElementById('open-address-selector-btn-floating');
-        const closeBtn = document.getElementById('close-address-selector-btn');
-        const applyBtn = document.getElementById('address-selector-apply');
-        const islandSelect = document.getElementById('address-island-group');
-        const provinceSelect = document.getElementById('address-province');
-        const citySelect = document.getElementById('address-city');
-        const barangaySelect = document.getElementById('address-barangay');
-        const previewEl = document.getElementById('address-selection-preview');
-        const modalStreetInput = document.getElementById('address-street-input');
-        const registerStreetHidden = document.getElementById('auth-street');
-        const checkoutStreetHidden = document.getElementById('floating-address-street');
-        const registerStreetPreview = document.getElementById('address-btn-street-preview');
-        const checkoutStreetPreview = document.getElementById('address-btn-street-preview-floating');
-
-        this.addressSelector = {
-            modal,
-            openBtnRegister,
-            openBtnCheckout,
-            closeBtn,
-            applyBtn,
-            islandSelect,
-            provinceSelect,
-            citySelect,
-            barangaySelect,
-            previewEl,
-            modalStreetInput,
-            registerStreetHidden,
-            checkoutStreetHidden,
-            registerStreetPreview,
-            checkoutStreetPreview
-        };
-
-        if (openBtnRegister) {
-            openBtnRegister.addEventListener('click', () => {
-                this.openAddressSelectorModal('register');
-            });
-        }
-
-        if (openBtnCheckout) {
-            openBtnCheckout.addEventListener('click', () => {
-                this.openAddressSelectorModal('checkout');
-            });
-        }
-
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.closeAddressSelectorModal());
-        }
-
-        modal.addEventListener('click', (event) => {
-            if (event.target === modal) {
-                this.closeAddressSelectorModal();
-            }
-        });
-
-        if (applyBtn) {
-            applyBtn.addEventListener('click', () => this.applyAddressSelection());
-        }
-
-        if (islandSelect) {
-            islandSelect.addEventListener('change', () => {
-                this.handleIslandGroupChange();
-            });
-        }
-
-        if (provinceSelect) {
-            provinceSelect.addEventListener('change', () => {
-                this.handleProvinceChange();
-            });
-        }
-
-        if (citySelect) {
-            citySelect.addEventListener('change', () => {
-                this.handleCityChange();
-            });
-        }
-
-        if (barangaySelect) {
-            barangaySelect.addEventListener('change', () => {
-                this.updateAddressSelectionPreview();
-            });
-        }
-
-        if (modalStreetInput) {
-            modalStreetInput.addEventListener('input', () => this.updateAddressSelectionPreview());
-        }
-
-        this.addressSelectorContext = 'register';
-    }
-
-    async loadPsgcData() {
-        if (this.psgcData) return this.psgcData;
-        const response = await fetch('/js/psgc_luzon.json', { cache: 'force-cache' });
-        if (!response.ok) {
-            throw new Error('Failed to load address data');
-        }
-        const data = await response.json();
-        this.psgcData = data;
-        return data;
-    }
-
-    async openAddressSelectorModal(context = 'register') {
-        if (!this.addressSelector?.modal) return;
-        this.addressSelectorContext = context;
-        try {
-            await this.loadPsgcData();
-            this.populateIslandGroupOptions();
-            this.applySavedAddressPartsToSelector(context);
-            this.applySavedStreetToSelector(context);
-        } catch (error) {
-            console.error('Address data load error:', error);
-            this.showMessage('Failed to load address list. Please try again.', 'error');
-            return;
-        }
-
-        this.addressSelector.modal.classList.add('open');
-        this.setPageScrollLocked(true);
-        if (this.addressSelector.modalStreetInput) {
-            this.addressSelector.modalStreetInput.focus();
-        } else if (this.addressSelector.islandSelect) {
-            this.addressSelector.islandSelect.focus();
-        }
-    }
-
-    closeAddressSelectorModal() {
-        if (!this.addressSelector?.modal) return;
-        this.addressSelector.modal.classList.remove('open');
-        this.setPageScrollLocked(false);
-    }
-
-    populateIslandGroupOptions() {
-        if (!this.addressSelector?.islandSelect || !this.psgcData?.islandGroups) return;
-        const islandSelect = this.addressSelector.islandSelect;
-        const current = islandSelect.value;
-        const islandGroups = ['Metro Manila', 'North Luzon', 'South Luzon'];
-
-        islandSelect.innerHTML = '<option value="">Select Luzon Area</option>' +
-            islandGroups.map(group => `<option value="${this.escapeHtml(group)}">${this.escapeHtml(group)}</option>`).join('');
-
-        if (current && islandGroups.includes(current)) {
-            islandSelect.value = current;
-        }
-    }
-
-    handleIslandGroupChange() {
-        if (!this.addressSelector) return;
-        const islandGroup = this.addressSelector.islandSelect?.value || '';
-        const provinceSelect = this.addressSelector.provinceSelect;
-        const citySelect = this.addressSelector.citySelect;
-        const barangaySelect = this.addressSelector.barangaySelect;
-
-        if (!islandGroup || !this.psgcData?.islandGroups?.[islandGroup]) {
-            this.setSelectOptions(provinceSelect, [], 'Select Province');
-            this.setSelectOptions(citySelect, [], 'Select Municipality / City');
-            this.setSelectOptions(barangaySelect, [], 'Select Barangay');
-            this.updateAddressSelectionPreview();
-            return;
-        }
-
-        const provinces = Object.keys(this.psgcData.islandGroups[islandGroup].provinces || {});
-        this.setSelectOptions(provinceSelect, provinces, 'Select Province');
-        this.setSelectOptions(citySelect, [], 'Select Municipality / City');
-        this.setSelectOptions(barangaySelect, [], 'Select Barangay');
-        this.updateAddressSelectionPreview();
-    }
-
-    handleProvinceChange() {
-        if (!this.addressSelector) return;
-        const islandGroup = this.addressSelector.islandSelect?.value || '';
-        const province = this.addressSelector.provinceSelect?.value || '';
-        const citySelect = this.addressSelector.citySelect;
-        const barangaySelect = this.addressSelector.barangaySelect;
-
-        const provinceData = this.psgcData?.islandGroups?.[islandGroup]?.provinces?.[province];
-        const cities = provinceData ? Object.keys(provinceData.cities || {}) : [];
-
-        this.setSelectOptions(citySelect, cities, 'Select Municipality / City');
-        this.setSelectOptions(barangaySelect, [], 'Select Barangay');
-        this.updateAddressSelectionPreview();
-    }
-
-    handleCityChange() {
-        if (!this.addressSelector) return;
-        const islandGroup = this.addressSelector.islandSelect?.value || '';
-        const province = this.addressSelector.provinceSelect?.value || '';
-        const city = this.addressSelector.citySelect?.value || '';
-        const barangaySelect = this.addressSelector.barangaySelect;
-
-        const barangays = this.psgcData?.islandGroups?.[islandGroup]?.provinces?.[province]?.cities?.[city] || [];
-        this.setSelectOptions(barangaySelect, barangays, 'Select Barangay');
-        this.updateAddressSelectionPreview();
-    }
-
-    setSelectOptions(selectEl, items, placeholder) {
-        if (!selectEl) return;
-        const safeItems = Array.isArray(items) ? items : [];
-        selectEl.innerHTML = `<option value="">${this.escapeHtml(placeholder)}</option>` +
-            safeItems.map(item => `<option value="${this.escapeHtml(item)}">${this.escapeHtml(item)}</option>`).join('');
-        selectEl.disabled = safeItems.length === 0;
-    }
-
-    resetAddressSelector() {
-        if (!this.addressSelector) return;
-        if (this.addressSelector.islandSelect) this.addressSelector.islandSelect.value = '';
-        this.setSelectOptions(this.addressSelector.provinceSelect, [], 'Select Province');
-        this.setSelectOptions(this.addressSelector.citySelect, [], 'Select Municipality / City');
-        this.setSelectOptions(this.addressSelector.barangaySelect, [], 'Select Barangay');
-        this.updateAddressSelectionPreview();
-    }
-
     getRegistrationAddressParts() {
-        const islandGroup = document.getElementById('auth-island-group')?.value || '';
         const province = document.getElementById('auth-province')?.value || '';
         const city = document.getElementById('auth-city')?.value || '';
         const barangay = document.getElementById('auth-barangay')?.value || '';
-        if (islandGroup || province || city || barangay) {
-            return { islandGroup, province, city, barangay };
+        if (province || city || barangay) {
+            return { province, city, barangay };
         }
         try {
             const saved = JSON.parse(localStorage.getItem('auth_form_register') || '{}');
-            return saved.addressParts || null;
+            if (saved.addressParts?.province || saved.addressParts?.city || saved.addressParts?.barangay) {
+                return {
+                    province: saved.addressParts.province || '',
+                    city: saved.addressParts.city || '',
+                    barangay: saved.addressParts.barangay || ''
+                };
+            }
+            return null;
         } catch (e) {
             return null;
         }
     }
 
     setRegistrationAddressParts(parts = {}) {
-        const islandGroup = parts.islandGroup || '';
         const province = parts.province || '';
         const city = parts.city || '';
         const barangay = parts.barangay || '';
 
-        const islandInput = document.getElementById('auth-island-group');
         const provinceInput = document.getElementById('auth-province');
         const cityInput = document.getElementById('auth-city');
         const barangayInput = document.getElementById('auth-barangay');
 
-        if (islandInput) islandInput.value = islandGroup;
         if (provinceInput) provinceInput.value = province;
         if (cityInput) cityInput.value = city;
         if (barangayInput) barangayInput.value = barangay;
 
-        this.saveFormData('register', { addressParts: { islandGroup, province, city, barangay } });
+        this.saveFormData('register', { addressParts: { province, city, barangay } });
     }
 
-    applySavedAddressPartsToSelector(context = 'register') {
-        if (!this.addressSelector) return;
-        const parts = context === 'checkout'
-            ? this.getCheckoutAddressParts()
-            : this.getRegistrationAddressParts();
-        if (!parts) return;
+    async setupRegistrationAddressForm(address = null) {
+        if (!window.PSGC) return;
 
-        const islandSelect = this.addressSelector.islandSelect;
-        const provinceSelect = this.addressSelector.provinceSelect;
-        const citySelect = this.addressSelector.citySelect;
-        const barangaySelect = this.addressSelector.barangaySelect;
+        const zoneSelect = document.getElementById('auth-zone');
+        const provinceSelect = document.getElementById('auth-province');
+        const citySelect = document.getElementById('auth-city');
+        const barangaySelect = document.getElementById('auth-barangay');
+        const streetInput = document.getElementById('auth-street');
 
-        if (islandSelect && parts.islandGroup) {
-            islandSelect.value = parts.islandGroup;
-            this.handleIslandGroupChange();
-        }
+        if (!zoneSelect || !provinceSelect || !citySelect || !barangaySelect || !streetInput) return;
 
-        if (provinceSelect && parts.province) {
-            provinceSelect.value = parts.province;
-            this.handleProvinceChange();
-        }
+        // Always initialise the zone dropdown
+        window.PSGC.loadZones(zoneSelect);
 
-        if (citySelect && parts.city) {
-            citySelect.value = parts.city;
-            this.handleCityChange();
-        }
+        // Reset downstream on a fresh load
+        window.PSGC.setSelectOptions(provinceSelect, [], 'Select Province');
+        provinceSelect.disabled = true;
+        window.PSGC.setSelectOptions(citySelect, [], 'Select City / Municipality');
+        citySelect.disabled = true;
+        window.PSGC.setSelectOptions(barangaySelect, [], 'Select Barangay');
+        barangaySelect.disabled = true;
+        streetInput.value = address?.street || '';
+        this.updateRegistrationAddressPreview();
+    }
 
-        if (barangaySelect && parts.barangay) {
-            barangaySelect.value = parts.barangay;
-        }
+    async handleRegistrationZoneChange() {
+        if (!window.PSGC) return;
+        const zone = document.getElementById('auth-zone')?.value || '';
+        const provinceEl = document.getElementById('auth-province');
+        const cityEl = document.getElementById('auth-city');
+        const barangayEl = document.getElementById('auth-barangay');
+        await window.PSGC.onZoneChange(zone, { provinceEl, cityEl, barangayEl }).catch(() => {});
+        this.updateRegistrationAddressPreview();
+    }
 
-        this.updateAddressSelectionPreview();
+    async handleRegistrationProvinceChange() {
+        if (!window.PSGC) return;
+        const province = document.getElementById('auth-province')?.value || '';
+        const citySelect = document.getElementById('auth-city');
+        const barangaySelect = document.getElementById('auth-barangay');
+        await window.PSGC.loadCities(province, citySelect);
+        window.PSGC.setSelectOptions(barangaySelect, [], 'Select Barangay');
+        this.updateRegistrationAddressPreview();
+    }
+
+    async handleRegistrationCityChange() {
+        if (!window.PSGC) return;
+        const city = document.getElementById('auth-city')?.value || '';
+        await window.PSGC.loadBarangays(city, document.getElementById('auth-barangay'));
+        this.updateRegistrationAddressPreview();
     }
 
     buildRegistrationAddress() {
         const street = document.getElementById('auth-street')?.value.trim() || '';
         const parts = this.getRegistrationAddressParts() || {};
-        const addressParts = [street, parts.barangay, parts.city, parts.province].filter(Boolean);
-        const composed = addressParts.join(', ');
+        const composed = window.PSGC
+            ? window.PSGC.formatAddress({ street, barangay: parts.barangay, city: parts.city, province: parts.province })
+            : [street, parts.barangay, parts.city, parts.province].filter(Boolean).join(', ');
         const addressInput = document.getElementById('auth-address');
         if (addressInput) {
             addressInput.value = composed;
@@ -5993,7 +5984,6 @@ class AgricultureMarket {
             address: composed,
             street,
             addressParts: {
-                islandGroup: parts.islandGroup || '',
                 province: parts.province || '',
                 city: parts.city || '',
                 barangay: parts.barangay || ''
@@ -6009,51 +5999,25 @@ class AgricultureMarket {
         return [firstName, middleName, lastName].filter(Boolean).join(' ').trim();
     }
 
-    applySavedStreetToSelector(context = 'register') {
-        if (!this.addressSelector?.modalStreetInput) return;
-        const streetValue = context === 'checkout'
-            ? (this.addressSelector.checkoutStreetHidden?.value || '')
-            : (this.addressSelector.registerStreetHidden?.value || '');
-        this.addressSelector.modalStreetInput.value = streetValue;
-        this.updateAddressButtonStreetPreview(context, streetValue);
-    }
-
-    updateAddressButtonStreetPreview(context, street) {
-        const label = street ? street : 'Street / Building / House No.';
-        if (context === 'checkout') {
-            if (this.addressSelector?.checkoutStreetPreview) {
-                this.addressSelector.checkoutStreetPreview.textContent = label;
-            }
-        } else {
-            if (this.addressSelector?.registerStreetPreview) {
-                this.addressSelector.registerStreetPreview.textContent = label;
-            }
-        }
-    }
-
     getCheckoutAddressParts() {
-        const islandGroup = document.getElementById('floating-address-island-group')?.value || '';
         const province = document.getElementById('floating-address-province')?.value || '';
         const city = document.getElementById('floating-address-city')?.value || '';
         const barangay = document.getElementById('floating-address-barangay')?.value || '';
-        if (islandGroup || province || city || barangay) {
-            return { islandGroup, province, city, barangay };
+        if (province || city || barangay) {
+            return { province, city, barangay };
         }
         return null;
     }
 
     setCheckoutAddressParts(parts = {}) {
-        const islandGroup = parts.islandGroup || '';
         const province = parts.province || '';
         const city = parts.city || '';
         const barangay = parts.barangay || '';
 
-        const islandInput = document.getElementById('floating-address-island-group');
         const provinceInput = document.getElementById('floating-address-province');
         const cityInput = document.getElementById('floating-address-city');
         const barangayInput = document.getElementById('floating-address-barangay');
 
-        if (islandInput) islandInput.value = islandGroup;
         if (provinceInput) provinceInput.value = province;
         if (cityInput) cityInput.value = city;
         if (barangayInput) barangayInput.value = barangay;
@@ -6071,120 +6035,20 @@ class AgricultureMarket {
         return composed;
     }
 
-    updateCheckoutAddressPreview() {
-        const previewEl = this.addressSelector?.previewEl;
-        const modalOpen = !!this.addressSelector?.modal?.classList.contains('open');
-        const modalStreet = this.addressSelector?.modalStreetInput?.value.trim() || '';
-        const storedStreet = document.getElementById('floating-address-street')?.value.trim() || '';
-        const street = modalOpen ? modalStreet : storedStreet;
-        const parts = modalOpen
-            ? {
-                islandGroup: this.addressSelector?.islandSelect?.value || '',
-                province: this.addressSelector?.provinceSelect?.value || '',
-                city: this.addressSelector?.citySelect?.value || '',
-                barangay: this.addressSelector?.barangaySelect?.value || ''
-            }
-            : (this.getCheckoutAddressParts() || {});
-        const hasSelection = parts.islandGroup && parts.province && parts.city && parts.barangay;
-
-        this.updateAddressButtonStreetPreview('checkout', street);
-
-        if (previewEl) {
-            if (hasSelection && street) {
-                previewEl.textContent = `${street}, ${parts.barangay}, ${parts.city}, ${parts.province}`;
-            } else if (hasSelection) {
-                previewEl.textContent = `${parts.barangay}, ${parts.city}, ${parts.province} (add street/building)`;
-            } else {
-                previewEl.textContent = 'Select values to preview the address.';
-            }
-        }
-
-        if (!modalOpen && hasSelection && street) {
-            this.buildCheckoutAddress();
-        }
-    }
-
-    updateAddressSelectionPreview() {
-        if (this.addressSelectorContext === 'checkout') {
-            this.updateCheckoutAddressPreview();
-        } else {
-            this.updateRegistrationAddressPreview();
-        }
-    }
-
     updateRegistrationAddressPreview() {
-        const previewEl = this.addressSelector?.previewEl;
-        const modalOpen = !!this.addressSelector?.modal?.classList.contains('open');
-        const modalStreet = this.addressSelector?.modalStreetInput?.value.trim() || '';
-        const storedStreet = document.getElementById('auth-street')?.value.trim() || '';
-        const street = modalOpen ? modalStreet : storedStreet;
-        const parts = modalOpen
-            ? {
-                islandGroup: this.addressSelector?.islandSelect?.value || '',
-                province: this.addressSelector?.provinceSelect?.value || '',
-                city: this.addressSelector?.citySelect?.value || '',
-                barangay: this.addressSelector?.barangaySelect?.value || ''
-            }
-            : (this.getRegistrationAddressParts() || {});
-        const hasSelection = parts.islandGroup && parts.province && parts.city && parts.barangay;
+        const street = document.getElementById('auth-street')?.value.trim() || '';
+        const parts = this.getRegistrationAddressParts() || {};
+        const hasSelection = parts.province && parts.city && parts.barangay;
+        const addressInput = document.getElementById('auth-address');
 
-        this.updateAddressButtonStreetPreview('register', street);
+        if (!addressInput) return;
 
-        if (previewEl) {
-            if (hasSelection && street) {
-                previewEl.textContent = `${street}, ${parts.barangay}, ${parts.city}, ${parts.province}`;
-            } else if (hasSelection) {
-                previewEl.textContent = `${parts.barangay}, ${parts.city}, ${parts.province} (add street/building)`;
-            } else {
-                previewEl.textContent = 'Select values to preview the address.';
-            }
-        }
-
-        if (!modalOpen && hasSelection && street) {
-            this.buildRegistrationAddress();
-        }
-    }
-
-    applyAddressSelection() {
-        if (!this.addressSelector) return;
-        const islandGroup = this.addressSelector.islandSelect?.value || '';
-        const province = this.addressSelector.provinceSelect?.value || '';
-        const city = this.addressSelector.citySelect?.value || '';
-        const barangay = this.addressSelector.barangaySelect?.value || '';
-
-        if (!islandGroup || !province || !city || !barangay) {
-            this.showMessage('Please complete all address selections', 'error');
+        if (hasSelection || street) {
+            addressInput.value = this.buildRegistrationAddress();
             return;
         }
 
-        const streetValue = this.addressSelector?.modalStreetInput?.value.trim() || '';
-        if (!streetValue) {
-            this.showMessage('Please enter your street/building/house number', 'error');
-            this.addressSelector?.modalStreetInput?.focus();
-            return;
-        }
-
-        if (this.addressSelectorContext === 'checkout') {
-            if (this.addressSelector?.checkoutStreetHidden) {
-                this.addressSelector.checkoutStreetHidden.value = streetValue;
-            }
-            this.setCheckoutAddressParts({ islandGroup, province, city, barangay });
-            this.updateAddressButtonStreetPreview('checkout', streetValue);
-            this.buildCheckoutAddress();
-            this.closeAddressSelectorModal();
-            const addressInput = document.getElementById('floating-address-full');
-            if (addressInput) addressInput.focus();
-        } else {
-            if (this.addressSelector?.registerStreetHidden) {
-                this.addressSelector.registerStreetHidden.value = streetValue;
-            }
-            this.setRegistrationAddressParts({ islandGroup, province, city, barangay });
-            this.updateAddressButtonStreetPreview('register', streetValue);
-            this.buildRegistrationAddress();
-            this.closeAddressSelectorModal();
-            const addressInput = document.getElementById('auth-address');
-            if (addressInput) addressInput.focus();
-        }
+        addressInput.value = '';
     }
 
     clearRegistrationState() {
@@ -6271,10 +6135,13 @@ class AgricultureMarket {
             });
         }
         if (registerFields) {
-            registerFields.querySelectorAll('input, textarea').forEach(field => {
+            registerFields.querySelectorAll('input, textarea, select').forEach(field => {
                 field.value = '';
             });
         }
+        this.setupRegistrationAddressForm().catch((error) => {
+            console.error('Registration PSGC reset error:', error);
+        });
         this.setRegisterRecaptchaVisible(true);
         
         // Clear OTP inputs
@@ -6301,6 +6168,10 @@ class AgricultureMarket {
         const modal = document.getElementById('add-address-modal');
         if (modal) {
             modal.classList.add('open');
+            this.setupFloatingAddressForm().catch((error) => {
+                console.error('Floating PSGC load error:', error);
+                this.showMessage('Failed to load provinces. Please try again.', 'error');
+            });
             // Prevent closing checkout when clicking outside add address modal
             // Prevent event from bubbling to checkout modal
             const modalContent = modal.querySelector('.modal-content');
@@ -6344,13 +6215,65 @@ class AgricultureMarket {
             if (streetHidden) {
                 streetHidden.value = '';
             }
-            this.updateAddressButtonStreetPreview('checkout', '');
+            this.setupFloatingAddressForm().catch((error) => {
+                console.error('Floating PSGC reset error:', error);
+            });
             // Ensure checkout modal stays open
             const checkoutModal = document.getElementById('checkout-modal');
             if (checkoutModal && !checkoutModal.classList.contains('open')) {
                 checkoutModal.classList.add('open');
             }
         }
+    }
+
+    async setupFloatingAddressForm(address = null) {
+        if (!window.PSGC) return;
+
+        const zoneSelect = document.getElementById('floating-address-zone');
+        const provinceSelect = document.getElementById('floating-address-province');
+        const citySelect = document.getElementById('floating-address-city');
+        const barangaySelect = document.getElementById('floating-address-barangay');
+        const streetInput = document.getElementById('floating-address-street');
+
+        if (!zoneSelect || !provinceSelect || !citySelect || !barangaySelect || !streetInput) return;
+
+        window.PSGC.loadZones(zoneSelect);
+
+        window.PSGC.setSelectOptions(provinceSelect, [], 'Select Province');
+        provinceSelect.disabled = true;
+        window.PSGC.setSelectOptions(citySelect, [], 'Select City / Municipality');
+        citySelect.disabled = true;
+        window.PSGC.setSelectOptions(barangaySelect, [], 'Select Barangay');
+        barangaySelect.disabled = true;
+        streetInput.value = address?.street || '';
+        this.buildCheckoutAddress();
+    }
+
+    async handleFloatingAddressZoneChange() {
+        if (!window.PSGC) return;
+        const zone = document.getElementById('floating-address-zone')?.value || '';
+        const provinceEl = document.getElementById('floating-address-province');
+        const cityEl = document.getElementById('floating-address-city');
+        const barangayEl = document.getElementById('floating-address-barangay');
+        await window.PSGC.onZoneChange(zone, { provinceEl, cityEl, barangayEl }).catch(() => {});
+        this.buildCheckoutAddress();
+    }
+
+    async handleFloatingAddressProvinceChange() {
+        if (!window.PSGC) return;
+        const province = document.getElementById('floating-address-province')?.value || '';
+        const citySelect = document.getElementById('floating-address-city');
+        const barangaySelect = document.getElementById('floating-address-barangay');
+        await window.PSGC.loadCities(province, citySelect);
+        window.PSGC.setSelectOptions(barangaySelect, [], 'Select Barangay');
+        this.buildCheckoutAddress();
+    }
+
+    async handleFloatingAddressCityChange() {
+        if (!window.PSGC) return;
+        const city = document.getElementById('floating-address-city')?.value || '';
+        await window.PSGC.loadBarangays(city, document.getElementById('floating-address-barangay'));
+        this.buildCheckoutAddress();
     }
 
     async saveAddressFromCheckout(e) {
@@ -6362,7 +6285,7 @@ class AgricultureMarket {
         const street = document.getElementById('floating-address-street').value.trim();
         const address = document.getElementById('floating-address-full').value.trim();
         const addressParts = this.getCheckoutAddressParts() || {};
-        const hasSelection = addressParts.islandGroup && addressParts.province && addressParts.city && addressParts.barangay;
+        const hasSelection = addressParts.province && addressParts.city && addressParts.barangay;
         
         // Validation
         if (!fullName) {
@@ -6379,7 +6302,7 @@ class AgricultureMarket {
         
         if (!street) {
             this.showMessage('Please enter your street/building/house number', 'error');
-            document.getElementById('open-address-selector-btn-floating')?.focus();
+            document.getElementById('floating-address-street')?.focus();
             return;
         }
 
@@ -6402,6 +6325,8 @@ class AgricultureMarket {
             label: '',
             full_name: fullName,
             phone: phoneWithPrefix,
+            street,
+            barangay: addressParts.barangay || '',
             address_line1: street,
             address_line2: addressParts.barangay || '',
             city: addressParts.city || '',

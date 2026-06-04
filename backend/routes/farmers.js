@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const { pool } = require('../utils/db');
 
 const router = express.Router();
@@ -10,7 +10,7 @@ const getUserFromToken = (req) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return null;
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    return jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     return null;
   }
@@ -514,7 +514,19 @@ router.put('/profile', async (req, res) => {
     const user = await requireFarmer(req, res);
     if (!user) return;
 
-    const { shop_description, shop_banner_url, shop_avatar_url, full_name, address } = req.body;
+    const body = req.body || {};
+    const { shop_description, shop_banner_url, shop_avatar_url, full_name, address } = body;
+    const hasPersonalNameFields = ['first_name', 'middle_name', 'last_name'].some((key) => Object.prototype.hasOwnProperty.call(body, key));
+    const firstName = String(body.first_name || '').trim();
+    const middleName = String(body.middle_name || '').trim();
+    const lastName = String(body.last_name || '').trim();
+    const recomputedFullName = hasPersonalNameFields
+      ? [firstName, middleName, lastName].filter(Boolean).join(' ').trim()
+      : '';
+
+    if (hasPersonalNameFields && (!firstName || !lastName)) {
+      return res.status(400).json({ message: 'First name and last name are required when updating personal name fields' });
+    }
 
     // Get current shop banner and avatar URLs if columns exist
     // Handle case where columns might not exist in database yet
@@ -539,9 +551,27 @@ router.put('/profile', async (req, res) => {
     const values = [];
     let paramIndex = 1;
 
-    if (full_name !== undefined && full_name !== null && full_name !== '') {
+    if (hasPersonalNameFields && recomputedFullName) {
+      updates.push(`full_name = $${paramIndex}`);
+      values.push(recomputedFullName);
+      paramIndex++;
+    } else if (full_name !== undefined && full_name !== null && full_name !== '') {
       updates.push(`full_name = $${paramIndex}`);
       values.push(full_name);
+      paramIndex++;
+    }
+
+    if (hasPersonalNameFields) {
+      updates.push(`first_name = $${paramIndex}`);
+      values.push(firstName || null);
+      paramIndex++;
+
+      updates.push(`middle_name = $${paramIndex}`);
+      values.push(middleName || null);
+      paramIndex++;
+
+      updates.push(`last_name = $${paramIndex}`);
+      values.push(lastName || null);
       paramIndex++;
     }
 

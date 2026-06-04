@@ -146,7 +146,7 @@ class ChatUI {
         const meta = this.conversationMeta.get(String(conversationId));
         const titleEl = document.getElementById('chat-header-title');
         const subtitleEl = document.getElementById('chat-header-subtitle');
-        
+
         if (titleEl) {
             titleEl.textContent = meta?.otherName || 'Chat';
         }
@@ -157,7 +157,13 @@ class ChatUI {
 
         // Load messages
         await this.loadMessages(conversationId);
-        
+
+        // Only mark as read if not on admin page (admin page should not auto-mark on page load)
+        const isAdminPage = document.getElementById('admin-sidebar-toggle') !== null;
+        if (!isAdminPage) {
+            await this.markConversationAsRead(conversationId);
+        }
+
         // Start polling for new messages
         if (this.pollInterval) {
             clearInterval(this.pollInterval);
@@ -371,7 +377,7 @@ class ChatUI {
         if (diffHours < 24) return `${diffHours}h ago`;
         if (diffDays < 7) return `${diffDays}d ago`;
         
-        return date.toLocaleDateString();
+        return date.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' });
     }
 
     escapeHtml(text) {
@@ -393,7 +399,7 @@ class ChatUI {
 
 // Initialize ChatUI - works for both standalone chat.html and embedded chat in farmer.html
 document.addEventListener('DOMContentLoaded', () => {
-    // Only initialize if we're on chat.html or if chat elements exist in farmer dashboard
+    // Initialize if we're on chat.html or if chat elements exist in farmer dashboard or admin dashboard
     const chatMessages = document.getElementById('chat-messages');
     if (chatMessages && !window.chatUI) {
         window.chatUI = new ChatUI();

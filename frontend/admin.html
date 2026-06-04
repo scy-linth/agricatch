@@ -3,407 +3,2259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - AgriCatch</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <title>Admin Dashboard — AgriCatch</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Font Awesome — required: admin.js renders fas fa-* icons dynamically (fa-crown, fa-bars, fa-users) -->
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+
+    <!-- NiceAdmin base template CSS -->
+    <link rel="stylesheet" href="/css/nicemain.css">
+    <link rel="stylesheet" href="/vendor/simple-datatables/style.css">
+    <!-- AgriCatch SaaS overrides — loaded LAST -->
+    <link rel="stylesheet" href="/css/agricatch-admin.css?v=ui-refinements-20260603g">
 </head>
-<body class="admin-theme">
-    <div class="admin-layout">
-        <div class="sidebar-overlay" id="admin-sidebar-overlay"></div>
-        <button class="mobile-menu-toggle" id="admin-mobile-menu-toggle" aria-label="Toggle menu" style="position: fixed; top: 1rem; left: 1rem; z-index: 2001; background: var(--sidebar-bg); color: white; border: none; padding: 0.75rem; border-radius: 8px;">
-            <i class="fas fa-bars"></i>
+<body>
+
+<!-- Loading Screen (first child of body so z-index:9999 covers everything) -->
+<div id="admin-loading-screen" class="loading-screen">
+  <div class="loading-content">
+    <div class="loading-logo">
+      <img src="/images/logo.png" alt="AgriCatch Logo" class="loading-logo-img">
+      <h1 class="loading-title">
+        <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
+      </h1>
+    </div>
+    <div class="loading-spinner">
+      <div class="spinner-ring"></div>
+      <div class="spinner-ring"></div>
+      <div class="spinner-ring"></div>
+    </div>
+    <p class="loading-text">Loading...</p>
+  </div>
+</div>
+
+<!-- Mobile sidebar overlay backdrop -->
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     HEADER / TOPBAR
+══════════════════════════════════════════════════════════════════════ -->
+<header id="header" class="header fixed-top d-flex align-items-center">
+
+    <!-- Sidebar toggle + Logo -->
+    <div class="d-flex align-items-center justify-content-between">
+        <button id="admin-sidebar-toggle" class="admin-sidebar-toggle-btn" type="button" aria-label="Toggle sidebar">
+            <i class="bi bi-list"></i>
         </button>
-        <aside class="admin-sidebar" id="admin-sidebar">
-            <div class="sidebar-brand">
-                <div class="brand-logo-container">
-                    <img src="/images/logo.png" alt="AgriCatch Logo" class="sidebar-logo">
-                    <div class="brand-text">
-                        <span class="brand-title">
-                            <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
-                        </span>
-                        <span class="brand-subtitle">Admin</span>
+        <a href="/" class="logo d-flex align-items-center" style="gap:4px;">
+            <img src="/images/logo.png" alt="AgriCatch">
+            <span>AgriCatch</span>
+        </a>
+    </div>
+
+    <!-- Right nav -->
+    <nav class="header-nav ms-auto">
+        <ul class="d-flex align-items-center list-unstyled mb-0 gap-1">
+
+            <!-- Messages dropdown -->
+            <li class="nav-item dropdown">
+                <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" aria-expanded="false" id="admin-float-chat-btn">
+                    <i class="bi bi-chat-left-text"></i>
+                    <span id="admin-chat-unread" class="badge bg-success badge-number" style="display:none">0</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow messages" style="min-width:360px;">
+                    <li class="dropdown-header d-flex align-items-center justify-content-between">
+                        <span>You have <span id="messages-count">0</span> new messages</span>
+                        <a href="#" id="view-all-messages-badge">
+                            <span class="badge rounded-pill bg-primary p-2 ms-2">View all</span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <div id="messages-list"><!-- populated by admin.js --></div>
+                    <li><hr class="dropdown-divider"></li>
+                    <li class="dropdown-footer">
+                        <a href="#" id="show-all-messages-link">Show all messages</a>
+                    </li>
+                </ul>
+            </li><!-- End Messages Nav -->
+
+            <!-- Notifications dropdown -->
+            <li class="nav-item dropdown">
+                <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-bell"></i>
+                    <span id="notif-badge" class="badge bg-danger badge-number" style="display:none">0</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications" style="min-width:360px;">
+                    <li class="dropdown-header">
+                        You have <span id="notif-count">0</span> new notifications
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <div id="notif-list"><!-- populated by admin.js --></div>
+                    <li><hr class="dropdown-divider"></li>
+                    <li class="dropdown-footer">
+                        <a href="#" id="show-all-notifications-link">Show all notifications</a>
+                    </li>
+                </ul>
+            </li><!-- End Notifications Nav -->
+
+<!-- Profile dropdown -->
+            <li class="nav-item dropdown pe-3">
+                <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#"
+                   data-bs-toggle="dropdown" aria-expanded="false">
+                    <div class="profile-avatar-ring">
+                        <img src="/images/resendlogo.png" alt="Profile" class="rounded-circle" id="header-profile-img">
                     </div>
-                </div>
-            </div>
-            <nav class="sidebar-nav">
-                <button id="visit-site-btn" class="sidebar-link visit-site-link" style="display: none;"><i class="fas fa-home"></i> Visit Site</button>
-                <a class="sidebar-link active" href="#orders" data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</a>
-                <a id="users-link" class="sidebar-link" href="#users" data-section="users"><i class="fas fa-users"></i> Customers</a>
-                <a class="sidebar-link" href="#products" data-section="products"><i class="fas fa-box"></i> Products</a>
-                <a class="sidebar-link" href="#categories" data-section="categories"><i class="fas fa-tags"></i> Categories</a>
-                <a class="sidebar-link" href="#logs" data-section="logs"><i class="fas fa-clipboard-check"></i> Logs</a>
-                <button id="logout-btn" class="sidebar-link logout-link"><i class="fas fa-sign-out-alt"></i> Log out</button>
-            </nav>
-        </aside>
+                    <span class="d-none d-md-block dropdown-toggle ps-2 fw-semibold" id="user-name">Admin</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
+                    <li class="dropdown-header">
+                        <h6 class="mb-0 fw-semibold" id="user-name-dd"></h6>
+                        <span id="user-email" class="small text-muted"></span>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center" href="#"
+                           onclick="adminDashboard&&adminDashboard.navigateTo('profile');return false;">
+                            <i class="bi bi-person"></i><span>My Profile</span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center" href="#"
+                           onclick="adminDashboard&&adminDashboard.navigateTo('profile','edit');return false;">
+                            <i class="bi bi-gear"></i><span>Edit Profile</span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center" href="#"
+                           onclick="adminDashboard&&adminDashboard.navigateTo('profile','password');return false;">
+                            <i class="bi bi-shield-lock"></i><span>Change Password</span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a id="logout-btn" class="dropdown-item d-flex align-items-center text-danger" href="#"
+                           onclick="adminDashboard&&adminDashboard.logout();return false;">
+                            <i class="bi bi-box-arrow-right"></i><span>Sign Out</span>
+                        </a>
+                    </li>
+                </ul>
+            </li><!-- End Profile Nav -->
 
-        <main class="admin-main">
-            <!-- Admin Welcome Banner -->
-            <div class="admin-welcome-banner">
-                <div class="welcome-text">
-                    <h1 class="welcome-title">
-                        <i class="fas fa-crown"></i>
-                        Admin Dashboard
-                    </h1>
-                    <p class="welcome-subtitle">Manage your AgriCatch platform</p>
-                </div>
-            </div>
+        </ul>
+    </nav>
+</header><!-- /header -->
 
-            <header class="admin-topbar">
-                <div class="topbar-left">
-                    <h1 class="page-title">Orders Management</h1>
-                </div>
-                <div class="topbar-filters" id="order-filters" style="display: flex;">
-                    <select id="order-status-filter" class="filter-select">
-                        <option value="">Any status</option>
-                        <option value="pending">Pending</option>
-                        <option value="confirmed">Confirmed</option>
-                        <option value="preparing">Preparing</option>
-                        <option value="ready">Ready</option>
-                        <option value="delivered">Delivered</option>
-                        <option value="cancelled">Cancelled</option>
-                    </select>
-                    <select id="order-price-filter" class="filter-select">
-                        <option value="">Any price</option>
-                        <option value="0-500">₱0 - ₱500</option>
-                        <option value="500-1500">₱500 - ₱1500</option>
-                        <option value="1500-3000">₱1500 - ₱3000</option>
-                    </select>
-                    <select id="order-sort-filter" class="filter-select">
-                        <option value="date_desc">Sort by Date</option>
-                        <option value="date_asc">Oldest</option>
-                        <option value="total_desc">Highest Total</option>
-                        <option value="total_asc">Lowest Total</option>
-                    </select>
-                </div>
-                <div class="topbar-right">
-                    <button id="admin-search-toggle" class="icon-btn" aria-label="Search">
-                        <i class="fas fa-magnifying-glass"></i>
-                    </button>
-                    <input id="admin-search-input" class="search-input" placeholder="Search..." style="min-width: 260px;">
-                    <div class="admin-profile">
-                        <img src="/images/resendlogo.png" alt="Admin avatar" class="profile-avatar">
-                        <div class="profile-meta">
-                            <span id="user-name" class="profile-name">Admin</span>
-                            <span id="user-email" class="profile-email">admin@agricatch.ph</span>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     SIDEBAR
+    #admin-sidebar  → admin.js getElementById + querySelector('.admin-sidebar')
+    .sidebar        → NiceAdmin CSS layout
+    .admin-sidebar  → rebuilt persistent sidebar layout
+══════════════════════════════════════════════════════════════════════ -->
+<aside id="admin-sidebar" class="sidebar admin-sidebar">
+
+    <ul class="sidebar-nav" id="sidebar-nav">
+
+        <!-- ── Overview ─────────────────────────────────────── -->
+        <li class="nav-heading">Overview</li>
+
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#overview" data-section="overview">
+                <i class="bi bi-speedometer2"></i>
+                <span>Dashboard</span>
+            </a>
+        </li>
+
+        <!-- ── Commerce ──────────────────────────────────────── -->
+        <li class="nav-heading">Commerce</li>
+
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#orders" data-section="orders">
+                <i class="bi bi-bag-check"></i>
+                <span>Orders</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#products" data-section="products" data-filter-status="active">
+                <i class="bi bi-shop"></i>
+                <span>Listings</span>
+            </a>
+        </li>
+
+        <!-- ── Catalog (collapsible submenu) ─────────────────── -->
+        <li class="nav-heading">Catalog</li>
+
+        <li class="nav-item">
+            <a class="nav-link collapsed" data-bs-target="#nav-catalog" data-bs-toggle="collapse" href="#">
+                <i class="bi bi-box-seam"></i>
+                <span>Product Management</span>
+                <i class="bi bi-chevron-down ms-auto"></i>
+            </a>
+            <ul id="nav-catalog" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                <li>
+                    <a href="#catalog-products" class="sidebar-link" data-section="catalog-products">
+                        <i class="bi bi-circle"></i><span>Products</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#categories" class="sidebar-link" data-section="categories">
+                        <i class="bi bi-circle"></i><span>Categories</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#category-requests" class="sidebar-link" data-section="category-requests">
+                        <i class="bi bi-circle"></i><span>Catalog Requests</span>
+                    </a>
+                </li>
+            </ul>
+        </li>
+
+        <!-- ── Product Approvals ───────────────────────────────── -->
+        <li class="nav-heading">Product Approvals</li>
+
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#product-approvals" data-section="product-approvals">
+                <i class="bi bi-check-circle"></i>
+                <span>Pending Approvals</span>
+                <span id="product-approvals-badge" class="sidebar-badge" style="display:none">0</span>
+            </a>
+        </li>
+
+        <!-- ── People ─────────────────────────────────────────── -->
+        <li class="nav-heading">People</li>
+
+        <li class="nav-item">
+            <a id="users-link" class="nav-link collapsed sidebar-link"
+               href="#users" data-section="users">
+                <i class="bi bi-people"></i>
+                <span>Customers</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#farmers" data-section="farmers">
+                <i class="bi bi-person-badge"></i>
+                <span>Farmers</span>
+            </a>
+        </li>
+
+        <!-- ── Communication ───────────────────────────────────── -->
+        <li class="nav-heading">Communication</li>
+
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#chat" data-section="chat">
+                <i class="bi bi-chat-dots"></i>
+                <span>Chat & Support</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#notifications" data-section="notifications">
+                <i class="bi bi-bell"></i>
+                <span>Notifications</span>
+            </a>
+        </li>
+
+        <!-- ── System ─────────────────────────────────────────── -->
+        <li class="nav-heading">System</li>
+
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#logs" data-section="logs">
+                <i class="bi bi-journal-check"></i>
+                <span>Audit Logs</span>
+            </a>
+        </li>
+
+
+    </ul>
+</aside><!-- /sidebar -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     MAIN CONTENT
+══════════════════════════════════════════════════════════════════════ -->
+<main id="main" class="main">
+
+
+    <!-- Page title — admin.js updates .page-title textContent on section change -->
+    <div class="pagetitle">
+        <h1 class="page-title">Dashboard Overview</h1>
+        <nav>
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item active" id="breadcrumb-current">Dashboard</li>
+            </ol>
+        </nav>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 1 — OVERVIEW SECTION (default active)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="overview" class="admin-section-card active">
+
+        <!-- KPI Cards Row -->
+        <div class="row g-3 mb-4">
+
+            <!-- Sales KPI -->
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card sales-card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-sales" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-sales" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-sales" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-sales" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-sales" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Sales <span id="kpi-sales-period">| Today</span></h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-cart3 text-success"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="kpi-sales-value">—</h6>
+                                <span id="kpi-sales-change" class="text-success small fw-bold"></span>
+                                <span id="kpi-sales-change-label" class="text-muted small"></span>
+                            </div>
+                        </div>
+                        <div id="kpi-sales-error" class="text-danger small mt-2" style="display:none">
+                            <i class="bi bi-exclamation-circle"></i> Failed to load
                         </div>
                     </div>
                 </div>
-            </header>
+            </div>
 
-            <!-- Dashboard Statistics - Always Visible at Top -->
-            <div class="admin-stats" style="margin-bottom: 2rem;">
-                <div class="stat-card">
-                    <div class="stat-icon" style="color: #3b82f6;"><i class="fas fa-users"></i></div>
-                    <div class="stat-details">
-                        <h3>Total Users</h3>
-                        <div class="stat-number" id="total-users">0</div>
+            <!-- Revenue KPI -->
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card revenue-card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-revenue" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-revenue" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-revenue" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-revenue" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-revenue" data-period="all">All Time</a></li>
+                        </ul>
                     </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="color: #10b981;"><i class="fas fa-box"></i></div>
-                    <div class="stat-details">
-                        <h3>Total Products</h3>
-                        <div class="stat-number" id="total-products">0</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="color: #f59e0b;"><i class="fas fa-shopping-cart"></i></div>
-                    <div class="stat-details">
-                        <h3>Total Orders</h3>
-                        <div class="stat-number" id="total-orders">0</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="color: #22c55e;"><i class="fas fa-peso-sign"></i></div>
-                    <div class="stat-details">
-                        <h3>Total Revenue</h3>
-                        <div class="stat-number" id="total-revenue">₱0.00</div>
+                    <div class="card-body">
+                        <h5 class="card-title">Revenue <span id="kpi-revenue-period">| Today</span></h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-currency-exchange" style="color:#2eca6a"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="kpi-revenue-value">—</h6>
+                                <span id="kpi-revenue-change" class="text-success small fw-bold"></span>
+                                <span id="kpi-revenue-change-label" class="text-muted small"></span>
+                            </div>
+                        </div>
+                        <div id="kpi-revenue-error" class="text-danger small mt-2" style="display:none">
+                            <i class="bi bi-exclamation-circle"></i> Failed to load
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <section id="orders" class="admin-section-card active">
-                <div class="section-header">
-                    <h2>Orders</h2>
+            <!-- Customers KPI -->
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card customers-card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-customers" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-customers" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-customers" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-customers" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-customers" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Customers <span id="kpi-customers-period">| Today</span></h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-people" style="color:#ff771d"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="kpi-customers-value">—</h6>
+                                <span id="kpi-customers-change" class="text-success small fw-bold"></span>
+                                <span id="kpi-customers-change-label" class="text-muted small"></span>
+                            </div>
+                        </div>
+                        <div id="kpi-customers-error" class="text-danger small mt-2" style="display:none">
+                            <i class="bi bi-exclamation-circle"></i> Failed to load
+                        </div>
+                    </div>
                 </div>
-                <div class="section-content">
-                    <table id="orders-table" class="admin-table">
+            </div>
+
+            <!-- Farmers KPI -->
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card farmers-card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-farmers" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-farmers" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-farmers" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-farmers" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-farmers" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Farmers <span id="kpi-farmers-period">| Today</span></h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-person-badge" style="color:#4154f1"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="kpi-farmers-value">—</h6>
+                                <span id="kpi-farmers-change" class="text-success small fw-bold"></span>
+                                <span id="kpi-farmers-change-label" class="text-muted small"></span>
+                            </div>
+                        </div>
+                        <div id="kpi-farmers-error" class="text-danger small mt-2" style="display:none">
+                            <i class="bi bi-exclamation-circle"></i> Failed to load
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /KPI row -->
+
+        <!-- Reports + Activity Row -->
+        <div class="row g-3">
+
+            <!-- Reports Chart (left col 8) -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Reports <span id="reports-period-label">| Today</span></h5>
+                        <div id="reportsChart" style="min-height:350px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity (right col 4) -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item activity-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item activity-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item activity-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item activity-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item activity-period-filter" href="#" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Recent Activity <span id="activity-period-label">| Today</span></h5>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <label class="small fw-semibold text-muted">Show</label>
+                            <select class="form-select form-select-sm" style="width:auto" data-entries-section="activity">
+                                <option value="5" selected>5</option>
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                            </select>
+                            <span class="small text-muted">entries</span>
+                        </div>
+                        <div class="activity" id="recent-activity-list">
+                            <div class="text-center text-muted py-4">
+                                <span class="spinner-border spinner-border-sm"></span>
+                            </div>
+                        </div>
+                        <div id="activity-pagination" class="pagination-container"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /reports row -->
+
+        <!-- Recent Sales + Top Selling Row -->
+        <div class="row g-3 mt-1">
+
+            <!-- Recent Sales -->
+            <div class="col-lg-8">
+                <div class="card recent-sales">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item recent-sales-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item recent-sales-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item recent-sales-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item recent-sales-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item recent-sales-period-filter" href="#" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Recent Sales <span id="recent-sales-period-label">| Today</span></h5>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <label class="small fw-semibold text-muted">Show</label>
+                            <select class="form-select form-select-sm" style="width:auto" data-entries-section="recent-sales">
+                                <option value="5" selected>5</option>
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                            </select>
+                            <span class="small text-muted">entries</span>
+                        </div>
+                        <table id="recent-sales-table" class="table table-borderless ac-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">#</th>
+                                    <th scope="col">Customer</th>
+                                    <th scope="col">Product</th>
+                                    <th scope="col">Price</th>
+                                    <th scope="col">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-sales-tbody">
+                                <tr><td colspan="5" class="text-center text-muted">
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                </td></tr>
+                            </tbody>
+                        </table>
+                        <div id="recent-sales-pagination" class="pagination-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Farmers -->
+            <div class="col-lg-4">
+                <div class="card top-selling">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item top-farmers-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item top-farmers-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item top-farmers-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item top-farmers-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item top-farmers-period-filter" href="#" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Top Farmers <span id="top-farmers-period-label">| Today</span></h5>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <label class="small fw-semibold text-muted">Show</label>
+                            <select class="form-select form-select-sm" style="width:auto" data-entries-section="top-farmers">
+                                <option value="5" selected>5</option>
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                            </select>
+                            <span class="small text-muted">entries</span>
+                        </div>
+                        <table id="top-farmers-table" class="table table-borderless ac-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Farmer</th>
+                                    <th scope="col">Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-farmers-tbody">
+                                <tr><td colspan="2" class="text-center text-muted">
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                </td></tr>
+                            </tbody>
+                        </table>
+                        <div id="top-farmers-pagination" class="pagination-container"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /recent sales row -->
+
+        <!-- Top Selling Products row -->
+        <div class="row g-3 mt-1">
+            <div class="col-12">
+                <div class="card top-selling">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item top-products-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item top-products-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item top-products-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item top-products-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item top-products-period-filter" href="#" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Top Selling Products <span id="top-products-period-label">| Today</span></h5>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <label class="small fw-semibold text-muted">Show</label>
+                            <select class="form-select form-select-sm" style="width:auto" data-entries-section="top-products">
+                                <option value="5" selected>5</option>
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                            </select>
+                            <span class="small text-muted">entries</span>
+                        </div>
+                        <table id="top-products-table" class="table table-borderless ac-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Preview</th>
+                                    <th scope="col">Product</th>
+                                    <th scope="col">Price</th>
+                                    <th scope="col">Sold</th>
+                                    <th scope="col">Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-products-tbody">
+                                <tr><td colspan="5" class="text-center text-muted">
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                </td></tr>
+                            </tbody>
+                        </table>
+                        <div id="top-products-pagination" class="pagination-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /top products row -->
+
+    </section><!-- /overview -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 2 — ORDERS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="orders" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <!-- Filter Bar -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="orders" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="order-status-filter" class="form-select form-select-sm">
+                            <option value="">Any status</option>
+                            <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="preparing">Preparing</option>
+                            <option value="out_for_delivery">Out for Delivery</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Price Range</label>
+                        <select id="order-price-filter" class="form-select form-select-sm">
+                            <option value="">Any price</option>
+                            <option value="0-500">₱0 – ₱500</option>
+                            <option value="500-1500">₱500 – ₱1,500</option>
+                            <option value="1500-3000">₱1,500 – ₱3,000</option>
+                            <option value="3000+">₱3,000+</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Sort</label>
+                        <select id="order-sort-filter" class="form-select form-select-sm">
+                            <option value="date_desc">Newest first</option>
+                            <option value="date_asc">Oldest first</option>
+                            <option value="total_desc">Highest total</option>
+                            <option value="total_asc">Lowest total</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="order-search-input" class="form-control me-2" placeholder="Order ID, customer name or email…">
+                                <button id="order-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
+                            </div>
+                            <button id="order-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh orders"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="orders-table" class="table ac-table table-sm table-hover align-middle">
                         <thead>
                             <tr>
-                                <th><input type="checkbox" aria-label="Select all orders"></th>
-                                <th>Order</th>
-                                <th>Customer</th>
-                                <th>Status</th>
-                                <th>Total</th>
-                                <th>Date</th>
-                                <th>Actions</th>
+                                <th class="col-order">ORDER</th>
+                                <th>CUSTOMER</th>
+                                <th>TOTAL</th>
+                                <th>STATUS</th>
+                                <th>DATE</th>
+                                <th class="col-actions">ACTIONS</th>
                             </tr>
                         </thead>
-                        <tbody id="orders-tbody"></tbody>
+                        <tbody id="orders-tbody">
+                            <tr>
+                                <td colspan="6">
+                                    <div class="table-skeleton">
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
-            </section>
 
-            <section id="users" class="admin-section-card">
-                <div class="section-header">
-                    <h2>Customers</h2>
+                <div id="orders-pagination" class="pagination-container"></div>
+
+            </div>
+        </div>
+    </section><!-- /orders -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 3 — CUSTOMERS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="users" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title d-flex align-items-center justify-content-between">
+                    <button id="open-create-user-modal"
+                            class="btn btn-sm btn-ac-ghost-green d-flex align-items-center gap-1"
+                            type="button">
+                        <i class="bi bi-plus-lg"></i>
+                        <span>Create Customer</span>
+                    </button>
+                </h5>
+
+                <!-- Filter Bar -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="users" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="users-status-filter" class="form-select form-select-sm">
+                            <option value="">Any status</option>
+                            <option value="active">Active</option>
+                            <option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="users-search-input" class="form-control me-2" placeholder="Name, username or email…">
+                                <button id="users-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;"><i class="bi bi-search me-1"></i>Search</button>
+                            </div>
+                            <button id="users-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh customers"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
                 </div>
-                <div class="section-content">
-                    <table id="users-table" class="admin-table">
+
+                <div class="table-responsive">
+                    <table id="users-table" class="table ac-table table-sm table-hover align-middle">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>User</th>
                                 <th>Full Name</th>
+                                <th>Username</th>
                                 <th>Email</th>
-                                <th>Password</th>
-                                <th>Role</th>
-                                <th>Verified</th>
+                                <th>Rating</th>
+                                <th>Status</th>
                                 <th>Joined</th>
-                                <th>Actions</th>
+                                <th class="col-actions">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="users-tbody"></tbody>
+                        <tbody id="users-tbody">
+                            <tr>
+                                <td colspan="8">
+                                    <div class="skeleton-row"></div>
+                                    <div class="skeleton-row"></div>
+                                    <div class="skeleton-row"></div>
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
-            </section>
 
-            <section id="products" class="admin-section-card">
-                <div class="section-header">
-                    <h2>Products</h2>
+                <div id="users-pagination" class="pagination-container"></div>
+
+            </div>
+        </div>
+    </section><!-- /users -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 4 — PRODUCTS/LISTINGS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="products" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <!-- Filter Bar -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="products" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Category</label>
+                        <select id="products-category-filter" class="form-select form-select-sm">
+                            <option value="">All categories</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="products-status-filter" class="form-select form-select-sm">
+                            <option value="">Any status</option>
+                            <option value="available">Active</option>
+                            <option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="products-search-input" class="form-control me-2" placeholder="Product name…">
+                                <button id="products-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;"><i class="bi bi-search me-1"></i>Search</button>
+                            </div>
+                            <button id="products-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
                 </div>
-                <div class="section-content">
-                    <table id="products-table" class="admin-table">
+
+                <div class="table-responsive">
+                    <table id="products-table" class="table ac-table table-sm table-hover align-middle">
                         <thead>
                             <tr>
+                                <th style="width:56px">Img</th>
                                 <th>ID</th>
                                 <th>Product</th>
+                                <th>Category</th>
                                 <th>Price</th>
                                 <th>Stock</th>
                                 <th>Farmer</th>
                                 <th>Status</th>
-                                <th>Actions</th>
+                                <th>Date Added</th>
+                                <th class="col-actions">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="products-tbody"></tbody>
+                        <tbody id="products-tbody">
+                            <tr>
+                                <td colspan="10">
+                                    <div class="table-skeleton">
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
-            </section>
 
-            <section id="logs" class="admin-section-card">
-                <div class="section-header">
-                    <h2>Audit Logs</h2>
-                </div>
-                <div class="section-content">
-                    <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap; margin-bottom: 12px;">
-                        <input id="logs-actor-filter" class="search-input" placeholder="Admin ID (optional)" style="min-width: 180px;">
-                        <input id="logs-action-filter" class="search-input" placeholder="Action (optional)" style="min-width: 220px;">
-                        <input id="logs-entity-filter" class="search-input" placeholder="Entity (users/products/orders)" style="min-width: 220px;">
-                        <button id="logs-refresh-btn" class="btn btn-secondary btn-small" type="button">Refresh</button>
+                <div id="products-pagination" class="pagination-container"></div>
+
+            </div>
+        </div>
+    </section><!-- /products -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 5 — CATEGORIES SECTION (redesigned)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="categories" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title d-flex align-items-center justify-content-between">
+                    <button id="show-add-category-form" class="btn btn-sm btn-ac-ghost-green d-flex align-items-center gap-1" type="button">
+                        <i class="bi bi-plus-lg"></i><span>Add Category</span>
+                    </button>
+                </h5>
+
+                <!-- Filter Bar -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="categories" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
                     </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="category-status-filter" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="active">Active</option>
+                            <option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="category-search-input" class="form-control me-2" placeholder="Category name…">
+                                <button id="category-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;"><i class="bi bi-search me-1"></i>Search</button>
+                            </div>
+                            <button id="categories-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh categories"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
 
-                    <table id="logs-table" class="admin-table">
+                <div class="table-responsive">
+                    <table id="categories-table" class="table ac-table table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th class="col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categories-tbody">
+                            <tr><td colspan="5" class="table-placeholder">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="categories-pagination" class="pagination-container"></div>
+
+            </div>
+        </div>
+    </section><!-- /categories -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 5b — PRODUCTS CATALOG SECTION (catalog names)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="catalog-products" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title d-flex align-items-center justify-content-between">
+                    <button id="show-add-catalog-form" class="btn btn-sm btn-ac-ghost-green d-flex align-items-center gap-1" type="button">
+                        <i class="bi bi-plus-lg"></i><span>Add Product</span>
+                    </button>
+                </h5>
+
+                <!-- Filter Bar -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="catalog-products" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Category</label>
+                        <select id="catalog-category-filter-bar" class="form-select form-select-sm">
+                            <option value="">All categories</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="catalog-status-filter" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="active">Active</option>
+                            <option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="catalog-search-input" class="form-control me-2" placeholder="Product name…">
+                                <button id="catalog-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;"><i class="bi bi-search me-1"></i>Search</button>
+                            </div>
+                            <button id="catalog-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh catalog"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="catalog-products-table" class="table ac-table table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Status</th>
+                                <th class="col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="catalog-names-tbody">
+                            <tr><td colspan="5" class="table-placeholder">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="catalog-products-pagination" class="pagination-container"></div>
+
+            </div>
+        </div>
+    </section><!-- /catalog-products -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 6 — FARMERS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="farmers" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title d-flex align-items-center justify-content-between">
+                    <button id="open-create-farmer-modal"
+                            class="btn btn-sm btn-ac-ghost-green d-flex align-items-center gap-1"
+                            type="button">
+                        <i class="bi bi-plus-lg"></i>
+                        <span>Create Farmer</span>
+                    </button>
+                </h5>
+
+                <!-- Filter Bar -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="farmers" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="farmers-status-filter" class="form-select form-select-sm">
+                            <option value="">Any status</option>
+                            <option value="active">Active</option>
+                            <option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Verification</label>
+                        <select id="farmers-verification-filter" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="verified">Verified</option>
+                            <option value="unverified">Unverified</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="farmers-search-input" class="form-control me-2" placeholder="Name, username or email…">
+                                <button id="farmers-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;"><i class="bi bi-search me-1"></i>Search</button>
+                            </div>
+                            <button id="farmers-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh farmers"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Farmers table -->
+                <div id="farmers-all-panel">
+                    <div class="table-responsive">
+                        <table id="farmers-all-table" class="table table-hover ac-table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Full Name</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Rating</th>
+                                    <th>Status</th>
+                                    <th>Joined</th>
+                                    <th class="col-actions">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="farmers-all-tbody">
+                                <tr><td colspan="8" class="text-center text-muted py-4">
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="farmers-pagination" class="pagination-container"></div>
+                </div>
+
+            </div>
+        </div>
+    </section><!-- /farmers -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 7 — AUDIT LOGS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="logs" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+
+                <!-- Filter bar — search-button gated -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="logs" style="min-width: 60px;">
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="200">200</option>
+                        </select>
+                    </div>
+                    <div class="col-md-auto col-sm-6" style="min-width: 100px;">
+                        <label class="form-label small fw-semibold mb-1">Action</label>
+                        <select id="logs-action-filter" class="form-select form-select-sm">
+                            <option value="">All actions</option>
+                            <option value="user.create">Create</option>
+                            <option value="user.update">Update</option>
+                            <option value="user.disable">Disable</option>
+                            <option value="user.enable">Enable</option>
+                            <option value="user.verify">Verify</option>
+                            <option value="product.update">Update Product</option>
+                            <option value="order.status.update">Order Status</option>
+                            <option value="order.disable">Disable Order</option>
+                            <option value="category.create">Create Category</option>
+                            <option value="category.update">Update Category</option>
+                        </select>
+                    </div>
+                    <div class="col-md-auto col-sm-6" style="min-width: 100px;">
+                        <label class="form-label small fw-semibold mb-1">Entity</label>
+                        <select id="logs-entity-filter" class="form-select form-select-sm">
+                            <option value="">All entities</option>
+                            <option value="users">Users</option>
+                            <option value="products">Products</option>
+                            <option value="orders">Orders</option>
+                            <option value="categories">Categories</option>
+                            <option value="farmers">Farmers</option>
+                        </select>
+                    </div>
+                    <div class="col-md-auto col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Admin</label>
+                        <select id="logs-actor-filter" class="form-select form-select-sm">
+                            <option value="">All admins</option>
+                        </select>
+                    </div>
+                    <div class="col-md-auto col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">From</label>
+                        <input id="logs-date-from" type="date" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-md-auto col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">To</label>
+                        <input id="logs-date-to" type="date" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="logs-search-input" class="form-control me-2" placeholder="Username or action…">
+                                <button id="logs-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
+                            </div>
+                            <button id="logs-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh logs"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="logs-table" class="table table-hover ac-table table-sm align-middle">
                         <thead>
                             <tr>
                                 <th>Time</th>
-                                <th>Admin</th>
+                                <th>Username</th>
+                                <th>Email</th>
                                 <th>Action</th>
                                 <th>Entity</th>
-                                <th>Entity ID</th>
-                                <th>Details</th>
+                                <th>Record ID</th>
+                                <th class="col-actions">Details</th>
                             </tr>
                         </thead>
-                        <tbody id="logs-tbody"></tbody>
+                        <tbody id="logs-tbody">
+                            <tr>
+                                <td colspan="7">
+                                    <div class="table-skeleton">
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
-            </section>
 
-            <section id="categories" class="admin-section-card">
-                <div class="section-header">
-                    <h2>Categories & Product Name Requests</h2>
+                <div id="logs-pagination" class="pagination-container"></div>
+
+            </div>
+        </div>
+    </section><!-- /logs -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 8 — NOTIFICATIONS SECTION
+         (Placeholder — title already mapped in admin.js, no backend yet)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="notifications" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <div class="section-filter-bar d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <p class="text-muted small mb-0">System alerts and account activity</p>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" id="notif-mark-all-btn">
+                        <i class="bi bi-check2-all me-1"></i>Mark All Read
+                    </button>
                 </div>
-                <div class="section-content">
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <div>
-                            <h3 style="margin-bottom:0.75rem;">Category List</h3>
-                            <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap: wrap;">
-                                <input id="new-category-name" class="search-input" placeholder="New category name">
-                                <input id="new-category-description" class="search-input" placeholder="Description (optional)">
-                                <button id="create-category-btn" class="btn btn-primary btn-small" type="button">Add Category</button>
-                            </div>
-                            <table class="admin-table" id="categories-table">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Name</th>
-                                        <th>Description</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="categories-tbody"></tbody>
-                            </table>
-                        </div>
-
-                        <div>
-                            <h3 style="margin-bottom:0.75rem;">Pending Product Name Requests</h3>
-                            <table class="admin-table" id="category-requests-table">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Name</th>
-                                        <th>Category</th>
-                                        <th>Requested By</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="category-requests-tbody"></tbody>
-                            </table>
-
-                            <h3 style="margin:1rem 0 0.75rem;">Product Name Catalog</h3>
-                            <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap: wrap;">
-                                <select id="catalog-category-select" class="filter-select" style="min-width:170px;"></select>
-                                <input id="new-catalog-name" class="search-input" placeholder="Product name">
-                                <button id="add-catalog-name-btn" class="btn btn-primary btn-small" type="button">Add Product Name</button>
-                            </div>
-                            <table class="admin-table" id="catalog-names-table">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Name</th>
-                                        <th>Category</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="catalog-names-tbody"></tbody>
-                            </table>
-                        </div>
+                <div id="notifications-list">
+                    <div class="text-center py-4">
+                        <span class="spinner-border spinner-border-sm text-success"></span>
                     </div>
                 </div>
-            </section>
-        </main>
-
-        <aside id="order-detail-panel" class="admin-detail-panel">
-            <button class="panel-close" id="close-order-panel" aria-label="Close order details">&times;</button>
-            <div id="order-detail-content" class="panel-content">
-                <div class="panel-placeholder">Select an order to view details</div>
-            </div>
-        </aside>
-
-        <aside id="category-detail-panel" class="admin-detail-panel">
-            <button class="panel-close" id="close-category-panel" aria-label="Close category details">&times;</button>
-            <div id="category-detail-content" class="panel-content">
-                <div class="panel-placeholder">Select a request to review details</div>
-            </div>
-        </aside>
-    </div>
-
-    <div id="admin-chat-drawer" class="admin-chat-drawer">
-        <div class="chat-drawer-header">
-            <h3>Chat with Farmers</h3>
-            <button id="close-chat-drawer" class="icon-btn" aria-label="Close chat">&times;</button>
-        </div>
-        <div class="chat-drawer-body">
-            <div class="conversation-sidebar">
-                <div class="conversation-sidebar-header">
-                    <h4>Conversations</h4>
+                <div id="notifications-empty-state" class="text-center py-5" style="display:none">
+                    <i class="bi bi-bell-slash text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">No notifications yet</p>
+                    <p class="text-muted small">You'll see system alerts and account activity here</p>
                 </div>
+                <div id="notifications-pagination" class="pagination-container"></div>
+            </div>
+        </div>
+    </section><!-- /notifications -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 9 — CHAT SECTION (full-page support inbox)
+         admin.js showSection('chat') navigates here.
+         #admin-chat-drawer is inside this section — chat.js still works
+         because all its target IDs are preserved below.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="chat" class="admin-section-card">
+        <!-- admin-chat-drawer INSIDE the section: becomes a full-width inbox panel.
+             CSS makes it position:static + full height when inside .admin-section-card.
+             chat.js still toggles .active on it — CSS makes that a no-op here. -->
+        <div id="admin-chat-drawer" class="admin-chat-drawer chat-section-mode">
+
+            <!-- Left panel: conversation list -->
+            <div class="chat-sidebar-panel">
+                <div class="chat-sidebar-header">
+                    <h3 class="chat-sidebar-title">
+                        <i class="bi bi-chat-dots"></i>
+                        Conversations
+                    </h3>
+                </div>
+                <!-- #conversation-list → chat.js populates this -->
                 <div id="conversation-list" class="conversation-list"></div>
+                <div id="chat-empty-state" class="text-center py-5" style="display:none">
+                    <i class="bi bi-chat-dots text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">No conversations yet</p>
+                    <p class="text-muted small">Messages from customers and farmers will appear here</p>
+                </div>
             </div>
-            <div class="chat-window">
-                <div id="chat-header" class="chat-header">
-                    <div class="chat-header-info">
-                        <div class="chat-header-title" id="chat-header-title">Select a conversation</div>
-                        <div class="chat-header-subtitle" id="chat-header-subtitle"></div>
+
+            <!-- Right panel: message thread -->
+            <div class="chat-main-panel">
+
+                <!-- #chat-header → chat.js updates title/subtitle -->
+                <div id="chat-header" class="chat-thread-header">
+                    <div class="chat-thread-identity">
+                        <div class="chat-thread-avatar">
+                            <i class="bi bi-person"></i>
+                        </div>
+                        <div>
+                            <div id="chat-header-title" class="chat-thread-name">
+                                Select a conversation
+                            </div>
+                            <div id="chat-header-subtitle" class="chat-thread-sub"></div>
+                        </div>
+                    </div>
+                    <!-- Close chat = navigate back to previous section -->
+                    <button id="close-chat-drawer"
+                            class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
+                        <i class="bi bi-arrow-left"></i>
+                        <span>Back</span>
+                    </button>
+                </div>
+
+                <!-- #chat-messages → chat.js populates messages -->
+                <div id="chat-messages" class="chat-messages-feed"></div>
+
+                <!-- #chat-form → chat.js handles submit -->
+                <form id="chat-form" class="chat-compose-bar">
+                    <input id="chat-input"
+                           class="chat-compose-input"
+                           type="text"
+                           placeholder="Type a message…"
+                           autocomplete="off"
+                           required>
+                    <button type="submit" class="btn btn-primary chat-send-btn">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </form>
+
+            </div>
+
+        </div>
+    </section><!-- /chat -->
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 10 — CATEGORY REQUESTS SECTION (Name Requests)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="category-requests" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted small mb-3">Review and approve/reject farmer-requested product names.</p>
+
+                <!-- Filter Bar -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="cat-req-status-filter" class="form-select form-select-sm">
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-4">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="category-requests">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="cat-req-search-input" class="form-control me-2"
+                                       placeholder="Product name or farmer…">
+                                <button id="cat-req-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
+                            </div>
+                            <button id="cat-req-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh requests"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
                     </div>
                 </div>
-                <div id="chat-messages" class="chat-messages"></div>
-                <form id="chat-form" class="chat-form">
-                    <input type="text" id="chat-input" placeholder="Type a message..." required>
-                    <button type="submit" class="btn btn-primary btn-small">Send</button>
-                </form>
+
+                <div class="table-responsive">
+                    <table id="category-requests-table" class="table table-hover ac-table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Requested Name</th>
+                                <th>Category</th>
+                                <th>Requested By</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th class="col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="category-requests-tbody">
+                            <tr><td colspan="7" class="text-center text-muted py-4">
+                                <span class="spinner-border spinner-border-sm"></span>
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="category-requests-pagination" class="pagination-container"></div>
             </div>
         </div>
-    </div>
+    </section><!-- /category-requests -->
 
-    <button id="admin-float-chat-btn" class="admin-float-chat-btn" type="button" aria-label="Open chat">
-        <i class="fas fa-message"></i>
-        <span id="admin-chat-unread" class="admin-chat-unread" style="display:none;">0</span>
-    </button>
+    <!-- ════════════════════════════════════════════════════════════════
+         § 11 — PRODUCT APPROVALS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="product-approvals" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted small mb-3">Review and approve farmer product listings before they go live.</p>
 
-    <div id="edit-user-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Edit User</h3>
-                <button class="close-btn" data-close-modal="edit-user-modal">&times;</button>
+                <!-- Filter Bar -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="product-approvals" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="product-approval-status-filter" class="form-select form-select-sm">
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="product-approval-search-input" class="form-control me-2"
+                                       placeholder="Product name or farmer…">
+                                <button id="product-approval-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
+                            </div>
+                            <button id="product-approval-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh approvals"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="product-approvals-table" class="table table-hover ac-table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Product Name</th>
+                                <th>Category</th>
+                                <th>Farmer</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>Date</th>
+                                <th class="col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="product-approvals-tbody">
+                            <tr><td colspan="8" class="text-center text-muted py-4">
+                                <span class="spinner-border spinner-border-sm"></span>
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="product-approvals-pagination" class="pagination-container"></div>
             </div>
-            <form id="edit-user-form" class="modal-body">
+        </div>
+    </section><!-- /product-approvals -->
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 12 — PROFILE SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="profile" class="admin-section-card">
+        <div class="row g-3">
+
+            <!-- Profile card (left col) -->
+            <div class="col-xl-4">
+                <div class="card">
+                    <div class="card-body profile-card pt-4 d-flex flex-column align-items-center">
+                        <div class="profile-avatar-lg mb-3">
+                            <img src="/images/resendlogo.png" alt="Profile" class="rounded-circle" id="profile-avatar-img" style="width:80px;height:80px;object-fit:cover">
+                        </div>
+                        <h2 class="fw-semibold" id="profile-full-name">—</h2>
+                        <h3 class="text-muted small" id="profile-role-label"></h3>
+                        <div class="social-links mt-2 d-flex gap-2">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile tabs (right col) -->
+            <div class="col-xl-8">
+                <div class="card">
+                    <div class="card-body pt-3">
+                        <ul class="nav nav-tabs nav-tabs-bordered" id="profileTabs">
+                            <li class="nav-item">
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#profile-overview">Overview</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#profile-edit">Edit Profile</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#profile-change-password">Change Password</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content pt-2">
+
+                            <!-- Overview Tab -->
+                            <div class="tab-pane fade show active profile-overview" id="profile-overview">
+                                <h5 class="card-title">Profile Details</h5>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Full Name</div>
+                                    <div class="col-lg-9 col-md-8" id="po-fullname">—</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Username</div>
+                                    <div class="col-lg-9 col-md-8" id="po-username">—</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Email</div>
+                                    <div class="col-lg-9 col-md-8" id="po-email">—</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Phone</div>
+                                    <div class="col-lg-9 col-md-8" id="po-phone">—</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Role</div>
+                                    <div class="col-lg-9 col-md-8" id="po-role">—</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Joined</div>
+                                    <div class="col-lg-9 col-md-8" id="po-joined">—</div>
+                                </div>
+                            </div>
+
+                            <!-- Edit Profile Tab -->
+                            <div class="tab-pane fade profile-edit" id="profile-edit">
+                                <h5 class="card-title">Edit Profile</h5>
+                                <form id="profile-edit-form">
+                                    <div class="row mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">First Name</label>
+                                            <input type="text" id="pe-firstname" class="form-control form-control-sm">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Middle Name (Optional)</label>
+                                            <input type="text" id="pe-middlename" class="form-control form-control-sm" placeholder="Optional">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Last Name</label>
+                                            <input type="text" id="pe-lastname" class="form-control form-control-sm">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Phone</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">+63</span>
+                                            <input type="text" id="pe-phone" class="form-control" placeholder="9XXXXXXXXX" maxlength="10" pattern="9[0-9]{9}">
+                                        </div>
+                                        <div class="form-text text-muted small">Enter 10 digits starting with 9 (e.g. 9123456789). Letters are not allowed.</div>
+                                    </div>
+                                    <div class="text-end">
+                                        <button type="submit" class="btn btn-primary btn-sm" id="profile-save-btn">
+                                            <span class="btn-text">Save Changes</span>
+                                            <span class="spinner-border spinner-border-sm d-none ms-1" id="profile-save-spinner"></span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Change Password Tab -->
+                            <div class="tab-pane fade" id="profile-change-password">
+                                <h5 class="card-title">Change Password</h5>
+                                <form id="profile-password-form">
+                                    <div class="mb-3">
+                                        <label class="form-label">Current Password</label>
+                                        <input type="password" id="pp-current" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">New Password</label>
+                                        <input type="password" id="pp-new" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Confirm New Password</label>
+                                        <input type="password" id="pp-confirm" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="text-end">
+                                        <button type="submit" class="btn btn-primary btn-sm" id="profile-pw-btn">
+                                            <span class="btn-text">Update Password</span>
+                                            <span class="spinner-border spinner-border-sm d-none ms-1" id="profile-pw-spinner"></span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                        </div><!-- /tab-content -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section><!-- /profile -->
+
+</main><!-- /main -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     SLIDE-OVER PANELS — outside main, outside sidebar
+══════════════════════════════════════════════════════════════════════ -->
+
+<!-- Order Detail Panel -->
+<aside id="order-detail-panel" class="admin-detail-panel">
+    <div class="detail-panel-header">
+        <h3 class="detail-panel-title">Order Details</h3>
+        <button id="close-order-panel"
+                class="detail-panel-close"
+                aria-label="Close order details">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div id="order-detail-content" class="detail-panel-body">
+        <div class="panel-empty-state">
+            <i class="bi bi-bag"></i>
+            <p>Select an order to view details</p>
+        </div>
+    </div>
+</aside>
+
+<!-- Category Request Panel -->
+<aside id="category-detail-panel" class="admin-detail-panel">
+    <div class="detail-panel-header">
+        <h3 class="detail-panel-title">Request Review</h3>
+        <button id="close-category-panel"
+                class="detail-panel-close"
+                aria-label="Close request details">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div id="category-detail-content" class="detail-panel-body">
+        <div class="panel-empty-state">
+            <i class="bi bi-tags"></i>
+            <p>Select a request to review</p>
+        </div>
+    </div>
+</aside>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     TOAST STACK
+══════════════════════════════════════════════════════════════════════ -->
+<div id="admin-toast-stack" class="admin-toast-stack" aria-live="polite"></div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     MODALS
+     System: .admin-modal-backdrop + .open class (NOT Bootstrap modals)
+     Exception: #edit-product-modal uses style.display='block' via admin.js
+══════════════════════════════════════════════════════════════════════ -->
+
+<!-- ── Confirm Dialog ─────────────────────────────────────────────── -->
+<div id="admin-confirm-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-confirm">
+        <div class="modal-body" style="background: linear-gradient(135deg, #dc2626, #991b1b); color: white; border-radius: 14px 14px 0 0;">
+            <h4 id="confirm-title" class="confirm-title" style="color: white; margin-top: 8px;">Are you sure?</h4>
+            <p id="confirm-message" class="confirm-message" style="color: rgba(255,255,255,0.95);">
+                This action cannot be undone.
+            </p>
+        </div>
+        <div class="modal-footer justify-content-center gap-2" style="border-top: none; padding-top: 16px;">
+            <button id="confirm-cancel-btn" class="btn btn-sm px-4 btn-secondary">Cancel</button>
+            <button id="confirm-ok-btn" class="btn btn-sm px-4 btn-ac-red">Confirm</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ── Edit User Modal ────────────────────────────────────────────── -->
+<div id="edit-user-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-lg">
+        <div class="modal-header">
+            <h5 class="modal-title">Edit User</h5>
+            <button class="modal-close-btn" data-close-modal="edit-user-modal"
+                    aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <form id="edit-user-form">
+            <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
                 <input type="hidden" id="edit-user-id">
 
-                <label for="edit-user-fullname">Full Name</label>
-                <input type="text" id="edit-user-fullname" placeholder="Full name">
-
-                <label for="edit-user-username">Username</label>
-                <input type="text" id="edit-user-username" placeholder="Username" required>
-
-                <label for="edit-user-email">Email</label>
-                <input type="email" id="edit-user-email" placeholder="Email" required>
-
-                <label for="edit-user-password">Password (plain text)</label>
-                <input type="text" id="edit-user-password" placeholder="Password">
-
-                <label for="edit-user-phone">Phone Number</label>
-                <input type="text" id="edit-user-phone" placeholder="Phone number">
-
-                <label for="edit-user-location">Location</label>
-                <input type="text" id="edit-user-location" placeholder="Location">
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-close-modal="edit-user-modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
+                <div class="form-row-3 mb-3">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-user-firstname">First Name</label>
+                        <input type="text" id="edit-user-firstname"
+                               class="form-control" placeholder="First name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-user-middlename">Middle Name (Optional)</label>
+                        <input type="text" id="edit-user-middlename"
+                               class="form-control" placeholder="Middle name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-user-lastname">Last Name</label>
+                        <input type="text" id="edit-user-lastname"
+                               class="form-control" placeholder="Last name">
+                    </div>
                 </div>
-            </form>
+
+                <div class="form-group mb-3">
+                    <label class="form-label" for="edit-user-fullname">Full Name</label>
+                    <input type="text" id="edit-user-fullname"
+                           class="form-control" placeholder="Full name">
+                </div>
+
+                <div class="form-row-2 mb-3">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-user-username">
+                            Username <span class="required-mark">*</span>
+                        </label>
+                        <input type="text" id="edit-user-username"
+                               class="form-control" placeholder="Username" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-user-email">
+                            Email <span class="required-mark">*</span>
+                        </label>
+                        <input type="email" id="edit-user-email"
+                               class="form-control" placeholder="Email" required>
+                    </div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label" for="edit-user-password">
+                        New Password
+                        <span class="form-label-hint">(leave blank to keep current)</span>
+                    </label>
+                    <div class="password-field-wrap">
+                        <input type="password" id="edit-user-password"
+                               class="form-control" placeholder="Set new password">
+                        <button type="button" class="pw-toggle-btn"
+                                id="edit-user-pw-toggle"
+                                aria-label="Toggle password visibility">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="form-hint">Min 6 characters (matches registration).</div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label" for="edit-user-phone">Phone Number</label>
+                    <div class="input-group">
+                        <span class="input-group-text">+63</span>
+                        <input type="tel" id="edit-user-phone" class="form-control" placeholder="9XXXXXXXXX" maxlength="10" pattern="9[0-9]{9}">
+                    </div>
+                    <div class="form-hint">Enter 10 digits starting with 9 (e.g. 9123456789).</div>
+                </div>
+
+                <div class="form-group mb-2">
+                    <label class="form-label">Address</label>
+                    <div class="addr-stack">
+                        <select id="edit-user-zone" class="form-select">
+                            <option value="">Select Zone (Metro / North / South Luzon)</option>
+                        </select>
+                        <select id="edit-user-province" class="form-select addr-select" disabled>
+                            <option value="">Select Province</option>
+                        </select>
+                        <select id="edit-user-city" class="form-select addr-select" disabled>
+                            <option value="">Select City / Municipality</option>
+                        </select>
+                        <select id="edit-user-barangay" class="form-select addr-select" disabled>
+                            <option value="">Select Barangay</option>
+                        </select>
+                        <input type="text" id="edit-user-street"
+                               class="form-control addr-select"
+                               placeholder="Street / Building / House No.">
+                        <textarea id="edit-user-address-preview"
+                                  class="form-control addr-select addr-preview"
+                                  rows="2" readonly
+                                  placeholder="Address preview"></textarea>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-secondary"
+                        data-close-modal="edit-user-modal">Cancel</button>
+                <button type="submit" class="btn btn-sm btn-ac-green">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ── Create User Modal ──────────────────────────────────────────── -->
+<div id="create-user-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-lg">
+        <div class="modal-header">
+            <h5 class="modal-title">
+                <i class="bi bi-person-plus me-2 text-primary"></i>
+                Create User
+            </h5>
+            <button class="modal-close-btn" data-close-modal="create-user-modal"
+                    aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <form id="create-user-form">
+            <div class="modal-body">
+
+                <div class="form-row-3 mb-3">
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-firstname">
+                            First Name <span class="required-mark">*</span>
+                        </label>
+                        <input type="text" id="create-user-firstname"
+                               class="form-control" placeholder="First name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-middlename">Middle Name (Optional)</label>
+                        <input type="text" id="create-user-middlename"
+                               class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-lastname">
+                            Last Name <span class="required-mark">*</span>
+                        </label>
+                        <input type="text" id="create-user-lastname"
+                               class="form-control" placeholder="Last name" required>
+                    </div>
+                </div>
+
+                <div class="form-row-2 mb-3">
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-username">
+                            Username <span class="required-mark">*</span>
+                        </label>
+                        <input type="text" id="create-user-username"
+                               class="form-control" placeholder="Username" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-email">
+                            Email <span class="required-mark">*</span>
+                        </label>
+                        <input type="email" id="create-user-email"
+                               class="form-control" placeholder="Email" required>
+                    </div>
+                </div>
+
+                <div class="form-row-2 mb-3">
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-role">
+                            Role <span class="required-mark">*</span>
+                        </label>
+                        <select id="create-user-role" class="form-select" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-phone">Phone Number</label>
+                        <div class="input-group">
+                            <span class="input-group-text">+63</span>
+                            <input type="text" id="create-user-phone"
+                                   class="form-control" placeholder="9XXXXXXXXX" maxlength="10" pattern="9[0-9]{9}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group mb-2">
+                    <label class="form-label" for="create-user-password">
+                        Password <span class="required-mark">*</span>
+                    </label>
+                    <div class="password-field-wrap">
+                        <input type="password" id="create-user-password"
+                               class="form-control" placeholder="Minimum 6 characters" required>
+                        <button type="button" class="pw-toggle-btn"
+                                id="create-user-pw-toggle"
+                                aria-label="Toggle password visibility">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="form-hint">
+                        Staff can create customer and farmer accounts.
+                        Super admins can also create staff accounts.
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-secondary"
+                        data-close-modal="create-user-modal">Cancel</button>
+                <button type="submit" class="btn btn-sm btn-ac-green"
+                        id="create-user-submit-btn">Create Account</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ── Edit Product Panel ─────────────────────────────────────────── -->
+<aside id="edit-product-panel" class="admin-detail-panel">
+    <div class="detail-panel-header">
+        <h3 class="detail-panel-title">Edit Product</h3>
+        <button id="edit-product-panel-close"
+                class="detail-panel-close"
+                aria-label="Close product edit">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div id="edit-product-content" class="detail-panel-body">
+        <div class="panel-empty-state">
+            <i class="bi bi-box-seam"></i>
+            <p>Loading product details...</p>
         </div>
     </div>
+    <div class="detail-panel-footer gap-2">
+        <button type="button" class="btn btn-sm me-auto btn-ac-red"
+                id="edit-product-disable-btn">Disable</button>
+        <button type="button" class="btn btn-sm btn-secondary"
+                id="edit-product-cancel">Cancel</button>
+        <button type="button" class="btn btn-sm btn-ac-green"
+                id="edit-product-save">
+            <span class="spinner-border spinner-border-sm d-none me-1" id="edit-product-save-spinner"></span>
+            Save Changes
+        </button>
+    </div>
+</aside>
 
-    <div id="edit-product-modal" class="modal">
+
+<!-- ── Category Edit Panel ─────────────────────────────────────────── -->
+<aside id="category-edit-panel" class="admin-detail-panel">
+    <div class="detail-panel-header">
+        <h3 class="detail-panel-title">Edit Category</h3>
+        <button id="category-edit-panel-close"
+                class="detail-panel-close"
+                aria-label="Close category edit">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div id="category-edit-content" class="detail-panel-body">
+        <div class="panel-empty-state">
+            <i class="bi bi-tags"></i>
+            <p>Loading category details...</p>
+        </div>
+    </div>
+    <div class="detail-panel-footer gap-2">
+        <button class="btn btn-sm me-auto btn-ac-red"
+                id="category-edit-toggle-disable">Disable</button>
+        <button class="btn btn-sm btn-secondary"
+                id="category-edit-cancel">Cancel</button>
+        <button class="btn btn-sm btn-ac-green"
+                id="category-edit-save">
+            <span class="spinner-border spinner-border-sm d-none me-1" id="category-edit-save-spinner"></span>
+            Save
+        </button>
+    </div>
+</aside>
+
+
+<!-- ── Catalog Name Edit Panel ─────────────────────────────────────── -->
+<aside id="catalog-edit-panel" class="admin-detail-panel">
+    <div class="detail-panel-header">
+        <h3 class="detail-panel-title">Edit Product Name</h3>
+        <button id="catalog-edit-panel-close"
+                class="detail-panel-close"
+                aria-label="Close catalog edit">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div id="catalog-edit-content" class="detail-panel-body">
+        <div class="panel-empty-state">
+            <i class="bi bi-box-seam"></i>
+            <p>Loading product details...</p>
+        </div>
+    </div>
+    <div class="detail-panel-footer gap-2">
+        <button class="btn btn-sm me-auto btn-ac-red"
+                id="catalog-edit-toggle-disable">Disable</button>
+        <button class="btn btn-sm btn-secondary"
+                id="catalog-edit-cancel">Cancel</button>
+        <button class="btn btn-sm btn-ac-green"
+                id="catalog-edit-save">
+            <span class="spinner-border spinner-border-sm d-none me-1" id="catalog-edit-save-spinner"></span>
+            Save
+        </button>
+    </div>
+</aside>
+
+
+<!-- ── Add Category Modal ────────────────────────────────────────── -->
+<div id="add-category-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-sm">
+        <div class="modal-header">
+            <h5 class="modal-title">Add Category</h5>
+            <button class="modal-close-btn" id="add-category-modal-close" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group mb-3">
+                <label class="form-label">Category Name <span class="required-mark">*</span></label>
+                <input type="text" id="new-category-name" class="form-control" placeholder="e.g. Vegetables">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description <span class="form-label-hint">(optional, max 200 characters)</span></label>
+                <input type="text" id="new-category-description" class="form-control" placeholder="Brief description" maxlength="200">
+            </div>
+        </div>
+        <div class="modal-footer gap-2">
+            <button class="btn btn-sm btn-secondary" id="add-category-cancel">Cancel</button>
+            <button class="btn btn-sm btn-ac-green" id="create-category-btn">Add Category</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ── Add Catalog Product Modal ─────────────────────────────────── -->
+<div id="add-catalog-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-sm">
+        <div class="modal-header">
+            <h5 class="modal-title">Add Product to Catalog</h5>
+            <button class="modal-close-btn" id="add-catalog-modal-close" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group mb-3">
+                <label class="form-label">Product Name <span class="required-mark">*</span></label>
+                <input type="text" id="new-catalog-name" class="form-control" placeholder="e.g. Sweet Corn">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Category <span class="required-mark">*</span></label>
+                <select id="catalog-category-select" class="form-select"></select>
+            </div>
+        </div>
+        <div class="modal-footer gap-2">
+            <button class="btn btn-sm btn-secondary" id="add-catalog-cancel">Cancel</button>
+            <button class="btn btn-sm btn-ac-green" id="add-catalog-name-btn">Add Product</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ── Audit Log Detail Modal ─────────────────────────────────────── -->
+<div id="audit-log-detail-modal" class="modal fade" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Edit Product</h3>
-                <button class="close-btn" data-close-modal="edit-product-modal">&times;</button>
+                <h5 class="modal-title">Audit Log Detail</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
             </div>
-            <form id="edit-product-form" class="modal-body">
-                <input type="hidden" id="edit-product-id">
-                <div class="edit-product-image-section">
-                    <label for="edit-product-image">Product Image</label>
-                    <div class="image-preview-wrapper">
-                        <img id="edit-product-image-preview" src="" alt="Product Image Preview" style="max-width: 100%; max-height: 180px; border-radius: 8px; object-fit: contain; background: #f3f4f6; display: block; margin-bottom: 8px;">
+            <div class="modal-body">
+                <div class="row mb-3 g-2" id="ald-meta">
+                    <!-- admin.js fills this with badges: action / entity / entity_id / time / actor -->
+                </div>
+                <div class="row mb-3 g-2" id="ald-security">
+                    <!-- admin.js fills this with security fields: ip_address / user_agent / session_id -->
+                </div>
+                <div class="row mb-2">
+                    <div class="col-auto">
+                        <button class="btn btn-sm btn-outline-primary" id="ald-toggle-diff">
+                            <i class="bi bi-code-diff me-1"></i>Show Diff
+                        </button>
                     </div>
-                    <input type="file" id="edit-product-image" accept="image/*">
                 </div>
-                <label for="edit-product-name">Product Name</label>
-                <input type="text" id="edit-product-name">
-                <label for="edit-product-price">Price</label>
-                <input type="number" id="edit-product-price" min="0" step="0.01">
-                <label for="edit-product-stock">Stock</label>
-                <input type="number" id="edit-product-stock" min="0">
-                <label for="edit-product-location">Location</label>
-                <input type="text" id="edit-product-location">
-                <label for="edit-product-description">Description</label>
-                <textarea id="edit-product-description" rows="3" maxlength="500" style="resize:vertical;"></textarea>
-                <div style="font-size: 0.9em; color: #64748b; margin-bottom: 8px;">
-                    <span id="edit-product-description-count">0</span>/500 characters
+                <div class="row g-3" id="ald-json-view">
+                    <div class="col-md-6">
+                        <h6 class="fw-semibold text-muted small mb-2">BEFORE</h6>
+                        <pre id="ald-before" class="p-3 rounded bg-light small" style="max-height:350px;overflow:auto;white-space:pre-wrap;word-break:break-all">—</pre>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-semibold text-muted small mb-2">AFTER</h6>
+                        <pre id="ald-after" class="p-3 rounded bg-light small" style="max-height:350px;overflow:auto;white-space:pre-wrap;word-break:break-all">—</pre>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-close-modal="edit-product-modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
+                <div class="row g-3 d-none" id="ald-diff-view">
+                    <div class="col-12">
+                        <h6 class="fw-semibold text-muted small mb-2">CHANGES</h6>
+                        <pre id="ald-diff" class="p-3 rounded bg-light small" style="max-height:350px;overflow:auto;white-space:pre-wrap;word-break:break-all">—</pre>
+                    </div>
                 </div>
-            </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
+</div>
 
-    <script src="/js/format.js"></script>
-    <script src="/js/admin.js"></script>
-    <script src="/js/chat.js"></script>
+<!-- ── Customer Detail Panel ─────────────────────────────────────────── -->
+<aside id="customer-detail-panel" class="admin-detail-panel">
+    <div class="detail-panel-header">
+        <h3 class="detail-panel-title">Customer Details</h3>
+        <button id="close-customer-panel"
+                class="detail-panel-close"
+                aria-label="Close customer details">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div class="detail-panel-body">
+        <ul class="nav nav-tabs nav-tabs-bordered" id="customerDetailTabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cdt-overview">Overview</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cdt-orders">Order History</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cdt-addresses">Addresses</button></li>
+        </ul>
+        <div class="tab-content p-3">
+            <div class="tab-pane fade show active" id="cdt-overview">
+                <div class="row g-3" id="cdt-overview-content">
+                    <div class="text-center py-5"><span class="spinner-border"></span></div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="cdt-orders">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle small">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Product</th><th>Status</th><th>Total</th><th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cdt-orders-tbody">
+                            <tr><td colspan="5" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="cdt-addresses">
+                <div id="cdt-addresses-content">
+                    <div class="text-center py-5"><span class="spinner-border"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="detail-panel-footer gap-2">
+        <button class="btn btn-sm me-auto btn-ac-red" id="cdt-disable-btn" type="button">
+            <span class="spinner-border spinner-border-sm d-none me-1" id="cdt-disable-spinner"></span>
+            Disable
+        </button>
+        <button class="btn btn-sm btn-ac-green" id="cdt-enable-btn" type="button">
+            <span class="spinner-border spinner-border-sm d-none me-1" id="cdt-enable-spinner"></span>
+            Enable
+        </button>
+        <button class="btn btn-sm btn-ac-green" id="cdt-edit-btn" type="button">Edit</button>
+    </div>
+</aside>
+
+<!-- ── Farmer Detail Panel ─────────────────────────────────────────── -->
+<aside id="farmer-detail-panel" class="admin-detail-panel">
+    <div class="detail-panel-header">
+        <h3 class="detail-panel-title">Farmer Details</h3>
+        <button id="close-farmer-panel"
+                class="detail-panel-close"
+                aria-label="Close farmer details">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div class="detail-panel-body">
+        <ul class="nav nav-tabs nav-tabs-bordered" id="farmerDetailTabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#fdt-info">Info</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#fdt-products">Products</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#fdt-reviews">Reviews</button></li>
+        </ul>
+        <div class="tab-content p-3">
+            <div class="tab-pane fade show active" id="fdt-info">
+                <div class="row g-3" id="fdt-info-content">
+                    <div class="text-center py-5"><span class="spinner-border"></span></div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="fdt-products">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Product</th><th>Price</th><th>Stock</th><th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fdt-products-tbody">
+                            <tr><td colspan="4" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="fdt-reviews">
+                <div id="fdt-reviews-content">
+                    <div class="text-center py-5"><span class="spinner-border"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="detail-panel-footer gap-2">
+        <button class="btn btn-sm me-auto btn-ac-red" id="fdt-disable-btn" type="button">
+            <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-disable-spinner"></span>
+            Disable
+        </button>
+        <button class="btn btn-sm btn-ac-green" id="fdt-enable-btn" type="button">
+            <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-enable-spinner"></span>
+            Enable
+        </button>
+        <button class="btn btn-sm d-none btn-ac-green" id="fdt-verify-btn" type="button">
+            <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-verify-spinner"></span>
+            Verify
+        </button>
+        <button class="btn btn-sm d-none btn-ac-red" id="fdt-unverify-btn" type="button">
+            <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-unverify-spinner"></span>
+            Unverify
+        </button>
+        <button class="btn btn-sm btn-ac-green" id="fdt-edit-btn" type="button">Edit</button>
+    </div>
+</aside>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     SCRIPTS
+     Load order: Bootstrap → Chart.js → ApexCharts → nicemain.js → format.js
+                 → admin-charts.js → psgc.js → admin.js → chat.js
+══════════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+<script src="/vendor/simple-datatables/simple-datatables.js"></script>
+<script src="/js/nicemain.js"></script>
+<script src="/js/format.js"></script>
+<script src="/js/admin-charts.js?v=light-colors-20260602"></script>
+<script src="/js/psgc.js"></script>
+<script src="/js/admin.js?v=ui-refinements-20260603g"></script>
+<script src="/js/chat.js"></script>
+
+<script>
+// Hide loading screen on page load
+window.addEventListener('load', function () {
+  setTimeout(function () {
+    var ls = document.getElementById('admin-loading-screen');
+    if (ls) ls.classList.add('hidden');
+  }, 500);
+});
+</script>
+
 </body>
 </html>

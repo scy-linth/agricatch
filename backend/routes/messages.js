@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
 
@@ -8,7 +8,7 @@ const getUserFromToken = (req) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return null;
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    return jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     return null;
   }
@@ -57,6 +57,20 @@ router.get('/conversation/:conversationId', async (req, res) => {
     if (!user) return res.status(401).json({ message: 'Authentication required' });
 
     const { conversationId } = req.params;
+
+    // Verify user belongs to this conversation
+    const convCheck = await pool.query(
+      'SELECT farmer_id, customer_id FROM conversations WHERE conversation_id = $1',
+      [conversationId]
+    );
+    if (convCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Conversation not found' });
+    }
+    const conv = convCheck.rows[0];
+    if (conv.farmer_id !== user.id && conv.customer_id !== user.id) {
+      return res.status(403).json({ message: 'Access denied to this conversation' });
+    }
+
     const result = await pool.query(`
       SELECT m.*
       FROM messages m

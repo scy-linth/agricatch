@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard — AgriCatch</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+</head>
+<body class="admin-theme">
+<div class="admin-layout">
+
+    <!-- Mobile overlay & toggle -->
+    <div class="sidebar-overlay" id="admin-sidebar-overlay"></div>
+    <button class="mobile-menu-toggle" id="admin-mobile-menu-toggle" aria-label="Toggle menu">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+    <aside class="admin-sidebar" id="admin-sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-logo-container">
+                <img src="/images/logo.png" alt="AgriCatch Logo" class="sidebar-logo">
+                <div class="brand-text">
+                    <span class="brand-title">
+                        <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
+                    </span>
+                    <span class="brand-subtitle">Admin Panel</span>
+                </div>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <button id="visit-site-btn" class="sidebar-link visit-site-link" style="display:none;">
+                <i class="fas fa-home"></i> Visit Site
+            </button>
+
+            <span class="sidebar-section-label">Operations</span>
+            <a class="sidebar-link active" href="#orders" data-section="orders">
+                <i class="fas fa-clipboard-list"></i> Orders
+            </a>
+            <a id="users-link" class="sidebar-link" href="#users" data-section="users">
+                <i class="fas fa-users"></i> Customers
+            </a>
+            <a class="sidebar-link" href="#products" data-section="products">
+                <i class="fas fa-box"></i> Products
+            </a>
+
+            <span class="sidebar-section-label">Catalog</span>
+            <a class="sidebar-link" href="#categories" data-section="categories">
+                <i class="fas fa-tags"></i> Categories
+            </a>
+            <a class="sidebar-link" href="#farmers" data-section="farmers">
+                <i class="fas fa-tractor"></i> Farmers
+            </a>
+
+            <span class="sidebar-section-label">System</span>
+            <a class="sidebar-link" href="#logs" data-section="logs">
+                <i class="fas fa-clipboard-check"></i> Audit Logs
+            </a>
+
+            <button id="logout-btn" class="sidebar-link logout-link">
+                <i class="fas fa-sign-out-alt"></i> Log out
+            </button>
+        </nav>
+    </aside>
+
+    <!-- ── Main Content ────────────────────────────────────────────────── -->
+    <main class="admin-main">
+
+        <!-- Hidden role-sentinel: admin.js updateWelcomeBanner() guards on these elements -->
+        <div class="admin-welcome-banner" style="display:none" aria-hidden="true">
+            <div class="welcome-text"><h1 class="welcome-title"></h1></div>
+        </div>
+
+        <!-- Topbar -->
+        <header class="admin-topbar">
+            <div class="topbar-left">
+                <h1 class="page-title">Orders</h1>
+            </div>
+            <div class="topbar-filters" id="order-filters">
+                <select id="order-status-filter" class="filter-select">
+                    <option value="">Any status</option>
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="preparing">Preparing</option>
+                    <option value="ready">Ready</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                <select id="order-price-filter" class="filter-select">
+                    <option value="">Any price</option>
+                    <option value="0-500">₱0 – ₱500</option>
+                    <option value="500-1500">₱500 – ₱1,500</option>
+                    <option value="1500-3000">₱1,500 – ₱3,000</option>
+                </select>
+                <select id="order-sort-filter" class="filter-select">
+                    <option value="date_desc">Newest first</option>
+                    <option value="date_asc">Oldest first</option>
+                    <option value="total_desc">Highest total</option>
+                    <option value="total_asc">Lowest total</option>
+                </select>
+            </div>
+            <div class="topbar-right">
+                <button id="admin-search-toggle" class="icon-btn" aria-label="Search">
+                    <i class="fas fa-magnifying-glass"></i>
+                </button>
+                <input id="admin-search-input" class="search-input" placeholder="Search…" aria-label="Search dashboard">
+                <div class="admin-profile">
+                    <img src="/images/resendlogo.png" alt="Admin avatar" class="profile-avatar">
+                    <div class="profile-meta">
+                        <span id="user-name" class="profile-name">Admin</span>
+                        <span id="user-email" class="profile-email">admin@agricatch.ph</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- KPI Stats Strip -->
+        <div class="admin-stats">
+            <div class="stat-card">
+                <div class="stat-icon stat-icon--blue"><i class="fas fa-users"></i></div>
+                <div class="stat-details">
+                    <h3>Total Users</h3>
+                    <div class="stat-number" id="total-users">0</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon stat-icon--green"><i class="fas fa-box"></i></div>
+                <div class="stat-details">
+                    <h3>Total Products</h3>
+                    <div class="stat-number" id="total-products">0</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon stat-icon--amber"><i class="fas fa-shopping-cart"></i></div>
+                <div class="stat-details">
+                    <h3>Total Orders</h3>
+                    <div class="stat-number" id="total-orders">0</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon stat-icon--emerald"><i class="fas fa-peso-sign"></i></div>
+                <div class="stat-details">
+                    <h3>Total Revenue</h3>
+                    <div class="stat-number" id="total-revenue">₱0.00</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Charts -->
+        <div class="admin-charts-grid" id="admin-charts-row">
+            <div class="admin-chart-card">
+                <h3 class="chart-title">Orders by Status</h3>
+                <div class="chart-canvas-wrap">
+                    <canvas id="admin-chart-orders-status"></canvas>
+                </div>
+            </div>
+            <div class="admin-chart-card">
+                <h3 class="chart-title">Revenue Trend — Last 30 Days</h3>
+                <div class="chart-canvas-wrap">
+                    <canvas id="admin-chart-revenue-trend"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Orders ────────────────────────────────────────────────────── -->
+        <section id="orders" class="admin-section-card active">
+            <div class="section-header">
+                <h2>Orders</h2>
+            </div>
+            <div class="section-content">
+                <table id="orders-table" class="admin-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" aria-label="Select all orders"></th>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th>Status</th>
+                            <th>Total</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-tbody"></tbody>
+                </table>
+                <div id="orders-pagination" class="pagination"></div>
+            </div>
+        </section>
+
+        <!-- ── Customers ─────────────────────────────────────────────────── -->
+        <section id="users" class="admin-section-card">
+            <div class="section-header">
+                <h2>Customers</h2>
+                <button id="open-create-user-modal" class="btn btn-primary btn-sm" type="button">
+                    <i class="fas fa-plus"></i> Create User
+                </button>
+            </div>
+            <div class="section-content">
+                <table id="users-table" class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>User</th>
+                            <th>Full Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Verified</th>
+                            <th>Joined</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody"></tbody>
+                </table>
+                <div id="users-pagination" class="pagination"></div>
+            </div>
+        </section>
+
+        <!-- ── Products ──────────────────────────────────────────────────── -->
+        <section id="products" class="admin-section-card">
+            <div class="section-header">
+                <h2>Products</h2>
+            </div>
+            <div class="section-content">
+                <table id="products-table" class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Product</th>
+                            <th>Price</th>
+                            <th>Stock</th>
+                            <th>Farmer</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="products-tbody"></tbody>
+                </table>
+                <div id="products-pagination" class="pagination"></div>
+            </div>
+        </section>
+
+        <!-- ── Farmers ───────────────────────────────────────────────────── -->
+        <section id="farmers" class="admin-section-card">
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-farmers-tab="pending">
+                    Pending Verification
+                    <span class="tab-count" id="farmers-pending-count">0</span>
+                </button>
+                <button class="admin-tab" data-farmers-tab="all">All Farmers</button>
+            </div>
+            <div id="farmers-pending-panel" class="section-content">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Username</th>
+                            <th>Joined</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="farmers-pending-tbody"></tbody>
+                </table>
+            </div>
+            <div id="farmers-all-panel" class="section-content" style="display:none;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Farmer</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Verified</th>
+                            <th>Joined</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="farmers-all-tbody"></tbody>
+                </table>
+                <div id="farmers-pagination" class="pagination"></div>
+            </div>
+        </section>
+
+        <!-- ── Audit Logs ─────────────────────────────────────────────────── -->
+        <section id="logs" class="admin-section-card">
+            <div class="section-header">
+                <h2>Audit Logs</h2>
+                <button id="logs-refresh-btn" class="btn btn-secondary btn-sm" type="button">
+                    <i class="fas fa-rotate-right"></i> Refresh
+                </button>
+            </div>
+            <div class="section-filters">
+                <input id="logs-actor-filter" class="search-input" placeholder="Admin ID (optional)">
+                <input id="logs-action-filter" class="search-input" placeholder="Action (optional)">
+                <input id="logs-entity-filter" class="search-input" placeholder="Entity (users / products / orders)">
+            </div>
+            <div class="section-content">
+                <table id="logs-table" class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Admin</th>
+                            <th>Action</th>
+                            <th>Entity</th>
+                            <th>Entity ID</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-tbody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ── Categories ─────────────────────────────────────────────────── -->
+        <section id="categories" class="admin-section-card">
+            <div class="section-header">
+                <h2>Categories &amp; Product Name Requests</h2>
+            </div>
+            <div class="section-content">
+                <div class="categories-grid">
+
+                    <!-- Left: Category List -->
+                    <div class="categories-col">
+                        <div class="categories-col-header">
+                            <h3>Category List</h3>
+                        </div>
+                        <div class="section-filters">
+                            <input id="new-category-name" class="search-input" placeholder="New category name">
+                            <input id="new-category-description" class="search-input" placeholder="Description (optional)">
+                            <button id="create-category-btn" class="btn btn-primary btn-sm" type="button">
+                                <i class="fas fa-plus"></i> Add
+                            </button>
+                        </div>
+                        <table class="admin-table" id="categories-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="categories-tbody"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Right: Requests + Catalog -->
+                    <div class="categories-col">
+                        <div class="categories-col-header">
+                            <h3>Pending Product Name Requests</h3>
+                        </div>
+                        <table class="admin-table" id="category-requests-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Requested By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="category-requests-tbody"></tbody>
+                        </table>
+
+                        <div class="categories-col-header" style="margin-top:1.5rem;">
+                            <h3>Product Name Catalog</h3>
+                        </div>
+                        <div class="section-filters">
+                            <select id="catalog-category-select" class="filter-select"></select>
+                            <input id="new-catalog-name" class="search-input" placeholder="Product name">
+                            <button id="add-catalog-name-btn" class="btn btn-primary btn-sm" type="button">
+                                <i class="fas fa-plus"></i> Add
+                            </button>
+                        </div>
+                        <table class="admin-table" id="catalog-names-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="catalog-names-tbody"></tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ── Order Detail Slide-over ────────────────────────────────────── -->
+    <aside id="order-detail-panel" class="admin-detail-panel">
+        <button class="panel-close" id="close-order-panel" aria-label="Close order details">&times;</button>
+        <div id="order-detail-content" class="panel-content">
+            <div class="panel-placeholder">Select an order to view details</div>
+        </div>
+    </aside>
+
+    <!-- ── Category Request Slide-over ───────────────────────────────── -->
+    <aside id="category-detail-panel" class="admin-detail-panel">
+        <button class="panel-close" id="close-category-panel" aria-label="Close category details">&times;</button>
+        <div id="category-detail-content" class="panel-content">
+            <div class="panel-placeholder">Select a request to review details</div>
+        </div>
+    </aside>
+
+</div><!-- /.admin-layout -->
+
+<!-- ── Chat Drawer ──────────────────────────────────────────────────── -->
+<div id="admin-chat-drawer" class="admin-chat-drawer">
+    <div class="chat-drawer-header">
+        <h3>Chat with Farmers</h3>
+        <button id="close-chat-drawer" class="icon-btn" aria-label="Close chat">&times;</button>
+    </div>
+    <div class="chat-drawer-body">
+        <div class="conversation-sidebar">
+            <div class="conversation-sidebar-header">
+                <h4>Conversations</h4>
+            </div>
+            <div id="conversation-list" class="conversation-list"></div>
+        </div>
+        <div class="chat-window">
+            <div id="chat-header" class="chat-header">
+                <div class="chat-header-info">
+                    <div class="chat-header-title" id="chat-header-title">Select a conversation</div>
+                    <div class="chat-header-subtitle" id="chat-header-subtitle"></div>
+                </div>
+            </div>
+            <div id="chat-messages" class="chat-messages"></div>
+            <form id="chat-form" class="chat-form">
+                <input type="text" id="chat-input" placeholder="Type a message…" required>
+                <button type="submit" class="btn btn-primary btn-sm">Send</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── Float Chat Button ─────────────────────────────────────────────── -->
+<button id="admin-float-chat-btn" class="admin-float-chat-btn" type="button" aria-label="Open chat">
+    <i class="fas fa-message"></i>
+    <span id="admin-chat-unread" class="admin-chat-unread" style="display:none;">0</span>
+</button>
+
+<!-- ── Toast Stack ───────────────────────────────────────────────────── -->
+<div id="admin-toast-stack" class="admin-toast-stack"></div>
+
+<!-- ── Confirm Dialog ────────────────────────────────────────────────── -->
+<div id="admin-confirm-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-sm">
+        <div class="modal-body modal-body--centered">
+            <div id="confirm-icon" class="confirm-modal-icon danger">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h4 id="confirm-title" class="confirm-modal-heading">Are you sure?</h4>
+            <p id="confirm-message" class="confirm-modal-msg">This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer modal-footer--centered">
+            <button id="confirm-cancel-btn" class="btn btn-secondary">Cancel</button>
+            <button id="confirm-ok-btn" class="btn btn-danger">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Edit User Modal ────────────────────────────────────────────────── -->
+<div id="edit-user-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-lg">
+        <div class="modal-header">
+            <h4 class="modal-title">Edit User</h4>
+            <button class="modal-close" data-close-modal="edit-user-modal"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="edit-user-form">
+            <div class="modal-body">
+                <input type="hidden" id="edit-user-id">
+                <div class="form-row form-row col-3">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-user-firstname">First Name</label>
+                        <input type="text" id="edit-user-firstname" class="form-control" placeholder="First name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-user-middlename">Middle Name</label>
+                        <input type="text" id="edit-user-middlename" class="form-control" placeholder="Middle name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-user-lastname">Last Name</label>
+                        <input type="text" id="edit-user-lastname" class="form-control" placeholder="Last name">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="edit-user-fullname">Full Name <span class="optional">(auto-filled from above)</span></label>
+                    <input type="text" id="edit-user-fullname" class="form-control" placeholder="Full name">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-user-username">Username <span class="required">*</span></label>
+                        <input type="text" id="edit-user-username" class="form-control" placeholder="Username" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-user-email">Email <span class="required">*</span></label>
+                        <input type="email" id="edit-user-email" class="form-control" placeholder="Email" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="edit-user-password">New Password <span class="optional">(leave blank to keep current)</span></label>
+                    <div class="password-field-wrap">
+                        <input type="password" id="edit-user-password" class="form-control" placeholder="Set new password">
+                        <button type="button" class="password-toggle" id="edit-user-pw-toggle" aria-label="Toggle password visibility">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <p class="form-hint">Min 8 characters. Stored as bcrypt hash.</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="edit-user-phone">Phone Number</label>
+                    <input type="text" id="edit-user-phone" class="form-control" placeholder="Phone number">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Address</label>
+                    <select id="edit-user-zone" class="form-control">
+                        <option value="">Select Zone (Metro / North / South Luzon)</option>
+                    </select>
+                    <select id="edit-user-province" class="form-control addr-select" disabled>
+                        <option value="">Select Province</option>
+                    </select>
+                    <select id="edit-user-city" class="form-control addr-select" disabled>
+                        <option value="">Select City / Municipality</option>
+                    </select>
+                    <select id="edit-user-barangay" class="form-control addr-select" disabled>
+                        <option value="">Select Barangay</option>
+                    </select>
+                    <input type="text" id="edit-user-street" class="form-control addr-select" placeholder="Street / Building / House No.">
+                    <textarea id="edit-user-address-preview" class="form-control addr-select addr-preview" rows="2" readonly placeholder="Address preview"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-close-modal="edit-user-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── Create User Modal ──────────────────────────────────────────────── -->
+<div id="create-user-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-lg">
+        <div class="modal-header">
+            <h4 class="modal-title">Create User</h4>
+            <button class="modal-close" data-close-modal="create-user-modal"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="create-user-form">
+            <div class="modal-body">
+                <div class="form-row col-3">
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-firstname">First Name <span class="required">*</span></label>
+                        <input type="text" id="create-user-firstname" class="form-control" placeholder="First name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-middlename">Middle Name</label>
+                        <input type="text" id="create-user-middlename" class="form-control" placeholder="Optional">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-lastname">Last Name <span class="required">*</span></label>
+                        <input type="text" id="create-user-lastname" class="form-control" placeholder="Last name" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-username">Username <span class="required">*</span></label>
+                        <input type="text" id="create-user-username" class="form-control" placeholder="Username" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-email">Email <span class="required">*</span></label>
+                        <input type="email" id="create-user-email" class="form-control" placeholder="Email" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-role">Role <span class="required">*</span></label>
+                        <select id="create-user-role" class="form-control" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="create-user-phone">Phone Number</label>
+                        <input type="text" id="create-user-phone" class="form-control" placeholder="Phone number">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="create-user-password">Password <span class="required">*</span></label>
+                    <div class="password-field-wrap">
+                        <input type="password" id="create-user-password" class="form-control" placeholder="Minimum 8 characters" required>
+                        <button type="button" class="password-toggle" id="create-user-pw-toggle" aria-label="Toggle password visibility">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <p class="form-hint">Staff can create customer and farmer accounts. Super admins can also create staff accounts.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-close-modal="create-user-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="create-user-submit-btn">Create Account</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── Edit Product Modal ─────────────────────────────────────────────── -->
+<div id="edit-product-modal" class="admin-modal-backdrop">
+    <div class="admin-modal">
+        <div class="modal-header">
+            <h4 class="modal-title">Edit Product</h4>
+            <button class="modal-close" data-close-modal="edit-product-modal"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="edit-product-form">
+            <div class="modal-body">
+                <input type="hidden" id="edit-product-id">
+                <div class="edit-product-image-section">
+                    <label class="form-label" for="edit-product-image">Product Image</label>
+                    <div class="image-preview-wrapper">
+                        <img id="edit-product-image-preview" src="" alt="Product Image Preview" class="product-image-preview">
+                    </div>
+                    <input type="file" id="edit-product-image" accept="image/*" class="file-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="edit-product-name">Product Name</label>
+                    <input type="text" id="edit-product-name" class="form-control">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-product-price">Price (₱)</label>
+                        <input type="number" id="edit-product-price" class="form-control" min="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-product-stock">Stock</label>
+                        <input type="number" id="edit-product-stock" class="form-control" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="edit-product-location">Location</label>
+                    <input type="text" id="edit-product-location" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="edit-product-description">Description</label>
+                    <textarea id="edit-product-description" class="form-control" rows="3" maxlength="500"></textarea>
+                    <p class="form-hint"><span id="edit-product-description-count">0</span>/500 characters</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-close-modal="edit-product-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── Category Edit Modal ────────────────────────────────────────────── -->
+<div id="category-edit-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-sm">
+        <div class="modal-header">
+            <h4 class="modal-title" id="category-edit-modal-title">Edit Category</h4>
+            <button class="modal-close" id="category-edit-modal-close"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Category Name <span class="required">*</span></label>
+                <input type="text" id="category-edit-name" class="form-control" placeholder="Category name">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description <span class="optional">(optional)</span></label>
+                <input type="text" id="category-edit-description" class="form-control" placeholder="Description">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="category-edit-cancel">Cancel</button>
+            <button class="btn btn-primary" id="category-edit-save">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Catalog Name Edit Modal ────────────────────────────────────────── -->
+<div id="catalog-edit-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-sm">
+        <div class="modal-header">
+            <h4 class="modal-title">Edit Product Name</h4>
+            <button class="modal-close" id="catalog-edit-modal-close"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Product Name <span class="required">*</span></label>
+                <input type="text" id="catalog-edit-name" class="form-control" placeholder="Product name">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Category <span class="required">*</span></label>
+                <select id="catalog-edit-category" class="form-control"></select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="catalog-edit-cancel">Cancel</button>
+            <button class="btn btn-primary" id="catalog-edit-save">Save</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/js/format.js"></script>
+<script src="/js/admin-charts.js"></script>
+<script src="/js/psgc.js"></script>
+<script src="/js/admin.js"></script>
+<script src="/js/chat.js"></script>
+</body>
+</html>

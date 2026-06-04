@@ -5,23 +5,26 @@ window.__PLACEHOLDER_IMAGE__ = window.__PLACEHOLDER_IMAGE__ || '/images/resendlo
 
 class AdminDashboard {
     constructor() {
-        // Resolve API base by host so dashboard pages work even without app.js.
         const host = window.location.hostname;
         const isLocalHost = host === 'localhost' || host === '127.0.0.1' || window.location.protocol === 'file:';
         const isCustomFrontendHost = host === 'agricatch.store' ||
             host === 'www.agricatch.store' ||
             host.includes('agricatch.store') ||
             host === 'agricatch.page.dev';
-        // Prefer explicit window.API_BASE, then local backend for dev/file pages, then render fallback, then relative /api
+
         this.apiBase = window.API_BASE || (isLocalHost ? 'http://localhost:3000/api' : (isCustomFrontendHost ? 'https://agricatch.onrender.com/api' : '/api'));
-        // Ensure a global fallback so other scripts or console checks can read the resolved API base
         try { if (!window.API_BASE) window.API_BASE = this.apiBase; } catch (e) {}
+
         this.token = localStorage.getItem('token');
         this.currentUserId = null;
         this.lastUsers = [];
+        this.lastFarmers = [];
         this.pendingOrderStatus = new Map();
+        this.sortableTables = {};
         this.searchQuery = '';
-        this.activeSection = 'orders';
+        this.activeSection = 'overview';
+        this.prevSection = 'overview';
+        this.previousModalId = null;
 
         if (!this.token) {
             window.location.href = '/?login=1';
@@ -29,6 +32,37 @@ class AdminDashboard {
         }
 
         this.init();
+
+        // Centralized event delegation for all table action buttons
+        // (capture phase so it fires before simple-datatables stopPropagation)
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+
+            if (btn.matches('.customer-view-btn')) {
+                this.openCustomerDetailModal(Number(btn.dataset.userId));
+            } else if (btn.matches('.product-edit-btn')) {
+                this.openProductEdit(Number(btn.dataset.productId));
+            } else if (btn.matches('.order-view-btn')) {
+                this.viewOrderDetails(Number(btn.dataset.orderId));
+            } else if (btn.matches('.audit-log-view-btn')) {
+                this.openAuditLogDetailModalById(Number(btn.dataset.logId));
+            } else if (btn.matches('.category-edit-btn')) {
+                this.editCategory(Number(btn.dataset.categoryId));
+            } else if (btn.matches('.catalog-edit-btn')) {
+                this.editCatalogName(Number(btn.dataset.catalogId));
+            } else if (btn.matches('.category-request-review-btn')) {
+                this.openCategoryRequestPanel(Number(btn.dataset.requestId));
+            } else if (btn.matches('.farmer-view-btn')) {
+                this.openFarmerDetailModal(Number(btn.dataset.farmerId));
+            } else if (btn.matches('.category-requests-view-btn')) {
+                this.showSection('category-requests');
+            } else if (btn.matches('.product-approve-btn')) {
+                this.approveProduct(Number(btn.dataset.productId));
+            } else if (btn.matches('.product-reject-btn')) {
+                this.rejectProduct(Number(btn.dataset.productId));
+            }
+        }, true);
     }
 
     fmtNumber(value, options) {
@@ -50,6 +84,128 @@ class AdminDashboard {
         } catch (_) {}
         const n = Number(value);
         return `₱${(Number.isFinite(n) ? n : 0).toFixed(2)}`;
+    }
+
+    getValidStatusOptions(currentStatus) {
+        const validTransitions = {
+            pending: ['confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'],
+            confirmed: ['preparing', 'out_for_delivery', 'delivered', 'cancelled'],
+            preparing: ['out_for_delivery', 'delivered', 'cancelled'],
+            out_for_delivery: ['delivered', 'cancelled'],
+            delivered: [],
+            cancelled: []
+        };
+
+        const statusLabels = {
+            pending: 'Pending',
+            confirmed: 'Confirmed',
+            preparing: 'Preparing',
+            out_for_delivery: 'Out for Delivery',
+            delivered: 'Delivered',
+            cancelled: 'Cancelled'
+        };
+
+        const allowed = validTransitions[currentStatus] || [];
+        const options = [];
+
+        allowed.forEach(status => {
+            options.push({ value: status, label: statusLabels[status] || status });
+        });
+
+        return options;
+    }
+
+    getAllStatusOptions(currentStatus) {
+        const statusLabels = {
+            pending: 'Pending',
+            confirmed: 'Confirmed',
+            preparing: 'Preparing',
+            out_for_delivery: 'Out for Delivery',
+            delivered: 'Delivered',
+            cancelled: 'Cancelled'
+        };
+
+        const statusColors = {
+            pending: '#ffc107',
+            confirmed: '#17a2b8',
+            preparing: '#fd7e14',
+            out_for_delivery: '#6f42c1',
+            delivered: '#28a745',
+            cancelled: '#dc3545'
+        };
+
+        const validTransitions = {
+            pending: ['confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'],
+            confirmed: ['preparing', 'out_for_delivery', 'delivered', 'cancelled'],
+            preparing: ['out_for_delivery', 'delivered', 'cancelled'],
+            out_for_delivery: ['delivered', 'cancelled'],
+            delivered: [],
+            cancelled: []
+        };
+
+        const allowed = validTransitions[currentStatus] || [];
+        const options = [];
+        Object.keys(statusLabels).forEach(status => {
+            options.push({
+                value: status,
+                label: statusLabels[status],
+                color: statusColors[status] || '#6c757d',
+                disabled: !allowed.includes(status)
+            });
+        });
+
+        return options;
+    }
+
+    refreshSortableTable(tableId, options = {}) {
+        const existing = this.sortableTables?.[tableId];
+        if (existing && typeof existing.destroy === 'function') {
+            try {
+                existing.destroy();
+            } catch (_) {}
+            delete this.sortableTables[tableId];
+        }
+
+        if (!window.simpleDatatables?.DataTable) return;
+
+        const table = document.getElementById(tableId);
+        if (!table) return;
+
+        const bodyRows = Array.from(table.querySelectorAll('tbody tr'));
+        const hasSortableRows = bodyRows.some((row) => row.children.length > 1);
+        if (!hasSortableRows) return;
+
+        const dataTableOptions = {
+            searchable: false,
+            paging: false,
+            perPageSelect: false,
+            sortable: true,
+            fixedHeight: false,
+            destroyable: true,
+            labels: {
+                placeholder: '',
+                noRows: 'No entries found',
+                noResults: 'No results found'
+            },
+            ...options
+        };
+
+        if (options.defaultSort) {
+            dataTableOptions.sort = options.defaultSort;
+        }
+
+        this.sortableTables[tableId] = new window.simpleDatatables.DataTable(table, dataTableOptions);
+        this.sortableTables[tableId]?.wrapperDOM?.classList.add('admin-sortable-wrapper');
+    }
+
+    destroySortableTable(tableId) {
+        const existing = this.sortableTables?.[tableId];
+        if (existing && typeof existing.destroy === 'function') {
+            try {
+                existing.destroy();
+            } catch (_) {}
+            delete this.sortableTables[tableId];
+        }
     }
 
     showAccessOverlay({ title, message, userEmail }) {
@@ -92,7 +248,7 @@ class AdminDashboard {
             <div style="border-top:1px solid #e2e8f0; padding-top: 12px;">
                 <div style="font-weight:600; margin-bottom:8px; color:#0f172a;">Recover admin role</div>
                 <div style="display:flex; gap:8px; flex-wrap: wrap;">
-                    <input id="admin-recover-secret" type="password" placeholder="Admin secret (default: admin123)" style="flex:1; min-width: 220px; padding:10px 12px; border-radius:10px; border:1px solid #cbd5e1;" />
+                    <input id="admin-recover-secret" type="password" placeholder="Admin secret" style="flex:1; min-width: 220px; padding:10px 12px; border-radius:10px; border:1px solid #cbd5e1;" />
                     <button id="admin-recover-btn" style="padding:10px 12px; border-radius:10px; border:1px solid #1d4ed8; background:#2563eb; color:#fff; cursor:pointer;">Recover</button>
                 </div>
                 <div id="admin-recover-result" style="margin-top:10px; color:#334155; font-size: 13px;"></div>
@@ -144,15 +300,37 @@ class AdminDashboard {
     }
 
     init() {
+        this._loadedSections = {};
+        this.pagination = {
+            orders: { page: 1, total: 0, limit: 50 },
+            users:  { page: 1, total: 0, limit: 50 },
+            products: { page: 1, total: 0, limit: 50 },
+            farmers: { page: 1, total: 0, limit: 50 },
+            logs: { page: 1, total: 0, limit: 25 },
+            categories: { page: 1, total: 0, limit: 50 },
+            'catalog-products': { page: 1, total: 0, limit: 50 },
+            'category-requests': { page: 1, total: 0, limit: 50 },
+            activity: { page: 1, total: 0, limit: 5 },
+            'top-products': { page: 1, total: 0, limit: 5 },
+            'top-farmers': { page: 1, total: 0, limit: 5 },
+            'recent-sales': { page: 1, total: 0, limit: 5 },
+        };
+        this._kpiPeriods = { 'kpi-sales': 'today', 'kpi-revenue': 'today', 'kpi-customers': 'today', 'kpi-farmers': 'today' };
+        this._reportPeriod = 'today';
+        this._activityPeriod = 'today';
+        this._topProductsPeriod = 'today';
+        this._topFarmersPeriod = 'today';
+        this._recentSalesPeriod = 'today';
+        this._reportsChart = null;
+
+        this._restorePeriods();
+
         this.checkAdminAuth();
         this.setupNavigation();
         this.loadDashboardStats();
-        this.loadUsers();
         this.loadOrders();
         this.loadProducts();
-        this.loadCategories();
-        this.loadCategoryRequests();
-        this.loadCatalogNames();
+        this.loadNotifications();
         this.setupEventListeners();
         this.setupRealtime();
         this.startUnreadPolling();
@@ -174,11 +352,99 @@ class AdminDashboard {
                     const reader = new FileReader();
                     reader.onload = (ev) => {
                         imgPreview.src = ev.target.result;
+                        imgPreview.style.display = '';
                     };
                     reader.readAsDataURL(file);
                 }
             });
         }
+
+        // Dashboard period filters (KPI cards)
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.kpi-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const card = link.dataset.card;
+            const period = link.dataset.period;
+            if (card && period) {
+                // Update active state for dropdown items
+                const dropdown = link.closest('.dropdown-menu');
+                if (dropdown) {
+                    dropdown.querySelectorAll('.kpi-period-filter').forEach(item => {
+                        item.classList.remove('active');
+                    });
+                    link.classList.add('active');
+                }
+                this._kpiPeriods[card] = period;
+                this.loadKpiCard(card, period);
+                this._savePeriods();
+            }
+        });
+
+        // Reports chart period
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.report-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._reportPeriod = period;
+            const lbl = document.getElementById('reports-period-label');
+            if (lbl) lbl.textContent = `| ${this._periodLabel(period)}`;
+            this.loadReportsChart(period);
+            this._savePeriods();
+        });
+
+        // Activity feed period
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.activity-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._activityPeriod = period;
+            const lbl = document.getElementById('activity-period-label');
+            if (lbl) lbl.textContent = `| ${this._periodLabel(period)}`;
+            this.loadRecentActivity(period);
+            this._savePeriods();
+        });
+
+        // Top products period
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.top-products-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._topProductsPeriod = period;
+            const lbl = document.getElementById('top-products-period-label');
+            if (lbl) lbl.textContent = `| ${this._periodLabel(period)}`;
+            this.loadTopProducts(period);
+            this._savePeriods();
+        });
+
+        // Top farmers period
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.top-farmers-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._topFarmersPeriod = period;
+            const lbl = document.getElementById('top-farmers-period-label');
+            if (lbl) lbl.textContent = `| ${this._periodLabel(period)}`;
+            this.loadTopFarmers(period);
+            this._savePeriods();
+        });
+
+        // Recent sales period
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.recent-sales-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._recentSalesPeriod = period;
+            const lbl = document.getElementById('recent-sales-period-label');
+            if (lbl) lbl.textContent = `| ${this._periodLabel(period)}`;
+            this.loadRecentSales(period);
+            this._savePeriods();
+        });
     }
 
     setupRealtime() {
@@ -208,6 +474,12 @@ class AdminDashboard {
                 if (logsSection && logsSection.classList.contains('active')) {
                     this.loadAuditLogs();
                 }
+                // Always refresh recent activity on dashboard
+                this.loadRecentActivity(this._activityPeriod || 'today');
+            });
+
+            es.addEventListener('chat.message', () => {
+                if (typeof this._refreshUnread === 'function') this._refreshUnread();
             });
         } catch (e) {
             // ignore
@@ -215,8 +487,8 @@ class AdminDashboard {
     }
 
     setupNavigation() {
-        // Load saved section or default to orders
-        const savedSection = localStorage.getItem('adminActiveSection') || 'orders';
+        // Load saved section or default to overview
+        const savedSection = localStorage.getItem('adminActiveSection') || 'overview';
         this.showSection(savedSection);
 
         // Add click handlers to sidebar links
@@ -224,82 +496,177 @@ class AdminDashboard {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 const section = link.getAttribute('data-section');
+                const filterStatus = link.getAttribute('data-filter-status');
                 if (section) {
                     this.showSection(section);
-
-                    // Update active state
-                    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-                    link.classList.add('active');
+                    document.body.classList.remove('toggle-sidebar');
+                    if (filterStatus && section === 'products') {
+                        const statusFilter = document.getElementById('products-status-filter');
+                        if (statusFilter) {
+                            statusFilter.value = filterStatus;
+                            this.loadProducts();
+                        }
+                    }
                 }
             });
         });
     }
 
+    navigateTo(sectionId, tab) {
+        this.showSection(sectionId);
+        if (tab) {
+            // Map shorthand tab names to actual HTML data-bs-target IDs
+            const tabMap = { 'password': 'change-password', 'edit': 'edit', 'overview': 'overview' };
+            const resolvedTab = tabMap[tab] || tab;
+            setTimeout(() => {
+                const tabBtn = document.querySelector(`#profileTabs [data-bs-target="#profile-${resolvedTab}"]`);
+                if (tabBtn && typeof bootstrap !== 'undefined') {
+                    new bootstrap.Tab(tabBtn).show();
+                }
+            }, 100);
+        }
+    }
+
     showSection(sectionId) {
+        this.prevSection = this.activeSection;
         this.activeSection = sectionId;
-        // Save current section to localStorage
         localStorage.setItem('adminActiveSection', sectionId);
 
-        // Hide all sections
         document.querySelectorAll('.admin-section-card').forEach(section => {
             section.classList.remove('active');
         });
 
-        // Show requested section
         const targetSection = document.getElementById(sectionId);
-        if (targetSection) {
-            targetSection.classList.add('active');
-        }
+        if (targetSection) targetSection.classList.add('active');
+
+        document.querySelectorAll('.sidebar-link[data-section]').forEach((link) => {
+            const isActive = link.getAttribute('data-section') === sectionId;
+            link.classList.toggle('active', isActive);
+            link.classList.toggle('collapsed', !isActive);
+        });
+
+        // Add active state to parent collapse menu for catalog sections
+        const catalogSections = ['catalog-products', 'categories', 'category-requests'];
+        const catalogParent = document.getElementById('nav-catalog');
+        const catalogLink = document.querySelector('[data-bs-target="#nav-catalog"]');
         
-        // Update page title
+        if (catalogSections.includes(sectionId)) {
+            if (catalogParent) {
+                catalogParent.classList.add('show');
+                if (catalogLink) {
+                    catalogLink.classList.remove('collapsed');
+                    catalogLink.setAttribute('aria-expanded', 'true');
+                }
+            }
+        } else {
+            // Collapse catalog menu when switching to non-catalog sections
+            if (catalogParent) {
+                catalogParent.classList.remove('show');
+                if (catalogLink) {
+                    catalogLink.classList.add('collapsed');
+                    catalogLink.setAttribute('aria-expanded', 'false');
+                }
+            }
+        }
+
+        this.closeOrderDetails();
+        this.closeCategoryDetails();
+        this.closeCategoryEdit();
+        this.closeCatalogEdit();
+        this.closeProductEdit();
+        document.getElementById('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+
         const pageTitle = document.querySelector('.page-title');
         if (pageTitle) {
             const titles = {
-                'orders': 'Orders Management',
-                'users': 'Customer Management',
-                'products': 'Product Management',
-                'categories': 'Category Management',
-                'logs': 'Audit Logs',
-                'reports': 'Reports',
-                'stats': 'Dashboard Statistics',
-                'notifications': 'Notifications',
-                'settings': 'Settings'
+                overview: 'Dashboard Overview',
+                orders: 'Order Management',
+                users: 'Customer Management',
+                products: 'Listings',
+                'catalog-products': 'Product Catalog',
+                categories: 'Category Management',
+                'category-requests': 'Product Catalog Requests',
+                'product-approvals': 'Pending Approvals',
+                farmers: 'Farmer Management',
+                logs: 'Audit Logs',
+                chat: 'Chat & Support',
+                notifications: 'Notifications',
+                profile: 'My Profile',
             };
             pageTitle.textContent = titles[sectionId] || 'Dashboard';
         }
 
-        // Show/hide order filters based on section
-        const orderFilters = document.getElementById('order-filters');
-        if (orderFilters) {
-            orderFilters.style.display = sectionId === 'orders' ? 'flex' : 'none';
-        }
-
-        // Update search placeholder per section
-        const searchInput = document.getElementById('admin-search-input');
-        if (searchInput) {
-            const placeholders = {
-                orders: 'Search order id, customer name/email...',
-                users: 'Search id, name, username, email...',
-                products: 'Search id, product name, farmer name/email...',
-                logs: 'Search is in log filters above',
+        // Update breadcrumb
+        const breadcrumbCurrent = document.getElementById('breadcrumb-current');
+        if (breadcrumbCurrent) {
+            const breadcrumbLabels = {
+                overview: 'Dashboard',
+                orders: 'Orders',
+                users: 'Customers',
+                products: 'Listings',
+                'catalog-products': 'Product Catalog',
+                categories: 'Category Management',
+                'category-requests': 'Product Catalog Requests',
+                'product-approvals': 'Pending Approvals',
+                farmers: 'Farmers',
+                logs: 'Audit Logs',
+                chat: 'Chat & Support',
+                notifications: 'Notifications',
+                profile: 'My Profile',
             };
-            searchInput.placeholder = placeholders[sectionId] || 'Search...';
+            breadcrumbCurrent.textContent = breadcrumbLabels[sectionId] || 'Dashboard';
         }
 
-        if (sectionId === 'logs') {
+        // Lazy-load sections on first visit
+        if (sectionId === 'logs' && !this._loadedSections?.logs) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections.logs = true;
+            this.loadAdminsForLogs();
             this.loadAuditLogs();
         }
-        if (sectionId === 'categories') {
+        if (sectionId === 'users' && !this._loadedSections?.users) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections.users = true;
+            this.loadUsers();
+        }
+        if (sectionId === 'categories' && !this._loadedSections?.categories) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections.categories = true;
             this.loadCategories();
-            this.loadCategoryRequests();
+        }
+        if (sectionId === 'catalog-products' && !this._loadedSections?.catalogProducts) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections.catalogProducts = true;
             this.loadCatalogNames();
+            if (!this._loadedSections?.categories) {
+                this._loadedSections.categories = true;
+                this.loadCategories();
+            }
+        }
+        if (sectionId === 'category-requests' && !this._loadedSections?.categoryRequests) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections.categoryRequests = true;
+            this.loadCategoryRequests();
+        }
+        if (sectionId === 'farmers' && !this._loadedSections?.farmers) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections.farmers = true;
+            this.loadFarmers();
+        }
+        if (sectionId === 'profile' && !this._loadedSections?.profile) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections.profile = true;
+            this.loadProfileSection();
+        }
+        if (sectionId === 'notifications') {
+            this.loadNotifications();
         }
     }
 
     async checkAdminAuth() {
         try {
             const response = await fetch(`${this.apiBase}/auth/profile`, {
-                headers: {
+                    headers: { 
                     'Authorization': `Bearer ${this.token}`
                 }
             });
@@ -317,94 +684,234 @@ class AdminDashboard {
                 }
                 this.currentUserRole = data.user.role;
                 this.currentUserId = data.user.id;
-                const userNameEl = document.getElementById('user-name');
-                const userEmailEl = document.getElementById('user-email');
-                if (userNameEl) {
-                    userNameEl.textContent = data.user.full_name || data.user.username || 'Staff';
+                const fullName = data.user.full_name || data.user.username || 'Staff';
+                // Extract first name and format as Title Case (capitalize each word)
+                const firstName = fullName.split(' ')[0];
+                const formattedFirstName = firstName.split(' ').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                ).join(' ');
+                const userNameEl   = document.getElementById('user-name');
+                const userNameDdEl = document.getElementById('user-name-dd');
+                const userEmailEl  = document.getElementById('user-email');
+                const profileImgEl  = document.getElementById('header-profile-img');
+                if (userNameEl)   userNameEl.textContent   = formattedFirstName;
+                if (userNameDdEl) userNameDdEl.textContent = formattedFirstName;
+                if (userEmailEl)  userEmailEl.textContent  = data.user.email || '';
+                // Set avatar to first letter of first name if no image
+                if (profileImgEl && !data.user.profile_image) {
+                    const firstLetter = firstName.charAt(0).toUpperCase();
+                    profileImgEl.style.display = 'none';
+                    // Create or update avatar fallback
+                    let avatarFallback = document.getElementById('header-avatar-fallback');
+                    if (!avatarFallback) {
+                        avatarFallback = document.createElement('div');
+                        avatarFallback.id = 'header-avatar-fallback';
+                        avatarFallback.className = 'profile-avatar-fallback';
+                        profileImgEl.parentNode.insertBefore(avatarFallback, profileImgEl);
+                    }
+                    avatarFallback.textContent = firstLetter;
+                    avatarFallback.style.display = 'flex';
+                } else if (profileImgEl && data.user.profile_image) {
+                    profileImgEl.src = data.user.profile_image;
+                    profileImgEl.style.display = 'block';
+                    const avatarFallback = document.getElementById('header-avatar-fallback');
+                    if (avatarFallback) avatarFallback.style.display = 'none';
                 }
-                if (userEmailEl) {
-                    userEmailEl.textContent = data.user.email || '';
-                }
-                // Update welcome banner after auth check
-                this.updateWelcomeBanner();
+                // Apply role-based UI
+                const visitSiteBtn = document.getElementById('visit-site-btn');
+                if (visitSiteBtn) visitSiteBtn.style.display = this.currentUserRole === 'super_admin' ? 'block' : 'none';
             } else {
-                // Invalid/expired session
-                window.location.href = '/';
+                if (response.status === 401 || response.status === 403) {
+                    try { localStorage.removeItem('token'); } catch (_) {}
+                    window.location.href = '/?login=1';
+                    return;
+                }
+
+                const message = response.status === 429
+                    ? 'Login verification is being rate-limited. Please retry in a few seconds.'
+                    : 'Admin session check failed. Staying on the dashboard so you can retry.';
+                this.showToast(message, response.status === 429 ? 'warning' : 'error');
             }
         } catch (error) {
             console.error('Auth check error:', error);
-            window.location.href = '/';
+            this.showToast('Admin session check failed due to a network error. Staying on the dashboard.', 'error');
         }
     }
 
     setupEventListeners() {
-        // Mobile sidebar toggle
-        const mobileMenuToggle = document.getElementById('admin-mobile-menu-toggle');
-        const adminSidebar = document.getElementById('admin-sidebar');
-        const sidebarOverlay = document.getElementById('admin-sidebar-overlay');
-        const closeSidebar = () => {
-            if (adminSidebar) adminSidebar.classList.remove('open');
-            if (sidebarOverlay) sidebarOverlay.classList.remove('active');
-            const icon = mobileMenuToggle?.querySelector('i');
-            if (icon) {
-                icon.classList.add('fa-bars');
-                icon.classList.remove('fa-times');
-            }
-        };
-        if (mobileMenuToggle && adminSidebar) {
-            mobileMenuToggle.addEventListener('click', () => {
-                adminSidebar.classList.toggle('open');
-                if (sidebarOverlay) sidebarOverlay.classList.toggle('active');
-                const icon = mobileMenuToggle.querySelector('i');
-                if (icon) {
-                    icon.classList.toggle('fa-bars');
-                    icon.classList.toggle('fa-times');
-                }
+        document.getElementById('logout-btn')?.addEventListener('click', () => this.logout());
+        document.getElementById('visit-site-btn')?.addEventListener('click', () => this.visitMainSite());
+
+        // Dropdown navigation links
+        document.getElementById('show-all-notifications-link')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.navigateTo('notifications');
+        });
+        document.getElementById('show-all-messages-link')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.navigateTo('chat');
+        });
+        document.getElementById('view-all-messages-badge')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.navigateTo('chat');
+        });
+
+        // Sidebar toggle button
+        const toggleBtn = document.getElementById('admin-sidebar-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.body.classList.toggle('toggle-sidebar');
             });
-            if (sidebarOverlay) {
-                sidebarOverlay.addEventListener('click', closeSidebar);
-            }
-            // Close sidebar when clicking on a link
-            document.querySelectorAll('.sidebar-link').forEach(link => {
-                link.addEventListener('click', () => {
-                    if (window.innerWidth <= 768) {
-                        closeSidebar();
-                    }
-                });
-            });
+        } else {
+            console.error('Toggle button not found!');
         }
 
-        document.getElementById('logout-btn').addEventListener('click', () => this.logout());
-        const visitSiteBtn = document.getElementById('visit-site-btn');
-        if (visitSiteBtn) {
-            visitSiteBtn.addEventListener('click', () => this.visitMainSite());
-        }
+        // Sidebar overlay — clicking backdrop closes sidebar on mobile
+        document.getElementById('sidebar-overlay')?.addEventListener('click', () => {
+            document.body.classList.remove('toggle-sidebar');
+        });
+
+        // Orders in-section filters
         const statusFilter = document.getElementById('order-status-filter');
-        const priceFilter = document.getElementById('order-price-filter');
-        const sortFilter = document.getElementById('order-sort-filter');
-        const closePanel = document.getElementById('close-order-panel');
-        const closeCategoryPanel = document.getElementById('close-category-panel');
-        const chatClose = document.getElementById('close-chat-drawer');
-        const floatChatBtn = document.getElementById('admin-float-chat-btn');
-        const searchToggle = document.getElementById('admin-search-toggle');
-        const searchInput = document.getElementById('admin-search-input');
+        const priceFilter  = document.getElementById('order-price-filter');
+        const sortFilter   = document.getElementById('order-sort-filter');
+        const orderSearch  = document.getElementById('order-search-btn');
+        const orderInput   = document.getElementById('order-search-input');
+        if (statusFilter) statusFilter.addEventListener('change', () => this.loadOrders(1));
+        if (priceFilter)  priceFilter.addEventListener('change',  () => this.loadOrders(1));
+        if (sortFilter)   sortFilter.addEventListener('change',   () => this.loadOrders(1));
+        if (orderSearch)  orderSearch.addEventListener('click',   () => this.loadOrders(1));
+        if (orderInput)   orderInput.addEventListener('keydown',  (e) => { if (e.key === 'Enter') this.loadOrders(1); });
 
-        if (statusFilter) statusFilter.addEventListener('change', () => this.applyOrderFilters());
-        if (priceFilter) priceFilter.addEventListener('change', () => this.applyOrderFilters());
-        if (sortFilter) sortFilter.addEventListener('change', () => this.applyOrderFilters());
+        const closePanel   = document.getElementById('close-order-panel');
+        const closeCategoryPanel = document.getElementById('close-category-panel');
+        const closeCustomerPanel = document.getElementById('close-customer-panel');
+        const closeFarmerPanel = document.getElementById('close-farmer-panel');
+        const chatClose    = document.getElementById('close-chat-drawer');
+
         if (closePanel) closePanel.addEventListener('click', () => this.closeOrderDetails());
         if (closeCategoryPanel) closeCategoryPanel.addEventListener('click', () => this.closeCategoryDetails());
-        if (chatClose) chatClose.addEventListener('click', () => this.toggleChatDrawer(false));
-        if (floatChatBtn) floatChatBtn.addEventListener('click', () => this.toggleChatDrawer(true));
+        if (closeCustomerPanel) closeCustomerPanel.addEventListener('click', () => this.closeCustomerDetails());
+        if (closeFarmerPanel) closeFarmerPanel.addEventListener('click', () => this.closeFarmerDetails());
+        if (chatClose) chatClose.addEventListener('click', () => {
+            // If prevSection is not set or is the same as current, default to overview
+            const targetSection = (this.prevSection && this.prevSection !== this.activeSection) 
+                ? this.prevSection 
+                : 'overview';
+            this.showSection(targetSection);
+        });
 
-        if (searchToggle && searchInput) {
-            // Search input is always visible; button just focuses it
-            searchToggle.addEventListener('click', () => searchInput.focus());
-            searchInput.addEventListener('input', () => {
-                this.searchQuery = searchInput.value || '';
-                this.applySearch();
+        // Users in-section filter - use API search across all pages
+        const usersSearchBtn = document.getElementById('users-search-btn');
+        const usersSearchInput = document.getElementById('users-search-input');
+        const usersStatusFilter = document.getElementById('users-status-filter');
+        if (usersSearchBtn) usersSearchBtn.addEventListener('click', () => this.loadUsers(1));
+        if (usersSearchInput) usersSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadUsers(1); });
+        if (usersStatusFilter) usersStatusFilter.addEventListener('change', () => this.loadUsers(1));
+
+        // Products in-section filter - use API search across all pages
+        const productsSearchBtn = document.getElementById('products-search-btn');
+        const productsSearchInput = document.getElementById('products-search-input');
+        const productsCatFilter = document.getElementById('products-category-filter');
+        const productsStatusFilter = document.getElementById('products-status-filter');
+        if (productsSearchBtn) productsSearchBtn.addEventListener('click', () => this.loadProducts(1));
+        if (productsSearchInput) productsSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadProducts(1); });
+        if (productsCatFilter) productsCatFilter.addEventListener('change', () => this.loadProducts(1));
+        if (productsStatusFilter) productsStatusFilter.addEventListener('change', () => this.loadProducts(1));
+
+        // Farmers in-section filter - use API search across all pages
+        const farmersSearchBtn = document.getElementById('farmers-search-btn');
+        const farmersSearchInput = document.getElementById('farmers-search-input');
+        const farmersStatusFilter = document.getElementById('farmers-status-filter');
+        const farmersVerificationFilter = document.getElementById('farmers-verification-filter');
+        if (farmersSearchBtn) farmersSearchBtn.addEventListener('click', () => this.loadFarmers('all', 1));
+        if (farmersSearchInput) farmersSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadFarmers('all', 1); });
+        if (farmersStatusFilter) farmersStatusFilter.addEventListener('change', () => this.loadFarmers('all', 1));
+        if (farmersVerificationFilter) farmersVerificationFilter.addEventListener('change', () => this.loadFarmers('all', 1));
+
+        // Audit logs filters - auto-apply on change
+        const logsSearchBtn = document.getElementById('logs-search-btn');
+        const logsActionFilter = document.getElementById('logs-action-filter');
+        const logsEntityFilter = document.getElementById('logs-entity-filter');
+        const logsActorFilter = document.getElementById('logs-actor-filter');
+        const logsDateFrom  = document.getElementById('logs-date-from');
+        const logsDateTo    = document.getElementById('logs-date-to');
+        if (logsSearchBtn) logsSearchBtn.addEventListener('click', () => this.loadAuditLogs());
+        if (logsActionFilter) logsActionFilter.addEventListener('change', () => this.loadAuditLogs());
+        if (logsEntityFilter) logsEntityFilter.addEventListener('change', () => this.loadAuditLogs());
+        if (logsActorFilter) logsActorFilter.addEventListener('change', () => this.loadAuditLogs());
+        if (logsDateFrom) logsDateFrom.addEventListener('change', () => this.loadAuditLogs());
+        if (logsDateTo)   logsDateTo.addEventListener('change', () => this.loadAuditLogs());
+
+        // ── Clear + Refresh buttons ─────────────────────────────────────────
+        document.getElementById('orders-refresh-btn')?.addEventListener('click', () => {
+            ['order-status-filter','order-price-filter','order-sort-filter','order-search-input'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
             });
-        }
+            this.loadOrders();
+            this.showToast('Orders refreshed', 'success');
+        });
+
+        document.getElementById('products-refresh-btn')?.addEventListener('click', () => {
+            ['products-search-input','products-category-filter','products-status-filter'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
+            });
+            this.loadProducts();
+            this.showToast('Listings refreshed', 'success');
+        });
+
+        document.getElementById('categories-refresh-btn')?.addEventListener('click', () => {
+            const s = document.getElementById('category-search-input'); if (s) s.value = '';
+            const f = document.getElementById('category-status-filter'); if (f) f.selectedIndex = 0;
+            this.loadCategories();
+            this.showToast('Categories refreshed', 'success');
+        });
+
+        document.getElementById('catalog-refresh-btn')?.addEventListener('click', () => {
+            const s = document.getElementById('catalog-search-input'); if (s) s.value = '';
+            const f = document.getElementById('catalog-category-filter-bar'); if (f) f.selectedIndex = 0;
+            const sf = document.getElementById('catalog-status-filter'); if (sf) sf.selectedIndex = 0;
+            this.loadCatalogNames();
+            this.showToast('Catalog refreshed', 'success');
+        });
+
+        document.getElementById('cat-req-refresh-btn')?.addEventListener('click', () => {
+            const s = document.getElementById('cat-req-search-input'); if (s) s.value = '';
+            const f = document.getElementById('cat-req-status-filter'); if (f) f.value = '';
+            this.loadCategoryRequests();
+            this.showToast('Product name requests refreshed', 'success');
+        });
+
+        document.getElementById('users-refresh-btn')?.addEventListener('click', () => {
+            ['users-search-input','users-status-filter'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
+            });
+            this.loadUsers();
+            this.showToast('Customers refreshed', 'success');
+        });
+
+        document.getElementById('farmers-refresh-btn')?.addEventListener('click', () => {
+            ['farmers-search-input','farmers-status-filter','farmers-verification-filter'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
+            });
+            this.loadFarmers();
+            this.showToast('Farmers refreshed', 'success');
+        });
+
+        document.getElementById('logs-refresh-btn')?.addEventListener('click', () => {
+            ['logs-action-filter','logs-entity-filter','logs-actor-filter','logs-date-from','logs-date-to'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.value = ''; }
+            });
+            this.loadAuditLogs();
+            this.showToast('Audit logs refreshed', 'success');
+        });
 
         document.querySelectorAll('[data-close-modal]').forEach(button => {
             button.addEventListener('click', () => {
@@ -413,282 +920,1017 @@ class AdminDashboard {
             });
         });
 
+        // Prevent letters in phone fields
+        ['pe-phone', 'edit-user-phone', 'create-user-phone'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', () => {
+                    el.value = el.value.replace(/\D/g, '');
+                });
+                el.addEventListener('keydown', (e) => {
+                    if (e.key.length === 1 && !/\d/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        e.preventDefault();
+                    }
+                });
+            }
+        });
+
         const editUserForm = document.getElementById('edit-user-form');
-        if (editUserForm) {
-            editUserForm.addEventListener('submit', (e) => this.submitUserEdit(e));
+        if (editUserForm) editUserForm.addEventListener('submit', (e) => this.submitUserEdit(e));
+
+        document.getElementById('open-create-user-modal')?.addEventListener('click', () => this.openCreateUserModal('customer'));
+        document.getElementById('open-create-farmer-modal')?.addEventListener('click', () => this.openCreateUserModal('farmer'));
+        document.getElementById('create-user-form')?.addEventListener('submit', (e) => this.submitUserCreate(e));
+        const createUserPwToggle = document.getElementById('create-user-pw-toggle');
+        const createUserPwInput  = document.getElementById('create-user-password');
+        if (createUserPwToggle && createUserPwInput) {
+            createUserPwToggle.addEventListener('click', () => {
+                const show = createUserPwInput.type === 'password';
+                createUserPwInput.type = show ? 'text' : 'password';
+                const icon = createUserPwToggle.querySelector('i');
+                if (icon) icon.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
+            });
+        }
+
+        const editUserPwToggle = document.getElementById('edit-user-pw-toggle');
+        const editUserPwInput  = document.getElementById('edit-user-password');
+        if (editUserPwToggle && editUserPwInput) {
+            editUserPwToggle.addEventListener('click', () => {
+                const show = editUserPwInput.type === 'password';
+                editUserPwInput.type = show ? 'text' : 'password';
+                const icon = editUserPwToggle.querySelector('i');
+                if (icon) icon.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
+            });
         }
 
         const editProductForm = document.getElementById('edit-product-form');
-        if (editProductForm) {
-            editProductForm.addEventListener('submit', (e) => this.submitProductEdit(e));
-        }
-
-        const logsRefreshBtn = document.getElementById('logs-refresh-btn');
-        if (logsRefreshBtn) {
-            logsRefreshBtn.addEventListener('click', () => this.loadAuditLogs());
-        }
+        if (editProductForm) editProductForm.addEventListener('submit', (e) => this.submitProductEdit(e));
 
         document.getElementById('create-category-btn')?.addEventListener('click', () => this.createCategory());
         document.getElementById('add-catalog-name-btn')?.addEventListener('click', () => this.addCatalogName());
+
+        // "Add Category" button → open the modal
+        document.getElementById('show-add-category-form')?.addEventListener('click', () => {
+            document.getElementById('add-category-modal')?.classList.add('open');
+        });
+        document.getElementById('add-category-cancel')?.addEventListener('click', () => {
+            document.getElementById('add-category-modal')?.classList.remove('open');
+        });
+        document.getElementById('add-category-modal-close')?.addEventListener('click', () => {
+            document.getElementById('add-category-modal')?.classList.remove('open');
+        });
+
+        // "Add Catalog Product" button → open the modal
+        document.getElementById('show-add-catalog-form')?.addEventListener('click', async () => {
+            const modal = document.getElementById('add-catalog-modal');
+            if (modal) {
+                // Pre-load categories if not already loaded
+                if (!this.lastCategories || this.lastCategories.length === 0) {
+                    await this.loadCategories();
+                }
+                const sel = document.getElementById('catalog-category-select');
+                const cats = this.lastCategories || [];
+                if (sel) {
+                    if (cats.length === 0) {
+                        this.showMessage('No categories available. Please create a category first.', 'error');
+                        return;
+                    }
+                    sel.innerHTML = cats.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
+                }
+                modal.classList.add('open');
+            }
+        });
+        document.getElementById('add-catalog-cancel')?.addEventListener('click', () => {
+            document.getElementById('add-catalog-modal')?.classList.remove('open');
+        });
+        document.getElementById('add-catalog-modal-close')?.addEventListener('click', () => {
+            document.getElementById('add-catalog-modal')?.classList.remove('open');
+        });
+
+        // Category-requests filter search button
+        document.getElementById('cat-req-search-btn')?.addEventListener('click', () => {
+            this.resetPaginationPage('category-requests');
+            this.loadCategoryRequests(undefined, undefined, 1);
+        });
+        document.getElementById('cat-req-search-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.resetPaginationPage('category-requests');
+                this.loadCategoryRequests(undefined, undefined, 1);
+            }
+        });
+        document.getElementById('cat-req-status-filter')?.addEventListener('change', () => {
+            this.resetPaginationPage('category-requests');
+            this.loadCategoryRequests(undefined, undefined, 1);
+        });
+
+        // Product-approvals filter search button
+        document.getElementById('product-approval-search-btn')?.addEventListener('click', () => {
+            this.resetPaginationPage('product-approvals');
+            this.loadProductApprovals(undefined, undefined, 1);
+        });
+        document.getElementById('product-approval-search-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.resetPaginationPage('product-approvals');
+                this.loadProductApprovals(undefined, undefined, 1);
+            }
+        });
+        document.getElementById('product-approval-status-filter')?.addEventListener('change', () => {
+            this.resetPaginationPage('product-approvals');
+            this.loadProductApprovals(undefined, undefined, 1);
+        });
+        document.getElementById('product-approval-refresh-btn')?.addEventListener('click', () => {
+            this.loadProductApprovals();
+            this.showToast('Product approvals refreshed', 'success');
+        });
+
+        // Category search filter
+        document.getElementById('category-search-btn')?.addEventListener('click', () => {
+            this.resetPaginationPage('categories');
+            this.loadCategories(1);
+        });
+        document.getElementById('category-search-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('category-search-btn')?.click();
+        });
+        document.getElementById('category-status-filter')?.addEventListener('change', () => {
+            document.getElementById('category-search-btn')?.click();
+        });
+
+        // Catalog (catalog-products) search + category filter + status filter
+        const runCatalogFilter = () => {
+            this.resetPaginationPage('catalog-products');
+            this.loadCatalogNames(1);
+        };
+        document.getElementById('catalog-search-btn')?.addEventListener('click', runCatalogFilter);
+        document.getElementById('catalog-search-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') runCatalogFilter();
+        });
+        document.getElementById('catalog-category-filter-bar')?.addEventListener('change', runCatalogFilter);
+        document.getElementById('catalog-status-filter')?.addEventListener('change', runCatalogFilter);
+
+        // Entries-per-page selects
+        document.addEventListener('change', (e) => {
+            const sel = e.target.closest('[data-entries-section]');
+            if (!sel) return;
+            const section = sel.getAttribute('data-entries-section');
+            const limit = Number(sel.value) || 50;
+            if (this.pagination[section]) {
+                this.pagination[section].limit = limit;
+                this.pagination[section].page  = 1;
+            }
+            const loaders = {
+                'orders': () => this.loadOrders(),
+                'users': () => this.loadUsers(),
+                'products': () => this.loadProducts(),
+                'farmers': () => this.loadFarmers(),
+                'categories': () => this.loadCategories(),
+                'catalog-products': () => this.loadCatalogNames(),
+                'category-requests': () => this.loadCategoryRequests(),
+                'product-approvals': () => this.loadProductApprovals(),
+                'logs': () => this.loadAuditLogs(),
+                'activity': () => this.loadRecentActivity(this._activityPeriod || 'today'),
+                'top-products': () => this.loadTopProducts(this._topProductsPeriod || 'today'),
+                'top-farmers': () => this.loadTopFarmers(this._topFarmersPeriod || 'today'),
+                'recent-sales': () => this.loadRecentSales(this._recentSalesPeriod || 'today'),
+            };
+            loaders[section]?.();
+        });
+
+        // Profile forms
+        document.getElementById('profile-edit-form')?.addEventListener('submit', (e) => this.submitProfileEdit(e));
+        document.getElementById('profile-password-form')?.addEventListener('submit', (e) => this.submitProfilePassword(e));
+
+        this.syncPanelAccessibility();
     }
 
-    async loadAuditLogs() {
+    syncPanelAccessibility() {
+        const panels = [
+            document.getElementById('order-detail-panel'),
+            document.getElementById('category-detail-panel'),
+            document.getElementById('customer-detail-panel'),
+            document.getElementById('farmer-detail-panel'),
+            document.getElementById('category-edit-panel'),
+            document.getElementById('catalog-edit-panel'),
+            document.getElementById('edit-product-panel')
+        ].filter(Boolean);
+
+        panels.forEach((panel) => {
+            const isActive = panel.classList.contains('active');
+            panel.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+            panel.hidden = !isActive;
+            if (isActive) {
+                panel.removeAttribute('inert');
+            } else {
+                panel.setAttribute('inert', '');
+            }
+        });
+    }
+
+    async loadAdminsForLogs() {
         try {
+            const params = new URLSearchParams();
+            if (this.currentUserRole === 'staff') {
+                params.set('role', 'staff');
+            }
+            const response = await fetch(`${this.apiBase}/admin/users?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            const users = data.users || data || [];
+            const select = document.getElementById('logs-actor-filter');
+            if (!select) return;
+
+            // Keep the "All admins" option
+            select.innerHTML = '<option value="">All admins</option>';
+
+            // Filter to only show staff and super_admin users
+            const admins = users.filter(u => u.role === 'staff' || u.role === 'super_admin');
+            admins.forEach(admin => {
+                const option = document.createElement('option');
+                option.value = admin.id;
+                option.textContent = `${admin.full_name || admin.username} (ID: ${admin.id})`;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading admins for logs:', error);
+        }
+    }
+
+    async loadAuditLogs(page = 1) {
+        try {
+            const pg = this.pagination.logs;
+            pg.page = page;
             const actor_admin_id = document.getElementById('logs-actor-filter')?.value?.trim();
-            const action = document.getElementById('logs-action-filter')?.value?.trim();
-            const entity = document.getElementById('logs-entity-filter')?.value?.trim();
+            const action  = document.getElementById('logs-action-filter')?.value?.trim();
+            const entity  = document.getElementById('logs-entity-filter')?.value?.trim();
+            const dateFrom = document.getElementById('logs-date-from')?.value?.trim();
+            const dateTo   = document.getElementById('logs-date-to')?.value?.trim();
 
             const params = new URLSearchParams();
-            params.set('limit', '25');
+            params.set('limit', String(pg.limit));
+            params.set('page', String(pg.page));
             if (actor_admin_id) params.set('actor_admin_id', actor_admin_id);
             if (action) params.set('action', action);
             if (entity) params.set('entity', entity);
+            if (dateFrom) params.set('date_from', dateFrom);
+            if (dateTo)   params.set('date_to', dateTo);
 
-            const response = await fetch(`${this.apiBase}/admin/logs?${params.toString()}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
+                const response = await fetch(`${this.apiBase}/admin/logs?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
             });
-
             if (!response.ok) return;
             const data = await response.json();
-            this.renderAuditLogs(data.logs || []);
+            this._lastLogs = data.logs || [];
+            pg.total = Number(data.pagination?.total || 0);
+            this.renderAuditLogs(this._lastLogs);
+            this.renderPagination('logs-pagination', pg, (p) => this.loadAuditLogs(p));
         } catch (error) {
             console.error('Error loading audit logs:', error);
         }
     }
 
     renderAuditLogs(logs) {
+        this.destroySortableTable('logs-table');
+        this._lastLogs = logs || [];
         const tbody = document.getElementById('logs-tbody');
         if (!tbody) return;
 
         if (!logs.length) {
-            tbody.innerHTML = `<tr><td colspan="6" style="color:#64748b;">No logs found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No logs found.</td></tr>`;
+            this.refreshSortableTable('logs-table', { columns: [{ select: 6, sortable: false }] });
             return;
         }
 
+        const colorIcons = {
+            success: 'bi-check-circle-fill text-success',
+            primary: 'bi-pencil-fill text-primary',
+            danger: 'bi-x-circle-fill text-danger',
+            warning: 'bi-exclamation-circle-fill text-warning',
+            info: 'bi-info-circle-fill text-info',
+            secondary: 'bi-circle text-secondary',
+        };
+
+        const getColor = (action) => {
+            if (action.includes('unverify') || action.includes('disable') || action.includes('reject') || action.includes('delete')) return 'danger';
+            if (action.includes('create') || action.includes('verify') || action.includes('approve') || action.includes('enable')) return 'success';
+            if (action.includes('update') || action.includes('status')) return 'primary';
+            if (action.includes('login')) return 'info';
+            return 'secondary';
+        };
+
         tbody.innerHTML = logs.map(log => {
-            const time = log.created_at ? new Date(log.created_at).toLocaleString() : '';
-            const adminLabel = `${log.actor_admin_name || 'Admin'} (#${log.actor_admin_id})`;
-            const email = log.actor_admin_email ? `<div style="color:#64748b;font-size:0.85rem;">${log.actor_admin_email}</div>` : '';
-            const details = `
-                <details>
-                    <summary style="cursor:pointer;">View</summary>
-                    <pre style="white-space:pre-wrap;max-width:520px;overflow:auto;background:#f8fafc;border:1px solid #e2e8f0;padding:8px;border-radius:8px;margin-top:8px;">${this.escapeHtml(JSON.stringify({ before: log.before, after: log.after }, null, 2))}</pre>
-                </details>
-            `;
+            const actor = log.actor_admin_name || log.actor_admin_email || `Admin #${log.actor_admin_id}`;
+            const email = log.actor_admin_email || '—';
+            const color = getColor(log.action || '');
+            const iconClass = colorIcons[color] || 'bi-circle text-secondary';
+            const detailBtn = `<button class="btn btn-sm py-0 px-2 btn-ac-green audit-log-view-btn" data-log-id="${log.id}">View</button>`;
             return `
-                <tr>
-                    <td>${time}</td>
-                    <td><div>${adminLabel}</div>${email}</td>
-                    <td>${log.action || ''}</td>
-                    <td>${log.entity || ''}</td>
-                    <td>${log.entity_id ?? ''}</td>
-                    <td>${details}</td>
-                </tr>
-            `;
+            <tr>
+                <td class="text-muted small">${log.created_at ? new Date(log.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                <td>${this.escapeHtml(actor)}</td>
+                <td class="text-muted small">${this.escapeHtml(email)}</td>
+                <td><i class="bi ${iconClass} me-1"></i>${this.escapeHtml(this.humanizeAction(log.action))}</td>
+                <td>${this.escapeHtml(log.entity)}</td>
+                <td>${log.entity_id || '—'}</td>
+                <td>${detailBtn}</td>
+            </tr>`;
         }).join('');
+
+        this.refreshSortableTable('logs-table', { columns: [{ select: 6, sortable: false }], defaultSort: [0, 'desc'] });
     }
 
-    async loadDashboardStats() {
-        try {
-            const response = await fetch(`${this.apiBase}/admin/stats`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
+    openAuditLogDetailModalById(id) {
+        // First check if log is in _lastLogs for immediate display
+        const cachedLog = (this._lastLogs || []).find(l => l.id === id);
+        if (cachedLog) {
+            this.openAuditLogDetailModal(cachedLog);
+            return;
+        }
+        // Otherwise fetch from API
+        this.fetchAuditLogDetail(id);
+    }
 
-            if (response.ok) {
-                const data = await response.json();
-                document.getElementById('total-users').textContent = this.fmtNumber(data.stats.totalUsers);
-                document.getElementById('total-products').textContent = this.fmtNumber(data.stats.totalProducts);
-                document.getElementById('total-orders').textContent = this.fmtNumber(data.stats.totalOrders);
-                document.getElementById('total-revenue').textContent = this.fmtCurrency(data.stats.totalRevenue);
-            }
-        } catch (error) {
-            console.error('Error loading stats:', error);
+    async fetchAuditLogDetail(id) {
+        try {
+            const res = await fetch(`/api/admin/audit-logs/${id}`);
+            if (!res.ok) throw new Error('Failed to fetch audit log');
+            const data = await res.json();
+            this.openAuditLogDetailModal(data.log);
+        } catch (err) {
+            console.error('Fetch audit log detail error:', err);
+            alert('Failed to load audit log details');
         }
     }
 
-    async loadUsers() {
+    openAuditLogDetailModal(log) {
+        if (typeof bootstrap === 'undefined') return;
+        const modal = document.getElementById('audit-log-detail-modal');
+        if (!modal) return;
+
+        const metaEl = document.getElementById('ald-meta');
+        const securityEl = document.getElementById('ald-security');
+        const beforeEl = document.getElementById('ald-before');
+        const afterEl  = document.getElementById('ald-after');
+        const diffEl   = document.getElementById('ald-diff');
+        const jsonView = document.getElementById('ald-json-view');
+        const diffView = document.getElementById('ald-diff-view');
+        const toggleBtn = document.getElementById('ald-toggle-diff');
+
+        // Dynamic color logic (same as Recent Activity)
+        const getColor = (action) => {
+            if (action.includes('unverify') || action.includes('disable') || action.includes('reject') || action.includes('delete')) return 'danger';
+            if (action.includes('create') || action.includes('verify') || action.includes('approve') || action.includes('enable')) return 'success';
+            if (action.includes('update') || action.includes('status')) return 'primary';
+            if (action.includes('login')) return 'info';
+            return 'secondary';
+        };
+        const color = getColor(log.action || '');
+        const time = log.created_at ? new Date(log.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+        if (metaEl) metaEl.innerHTML = `
+            <div class="col-auto"><span class="audit-badge audit-badge-${color}">${this.escapeHtml(this.humanizeAction(log.action || ''))}</span></div>
+            ${log.entity ? `<div class="col-auto"><span class="badge bg-light text-dark">${this.escapeHtml(log.entity)}</span></div>` : ''}
+            ${log.entity_id != null ? `<div class="col-auto"><span class="badge bg-secondary-subtle text-secondary">ID: ${log.entity_id}</span></div>` : ''}
+            <div class="col-auto"><span class="badge bg-light text-muted small">${time}</span></div>
+            ${log.actor_admin_name ? `<div class="col-auto"><span class="badge bg-info-subtle text-info small"><i class="bi bi-person me-1"></i>${this.escapeHtml(log.actor_admin_name)}</span></div>` : ''}
+            ${log.actor_admin_email ? `<div class="col-auto"><span class="badge bg-secondary-subtle text-secondary small"><i class="bi bi-envelope me-1"></i>${this.escapeHtml(log.actor_admin_email)}</span></div>` : ''}
+        `;
+
+        // Security fields
+        if (securityEl) {
+            const securityBadges = [];
+            if (log.ip_address) securityBadges.push(`<div class="col-auto"><span class="badge bg-secondary-subtle text-secondary small"><i class="bi bi-globe me-1"></i>${this.escapeHtml(log.ip_address)}</span></div>`);
+            if (log.session_id) securityBadges.push(`<div class="col-auto"><span class="badge bg-warning-subtle text-warning small"><i class="bi bi-key me-1"></i>${this.escapeHtml(log.session_id)}</span></div>`);
+            if (log.user_agent) securityBadges.push(`<div class="col-auto"><span class="badge bg-secondary-subtle text-secondary small" data-bs-toggle="tooltip" data-bs-placement="top" title="${this.escapeHtml(log.user_agent)}"><i class="bi bi-browser me-1"></i>${this.escapeHtml(log.user_agent.substring(0, 50))}${log.user_agent.length > 50 ? '...' : ''}</span></div>`);
+            securityEl.innerHTML = securityBadges.join('') || '<div class="col-auto"><span class="text-muted small">No security info available</span></div>';
+        }
+
+        // Pretty-print JSON with syntax highlighting
+        if (beforeEl) beforeEl.innerHTML = log.before ? this.formatJson(log.before) : '—';
+        if (afterEl)  afterEl.innerHTML  = log.after  ? this.formatJson(log.after) : '—';
+
+        // Generate diff
+        if (diffEl) {
+            const diffHtml = this.generateDiff(log.before, log.after);
+            diffEl.innerHTML = diffHtml || '—';
+        }
+
+        // Reset view to JSON
+        if (jsonView) jsonView.classList.remove('d-none');
+        if (diffView) diffView.classList.add('d-none');
+        if (toggleBtn) {
+            toggleBtn.innerHTML = '<i class="bi bi-code-diff me-1"></i>Show Diff';
+            toggleBtn.onclick = () => this.toggleDiffView();
+        }
+
+        const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
+        bsModal.show();
+
+        // Initialize tooltips for new elements
+        const tooltipTriggerList = modal.querySelectorAll('[data-bs-toggle="tooltip"]');
+        [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+    }
+
+    toggleDiffView() {
+        const jsonView = document.getElementById('ald-json-view');
+        const diffView = document.getElementById('ald-diff-view');
+        const toggleBtn = document.getElementById('ald-toggle-diff');
+
+        if (jsonView.classList.contains('d-none')) {
+            // Show JSON view
+            jsonView.classList.remove('d-none');
+            diffView.classList.add('d-none');
+            toggleBtn.innerHTML = '<i class="bi bi-code-diff me-1"></i>Show Diff';
+        } else {
+            // Show diff view
+            jsonView.classList.add('d-none');
+            diffView.classList.remove('d-none');
+            toggleBtn.innerHTML = '<i class="bi bi-list me-1"></i>Show JSON';
+        }
+    }
+
+    generateDiff(before, after) {
+        if (!before && !after) return null;
+        if (!before) return `<span class="text-success">+ New entry</span>\n${this.formatJson(after)}`;
+        if (!after) return `<span class="text-danger">- Deleted entry</span>\n${this.formatJson(before)}`;
+
+        const beforeStr = JSON.stringify(before, null, 2);
+        const afterStr = JSON.stringify(after, null, 2);
+
+        if (beforeStr === afterStr) return '<span class="text-muted">No changes detected</span>';
+
+        // Simple line-by-line diff
+        const beforeLines = beforeStr.split('\n');
+        const afterLines = afterStr.split('\n');
+        let diff = '';
+
+        const maxLen = Math.max(beforeLines.length, afterLines.length);
+        for (let i = 0; i < maxLen; i++) {
+            const beforeLine = beforeLines[i] || '';
+            const afterLine = afterLines[i] || '';
+
+            if (beforeLine === afterLine) {
+                diff += this.formatJsonLine(beforeLine) + '\n';
+            } else {
+                if (beforeLine) diff += `<span class="text-danger">- ${this.escapeHtml(beforeLine)}</span>\n`;
+                if (afterLine) diff += `<span class="text-success">+ ${this.escapeHtml(afterLine)}</span>\n`;
+            }
+        }
+
+        return diff;
+    }
+
+    formatJsonLine(line) {
+        return line
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/(".*?")/g, '<span class="text-success">$1</span>')
+            .replace(/(\d+)/g, '<span class="text-primary">$1</span>')
+            .replace(/(true|false|null)/g, '<span class="text-danger">$1</span>');
+    }
+
+    humanizeAction(action) {
+        const map = {
+            'user.create': 'Created user', 'user.update': 'Updated user',
+            'user.disable': 'Disabled user', 'user.enable': 'Enabled user',
+            'user.verify': 'Verified farmer', 'user.unverify': 'Unverified farmer',
+            'user.shop_profile.update': 'Updated shop profile',
+            'user.generate_temp_password': 'Generated temp password',
+            'user.role.update': 'Updated user role',
+            'user.login': 'Admin login',
+            'product.create': 'Added product', 'product.update': 'Updated product',
+            'product.disable': 'Disabled product', 'product.enable': 'Enabled product',
+            'product.assign': 'Reassigned product',
+            'order.status.update': 'Updated order status', 'order.disable': 'Disabled order',
+            'order.enable': 'Enabled order',
+            'category.create': 'Created category', 'category.update': 'Updated category',
+            'category.disable': 'Disabled category', 'category.enable': 'Enabled category',
+            'category.delete': 'Deleted category',
+            'catalog_name.create': 'Added catalog name', 'catalog_name.update': 'Updated catalog name',
+            'catalog_name.disable': 'Disabled catalog name', 'catalog_name.enable': 'Enabled catalog name',
+            'category.request.review': 'Reviewed name request',
+            'announcement.broadcast': 'Broadcast announcement',
+            'settings.update': 'Updated settings',
+            'feature_flag.update': 'Updated feature flag',
+        };
+        return map[action] || action.replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    formatJson(obj) {
+        const json = JSON.stringify(obj, null, 2);
+        // Simple syntax highlighting
+        return json
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/(".*?")/g, '<span class="text-success">$1</span>')
+            .replace(/(\d+)/g, '<span class="text-primary">$1</span>')
+            .replace(/(true|false|null)/g, '<span class="text-danger">$1</span>');
+    }
+
+    _periodLabel(period) {
+        const map = { today: 'Today', week: 'This Week', month: 'This Month', year: 'This Year', all: 'All Time' };
+        return map[period] || period;
+    }
+
+    _restorePeriods() {
         try {
-            const response = await fetch(`${this.apiBase}/admin/users`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
+            const saved = localStorage.getItem('adminDashboardPeriods');
+            if (!saved) return;
+            const parsed = JSON.parse(saved);
+            if (parsed.kpiPeriods) this._kpiPeriods = { ...this._kpiPeriods, ...parsed.kpiPeriods };
+            if (parsed.reportPeriod) this._reportPeriod = parsed.reportPeriod;
+            if (parsed.activityPeriod) this._activityPeriod = parsed.activityPeriod;
+            if (parsed.topProductsPeriod) this._topProductsPeriod = parsed.topProductsPeriod;
+            if (parsed.topFarmersPeriod) this._topFarmersPeriod = parsed.topFarmersPeriod;
+            if (parsed.recentSalesPeriod) this._recentSalesPeriod = parsed.recentSalesPeriod;
+        } catch (_) {}
+    }
+
+    _savePeriods() {
+        try {
+            localStorage.setItem('adminDashboardPeriods', JSON.stringify({
+                kpiPeriods: this._kpiPeriods,
+                reportPeriod: this._reportPeriod,
+                activityPeriod: this._activityPeriod,
+                topProductsPeriod: this._topProductsPeriod,
+                topFarmersPeriod: this._topFarmersPeriod,
+                recentSalesPeriod: this._recentSalesPeriod,
+            }));
+        } catch (_) {}
+    }
+
+    _periodToDates(period) {
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        const today = fmt(now);
+        if (period === 'today') return { date_from: today, date_to: today };
+        if (period === 'week')  { const d = new Date(now); d.setDate(d.getDate() - 6); return { date_from: fmt(d), date_to: today }; }
+        if (period === 'month') { const d = new Date(now.getFullYear(), now.getMonth(), 1); return { date_from: fmt(d), date_to: today }; }
+        if (period === 'year')  { const d = new Date(now.getFullYear(), 0, 1); return { date_from: fmt(d), date_to: today }; }
+        return {}; // all time — no date restriction
+    }
+
+    async loadDashboardStats() {
+        // Load all KPI cards with their saved periods
+        for (const [card, period] of Object.entries(this._kpiPeriods)) {
+            this.loadKpiCard(card, period);
+        }
+        // Load other dashboard widgets with saved periods
+        this.loadReportsChart(this._reportPeriod);
+        this.loadRecentActivity(this._activityPeriod);
+        this.loadTopProducts(this._topProductsPeriod);
+        this.loadTopFarmers(this._topFarmersPeriod);
+        this.loadRecentSales(this._recentSalesPeriod);
+
+        // Update visible period labels to match restored values
+        const reportLbl = document.getElementById('reports-period-label');
+        if (reportLbl) reportLbl.textContent = `| ${this._periodLabel(this._reportPeriod)}`;
+        const activityLbl = document.getElementById('activity-period-label');
+        if (activityLbl) activityLbl.textContent = `| ${this._periodLabel(this._activityPeriod)}`;
+        const topProdLbl = document.getElementById('top-products-period-label');
+        if (topProdLbl) topProdLbl.textContent = `| ${this._periodLabel(this._topProductsPeriod)}`;
+        const topFarmLbl = document.getElementById('top-farmers-period-label');
+        if (topFarmLbl) topFarmLbl.textContent = `| ${this._periodLabel(this._topFarmersPeriod)}`;
+        const recentSalesLbl = document.getElementById('recent-sales-period-label');
+        if (recentSalesLbl) recentSalesLbl.textContent = `| ${this._periodLabel(this._recentSalesPeriod)}`;
+    }
+
+    async loadKpiCard(card, period) {
+        try {
+            const res = await fetch(`${this.apiBase}/admin/dashboard/stats?period=${period}&metric=${card}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const { stats } = await res.json();
+
+            const periodLabel = this._periodLabel(period);
+            const metric = card.replace('kpi-', '');
+
+            const valEl = document.getElementById(`${card}-value`);
+            const periodEl = document.getElementById(`${card}-period`);
+            const changeEl = document.getElementById(`${card}-change`);
+            const changeLabelEl = document.getElementById(`${card}-change-label`);
+
+            if (periodEl) periodEl.textContent = `| ${periodLabel}`;
+            if (valEl) {
+                if (metric === 'revenue') {
+                    valEl.textContent = this.fmtCurrency(stats.revenue ?? 0);
+                } else if (metric === 'sales') {
+                    valEl.textContent = this.fmtNumber(stats.sales ?? 0);
+                } else if (metric === 'customers') {
+                    valEl.textContent = this.fmtNumber(stats.customers ?? 0);
+                } else if (metric === 'farmers') {
+                    valEl.textContent = this.fmtNumber(stats.farmers ?? 0);
                 }
+            }
+
+            const changeProp = metric + 'Change';
+            const change = stats[changeProp] ?? 0;
+            if (changeEl) {
+                const isPos = change >= 0;
+                changeEl.className = `small fw-bold ${isPos ? 'text-success' : 'text-danger'}`;
+                changeEl.textContent = `${isPos ? '+' : ''}${change}%`;
+            }
+            if (changeLabelEl && period !== 'all') {
+                changeLabelEl.textContent = ` vs prev ${period}`;
+            }
+        } catch (err) {
+            console.warn('KPI card error:', err);
+        }
+    }
+
+    async loadReportsChart(period) {
+        try {
+            const res = await fetch(`${this.apiBase}/admin/dashboard/report?period=${period}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const { data } = await res.json();
+
+            if (typeof ApexCharts === 'undefined') return;
+
+            const labels = data.map(d => {
+                const dt = new Date(d.label);
+                if (period === 'today') return dt.getHours() + ':00';
+                if (period === 'year' || period === 'all') return dt.toLocaleString('default', { month: 'short' });
+                return dt.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+            });
+
+            const revenues = data.map(d => d.revenue);
+            const sales = data.map(d => d.sales);
+            const customers = data.map(d => d.customers);
+            const farmers = data.map(d => d.farmers || 0);
+
+            const options = {
+                series: [
+                    { name: 'Revenue (₱)', data: revenues, yaxisIndex: 0 },
+                    { name: 'Sales', data: sales, yaxisIndex: 1 },
+                    { name: 'Customers', data: customers, yaxisIndex: 1 },
+                    { name: 'Farmers', data: farmers, yaxisIndex: 1 },
+                ],
+                chart: { type: 'area', height: 350, toolbar: { show: false }, zoom: { enabled: false } },
+                colors: ['#2d7a3a', '#4154f1', '#ff771d', '#9b59b6'],
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 2 },
+                fill: { type: 'gradient', gradient: { opacityFrom: .6, opacityTo: .1 } },
+                xaxis: { categories: labels, tickAmount: Math.min(labels.length, 7) },
+                yaxis: [
+                    { labels: { formatter: v => '₱' + this.fmtNumber(v) } },
+                    { opposite: true, labels: { formatter: v => this.fmtNumber(v) } }
+                ],
+                tooltip: { shared: true, intersect: false, y: { formatter: (v, { seriesIndex }) => seriesIndex === 0 ? '₱' + v.toLocaleString() : v } },
+                legend: { position: 'top' },
+                grid: { borderColor: '#f0f0f0' },
+            };
+
+            const el = document.getElementById('reportsChart');
+            if (!el) return;
+            if (this._reportsChart) { this._reportsChart.destroy(); }
+            this._reportsChart = new ApexCharts(el, options);
+            this._reportsChart.render();
+        } catch (err) {
+            console.warn('Reports chart error:', err);
+        }
+    }
+
+    async loadRecentActivity(period, page = 1) {
+        try {
+            const pg = this.pagination.activity;
+            pg.page = page;
+            const params = new URLSearchParams({ period, page: String(page), limit: String(pg.limit) });
+            const res = await fetch(`${this.apiBase}/admin/dashboard/recent-activity?${params}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const { activity, total } = await res.json();
+            this.lastActivity = activity || [];
+            pg.total = Number(total || 0);
+            this.renderRecentActivityList(this.lastActivity);
+        } catch (err) {
+            console.warn('Recent activity error:', err);
+        }
+    }
+
+    async loadTopProducts(period, page = 1) {
+        try {
+            const pg = this.pagination['top-products'];
+            pg.page = page;
+            const params = new URLSearchParams({ period, page: String(page), limit: String(pg.limit) });
+            const res = await fetch(`${this.apiBase}/admin/dashboard/top-products?${params}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const { products, total } = await res.json();
+            this.lastTopProducts = products || [];
+            pg.total = Number(total || 0);
+            this.renderTopProductsTable(this.lastTopProducts);
+        } catch (err) {
+            console.warn('Top products error:', err);
+        }
+    }
+
+    async loadTopFarmers(period, page = 1) {
+        try {
+            const pg = this.pagination['top-farmers'];
+            pg.page = page;
+            const params = new URLSearchParams({ period, page: String(page), limit: String(pg.limit) });
+            const res = await fetch(`${this.apiBase}/admin/dashboard/top-farmers?${params}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const { farmers, total } = await res.json();
+            this.lastTopFarmers = farmers || [];
+            pg.total = Number(total || 0);
+            this.renderTopFarmersTable(this.lastTopFarmers);
+        } catch (err) {
+            console.warn('Top farmers error:', err);
+        }
+    }
+
+    async loadRecentSales(period, page = 1) {
+        try {
+            const dates = this._periodToDates(period || 'today');
+            const pg = this.pagination['recent-sales'];
+            pg.page = page;
+            const params = new URLSearchParams({ page: String(page), limit: String(pg.limit) });
+            if (dates.date_from) params.set('date_from', dates.date_from);
+            if (dates.date_to)   params.set('date_to',   dates.date_to);
+            const res = await fetch(`${this.apiBase}/admin/orders?${params}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const { orders, total } = await res.json();
+            this.lastRecentSales = orders || [];
+            pg.total = Number(total || 0);
+            this.renderRecentSalesTable(this.lastRecentSales);
+        } catch (err) {
+            console.warn('Recent sales error:', err);
+        }
+    }
+
+    async loadUsers(page = 1) {
+        try {
+            const pg = this.pagination.users;
+            pg.page = page;
+            const search = (document.getElementById('users-search-input')?.value || '').trim();
+            const status = (document.getElementById('users-status-filter')?.value || '').trim();
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit),
+                role: 'customer'
+            });
+            if (search) params.set('search', search);
+            if (status) params.set('status', status);
+
+            const response = await fetch(`${this.apiBase}/admin/users?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
             });
 
             if (response.ok) {
                 const data = await response.json();
                 this.lastUsers = data.users || [];
-                this.renderUsers(data.users);
+                pg.total = Number(data.total || 0);
+                this.renderUsers(this.lastUsers);
+                this.renderPagination('users-pagination', pg, (p) => this.loadUsers(p));
+            } else {
+                const tbody = document.getElementById('users-tbody');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load users. Please try again.</td></tr>`;
+                this.showMessage('Failed to load users', 'error');
             }
         } catch (error) {
             console.error('Error loading users:', error);
+            const tbody = document.getElementById('users-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load users. Please try again.</td></tr>`;
+            this.showMessage('Failed to load users', 'error');
         }
     }
 
-    renderUsers(users) {
-        const tbody = document.getElementById('users-tbody');
-        tbody.innerHTML = users.map(user => {
-            // super_admin users get masked password and Admin role badge
-            const isSuperAdmin = user.role === 'super_admin';
-            const canEditThisUser = this.currentUserRole === 'super_admin' || user.role !== 'staff';
-            const canToggleDisable = this.currentUserRole === 'super_admin'
-                ? user.id !== this.currentUserId && !isSuperAdmin
-                : user.role !== 'staff' && user.id !== this.currentUserId && !isSuperAdmin;
-            const isDisabled = !!user.is_disabled;
+    // Kept for backward compat (called by realtime events etc.)
+    renderUsersFiltered() { this.applyUsersFilter(); }
 
-            return `
-                <tr>
-                    <td>${user.id}</td>
-                    <td>${user.username || '—'}</td>
-                    <td>${user.full_name || '—'}</td>
-                    <td>${user.email}</td>
-                    <td>${isSuperAdmin ? '••••••••' : (user.password ?? '')}</td>
-                    <td>
-                        ${isSuperAdmin ? 
-                            '<span class="status-pill" style="background: #f59e0b; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">Admin</span>' :
-                            `<select onchange="adminDashboard.updateUserRole(${user.id}, this.value)" ${user.id === this.currentUserId ? 'disabled' : ''}>
-                                <option value="customer" ${user.role === 'customer' ? 'selected' : ''}>Customer</option>
-                                <option value="farmer" ${user.role === 'farmer' ? 'selected' : ''}>Farmer</option>
-                                <option value="staff" ${user.role === 'staff' ? 'selected' : ''}>Staff</option>
-                            </select>`
-                        }
-                        ${!isSuperAdmin ? `<div style="margin-top:6px;"><span class="status-pill ${isDisabled ? 'pending' : 'completed'}">${isDisabled ? 'Disabled' : 'Active'}</span></div>` : ''}
-                    </td>
-                    <td>
-                        ${user.role === 'farmer' ? `
-                            <label class="toggle-switch">
-                                <input type="checkbox" ${user.is_verified ? 'checked' : ''} onchange="adminDashboard.toggleFarmerVerification(${user.id}, this.checked)" ${isSuperAdmin ? 'disabled' : ''}>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        ` : '—'}
-                    </td>
-                    <td>${new Date(user.created_at).toLocaleDateString()}</td>
-                    <td>
-                        ${canEditThisUser ? `<button onclick="adminDashboard.openUserEdit(${user.id})" class="btn btn-small">Edit User</button>` : ''}
-                        <button onclick="adminDashboard.toggleUserDisabled(${user.id}, ${!isDisabled})" class="btn btn-small ${isDisabled ? '' : 'btn-danger'}" ${!canToggleDisable ? 'disabled' : ''}>
-                            ${isDisabled ? 'Enable' : 'Disable'}
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    async loadOrders() {
+    async loadOrders(page = 1) {
         try {
-            const response = await fetch(`${this.apiBase}/admin/orders?t=${Date.now()}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                },
+            const pg = this.pagination?.orders || { page: 1, total: 0, limit: 50 };
+            pg.page = page;
+            const status = document.getElementById('order-status-filter')?.value || '';
+            const price = document.getElementById('order-price-filter')?.value || '';
+            const sort = document.getElementById('order-sort-filter')?.value || 'date_desc';
+            const search = (document.getElementById('order-search-input')?.value || '').trim();
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit),
+                sort,
+                t: String(Date.now())
+            });
+            if (status) params.set('status', status);
+            if (search) params.set('search', search);
+            if (price) {
+                if (price === '3000+') {
+                    params.set('min_total', '3000');
+                } else {
+                    const [min, max] = price.split('-').map(Number);
+                    if (!Number.isNaN(min)) params.set('min_total', String(min));
+                    if (!Number.isNaN(max)) params.set('max_total', String(max));
+                }
+            }
+            const response = await fetch(`${this.apiBase}/admin/orders?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
                 cache: 'no-store'
             });
 
             if (response.ok) {
                 const data = await response.json();
                 this.lastOrders = data.orders || [];
-                this.applyOrderFilters();
+                pg.total = Number(data.total || 0);
+                this.renderOrders(this.lastOrders);
+                this.renderPagination('orders-pagination', pg, (p) => this.loadOrders(p));
+                // Update admin charts whenever orders are refreshed
+                if (window.AdminCharts) window.AdminCharts.update(this.lastOrders);
             }
         } catch (error) {
             console.error('Error loading orders:', error);
         }
     }
 
-    clearOrdersFromUI() {
-        // Clear in-memory cache
-        this.lastOrders = [];
-        // Clear UI
-        this.renderOrders([]);
-        // Force reload from server
-        this.loadOrders();
+    applyUsersFilter() {
+        const q      = (document.getElementById('users-search-input')?.value || '').trim().toLowerCase();
+        const status = (document.getElementById('users-status-filter')?.value || '').trim().toLowerCase();
+
+        let users = [...(this.lastUsers || [])].filter(u => (u.role || '') === 'customer');
+        if (q) {
+            users = users.filter(u =>
+                String(u.id || '').includes(q) ||
+                String(u.full_name || '').toLowerCase().includes(q) ||
+                String(u.username || '').toLowerCase().includes(q) ||
+                String(u.email || '').toLowerCase().includes(q)
+            );
+        }
+        if (status === 'active') users = users.filter(u => !u.is_disabled);
+        else if (status === 'suspended') users = users.filter(u => u.is_disabled && u.disable_type === 'suspended');
+        else if (status === 'banned') users = users.filter(u => u.is_disabled && u.disable_type === 'banned');
+
+        this.renderUsers(users);
     }
 
-    applySearch() {
-        const q = (this.searchQuery || '').trim().toLowerCase();
-        if (this.activeSection === 'orders') {
-            this.applyOrderFilters();
-            return;
+    applyFarmersFilter() {
+        const q = (document.getElementById('farmers-search-input')?.value || '').trim().toLowerCase();
+        const status = (document.getElementById('farmers-status-filter')?.value || '').trim().toLowerCase();
+        const verification = (document.getElementById('farmers-verification-filter')?.value || '').trim().toLowerCase();
+
+        let farmers = [...(this.lastFarmers || [])];
+        
+        if (q) {
+            farmers = farmers.filter(f =>
+                String(f.id || '').includes(q) ||
+                String(f.full_name || '').toLowerCase().includes(q) ||
+                String(f.username || '').toLowerCase().includes(q) ||
+                String(f.email || '').toLowerCase().includes(q)
+            );
         }
-        if (this.activeSection === 'users') {
-            const users = [...(this.lastUsers || [])];
-            if (!q) {
-                this.renderUsers(users);
-                return;
-            }
-            const filtered = users.filter(u => {
-                const id = String(u.id || '');
-                const name = String(u.full_name || '').toLowerCase();
-                const username = String(u.username || '').toLowerCase();
-                const email = String(u.email || '').toLowerCase();
-                return id.includes(q) || name.includes(q) || username.includes(q) || email.includes(q);
-            });
-            this.renderUsers(filtered);
-            return;
-        }
-        if (this.activeSection === 'products') {
-            const products = [...(this.lastProducts || [])];
-            if (!q) {
-                this.renderProducts(products);
-                return;
-            }
-            const filtered = products.filter(p => {
-                const id = String(p.id || '');
-                const name = String(p.name || '').toLowerCase();
-                const farmer = String(p.farmer_name || '').toLowerCase();
-                const farmerEmail = String(p.farmer_email || '').toLowerCase();
-                return id.includes(q) || name.includes(q) || farmer.includes(q) || farmerEmail.includes(q);
-            });
-            this.renderProducts(filtered);
-        }
+        
+        if (status === 'active') farmers = farmers.filter(f => !f.is_disabled);
+        else if (status === 'disabled') farmers = farmers.filter(f => !!f.is_disabled);
+        
+        if (verification === 'verified') farmers = farmers.filter(f => !!f.is_verified);
+        else if (verification === 'unverified') farmers = farmers.filter(f => !f.is_verified);
+
+        this.renderFarmers(farmers);
     }
 
-    renderOrders(orders) {
-        const tbody = document.getElementById('orders-tbody');
-        tbody.innerHTML = orders.map(order => {
-            const isDisabled = !!order.is_disabled;
-            const statusClass = isDisabled ? 'pending' : this.getStatusClass(order.status);
-            const statusLabel = isDisabled ? 'Disabled' : this.formatStatus(order.status);
+    applyProductsFilter() {
+        const q = (document.getElementById('products-search-input')?.value || '').trim().toLowerCase();
+        const catId = document.getElementById('products-category-filter')?.value || '';
+        const status = (document.getElementById('products-status-filter')?.value || '').trim().toLowerCase();
+
+        let products = [...(this.lastProducts || [])];
+        
+        if (q) {
+            products = products.filter(p =>
+                String(p.id || '').includes(q) ||
+                String(p.name || '').toLowerCase().includes(q) ||
+                String(p.farmer_name || '').toLowerCase().includes(q)
+            );
+        }
+        
+        if (catId) {
+            products = products.filter(p => String(p.category_id) === catId);
+        }
+        
+        if (status === 'available') {
+            products = products.filter(p => !p.is_admin_disabled && !p.farmer_is_disabled && p.is_available);
+        } else if (status === 'disabled') {
+            products = products.filter(p => p.is_admin_disabled || p.farmer_is_disabled || !p.is_available);
+        }
+
+        this.renderProducts(products);
+    }
+
+    renderUsers(users) {
+        this.destroySortableTable('users-table');
+        const tbody = document.getElementById('users-tbody');
+        if (!tbody) return;
+        if (!users.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No users found</td></tr>`;
+            this.refreshSortableTable('users-table', { columns: [{ select: 7, sortable: false }] });
+            return;
+        }
+        tbody.innerHTML = users.map(user => {
+            const safeRole = 'customer';
+            const isSuperAdmin = false;
+            const canEditThisUser = true;
+            const canToggleDisable = this.currentUserRole === 'super_admin'
+                ? user.id !== this.currentUserId && !isSuperAdmin
+                : user.role !== 'staff' && user.id !== this.currentUserId && !isSuperAdmin;
+            const isDisabled = !!user.is_disabled;
+
+            const statusBadge = isSuperAdmin ? '' :
+                this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
+
+            const fullName = user.full_name || '—';
+            const rating = user.rating ? `<span class="star-rating">★</span> ${Number(user.rating).toFixed(1)}` : '—';
+
             return `
-            <tr>
-                <td><input type="checkbox" aria-label="Select order ${order.id}"></td>
-                <td>#${order.id}</td>
-                <td>${order.username || order.email}</td>
-                <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
-                <td>${this.fmtCurrency(order.total_amount)}</td>
-                <td>${new Date(order.created_at).toLocaleDateString()}</td>
-                <td>
-                    <button onclick="adminDashboard.viewOrderDetails(${order.id})" class="btn btn-small">View</button>
-                    <button onclick="adminDashboard.toggleOrderDisabled(${order.id}, ${!isDisabled})" class="btn btn-small ${isDisabled ? '' : 'btn-danger'}">
-                        ${isDisabled ? 'Enable' : 'Disable'}
-                    </button>
-                </td>
-            </tr>
-        `;
+                <tr>
+                    <td class="text-muted">${user.id}</td>
+                    <td>
+                        <div class="user-cell">
+                            <div class="user-cell-name">${this.escapeHtml(fullName)}</div>
+                        </div>
+                    </td>
+                    <td style="color:#777171f0">${this.escapeHtml(user.username || '—')}</td>
+                    <td>${this.escapeHtml(user.email)}</td>
+                    <td>${rating}</td>
+                    <td>
+                        <div class="d-flex flex-column gap-1 align-items-start">
+                            ${statusBadge}
+                        </div>
+                    </td>
+                    <td class="text-muted">${user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                    <td>
+                        <button class="btn btn-sm py-0 px-2 btn-ac-green customer-view-btn" data-user-id="${user.id}">View</button>
+                    </td>
+                </tr>
+            `;
         }).join('');
+
+        this.refreshSortableTable('users-table', { columns: [{ select: 7, sortable: false }], defaultSort: [6, 'desc'] });
     }
 
-    async loadProducts() {
+    formatRole(role) {
+        const map = { super_admin: 'Super Admin', staff: 'Staff', farmer: 'Farmer', customer: 'Customer' };
+        return map[role] || role;
+    }
+
+    async loadProducts(page = 1) {
         try {
-            const response = await fetch(`${this.apiBase}/admin/products`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
+            const pg = this.pagination?.products || { page: 1, total: 0, limit: 50 };
+            pg.page = page;
+            const search = (document.getElementById('products-search-input')?.value || '').trim();
+            const category = (document.getElementById('products-category-filter')?.value || '').trim();
+            const status = (document.getElementById('products-status-filter')?.value || '').trim();
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit)
+            });
+            if (search) params.set('search', search);
+            if (category) params.set('category', category);
+            if (status) params.set('status', status);
+
+            const response = await fetch(`${this.apiBase}/admin/products?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
             });
 
             if (response.ok) {
                 const data = await response.json();
                 this.lastProducts = data.products || [];
+                pg.total = Number(data.total || 0);
                 this.renderProducts(this.lastProducts);
+                this.renderPagination('products-pagination', pg, (p) => this.loadProducts(p));
+            } else {
+                const tbody = document.getElementById('products-tbody');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger py-3">Failed to load products. Please try again.</td></tr>`;
+                this.showMessage('Failed to load products', 'error');
             }
         } catch (error) {
             console.error('Error loading products:', error);
+            const tbody = document.getElementById('products-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger py-3">Failed to load products. Please try again.</td></tr>`;
+            this.showMessage('Failed to load products', 'error');
         }
     }
 
     renderProducts(products) {
+        this.destroySortableTable('products-table');
         const tbody = document.getElementById('products-tbody');
+        if (!tbody) return;
+        if (!products.length) {
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No products found</td></tr>`;
+            this.refreshSortableTable('products-table', { columns: [{ select: 0, sortable: false }, { select: 9, sortable: false }] });
+            return;
+        }
         tbody.innerHTML = products.map(product => {
             const isAdminDisabled = !!product.is_admin_disabled;
             const isFarmerDisabled = !!product.farmer_is_disabled;
@@ -697,52 +1939,807 @@ class AdminDashboard {
                 : isFarmerDisabled
                     ? 'Farmer Disabled'
                     : (product.is_available ? 'Available' : 'Unavailable');
-            const statusClass = (isAdminDisabled || isFarmerDisabled || !product.is_available) ? 'pending' : 'completed';
+            const statusKey = isAdminDisabled ? 'admin_disabled' : isFarmerDisabled ? 'farmer_disabled' : (product.is_available ? 'available' : 'unavailable');
+            const createdAt = product.created_at ? new Date(product.created_at) : null;
+            const createdLabel = createdAt ? createdAt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+            const createdOrder = createdAt ? createdAt.getTime() : 0;
+            const thumb = product.image_url
+                ? `<img src="${this.escapeHtml(product.image_url)}" class="product-thumb" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">`
+                : '';
+            const placeholder = `<div class="product-thumb-placeholder" ${product.image_url ? 'style="display:none"' : ''}><i class="bi bi-image"></i></div>`;
+
             return `
             <tr>
-                <td>${product.id}</td>
-                <td>${product.name}</td>
+                <td>${thumb}${placeholder}</td>
+                <td class="text-muted">${product.id}</td>
+                <td class="fw-semibold">${this.escapeHtml(product.name)}</td>
+                <td class="text-muted">${this.escapeHtml(product.category_name || '—')}</td>
                 <td>${this.fmtCurrency(product.price)}</td>
                 <td>${this.fmtNumber(product.stock_quantity ?? 0)}</td>
                 <td>
-                    <div>${product.farmer_name || 'Unassigned'}</div>
-                    ${product.farmer_email ? `<div style="color:#64748b;font-size:0.85rem;">${product.farmer_email}</div>` : ''}
+                    <div class="fw-semibold">${this.escapeHtml(product.farmer_name || 'Unassigned')}${product.farmer_username ? ` <span style="color:#777171f0;font-size:.75rem">(${this.escapeHtml(product.farmer_username)})</span>` : ''}</div>
+                    ${product.farmer_email ? `<div class="text-muted">${this.escapeHtml(product.farmer_email)}</div>` : ''}
                 </td>
-                <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
+                <td>${this.renderStatus(statusLabel, statusKey)}</td>
+                <td class="text-muted" data-order="${createdOrder}">${createdLabel}</td>
                 <td>
-                    <button onclick="adminDashboard.openProductEdit(${product.id})" class="btn btn-small">Edit</button>
-                    <button onclick="adminDashboard.toggleProductStatus(${product.id}, ${!isAdminDisabled})" class="btn btn-small ${isAdminDisabled ? '' : 'btn-danger'}">
-                        ${isAdminDisabled ? 'Enable' : 'Disable'}
-                    </button>
+                    <button class="btn btn-sm py-0 px-2 btn-ac-green product-edit-btn" data-product-id="${product.id}">Edit</button>
                 </td>
             </tr>
         `;
         }).join('');
+
+        this.refreshSortableTable('products-table', { columns: [{ select: 0, sortable: false }, { select: 9, sortable: false }], defaultSort: [8, 'desc'] });
     }
 
-    async loadCategories() {
+    clearOrdersFromUI() {
+        this.lastOrders = [];
+        this.renderOrders([]);
+        this.loadOrders();
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  Customer detail modal
+    // ────────────────────────────────────────────────────────────
+    async openCustomerDetailModal(userId) {
+        if (typeof bootstrap === 'undefined') return;
         try {
-            const response = await fetch(`${this.apiBase}/admin/categories`, {
+            const res = await fetch(`${this.apiBase}/admin/customers/${userId}/summary`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) {
+                const ov = document.getElementById('cdt-overview-content');
+                if (ov) ov.innerHTML = `<div class="text-center text-danger py-3">Failed to load customer details. Please try again.</div>`;
+                this.showToast('Failed to load customer details', 'error');
+                return;
+            }
+            const { user, orders, addresses, total_spent, total_orders } = await res.json();
+            const safeUser = { ...user, role: 'customer' };
+
+            // Overview tab
+            const ov = document.getElementById('cdt-overview-content');
+            if (ov) ov.innerHTML = `
+                <div class="row g-2 mb-3">
+                    ${[
+                        ['Full Name', safeUser.full_name || '—'], ['Username', safeUser.username || '—'],
+                        ['Email', safeUser.email || '—'], ['Phone', safeUser.phone || '—'],
+                        ['Status', safeUser.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
+                        ['Joined', safeUser.created_at ? new Date(safeUser.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
+                        ['Total Orders', total_orders], ['Total Spent', this.fmtCurrency(total_spent)],
+                    ].map(([k,v]) => `<div class="col-6"><div class="text-muted small">${k}</div><div class="fw-semibold small">${v}</div></div>`).join('')}
+                </div>
+            `;
+
+            // Orders tab
+            const otbody = document.getElementById('cdt-orders-tbody');
+            if (otbody) {
+                if (!orders.length) {
+                    otbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3 small">No orders</td></tr>`;
+                } else {
+                    otbody.innerHTML = orders.map(o => `
+                        <tr>
+                            <td class="small">#${o.id}</td>
+                            <td class="small">${this.escapeHtml(o.product_name || (o.items && o.items[0] && o.items[0].product_name) || '—')}</td>
+                            <td>${this.renderStatus(this.formatStatus(o.status), o.status)}</td>
+                            <td class="small">${this.fmtCurrency(o.total_amount)}</td>
+                            <td class="small text-muted">${o.created_at ? new Date(o.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                        </tr>
+                    `).join('');
+                }
+            }
+
+            // Addresses tab
+            const addrEl = document.getElementById('cdt-addresses-content');
+            if (addrEl) {
+                if (!addresses.length) {
+                    addrEl.innerHTML = `<div class="text-muted small py-3 text-center">No saved addresses</div>`;
+                } else {
+                    addrEl.innerHTML = addresses.map(a => `
+                        <div class="border rounded p-2 mb-2 small">
+                            ${a.is_default ? `<span class="badge bg-success-subtle text-success mb-1">Default</span><br>` : ''}
+                            <div class="fw-semibold">${this.escapeHtml(a.full_address || a.address_line || '')}</div>
+                            ${a.barangay ? `<div class="text-muted">${this.escapeHtml([a.barangay, a.city, a.province].filter(Boolean).join(', '))}</div>` : ''}
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Action buttons
+            const isDisabled = !!user.is_disabled;
+            const disableBtn = document.getElementById('cdt-disable-btn');
+            const enableBtn  = document.getElementById('cdt-enable-btn');
+
+            if (disableBtn) disableBtn.style.display = isDisabled ? 'none' : '';
+            if (enableBtn)  enableBtn.style.display  = isDisabled ? '' : 'none';
+
+            const editBtn = document.getElementById('cdt-edit-btn');
+            if (editBtn) { editBtn.onclick = () => { this.previousModalId = 'customer-detail-modal'; this.openUserEdit(userId); }; }
+
+            if (disableBtn) { disableBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to disable this customer?', { title: 'Disable Customer', danger: true })) return;
+                
+                // Show loading state
+                const spinner = document.getElementById('cdt-disable-spinner');
+                if (disableBtn) disableBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                
+                const r = await fetch(`${this.apiBase}/admin/users/${userId}/disable`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({ is_disabled: true })
+                });
+                
+                // Hide loading state
+                if (disableBtn) disableBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                
+                if (r.ok) {
+                    this.showToast('User disabled', 'success');
+                    disableBtn.style.display = 'none';
+                    if (enableBtn) enableBtn.style.display = '';
+                    // Update overview status
+                    const ov = document.getElementById('cdt-overview-content');
+                    if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Active<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Disabled</span>');
+                    this.loadUsers();
+                }
+            }; }
+
+            if (enableBtn) { enableBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to enable this customer?', { title: 'Enable Customer', danger: false })) return;
+                
+                // Show loading state
+                const spinner = document.getElementById('cdt-enable-spinner');
+                if (enableBtn) enableBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                
+                const r = await fetch(`${this.apiBase}/admin/users/${userId}/enable`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` }
+                });
+                
+                // Hide loading state
+                if (enableBtn) enableBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                
+                if (r.ok) {
+                    this.showToast('User enabled', 'success');
+                    enableBtn.style.display = 'none';
+                    if (disableBtn) disableBtn.style.display = '';
+                    // Update overview status
+                    const ov = document.getElementById('cdt-overview-content');
+                    if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Disabled<\/span>/, '<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Active</span>');
+                    this.loadUsers();
+                }
+            }; }
+
+            // Show side panel instead of modal
+            const panel = document.getElementById('customer-detail-panel');
+            if (panel) {
+                panel.removeAttribute('inert');
+                panel.classList.add('active');
+                this.syncPanelAccessibility();
+            }
+        } catch (err) {
+            console.error('Customer detail error:', err);
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  Farmer detail modal
+    // ────────────────────────────────────────────────────────────
+    async openFarmerDetailModal(farmerId) {
+        if (typeof bootstrap === 'undefined') return;
+        try {
+            const res = await fetch(`${this.apiBase}/admin/farmers/${farmerId}/summary`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) {
+                const infoEl = document.getElementById('fdt-info-content');
+                if (infoEl) infoEl.innerHTML = `<div class="text-center text-danger py-3">Failed to load farmer details. Please try again.</div>`;
+                this.showToast('Failed to load farmer details', 'error');
+                return;
+            }
+            const { farmer, products, reviews, revenue, order_count } = await res.json();
+
+            const infoEl = document.getElementById('fdt-info-content');
+            if (infoEl) infoEl.innerHTML = `
+                <div class="row g-2">
+                    ${[
+                        ['Full Name', farmer.full_name || '—'], ['Username', farmer.username || '—'],
+                        ['Email', farmer.email || '—'], ['Phone', farmer.phone || '—'],
+                        ['Verified', farmer.is_verified ? this.renderStatus('Yes', 'verified') : this.renderStatus('No', 'unverified')],
+                        ['Status', farmer.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
+                        ['Joined', farmer.created_at ? new Date(farmer.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
+                        ['Total Revenue', this.fmtCurrency(revenue)], ['Order Count', order_count],
+                    ].map(([k,v]) => `<div class="col-6"><div class="text-muted small">${k}</div><div class="fw-semibold small">${v}</div></div>`).join('')}
+                </div>
+            `;
+
+            const ptbody = document.getElementById('fdt-products-tbody');
+            if (ptbody) {
+                ptbody.innerHTML = products.length
+                    ? products.map(p => `
+                        <tr>
+                            <td class="small fw-semibold">${this.escapeHtml(p.name)}</td>
+                            <td class="small">${this.fmtCurrency(p.price)}</td>
+                            <td class="small">${p.stock_quantity}</td>
+                            <td>${this.renderStatus(p.is_available ? 'Available' : 'Unavailable', p.is_available ? 'available' : 'unavailable')}</td>
+                        </tr>
+                    `).join('')
+                    : `<tr><td colspan="4" class="text-center text-muted py-3 small">No products</td></tr>`;
+            }
+
+            const rvEl = document.getElementById('fdt-reviews-content');
+            if (rvEl) {
+                rvEl.innerHTML = reviews.length
+                    ? `<div class="list-group list-group-flush">` + reviews.map(r => `
+                        <div class="list-group-item border-0 px-0 py-2">
+                            <div class="d-flex align-items-center gap-1 mb-1">
+                                <span class="star-rating">${'★'.repeat(Math.round(r.rating || 0))}<span class="empty">${'★'.repeat(5 - Math.round(r.rating || 0))}</span></span>
+                                <span class="text-muted small">(${Number(r.rating || 0).toFixed(1)})</span>
+                            </div>
+                            ${r.comment ? `<div class="small text-muted">"${this.escapeHtml(r.comment)}"</div>` : ''}
+                        </div>
+                    `).join('') + `</div>`
+                    : `<div class="text-muted small py-3 text-center">No reviews yet</div>`;
+            }
+
+            // Action buttons
+            const editBtn = document.getElementById('fdt-edit-btn');
+            const disableBtn = document.getElementById('fdt-disable-btn');
+            const enableBtn  = document.getElementById('fdt-enable-btn');
+            const verifyBtn  = document.getElementById('fdt-verify-btn');
+            const unverifyBtn = document.getElementById('fdt-unverify-btn');
+            const isDisabled = !!farmer.is_disabled;
+            if (editBtn) editBtn.onclick = () => { this.previousModalId = 'farmer-detail-modal'; this.openUserEdit(farmerId); };
+            if (disableBtn) disableBtn.style.display = isDisabled ? 'none' : '';
+            if (enableBtn)  enableBtn.style.display  = isDisabled ? '' : 'none';
+            if (verifyBtn) verifyBtn.classList.toggle('d-none', !!farmer.is_verified);
+            if (unverifyBtn) unverifyBtn.classList.toggle('d-none', !farmer.is_verified);
+
+            if (disableBtn) { disableBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to disable this farmer?', { title: 'Disable Farmer', danger: true })) return;
+                
+                // Show loading state
+                const spinner = document.getElementById('fdt-disable-spinner');
+                if (disableBtn) disableBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                
+                const r = await fetch(`${this.apiBase}/admin/users/${farmerId}/disable`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({ is_disabled: true })
+                });
+                
+                // Hide loading state
+                if (disableBtn) disableBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                
+                if (r.ok) {
+                    this.showToast('Farmer disabled', 'success');
+                    disableBtn.style.display = 'none';
+                    if (enableBtn) enableBtn.style.display = '';
+                    const infoEl = document.getElementById('fdt-info-content');
+                    if (infoEl) infoEl.innerHTML = infoEl.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Active<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">Disabled</span>');
+                    this.loadFarmers();
+                }
+            }; }
+
+            if (verifyBtn) verifyBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to verify this farmer?', { title: 'Verify Farmer', danger: false })) return;
+                
+                // Show loading state
+                const spinner = document.getElementById('fdt-verify-spinner');
+                if (verifyBtn) verifyBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                
+                await this.toggleFarmerVerification(farmerId, true);
+                
+                // Hide loading state
+                if (verifyBtn) verifyBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                
+                verifyBtn.classList.add('d-none');
+                if (unverifyBtn) unverifyBtn.classList.remove('d-none');
+                const infoEl = document.getElementById('fdt-info-content');
+                if (infoEl) infoEl.innerHTML = infoEl.innerHTML.replace(/<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">No<\/span>/, '<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">Yes</span>');
+                this.loadFarmers();
+            };
+            if (unverifyBtn) unverifyBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to unverify this farmer?', { title: 'Unverify Farmer', danger: true })) return;
+                
+                // Show loading state
+                const spinner = document.getElementById('fdt-unverify-spinner');
+                if (unverifyBtn) unverifyBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                
+                await this.toggleFarmerVerification(farmerId, false);
+                
+                // Hide loading state
+                if (unverifyBtn) unverifyBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                
+                unverifyBtn.classList.add('d-none');
+                if (verifyBtn) verifyBtn.classList.remove('d-none');
+                const infoEl = document.getElementById('fdt-info-content');
+                if (infoEl) infoEl.innerHTML = infoEl.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Yes<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">No</span>');
+                this.loadFarmers();
+            };
+            if (enableBtn)  enableBtn.onclick  = async () => {
+                if (!await this.adminConfirm('Are you sure you want to enable this farmer?', { title: 'Enable Farmer', danger: false })) return;
+                
+                // Show loading state
+                const spinner = document.getElementById('fdt-enable-spinner');
+                if (enableBtn) enableBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                
+                const r = await fetch(`${this.apiBase}/admin/users/${farmerId}/enable`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` }
+                });
+                
+                // Hide loading state
+                if (enableBtn) enableBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                
+                if (r.ok) {
+                    this.showToast('Farmer enabled', 'success');
+                    enableBtn.style.display = 'none';
+                    if (disableBtn) disableBtn.style.display = '';
+                    const infoEl = document.getElementById('fdt-info-content');
+                    if (infoEl) infoEl.innerHTML = infoEl.innerHTML.replace(/<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Disabled<\/span>/, '<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">Active</span>');
+                    this.loadFarmers();
+                }
+            };
+
+            // Show side panel instead of modal
+            const panel = document.getElementById('farmer-detail-panel');
+            if (panel) {
+                panel.removeAttribute('inert');
+                panel.classList.add('active');
+                this.syncPanelAccessibility();
+            }
+        } catch (err) {
+            console.error('Farmer detail error:', err);
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  Profile section
+    // ────────────────────────────────────────────────────────────
+    async loadProfileSection() {
+        try {
+            const res = await fetch(`${this.apiBase}/auth/profile`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const { user } = await res.json();
+            this._profileUser = user;
+
+            const fullName = user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username;
+            const roleName = this.formatRole(user.role);
+            const isDisabled = !!user.is_disabled;
+
+            // Profile card
+            const avatarEl = document.getElementById('profile-avatar-img');
+            const nameEl   = document.getElementById('profile-full-name');
+            const roleEl   = document.getElementById('profile-role-label');
+            if (avatarEl && user.avatar_url) { avatarEl.src = user.avatar_url; }
+            if (nameEl)   nameEl.textContent  = fullName;
+            if (roleEl)   roleEl.textContent  = roleName;
+
+            // Overview tab fields
+            const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v || '—'; };
+            setVal('po-fullname', fullName);
+            setVal('po-username', user.username || '');
+            setVal('po-email', user.email);
+            setVal('po-phone', user.phone);
+            setVal('po-role', roleName);
+
+            const nameParts = [user.first_name, user.middle_name, user.last_name].filter(Boolean);
+            const dbFullName = nameParts.join(' ') || user.full_name || '';
+
+            // Edit tab pre-fill with actual values
+            const setValue = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.value = value || '';
+            };
+            setValue('pe-fullname', dbFullName);
+            setValue('pe-firstname', user.first_name || '');
+            setValue('pe-middlename', user.middle_name || '');
+            setValue('pe-lastname', user.last_name || '');
+            setValue('pe-phone', (user.phone || '').replace(/^\+63/, ''));
+
+        } catch (err) {
+            console.error('Profile section error:', err);
+        }
+    }
+
+    async submitProfileEdit(e) {
+        e.preventDefault();
+        const btn     = document.getElementById('profile-save-btn');
+        const spinner = document.getElementById('profile-save-spinner');
+        const first_name  = document.getElementById('pe-firstname')?.value?.trim();
+        const middle_name = document.getElementById('pe-middlename')?.value?.trim();
+        const last_name   = document.getElementById('pe-lastname')?.value?.trim();
+        const full_name   = document.getElementById('pe-fullname')?.value?.trim();
+        const rawPhone    = document.getElementById('pe-phone')?.value?.trim();
+        const profileUser = this._profileUser || {};
+        const fallbackPhone = String(profileUser.phone || '').replace(/^\+63/, '');
+        const effectiveFirstName = first_name || profileUser.first_name || '';
+        const effectiveMiddleName = middle_name || profileUser.middle_name || '';
+        const effectiveLastName = last_name || profileUser.last_name || '';
+        const effectiveFullName = full_name || profileUser.full_name || `${effectiveFirstName} ${effectiveMiddleName} ${effectiveLastName}`.trim();
+        const effectiveRawPhone = rawPhone || fallbackPhone;
+        // Validate phone format: must be 10 digits starting with 9
+        if (effectiveRawPhone && !/^9[0-9]{9}$/.test(effectiveRawPhone)) {
+            this.showToast('Phone must be 10 digits starting with 9 (e.g. 9123456789)', 'error');
+            return;
+        }
+        // Prepend +63 if a value is entered; leave blank if empty
+        const phone = effectiveRawPhone ? ('+63' + effectiveRawPhone.replace(/^\+63/, '')) : '';
+
+        if (btn) btn.disabled = true;
+        if (spinner) spinner.classList.remove('d-none');
+        try {
+            const res = await fetch(`${this.apiBase}/auth/profile`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                body: JSON.stringify({ first_name: effectiveFirstName, middle_name: effectiveMiddleName, last_name: effectiveLastName, full_name: effectiveFullName, phone })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { this.showToast(data.message || 'Update failed', 'error'); return; }
+            this.showToast('Profile updated', 'success');
+            this._loadedSections.profile = false;
+            this.loadProfileSection();
+        } catch(e) {
+            this.showToast('Update failed', 'error');
+        } finally {
+            if (btn) btn.disabled = false;
+            if (spinner) spinner.classList.add('d-none');
+        }
+    }
+
+    async submitProfilePassword(e) {
+        e.preventDefault();
+        const btn     = document.getElementById('profile-pw-btn');
+        const spinner = document.getElementById('profile-pw-spinner');
+        const current = document.getElementById('pp-current')?.value;
+        const newPw   = document.getElementById('pp-new')?.value;
+        const confirm = document.getElementById('pp-confirm')?.value;
+
+        if (newPw !== confirm) { this.showToast('Passwords do not match', 'error'); return; }
+        if ((newPw || '').length < 6) { this.showToast('Password must be at least 6 characters', 'error'); return; }
+
+        if (btn) btn.disabled = true;
+        if (spinner) spinner.classList.remove('d-none');
+        try {
+            const res = await fetch(`${this.apiBase}/auth/change-password`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                body: JSON.stringify({ currentPassword: current, newPassword: newPw })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { this.showToast(data.message || 'Failed to change password', 'error'); return; }
+            this.showToast('Password changed', 'success');
+            document.getElementById('profile-password-form')?.reset();
+        } catch(e) {
+            this.showToast('Failed to change password', 'error');
+        } finally {
+            if (btn) btn.disabled = false;
+            if (spinner) spinner.classList.add('d-none');
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // ────────────────────────────────────────────────────────────
+    //  Notifications
+    // ────────────────────────────────────────────────────────────
+    async loadNotifications(page = 1) {
+        const list = document.getElementById('notifications-list');
+        if (!list) return;
+        list.innerHTML = `<div class="text-center py-4"><span class="spinner-border spinner-border-sm text-success"></span></div>`;
+        try {
+            const limit = 20;
+            const res = await fetch(`${this.apiBase}/notifications?page=${page}&limit=${limit}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) throw new Error('Failed');
+            const data = await res.json();
+            const items = data.notifications || data || [];
+            const total = data.total || 0;
+            
+            // Initialize pagination state if not exists
+            if (!this.pagination.notifications) {
+                this.pagination.notifications = { page: 1, total: 0, limit };
+            }
+            this.pagination.notifications.page = page;
+            this.pagination.notifications.total = total;
+            this.pagination.notifications.limit = limit;
+            
+            this.renderNotifications(items);
+            this.renderPagination('notifications-pagination', this.pagination.notifications, (p) => this.loadNotifications(p));
+            this._updateNotifHeaderDropdown(items);
+            const unread = items.filter(n => !n.is_read).length;
+            const badge  = document.getElementById('notif-badge');
+            const count  = document.getElementById('notif-count');
+            if (badge) badge.style.display = unread ? '' : 'none';
+            if (count) count.textContent = unread > 99 ? '99+' : String(unread);
+        } catch (err) {
+            const l = document.getElementById('notifications-list');
+            if (l) l.innerHTML = `<div class="text-center py-4 text-muted small">Failed to load notifications.</div>`;
+            this._updateNotifHeaderDropdown([], true);
+        }
+    }
+
+    _updateNotifHeaderDropdown(items, error = null) {
+        const dropdownList = document.getElementById('notif-list');
+        if (!dropdownList) return;
+        
+        if (error) {
+            dropdownList.innerHTML = `<li class="text-center py-2 small text-danger">Failed to load notifications</li>`;
+            return;
+        }
+        
+        const recent = items.slice(0, 5);
+        if (!recent.length) {
+            dropdownList.innerHTML = `<li class="text-center py-2 small text-muted">No notifications</li>`;
+            return;
+        }
+        const iconMap = { order: 'bi-bag-check text-success', product: 'bi-box-seam text-primary', user: 'bi-person text-info', system: 'bi-gear text-secondary' };
+        dropdownList.innerHTML = recent.map(n => {
+            const ic = iconMap[n.type] || 'bi-bell text-muted';
+            const relTime = this._relativeTime(new Date(n.created_at));
+            const bg = n.is_read ? '' : 'bg-success bg-opacity-10';
+            return `<li>
+                <a class="dropdown-item d-flex align-items-start ${bg} py-2 notif-header-link"
+                    href="#" data-section="notifications">
+                    <i class="bi ${ic} me-2 mt-1 flex-shrink-0"></i>
+                    <div>
+                        <div class="small ${n.is_read ? '' : 'fw-semibold'}">${this.escapeHtml(n.title || 'Notification')}</div>
+                        <div style="font-size:.7rem" class="text-muted">${relTime}</div>
+                    </div>
+                </a>
+            </li>`;
+        }).join('');
+
+        // Add event listeners for header notification links
+        dropdownList.querySelectorAll('.notif-header-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const section = link.dataset.section;
+                if (section) this.navigateTo(section);
+            });
+        });
+    }
+
+    renderNotifications(items) {
+        const list = document.getElementById('notifications-list');
+        if (!list) return;
+        if (!items.length) {
+            list.innerHTML = `<div class="text-center py-5 text-muted">
+                <i class="bi bi-bell-slash fs-2 d-block mb-2"></i>
+                No notifications yet.
+            </div>`;
+            return;
+        }
+        const iconMap = {
+            order: 'bi-bag-check text-success',
+            product: 'bi-box-seam text-primary',
+            user: 'bi-person text-info',
+            system: 'bi-gear text-secondary',
+            payment: 'bi-credit-card text-warning',
+        };
+        list.innerHTML = items.map(n => {
+            const iconClass  = iconMap[n.type] || 'bi-bell text-muted';
+            const unreadCls  = n.is_read ? '' : 'fw-semibold';
+            const bgCls      = n.is_read ? '' : 'bg-success bg-opacity-10 border-start border-success border-3';
+            const relTime    = this._relativeTime(new Date(n.created_at));
+            const cursorCls  = n.is_read ? '' : 'cursor-pointer';
+            return `
+            <div class="d-flex align-items-start gap-3 py-3 px-3 ${bgCls} border-bottom notif-item ${cursorCls}" data-id="${n.id}">
+                <div class="flex-shrink-0 mt-1"><i class="bi ${iconClass} fs-5"></i></div>
+                <div class="flex-grow-1">
+                    <div class="${unreadCls} small">${this.escapeHtml(n.title || 'Notification')}</div>
+                    <div class="text-muted small">${this.escapeHtml(n.message || '')}</div>
+                    <div class="text-muted" style="font-size:.7rem">${relTime}</div>
+                </div>
+                ${!n.is_read ? `<button class="btn btn-sm py-0 px-1 text-muted flex-shrink-0 notif-mark-read-btn"
+                    data-id="${n.id}" title="Mark read">
+                    <i class="bi bi-check2"></i></button>` : ''}
+            </div>`;
+        }).join('');
+
+        // Add event listeners for notification items
+        list.querySelectorAll('.notif-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = Number(item.dataset.id);
+                this.openNotification(id);
+            });
+        });
+
+        // Add event listeners for mark read buttons
+        list.querySelectorAll('.notif-mark-read-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = Number(btn.dataset.id);
+                this.markNotifRead(id, btn);
+            });
+        });
+    }
+
+    _relativeTime(date) {
+        if (isNaN(date.getTime())) return '';
+        const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+        if (diff < 60)    return 'just now';
+        if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return `${Math.floor(diff / 86400)}d ago`;
+    }
+
+    async markNotifRead(id, btn) {
+        try {
+            await fetch(`${this.apiBase}/notifications/${id}/read`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            const item = btn?.closest('.notif-item');
+            if (item) {
+                item.classList.remove('bg-success', 'bg-opacity-10', 'border-start', 'border-success', 'border-3');
+                btn.remove();
+                item.querySelector('.fw-semibold')?.classList.remove('fw-semibold');
+            }
+            const countEl = document.getElementById('notif-count');
+            const badge   = document.getElementById('notif-badge');
+            if (countEl) {
+                const next = Math.max(0, (parseInt(countEl.textContent) || 0) - 1);
+                countEl.textContent = next > 99 ? '99+' : String(next);
+                if (badge) badge.style.display = next ? '' : 'none';
+            }
+        } catch (err) {
+            console.error('Failed to mark notification as read:', err);
+        }
+    }
+
+    async openNotification(id) {
+        // Mark as read and optionally navigate to related content
+        await this.markNotifRead(id, document.querySelector(`.notif-item[data-id="${id}"] button`));
+        // Future: could navigate to related section based on notification type
+    }
+
+    async markAllNotifsRead() {
+        const btn = document.getElementById('notif-mark-all-btn');
+        if (btn) btn.disabled = true;
+        try {
+            const response = await fetch(`${this.apiBase}/notifications/read-all`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) {
+                this.showToast('Failed to mark all as read', 'error');
+                return;
+            }
+            this.loadNotifications();
+        } catch (err) {
+            this.showToast('Failed to mark all as read', 'error');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    //  Farmers analytics chart
+    // ────────────────────────────────────────────────────────────
+    async renderFarmersAnalyticsChart() {
+        const el = document.getElementById('farmersRevenueChart');
+        if (!el || typeof ApexCharts === 'undefined') return;
+        try {
+            let farmers = this.lastTopFarmers || [];
+            if (!farmers.length) {
+                const params = new URLSearchParams({ period: 'month', page: '1', limit: '10' });
+                const res = await fetch(`${this.apiBase}/admin/dashboard/top-farmers?${params}`, {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                farmers = data.farmers || [];
+            }
+            if (!farmers.length) return;
+
+            const names    = farmers.map(f => f.full_name || f.username);
+            const revenues = farmers.map(f => parseFloat(f.revenue) || 0);
+
+            if (this._farmersChart) { this._farmersChart.destroy(); }
+            this._farmersChart = new ApexCharts(el, {
+                series: [{ name: 'Revenue', data: revenues }],
+                chart: { type: 'bar', height: 380, toolbar: { show: false } },
+                colors: ['#2d7a3a'],
+                plotOptions: { bar: { horizontal: true, borderRadius: 4, distributed: false } },
+                dataLabels: { enabled: false },
+                xaxis: { categories: names, labels: { formatter: v => '₱' + this.fmtNumber(v) } },
+                yaxis: { labels: { style: { fontSize: '12px' } } },
+                tooltip: { y: { formatter: v => this.fmtCurrency(v) } },
+                grid: { borderColor: '#f0f0f0' },
+            });
+            this._farmersChart.render();
+        } catch (err) {
+            console.warn('Farmers chart error:', err);
+        }
+    }
+
+    async loadCategories(page = 1) {
+        try {
+            const pg = this.pagination.categories || { page: 1, total: 0, limit: 50 };
+            pg.page = page;
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit)
+            });
+            const search = document.getElementById('category-search-input')?.value?.trim();
+            const statusFilter = document.getElementById('category-status-filter')?.value || '';
+            if (search) params.set('search', search);
+            if (statusFilter) params.set('status', statusFilter);
+            const response = await fetch(`${this.apiBase}/admin/categories?${params.toString()}`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
                 }
             });
-            if (!response.ok) return;
+            if (!response.ok) {
+                const tbody = document.getElementById('categories-tbody');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3">Failed to load categories. Please try again.</td></tr>`;
+                this.showMessage('Failed to load categories', 'error');
+                return;
+            }
             const data = await response.json();
             this.lastCategories = data.categories || [];
+            pg.total = Number(data.total || 0);
             this.renderCategories(this.lastCategories);
+            this.populateCategoryFilters();
         } catch (error) {
             console.error('Error loading categories:', error);
+            const tbody = document.getElementById('categories-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3">Failed to load categories. Please try again.</td></tr>`;
+            this.showMessage('Failed to load categories', 'error');
         }
     }
 
+    populateCategoryFilters() {
+        const categories = this.lastCategories || [];
+        const filters = [
+            'products-category-filter',
+            'catalog-category-filter-bar'
+        ];
+
+        filters.forEach(filterId => {
+            const select = document.getElementById(filterId);
+            if (!select) return;
+
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">All categories</option>';
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.name;
+                select.appendChild(option);
+            });
+            select.value = currentValue;
+        });
+    }
+
     renderCategories(categories) {
+        this.destroySortableTable('categories-table');
         const tbody = document.getElementById('categories-tbody');
         if (!tbody) return;
 
-        tbody.innerHTML = (categories || []).map((category) => {
+        const filtered = Array.isArray(categories) ? categories : [];
+        this.filteredCategories = filtered;
+        const pg = this.pagination.categories || { page: 1, total: 0, limit: 50 };
+
+        if (!filtered.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="table-placeholder">No categories found.</td></tr>`;
+        } else {
+            tbody.innerHTML = filtered.map((category) => {
             const isDisabled = !!category.is_disabled;
-            const statusPill = `<span class="status-pill ${isDisabled ? 'pending' : 'completed'}" style="margin-left:6px;">${isDisabled ? 'Disabled' : 'Active'}</span>`;
+            const statusPill = this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
             return `
             <tr>
                 <td>${category.id}</td>
@@ -750,21 +2747,32 @@ class AdminDashboard {
                 <td>${this.escapeHtml(category.description || '—')}</td>
                 <td>${statusPill}</td>
                 <td>
-                    <button class="btn btn-small" onclick="adminDashboard.editCategory(${category.id})">Edit</button>
-                    <button class="btn btn-small ${isDisabled ? '' : 'btn-danger'}" onclick="adminDashboard.toggleCategoryDisabled(${category.id}, ${!isDisabled})">
-                        ${isDisabled ? 'Enable' : 'Disable'}
-                    </button>
-                    <button class="btn btn-small btn-danger" onclick="adminDashboard.deleteCategory(${category.id})">Delete</button>
+                    <button class="btn btn-sm py-0 px-2 btn-ac-green category-edit-btn" data-category-id="${category.id}">Edit</button>
                 </td>
             </tr>
         `;
-        }).join('');
+            }).join('');
+        }
+
+        this.renderPagination('categories-pagination', pg, (page) => {
+            this.loadCategories(page);
+        });
+
+        this.refreshSortableTable('categories-table', { columns: [{ select: 4, sortable: false }] });
 
         const catalogCategorySelect = document.getElementById('catalog-category-select');
         if (catalogCategorySelect) {
             const options = ['<option value="">Select category</option>']
-                .concat((categories || []).filter(c => !c.is_disabled).map((category) => `<option value="${category.id}">${this.escapeHtml(category.name || '')}</option>`));
+                .concat((this.lastCategories || []).filter(c => !c.is_disabled).map((category) => `<option value="${category.id}">${this.escapeHtml(category.name || '')}</option>`));
             catalogCategorySelect.innerHTML = options.join('');
+        }
+
+        // Also populate the filter-bar category dropdown in #catalog-products
+        const filterCatSel = document.getElementById('catalog-category-filter-bar');
+        if (filterCatSel) {
+            filterCatSel.innerHTML = ['<option value="">All categories</option>']
+                .concat((this.lastCategories || []).map(c => `<option value="${c.id}">${this.escapeHtml(c.name || '')}</option>`))
+                .join('');
         }
     }
 
@@ -779,6 +2787,16 @@ class AdminDashboard {
             return;
         }
 
+        // Check for duplicate category name
+        const existingCategory = (this.lastCategories || []).find(
+            c => c.name.toLowerCase() === name.toLowerCase()
+        );
+        if (existingCategory) {
+            this.showMessage('A category with this name already exists', 'error');
+            return;
+        }
+
+        const restoreContext = this._currentCategoryRequestId;
         try {
             const response = await fetch(`${this.apiBase}/admin/categories`, {
                 method: 'POST',
@@ -795,25 +2813,54 @@ class AdminDashboard {
             }
 
             this.showMessage('Category created', 'success');
+            const newCategory = data.category || {};
+            const newCategoryId = newCategory.id || null;
             if (nameEl) nameEl.value = '';
             if (descEl) descEl.value = '';
-            this.loadCategories();
+            document.getElementById('add-category-modal')?.classList.remove('open');
+            await this.loadCategories();
+            // If a request review panel is open, refresh its category dropdown and select the new category
+            const reqCatSel = document.getElementById('category-request-category');
+            if (reqCatSel && newCategoryId) {
+                const opts = ['<option value="">Select category</option>'].concat((this.lastCategories || []).map((c) => {
+                    return `<option value="${c.id}" ${Number(c.id) === Number(newCategoryId) ? 'selected' : ''}>${this.escapeHtml(c.name)}</option>`;
+                })).concat(['<option value="__new__">+ Add New Category</option>']).join('');
+                reqCatSel.innerHTML = opts;
+            }
+            // Restore category request panel context if it was open
+            if (restoreContext) {
+                this.openCategoryRequestPanel(restoreContext);
+                this._currentCategoryRequestId = null;
+            }
         } catch (error) {
             console.error('Create category error:', error);
             this.showMessage('Failed to create category', 'error');
         }
     }
 
-    async loadCatalogNames() {
+    async loadCatalogNames(page = 1) {
         try {
-            const response = await fetch(`${this.apiBase}/admin/catalog-names`, {
-                headers: {
+            const pg = this.pagination['catalog-products'] || { page: 1, total: 0, limit: 50 };
+            pg.page = page;
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit)
+            });
+            const search = document.getElementById('catalog-search-input')?.value?.trim();
+            const catId = document.getElementById('catalog-category-filter-bar')?.value || '';
+            const statusFilter = document.getElementById('catalog-status-filter')?.value || '';
+            if (search) params.set('search', search);
+            if (catId) params.set('category', catId);
+            if (statusFilter) params.set('status', statusFilter);
+            const response = await fetch(`${this.apiBase}/admin/catalog-names?${params.toString()}`, {
+                    headers: {
                     'Authorization': `Bearer ${this.token}`
                 }
             });
             if (!response.ok) return;
             const data = await response.json();
             this.lastCatalogNames = data.names || [];
+            pg.total = Number(data.total || 0);
             this.renderCatalogNames(this.lastCatalogNames);
         } catch (error) {
             console.error('Error loading catalog names:', error);
@@ -821,24 +2868,80 @@ class AdminDashboard {
     }
 
     renderCatalogNames(items) {
+        this.destroySortableTable('catalog-products-table');
         const tbody = document.getElementById('catalog-names-tbody');
         if (!tbody) return;
 
-        if (!(items || []).length) {
-            tbody.innerHTML = `<tr><td colspan="4" style="color:#64748b;">No catalog names yet.</td></tr>`;
+        const filtered = Array.isArray(items) ? items : [];
+        this.filteredCatalogNames = filtered;
+        const pg = this.pagination['catalog-products'] || { page: 1, total: 0, limit: 50 };
+
+        if (!filtered.length) {
+            tbody.innerHTML = `<tr><td colspan="5" style="color:#64748b;">No catalog names yet.</td></tr>`;
+            this.renderPagination('catalog-products-pagination', pg, (page) => {
+                this.loadCatalogNames(page);
+            });
+            this.refreshSortableTable('catalog-products-table', { columns: [{ select: 4, sortable: false }] });
             return;
         }
 
-        tbody.innerHTML = (items || []).map((item) => `
+        tbody.innerHTML = filtered.map((item) => {
+            const isDisabled = !!item.is_disabled;
+            const statusPill = this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
+            return `
             <tr>
                 <td>${item.id}</td>
                 <td>${this.escapeHtml(item.name || '')}</td>
                 <td>${this.escapeHtml(item.category_name || '—')}</td>
+                <td>${statusPill}</td>
                 <td>
-                    <button class="btn btn-small" onclick="adminDashboard.editCatalogName(${item.id})">Edit</button>
+                    <button class="btn btn-sm py-0 px-2 btn-ac-green catalog-edit-btn" data-catalog-id="${item.id}">Edit</button>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
+
+        this.renderPagination('catalog-products-pagination', pg, (page) => {
+            this.loadCatalogNames(page);
+        });
+
+        this.refreshSortableTable('catalog-products-table', { columns: [{ select: 4, sortable: false }] });
+    }
+
+    async toggleCatalogNameDisabled(catalogId, disable) {
+        const label = disable ? 'disable' : 'enable';
+        if (!await this.adminConfirm(`Are you sure you want to ${label} this product name?`, { title: `${disable ? 'Disable' : 'Enable'} Product Name`, danger: disable })) return;
+        try {
+            const response = await fetch(`${this.apiBase}/admin/catalog-names/${catalogId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                body: JSON.stringify({ is_disabled: disable })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) { this.showMessage(data.message || 'Failed to update', 'error'); return; }
+            this.showMessage(disable ? 'Product name disabled' : 'Product name enabled', 'success');
+            this.loadCatalogNames();
+        } catch (error) {
+            console.error('Toggle catalog name error:', error);
+            this.showMessage('Operation failed', 'error');
+        }
+    }
+
+    async deleteCatalogName(catalogId) {
+        if (!await this.adminConfirm('Delete this product name permanently?', { title: 'Delete Product Name', okLabel: 'Delete' })) return;
+        try {
+            const response = await fetch(`${this.apiBase}/admin/catalog-names/${catalogId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) { this.showMessage(data.message || 'Failed to delete', 'error'); return; }
+            this.showMessage('Product name deleted', 'success');
+            this.loadCatalogNames();
+        } catch (error) {
+            console.error('Delete catalog name error:', error);
+            this.showMessage('Delete failed', 'error');
+        }
     }
 
     async addCatalogName() {
@@ -868,6 +2971,7 @@ class AdminDashboard {
 
             this.showMessage('Product name added to catalog', 'success');
             if (nameEl) nameEl.value = '';
+            document.getElementById('add-catalog-modal')?.classList.remove('open');
             this.loadCatalogNames();
         } catch (error) {
             console.error('Add catalog name error:', error);
@@ -879,85 +2983,76 @@ class AdminDashboard {
         const item = (this.lastCatalogNames || []).find((entry) => Number(entry.id) === Number(catalogId));
         if (!item) return;
 
-        const nextName = prompt('Edit product name:', item.name || '');
-        if (nextName === null) return;
-        const trimmedName = String(nextName || '').trim();
-        if (!trimmedName) {
-            this.showMessage('Product name cannot be empty', 'error');
-            return;
-        }
+        const result = await this.openCatalogEditModal(item);
+        if (!result) return;
 
-        const categoryPrompt = prompt('Enter category ID:', String(item.category_id || ''));
-        if (categoryPrompt === null) return;
-        const nextCategoryId = Number(categoryPrompt || 0);
-        if (!nextCategoryId) {
-            this.showMessage('Valid category ID is required', 'error');
-            return;
-        }
-
-        try {
-            const response = await fetch(`${this.apiBase}/admin/catalog-names/${catalogId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.token}`
-                },
-                body: JSON.stringify({ name: trimmedName, category_id: nextCategoryId })
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                this.showMessage(data.message || 'Failed to update product name', 'error');
-                return;
+        if (result.action === 'save') {
+            try {
+                const response = await fetch(`${this.apiBase}/admin/catalog-names/${catalogId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`
+                    },
+                    body: JSON.stringify({ name: result.name, category_id: result.category_id })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    this.showMessage(data.message || 'Failed to update product name', 'error');
+                    return;
+                }
+                this.showMessage('Product name updated', 'success');
+                this.loadCatalogNames();
+            } catch (error) {
+                console.error('Edit catalog name error:', error);
+                this.showMessage('Failed to update product name', 'error');
             }
-
-            this.showMessage('Product name updated', 'success');
-            this.loadCatalogNames();
-        } catch (error) {
-            console.error('Edit catalog name error:', error);
-            this.showMessage('Failed to update product name', 'error');
+        } else if (result.action === 'disable') {
+            await this.toggleCatalogNameDisabled(catalogId, !item.is_disabled);
         }
+        // NOTE: Delete action reserved for superadmin only; disabled in UI.
+        // } else if (result.action === 'delete') {
+        //     await this.deleteCatalogName(catalogId);
+        // }
     }
 
     async editCategory(categoryId) {
         const category = (this.lastCategories || []).find((item) => Number(item.id) === Number(categoryId));
         if (!category) return;
 
-        const nextName = prompt('Edit category name:', category.name || '');
-        if (nextName === null) return;
-        const trimmedName = String(nextName || '').trim();
-        if (!trimmedName) {
-            this.showMessage('Category name cannot be empty', 'error');
-            return;
-        }
+        const result = await this.openCategoryEditModal(category);
+        if (!result) return;
 
-        const nextDescription = prompt('Edit category description:', category.description || '');
-        if (nextDescription === null) return;
-
-        try {
-            const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.token}`
-                },
-                body: JSON.stringify({ name: trimmedName, description: String(nextDescription || '').trim(), type: 'agricultural' })
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                this.showMessage(data.message || 'Failed to update category', 'error');
-                return;
+        if (result.action === 'save') {
+            try {
+                const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`
+                    },
+                    body: JSON.stringify({ name: result.name, description: result.description, type: 'agricultural' })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    this.showMessage(data.message || 'Failed to update category', 'error');
+                    return;
+                }
+                this.showMessage('Category updated', 'success');
+                this.loadCategories();
+            } catch (error) {
+                console.error('Update category error:', error);
+                this.showMessage('Failed to update category', 'error');
             }
-
-            this.showMessage('Category updated', 'success');
-            this.loadCategories();
-        } catch (error) {
-            console.error('Update category error:', error);
-            this.showMessage('Failed to update category', 'error');
+        } else if (result.action === 'disable') {
+            await this.toggleCategoryDisabled(categoryId, !category.is_disabled);
+        } else if (result.action === 'delete') {
+            await this.deleteCategory(categoryId);
         }
     }
 
     async deleteCategory(categoryId) {
-        if (!confirm('Delete this category permanently? This cannot be undone.')) return;
+        if (!await this.adminConfirm('Delete this category permanently? This cannot be undone.', { title: 'Delete Category', okLabel: 'Delete' })) return;
 
         try {
             const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}`, {
@@ -979,48 +3074,213 @@ class AdminDashboard {
         }
     }
 
-    async loadCategoryRequests() {
+    async loadCategoryRequests(status, search, page = 1) {
         try {
-            const response = await fetch(`${this.apiBase}/admin/category-requests?status=pending`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
+            const pg = this.pagination['category-requests'] || { page: 1, total: 0, limit: 50 };
+            pg.page = page;
+            const params = new URLSearchParams();
+            const rawStatusVal = status !== undefined ? status : (document.getElementById('cat-req-status-filter')?.value ?? 'pending');
+            const statusVal = rawStatusVal === '' ? 'all' : rawStatusVal;
+            if (statusVal) params.set('status', statusVal);
+            const searchVal = search !== undefined ? search : (document.getElementById('cat-req-search-input')?.value?.trim() ?? '');
+            if (searchVal) params.set('search', searchVal);
+            params.set('page', String(page));
+            params.set('limit', String(pg.limit));
+
+            const response = await fetch(`${this.apiBase}/admin/category-requests?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (!response.ok) return;
 
             const data = await response.json();
             this.lastCategoryRequests = data.requests || [];
+            pg.total = Number(data.total || 0);
             this.renderCategoryRequests(this.lastCategoryRequests);
         } catch (error) {
             console.error('Error loading category requests:', error);
         }
     }
 
-    renderCategoryRequests(requests) {
-        const tbody = document.getElementById('category-requests-tbody');
+    async loadProductApprovals(status, search, page = 1) {
+        try {
+            const pg = this.pagination['product-approvals'] || { page: 1, total: 0, limit: 50 };
+            pg.page = page;
+            const params = new URLSearchParams();
+            const rawStatusVal = status !== undefined ? status : (document.getElementById('product-approval-status-filter')?.value ?? 'pending');
+            const statusVal = rawStatusVal === '' ? 'all' : rawStatusVal;
+            if (statusVal) params.set('status', statusVal);
+            const searchVal = search !== undefined ? search : (document.getElementById('product-approval-search-input')?.value?.trim() ?? '');
+            if (searchVal) params.set('search', searchVal);
+            params.set('page', String(page));
+            params.set('limit', String(pg.limit));
+
+            const response = await fetch(`${this.apiBase}/admin/products?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+
+            const data = await response.json();
+            this.lastProductApprovals = data.products || [];
+            pg.total = Number(data.total || 0);
+            this.renderProductApprovals(this.lastProductApprovals);
+            this.updateProductApprovalsBadge();
+        } catch (error) {
+            console.error('Error loading product approvals:', error);
+        }
+    }
+
+    renderProductApprovals(products) {
+        this.destroySortableTable('product-approvals-table');
+        const tbody = document.getElementById('product-approvals-tbody');
         if (!tbody) return;
 
-        if (!(requests || []).length) {
-            tbody.innerHTML = `<tr><td colspan="5" style="color:#64748b;">No pending requests.</td></tr>`;
+        const filtered = Array.isArray(products) ? products : [];
+        this.filteredProductApprovals = filtered;
+        const pg = this.pagination['product-approvals'] || { page: 1, total: 0, limit: 50 };
+
+        if (!filtered.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="table-placeholder">No products found</td></tr>`;
+            this.renderPagination('product-approvals-pagination', pg, (p) => this.loadProductApprovals(undefined, undefined, p));
             return;
         }
 
-        tbody.innerHTML = requests.map((request) => `
+        tbody.innerHTML = filtered.map(p => `
             <tr>
-                <td>${request.id}</td>
-                <td>${this.escapeHtml(request.name || '')}</td>
-                <td>${this.escapeHtml(request.category_name || request.requested_category_name || '—')}</td>
-                <td>${this.escapeHtml(request.requested_by_username || 'Farmer')}</td>
-                <td>
-                    <button class="btn btn-small" onclick="adminDashboard.openCategoryRequestPanel(${request.id})">Review</button>
+                <td class="small text-muted">${p.id}</td>
+                <td class="small fw-semibold">${this.escapeHtml(p.name || '')}</td>
+                <td class="small">${this.escapeHtml(p.category_name || '—')}</td>
+                <td class="small">${this.escapeHtml(p.farmer_name || '—')}</td>
+                <td class="small">${this.fmtCurrency(p.price)}</td>
+                <td class="small">${p.stock || 0}</td>
+                <td class="small text-muted">${p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-ac-green product-approve-btn" data-product-id="${p.id}">Approve</button>
+                    <button class="btn btn-sm btn-ac-red product-reject-btn" data-product-id="${p.id}">Reject</button>
                 </td>
             </tr>
         `).join('');
+
+        this.refreshSortableTable('product-approvals-table');
+        this.renderPagination('product-approvals-pagination', pg, (p) => this.loadProductApprovals(undefined, undefined, p));
+    }
+
+    updateProductApprovalsBadge() {
+        const badge = document.getElementById('product-approvals-badge');
+        if (!badge) return;
+        const pendingCount = this.lastProductApprovals?.filter(p => p.status === 'pending').length || 0;
+        if (pendingCount > 0) {
+            badge.textContent = pendingCount;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    async approveProduct(productId) {
+        if (!await this.adminConfirm('Are you sure you want to approve this product?', { title: 'Approve Product', danger: false })) return;
+        try {
+            const response = await fetch(`${this.apiBase}/admin/products/${productId}/approve`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) throw new Error('Failed to approve product');
+            this.showToast('Product approved successfully', 'success');
+            this.loadProductApprovals();
+        } catch (error) {
+            console.error('Error approving product:', error);
+            this.showToast('Failed to approve product', 'error');
+        }
+    }
+
+    async rejectProduct(productId) {
+        if (!await this.adminConfirm('Are you sure you want to reject this product?', { title: 'Reject Product', danger: true })) return;
+        try {
+            const response = await fetch(`${this.apiBase}/admin/products/${productId}/reject`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) throw new Error('Failed to reject product');
+            this.showToast('Product rejected successfully', 'success');
+            this.loadProductApprovals();
+        } catch (error) {
+            console.error('Error rejecting product:', error);
+            this.showToast('Failed to reject product', 'error');
+        }
+    }
+
+    renderCategoryRequestsPreview(requests) {
+        const tbody = document.getElementById('cat-req-preview-tbody');
+        if (!tbody) return;
+        if (!(requests || []).length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="table-placeholder">No pending requests</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = requests.slice(0, 10).map(r => `
+            <tr>
+                <td class="small text-muted">${r.id}</td>
+                <td class="small fw-semibold">${this.escapeHtml(r.name || '')}</td>
+                <td class="small">${this.escapeHtml(r.category_name || r.requested_category_name || '—')}</td>
+                <td class="small">${this.escapeHtml(r.requested_by_username || 'Farmer')}</td>
+                <td>
+                    <button class="btn btn-sm py-0 px-2 btn-ac-green category-requests-view-btn"
+                        data-section="category-requests">View</button>
+                </td>
+            </tr>
+        `).join('');
+
+    }
+
+    renderCategoryRequests(requests) {
+        this.destroySortableTable('category-requests-table');
+        const tbody = document.getElementById('category-requests-tbody');
+        if (!tbody) return;
+
+        const filtered = Array.isArray(requests) ? requests : [];
+        this.filteredCategoryRequests = filtered;
+        const pg = this.pagination['category-requests'] || { page: 1, total: 0, limit: 50 };
+
+        if (!filtered.length) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No requests found.</td></tr>`;
+            this.renderPagination('category-requests-pagination', pg, (page) => {
+                this.loadCategoryRequests(undefined, undefined, page);
+            });
+            this.refreshSortableTable('category-requests-table', { columns: [{ select: 6, sortable: false }] });
+            return;
+        }
+
+        tbody.innerHTML = filtered.map((request) => {
+            const date   = request.created_at ? new Date(request.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+            const status = request.status || 'pending';
+            const requesterName = this.escapeHtml(request.requested_by_full_name || request.requested_by_username || 'Farmer');
+            const requesterUser = request.requested_by_username ? ` <span style="color:#777171f0;font-size:.75rem">(${this.escapeHtml(request.requested_by_username)})</span>` : '';
+            const requesterEmail = request.requested_by_email ? `<div class="text-muted">${this.escapeHtml(request.requested_by_email)}</div>` : '';
+            return `
+            <tr>
+                <td class="text-muted">${request.id}</td>
+                <td class="fw-semibold">${this.escapeHtml(request.name || '')}</td>
+                <td>${this.escapeHtml(request.category_name || request.requested_category_name || '—')}</td>
+                <td><div class="fw-semibold">${requesterName}${requesterUser}</div>${requesterEmail}</td>
+                <td class="text-muted">${date}</td>
+                <td>${this.renderStatus(this.formatStatus(status), status)}</td>
+                <td>
+                    <button class="btn btn-sm py-0 px-2 btn-ac-green category-request-review-btn" data-request-id="${request.id}">Review</button>
+                </td>
+            </tr>
+        `}).join('');
+
+        this.renderPagination('category-requests-pagination', pg, (page) => {
+            this.loadCategoryRequests(undefined, undefined, page);
+        });
+
+        this.refreshSortableTable('category-requests-table', { columns: [{ select: 6, sortable: false }], defaultSort: [4, 'desc'] });
     }
 
     openCategoryRequestPanel(requestId) {
         const request = (this.lastCategoryRequests || []).find((item) => Number(item.id) === Number(requestId));
         if (!request) return;
+
+        // Store current request ID for context restoration after adding new category
+        this._currentCategoryRequestId = requestId;
 
         const panel = document.getElementById('category-detail-panel');
         const content = document.getElementById('category-detail-content');
@@ -1031,46 +3291,170 @@ class AdminDashboard {
             return `<option value="${category.id}" ${selected}>${this.escapeHtml(category.name)}</option>`;
         })).join('');
 
+        const requesterInfo = [
+            request.requested_by_full_name ? `<span class="fw-semibold">${this.escapeHtml(request.requested_by_full_name)}</span>` : '',
+            request.requested_by_username ? `<span style="color:#777171f0">${this.escapeHtml(request.requested_by_username)}</span>` : '',
+            request.requested_by_email ? `<span class="text-muted">${this.escapeHtml(request.requested_by_email)}</span>` : ''
+        ].filter(Boolean).join(' &nbsp;&bull;&nbsp; ');
+
+        const categoryOptionsWithNew = categoryOptions.replace('</select>', '') + `<option value="__new__">+ Add New Category</option></select>`;
+
         content.innerHTML = `
-            <div class="panel-header">
-                <h3>Request #${request.id}</h3>
+            <div class="panel-header" style="background:#f8faf8;color:var(--ac-heading);padding:12px 16px;border-radius:8px 8px 0 0;border-bottom:1px solid var(--ac-border-light);">
+                <h3 style="color:var(--ac-heading);margin:0;">Request #${request.id}</h3>
             </div>
+            ${requesterInfo ? `<div class="panel-section" style="padding-bottom:0.5rem;border-bottom:1px solid #e8ede9;margin-bottom:0.5rem;"><div class="small">${requesterInfo}</div></div>` : ''}
             <div class="panel-section" style="display:flex; flex-direction:column; gap:0.6rem;">
                 <label>Name</label>
-                <input id="category-request-name" class="search-input" value="${this.escapeHtml(request.name || '')}">
+                <input id="category-request-name" class="form-control form-control-sm" value="${this.escapeHtml(request.name || '')}">
                 <label>Category</label>
-                <select id="category-request-category" class="filter-select">${categoryOptions}</select>
-                <label>Requested New Category</label>
-                <input id="category-request-requested-category" class="search-input" value="${this.escapeHtml(request.requested_category_name || '')}" placeholder="Optional farmer-requested category name">
-                <label>Add New Category (Staff)</label>
-                <input id="category-request-new-category" class="search-input" placeholder="Create category during review (optional)">
+                <select id="category-request-category" class="form-select form-select-sm">${categoryOptionsWithNew}</select>
                 <label>Request Notes</label>
-                <textarea class="search-input" rows="3" disabled>${this.escapeHtml(request.notes || '')}</textarea>
+                <textarea class="form-control form-control-sm" rows="3" disabled maxlength="250">${this.escapeHtml((request.notes || '').substring(0, 250))}</textarea>
                 <label>Review Notes</label>
-                <textarea id="category-request-review-notes" class="search-input" rows="3" placeholder="Optional review notes"></textarea>
-                <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
-                    <button class="btn btn-secondary btn-small" onclick="adminDashboard.reviewCategoryRequest(${request.id}, 'pending')">Save Edits</button>
-                    <button class="btn btn-primary btn-small" onclick="adminDashboard.reviewCategoryRequest(${request.id}, 'approved')">Approve</button>
-                    <button class="btn btn-danger btn-small" onclick="adminDashboard.reviewCategoryRequest(${request.id}, 'rejected')">Decline</button>
+                <textarea id="category-request-review-notes" class="form-control form-control-sm" rows="3" placeholder="Optional review notes (max 250 characters)" maxlength="250"></textarea>
+                <div class="text-muted small" style="text-align:right; margin-top:2px;">
+                    <span id="category-request-review-notes-counter">0</span>/250
                 </div>
             </div>
         `;
 
+        // Add footer with approve/decline buttons
+        const footer = document.createElement('div');
+        footer.className = 'detail-panel-footer gap-2';
+        footer.innerHTML = `
+            <button class="btn btn-sm btn-ac-red category-request-reject-btn" data-request-id="${request.id}" data-status="rejected">
+                <span class="spinner-border spinner-border-sm d-none me-1 category-request-reject-spinner"></span>
+                Decline
+            </button>
+            <button class="btn btn-sm btn-ac-green category-request-approve-btn" data-request-id="${request.id}" data-status="approved">
+                <span class="spinner-border spinner-border-sm d-none me-1 category-request-approve-spinner"></span>
+                Approve
+            </button>
+        `;
+        panel.appendChild(footer);
+
+        // Wire "Add New Category" dropdown option to open the Add Category modal
+        const catSel = document.getElementById('category-request-category');
+        if (catSel) {
+            catSel.addEventListener('change', () => {
+                if (catSel.value === '__new__') {
+                    catSel.value = '';
+                    document.getElementById('add-category-modal')?.classList.add('open');
+                }
+            });
+        }
+
+        // Wire character counter for review notes
+        const reviewNotesEl = document.getElementById('category-request-review-notes');
+        const counterEl = document.getElementById('category-request-review-notes-counter');
+        if (reviewNotesEl && counterEl) {
+            const updateCounter = () => {
+                counterEl.textContent = reviewNotesEl.value.length;
+            };
+            reviewNotesEl.addEventListener('input', updateCounter);
+            updateCounter();
+        }
+
+        // Add event listeners for approve/decline buttons
+        panel.querySelector('.category-request-approve-btn')?.addEventListener('click', async () => {
+            const requestId = Number(panel.querySelector('.category-request-approve-btn').dataset.requestId);
+            if (!await this.adminConfirm('Are you sure you want to approve this category request?', { title: 'Approve Request', danger: false })) return;
+            
+            // Show loading state
+            const approveBtn = panel.querySelector('.category-request-approve-btn');
+            const rejectBtn = panel.querySelector('.category-request-reject-btn');
+            const approveSpinner = panel.querySelector('.category-request-approve-spinner');
+            if (approveBtn) approveBtn.disabled = true;
+            if (rejectBtn) rejectBtn.disabled = true;
+            if (approveSpinner) approveSpinner.classList.remove('d-none');
+            
+            this.reviewCategoryRequest(requestId, 'approved');
+            // Remove footer after action
+            footer.remove();
+        });
+
+        panel.querySelector('.category-request-reject-btn')?.addEventListener('click', async () => {
+            const requestId = Number(panel.querySelector('.category-request-reject-btn').dataset.requestId);
+            if (!await this.adminConfirm('Are you sure you want to reject this category request?', { title: 'Reject Request', danger: true })) return;
+            
+            // Show loading state
+            const approveBtn = panel.querySelector('.category-request-approve-btn');
+            const rejectBtn = panel.querySelector('.category-request-reject-btn');
+            const rejectSpinner = panel.querySelector('.category-request-reject-spinner');
+            if (approveBtn) approveBtn.disabled = true;
+            if (rejectBtn) rejectBtn.disabled = true;
+            if (rejectSpinner) rejectSpinner.classList.remove('d-none');
+            
+            this.reviewCategoryRequest(requestId, 'rejected');
+            // Remove footer after action
+            footer.remove();
+        });
+
         panel.classList.add('active');
+        this.syncPanelAccessibility();
     }
 
     closeCategoryDetails() {
-        document.getElementById('category-detail-panel')?.classList.remove('active');
+        const panel = document.getElementById('category-detail-panel');
+        if (panel) {
+            panel.classList.remove('active');
+            panel.setAttribute('inert', '');
+        }
+        this.syncPanelAccessibility();
+    }
+
+    closeCustomerDetails() {
+        const panel = document.getElementById('customer-detail-panel');
+        if (panel) {
+            panel.classList.remove('active');
+            panel.setAttribute('inert', '');
+        }
+        this.syncPanelAccessibility();
+    }
+
+    closeFarmerDetails() {
+        const panel = document.getElementById('farmer-detail-panel');
+        if (panel) {
+            panel.classList.remove('active');
+            panel.setAttribute('inert', '');
+        }
+        this.syncPanelAccessibility();
+    }
+
+    closeCategoryEdit() {
+        const panel = document.getElementById('category-edit-panel');
+        if (panel) {
+            panel.classList.remove('active');
+            panel.setAttribute('inert', '');
+        }
+        this.syncPanelAccessibility();
+    }
+
+    closeCatalogEdit() {
+        const panel = document.getElementById('catalog-edit-panel');
+        if (panel) {
+            panel.classList.remove('active');
+            panel.setAttribute('inert', '');
+        }
+        this.syncPanelAccessibility();
+    }
+
+    closeProductEdit() {
+        const panel = document.getElementById('edit-product-panel');
+        if (panel) {
+            panel.classList.remove('active');
+            panel.setAttribute('inert', '');
+        }
+        this.syncPanelAccessibility();
     }
 
     async reviewCategoryRequest(requestId, status) {
         const name = String(document.getElementById('category-request-name')?.value || '').trim();
         const category_id = Number(document.getElementById('category-request-category')?.value || 0);
-        const requested_category_name = String(document.getElementById('category-request-requested-category')?.value || '').trim();
-        const new_category_name = String(document.getElementById('category-request-new-category')?.value || '').trim();
         const review_notes = String(document.getElementById('category-request-review-notes')?.value || '').trim();
 
-        if (status === 'approved' && (!name || (!category_id && !new_category_name))) {
+        if (status === 'approved' && (!name || !category_id)) {
             this.showMessage('Name and category are required for approval', 'error');
             return;
         }
@@ -1086,8 +3470,6 @@ class AdminDashboard {
                     status,
                     name,
                     category_id,
-                    requested_category_name,
-                    new_category_name,
                     review_notes
                 })
             });
@@ -1121,6 +3503,7 @@ class AdminDashboard {
 
             if (response.ok) {
                 this.showMessage('Farmer verification updated!', 'success');
+                await this.loadFarmers();
             } else {
                 this.showMessage('Failed to update verification', 'error');
             }
@@ -1228,53 +3611,12 @@ class AdminDashboard {
     }
 
     applyOrderFilters() {
-        const statusFilter = document.getElementById('order-status-filter');
-        const priceFilter = document.getElementById('order-price-filter');
-        const sortFilter = document.getElementById('order-sort-filter');
-
-        let filtered = [...(this.lastOrders || [])];
-
-        if (statusFilter && statusFilter.value) {
-            filtered = filtered.filter(order => order.status === statusFilter.value);
-        }
-
-        if (priceFilter && priceFilter.value) {
-            const [min, max] = priceFilter.value.split('-').map(Number);
-            filtered = filtered.filter(order => {
-                const total = parseFloat(order.total_amount || 0);
-                return total >= min && total <= max;
-            });
-        }
-
-        if (sortFilter && sortFilter.value) {
-            if (sortFilter.value === 'date_asc') {
-                filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-            } else if (sortFilter.value === 'date_desc') {
-                filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            } else if (sortFilter.value === 'total_desc') {
-                filtered.sort((a, b) => parseFloat(b.total_amount) - parseFloat(a.total_amount));
-            } else if (sortFilter.value === 'total_asc') {
-                filtered.sort((a, b) => parseFloat(a.total_amount) - parseFloat(b.total_amount));
-            }
-        }
-
-        const q = (this.searchQuery || '').trim().toLowerCase();
-        if (q) {
-            filtered = filtered.filter(order => {
-                const id = String(order.id || '');
-                const user = String(order.full_name || order.username || '').toLowerCase();
-                const email = String(order.email || '').toLowerCase();
-                return id.includes(q) || user.includes(q) || email.includes(q);
-            });
-        }
-
-        this.renderOrders(filtered);
+        this.loadOrders(1);
     }
 
     startUnreadPolling() {
-        const badge = document.getElementById('admin-chat-unread');
-        if (!badge) return;
-
+        // Unread count is driven by SSE 'chat.message' events to avoid polling.
+        // Initial load only.
         const load = async () => {
             try {
                 const res = await fetch(`${this.apiBase}/messages/unread-count`, {
@@ -1283,40 +3625,89 @@ class AdminDashboard {
                 if (!res.ok) return;
                 const data = await res.json().catch(() => ({}));
                 const count = Number(data.count || 0);
-                badge.textContent = String(count);
-                badge.style.display = count > 0 ? 'inline-flex' : 'none';
+                const badge = document.getElementById('admin-chat-unread');
+                if (badge) {
+                    badge.textContent = String(count);
+                    badge.style.display = count > 0 ? 'inline-flex' : 'none';
+                }
             } catch (_) {
                 // ignore
             }
         };
-
         load();
-        setInterval(load, 5000);
+        // Refresh on SSE chat.message events (wired in setupRealtime)
+        this._refreshUnread = load;
     }
 
     getStatusClass(status) {
-        if (['pending', 'confirmed', 'preparing', 'out_for_delivery'].includes(status)) return 'preparing';
+        if (['pending'].includes(status)) return 'pending';
+        if (['confirmed'].includes(status)) return 'confirmed';
+        if (['preparing', 'out_for_delivery'].includes(status)) return 'preparing';
         if (status === 'delivered') return 'delivered';
-        if (status === 'cancelled') return 'pending';
+        if (status === 'cancelled') return 'cancelled';
+        if (status === 'refunded') return 'refunded';
         return 'completed';
     }
 
     formatStatus(status) {
         if (!status) return 'Pending';
-        return status.charAt(0).toUpperCase() + status.slice(1);
+        const map = {
+            pending: 'Pending',
+            confirmed: 'Confirmed',
+            preparing: 'Preparing',
+            out_for_delivery: 'Out for Delivery',
+            delivered: 'Delivered',
+            completed: 'Completed',
+            cancelled: 'Cancelled',
+            refunded: 'Refunded',
+        };
+        return map[status] || status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
+    }
+
+    getStatusColor(status) {
+        const colors = {
+            pending: '#f59e0b',
+            confirmed: '#2563eb',
+            preparing: '#f97316',
+            out_for_delivery: '#8b5cf6',
+            delivered: '#41bf5b',
+            completed: '#41bf5b',
+            cancelled: '#dc2626',
+            refunded: '#dc2626',
+            active: '#41bf5b',
+            disabled: '#dc2626',
+            admin_disabled: '#dc2626',
+            farmer_disabled: '#f97316',
+            verified: '#41bf5b',
+            unverified: '#dc2626',
+            available: '#41bf5b',
+            unavailable: '#dc2626',
+            approved: '#41bf5b',
+            rejected: '#dc2626',
+        };
+        return colors[status] || '#6c757d';
+    }
+
+    renderStatus(text, statusKey) {
+        return `<span style="color:${this.getStatusColor(statusKey)};background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">${text}</span>`;
     }
 
     toggleChatDrawer(show) {
         const drawer = document.getElementById('admin-chat-drawer');
         if (!drawer) return;
         drawer.classList.toggle('active', show);
+        if (show && this.activeSection !== 'chat') {
+            this.showSection('chat');
+        }
     }
 
     closeOrderDetails() {
         const panel = document.getElementById('order-detail-panel');
         if (panel) {
             panel.classList.remove('active');
+            panel.setAttribute('inert', '');
         }
+        this.syncPanelAccessibility();
     }
 
     openOrderDetails(order) {
@@ -1325,56 +3716,101 @@ class AdminDashboard {
         if (!panel || !content) return;
         this.currentOrderDetail = order;
 
+        panel.removeAttribute('inert');
+        panel.classList.add('active');
+        this.syncPanelAccessibility();
+
         content.innerHTML = `
             <div class="panel-header">
                 <h3>Order #${order.id}</h3>
-                <span class="status-pill ${this.getStatusClass(order.status)}">${this.formatStatus(order.status)}</span>
-            </div>
-            <div class="panel-section">
-                <label for="order-status-select-${order.id}">Update Status</label>
-                <select id="order-status-select-${order.id}" class="filter-select">
-                    <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Pending</option>
-                    <option value="confirmed" ${order.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
-                    <option value="preparing" ${order.status === 'preparing' ? 'selected' : ''}>Preparing</option>
-                    <option value="out_for_delivery" ${order.status === 'out_for_delivery' ? 'selected' : ''}>Out for Delivery</option>
-                    <option value="delivered" ${order.status === 'delivered' ? 'selected' : ''}>Delivered</option>
-                    <option value="cancelled" ${order.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
-                </select>
-                <button id="save-order-status-${order.id}" class="btn btn-primary btn-small" type="button" style="margin-top:10px;" disabled>
-                    Save
-                </button>
+                ${this.renderStatus(this.formatStatus(order.status), order.status)}
             </div>
             <div class="panel-section">
                 <h4>Customer</h4>
-                <p>${order.customer_name || order.username || 'N/A'}</p>
-                <p>${order.email || ''}</p>
-                <p>${order.customer_phone || ''}</p>
+                <table class="w-100" style="font-size:0.875rem;border-collapse:collapse;">
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Full Name:</td>
+                        <td class="fw-semibold pb-1">${this.escapeHtml(order.customer_name || order.full_name || '—')}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Username:</td>
+                        <td class="pb-1">${this.escapeHtml(order.username || '—')}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Email:</td>
+                        <td class="pb-1">${this.escapeHtml(order.email || '—')}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2" style="white-space:nowrap">Phone:</td>
+                        <td>${this.escapeHtml(order.customer_phone || '—')}</td>
+                    </tr>
+                </table>
             </div>
             <div class="panel-section">
                 <h4>Chat Farmers</h4>
                 <div id="order-farmers-list" class="panel-item"></div>
-                <p style="color:#64748b;font-size:0.9rem;margin-top:8px;">Select a farmer to open chat in the bottom-right drawer.</p>
+                <p style="color:#64748b;font-size:0.9rem;margin-top:8px;">Select a farmer to open the support inbox for this order.</p>
             </div>
             <div class="panel-section">
                 <h4>Order Info</h4>
                 <p>Total: ${this.fmtCurrency(order.total_amount)}</p>
-                <p>Date: ${new Date(order.created_at).toLocaleString()}</p>
+                <p>Date: ${new Date(order.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                 ${order.delivery_address ? `<p>Address: ${order.delivery_address}</p>` : ''}
             </div>
             <div class="panel-section">
                 <h4>Items</h4>
                 ${(order.items || []).map(item => `
-                    <div class="panel-item">
-                        <div>${item.product_name || 'N/A'}</div>
-                        <div>${this.fmtNumber(item.quantity)} ${item.unit || ''} • ${this.fmtCurrency(item.price)}</div>
+                    <div class="panel-item d-flex align-items-center gap-2">
+                        ${item.image_url
+                            ? `<img src="${this.escapeHtml(item.image_url)}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'">`
+                            : `<div style="width:44px;height:44px;border-radius:6px;background:#f0f3f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="bi bi-image text-muted"></i></div>`}
+                        <div>
+                            <div class="fw-semibold">${this.escapeHtml(item.product_name || 'N/A')}</div>
+                            <div class="small text-muted">${this.fmtNumber(item.quantity)} ${this.escapeHtml(item.unit || '')} &bull; ${this.fmtCurrency(item.price)}</div>
+                        </div>
                     </div>
                 `).join('')}
             </div>
+            <div class="panel-section">
+                <div>
+                    ${order.status === 'delivered' || order.status === 'cancelled'
+                        ? `
+                        <label>Status</label>
+                        <div class="mt-1">
+                            ${this.renderStatus(this.formatStatus(order.status), order.status)}
+                        </div>
+                        `
+                        : `
+                        <label for="order-status-select-${order.id}">Update Status</label>
+                        <select id="order-status-select-${order.id}" class="form-select form-select-sm mt-1">
+                            ${this.getAllStatusOptions(order.status).map(opt => `
+                                <option value="${opt.value}" ${opt.value === order.status ? 'selected' : ''} ${opt.disabled ? 'disabled' : ''} style="color:${opt.disabled ? '#6c757d' : opt.color};font-weight:500;">${opt.label}</option>
+                            `).join('')}
+                        </select>
+                        `
+                    }
+                </div>
+                ${order.status !== 'delivered' && order.status !== 'cancelled' ? `
+                <div class="mt-2">
+                    <button id="save-order-status-${order.id}" class="btn btn-small w-100 btn-ac-green" type="button" disabled>
+                        Save Status
+                    </button>
+                </div>
+                ` : ''}
+                <div class="mt-2">
+                    <button id="order-disable-btn-${order.id}" data-order-id="${order.id}" data-disable="${!order.is_disabled}"
+                            class="btn w-100 btn-ac-red order-disable-btn" style="padding:8px;" type="button">
+                        ${order.is_disabled ? 'Enable Order' : 'Disable Order'}
+                    </button>
+                </div>
+            </div>
         `;
         panel.classList.add('active');
+        this.syncPanelAccessibility();
 
         const statusSelect = document.getElementById(`order-status-select-${order.id}`);
         const saveBtn = document.getElementById(`save-order-status-${order.id}`);
+        const disableBtn = document.getElementById(`order-disable-btn-${order.id}`);
         if (statusSelect && saveBtn) {
             saveBtn.disabled = true;
 
@@ -1391,6 +3827,14 @@ class AdminDashboard {
                 await this.updateOrderStatus(order.id, next);
                 // Reload the detail view to reflect latest state
                 await this.viewOrderDetails(order.id);
+            });
+        }
+
+        if (disableBtn) {
+            disableBtn.addEventListener('click', () => {
+                const orderId = Number(disableBtn.dataset.orderId);
+                const shouldDisable = disableBtn.dataset.disable === 'true';
+                this.toggleOrderDisabled(orderId, shouldDisable);
             });
         }
 
@@ -1419,11 +3863,19 @@ class AdminDashboard {
                             <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(f.name)}</div>
                             <div style="color:#64748b;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(f.email)}</div>
                         </div>
-                        <button class="btn btn-primary btn-small" type="button" onclick="adminDashboard.openChatForFarmer(${f.id})">
+                        <button class="btn btn-primary btn-small farmer-chat-btn" type="button" data-farmer-id="${f.id}">
                             Chat
                         </button>
                     </div>
                 `).join('');
+                
+                // Add event listeners for chat buttons
+                list.querySelectorAll('.farmer-chat-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const farmerId = Number(btn.dataset.farmerId);
+                        this.openChatForFarmer(farmerId);
+                    });
+                });
             }
         }
     }
@@ -1439,18 +3891,57 @@ class AdminDashboard {
             subtitle: `Order #${order.id} • Customer: ${order.customer_name || order.username || 'N/A'}`
         };
 
-        this.toggleChatDrawer(true);
+        this.showSection('chat');
+        this.closeOrderDetails();
 
         if (window.chatUI && typeof window.chatUI.openConversationWithFarmer === 'function') {
             window.chatUI.openConversationWithFarmer(farmerId, farmerName);
         }
     }
 
+    openCreateUserModal(preferredRole) {
+        const modal = document.getElementById('create-user-modal');
+        if (!modal) return;
+        const form = document.getElementById('create-user-form');
+        if (form) form.reset();
+
+        // Clear text inputs that reset() might not catch
+        ['create-user-firstname', 'create-user-middlename', 'create-user-lastname',
+         'create-user-username', 'create-user-email', 'create-user-phone',
+         'create-user-password'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+
+        const roleSel = document.getElementById('create-user-role');
+        if (roleSel) {
+            const roles = [];
+            if (this.currentUserRole === 'super_admin') {
+                roles.push({ value: 'staff', label: 'Staff' });
+            }
+            roles.push({ value: 'customer', label: 'Customer' });
+            roles.push({ value: 'farmer', label: 'Farmer' });
+            roleSel.innerHTML = roles.map(r => `<option value="${r.value}">${r.label}</option>`).join('');
+            roleSel.value = ['customer', 'farmer', 'staff'].includes(preferredRole) ? preferredRole : 'customer';
+        } else {
+            this.showMessage('Role dropdown not found', 'error');
+            return;
+        }
+
+        const submitBtn = document.getElementById('create-user-submit-btn');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Create Account';
+        }
+
+        modal.classList.add('open');
+    }
+
     openUserEdit(userId) {
         const modal = document.getElementById('edit-user-modal');
         if (!modal) return;
 
-        const user = (this.lastUsers || []).find(u => u.id === userId);
+        const user = (this.lastUsers || []).find(u => u.id === userId) || (this.lastFarmers || []).find(f => f.id === userId);
         if (!user) return;
 
         const idEl = document.getElementById('edit-user-id');
@@ -1459,21 +3950,105 @@ class AdminDashboard {
         const emailEl = document.getElementById('edit-user-email');
         const passwordEl = document.getElementById('edit-user-password');
         const phoneEl = document.getElementById('edit-user-phone');
-        const locationEl = document.getElementById('edit-user-location');
+        const zoneEl = document.getElementById('edit-user-zone');
+        const provinceEl = document.getElementById('edit-user-province');
+        const cityEl = document.getElementById('edit-user-city');
+        const barangayEl = document.getElementById('edit-user-barangay');
+        const streetEl = document.getElementById('edit-user-street');
+        const addrPreviewEl = document.getElementById('edit-user-address-preview');
 
         if (idEl) idEl.value = String(userId);
         if (fullNameEl) fullNameEl.value = user.full_name || '';
+        const firstNameEl = document.getElementById('edit-user-firstname');
+        const middleNameEl = document.getElementById('edit-user-middlename');
+        const lastNameEl = document.getElementById('edit-user-lastname');
+        if (firstNameEl) firstNameEl.value = user.first_name || '';
+        if (middleNameEl) middleNameEl.value = user.middle_name || '';
+        if (lastNameEl) lastNameEl.value = user.last_name || '';
+
         if (usernameEl) usernameEl.value = user.username || '';
         if (emailEl) emailEl.value = user.email || '';
-        if (passwordEl) passwordEl.value = user.password || '';
-        if (phoneEl) phoneEl.value = user.phone || '';
-        if (locationEl) locationEl.value = user.address || user.location || '';
+        if (passwordEl) passwordEl.value = '';
+        if (phoneEl) {
+            const rawPhone = (user.phone || '').replace(/^\+63/, '');
+            phoneEl.value = rawPhone;
+            phoneEl.oninput = () => {
+                phoneEl.value = phoneEl.value.replace(/\D/g, '').slice(0, 10);
+                if (phoneEl.value && !phoneEl.value.startsWith('9')) {
+                    phoneEl.setCustomValidity('Phone number must start with 9');
+                } else if (phoneEl.value.length > 0 && phoneEl.value.length < 10) {
+                    phoneEl.setCustomValidity('Phone number must be 10 digits');
+                } else {
+                    phoneEl.setCustomValidity('');
+                }
+            };
+        }
 
-        // Show preview of registered values
-        phoneEl && (phoneEl.placeholder = user.phone ? `Registered: ${user.phone}` : 'No phone registered');
-        locationEl && (locationEl.placeholder = user.address ? `Registered: ${user.address}` : (user.location ? `Registered: ${user.location}` : 'No location registered'));
+        // Reset PSGC address dropdowns
+        if (zoneEl && window.PSGC) {
+            window.PSGC.loadZones(zoneEl);
+            zoneEl.value = '';
+        }
+        if (provinceEl) { provinceEl.innerHTML = '<option value="">Select Province</option>'; provinceEl.disabled = true; }
+        if (cityEl) { cityEl.innerHTML = '<option value="">Select City / Municipality</option>'; cityEl.disabled = true; }
+        if (barangayEl) { barangayEl.innerHTML = '<option value="">Select Barangay</option>'; barangayEl.disabled = true; }
+        if (streetEl) streetEl.value = '';
+        if (addrPreviewEl) addrPreviewEl.value = user.address || user.location || '';
 
-        modal.style.display = 'block';
+        // Wire zone/province/city/barangay/street change handlers (bind once using named fn)
+        if (zoneEl) zoneEl.onchange = () => this._editUserZoneChange();
+        if (provinceEl) provinceEl.onchange = () => this._editUserProvinceChange();
+        if (cityEl) cityEl.onchange = () => this._editUserCityChange();
+        if (barangayEl) barangayEl.onchange = () => this._editUserUpdatePreview();
+        if (streetEl) streetEl.oninput = () => this._editUserUpdatePreview();
+
+        modal.classList.add('open');
+    }
+
+    async _editUserZoneChange() {
+        if (!window.PSGC) return;
+        const zone = document.getElementById('edit-user-zone')?.value || '';
+        const provinceEl = document.getElementById('edit-user-province');
+        const cityEl = document.getElementById('edit-user-city');
+        const barangayEl = document.getElementById('edit-user-barangay');
+        await window.PSGC.onZoneChange(zone, { provinceEl, cityEl, barangayEl }).catch(() => {});
+        this._editUserUpdatePreview();
+    }
+
+    async _editUserProvinceChange() {
+        if (!window.PSGC) return;
+        const province = document.getElementById('edit-user-province')?.value || '';
+        const cityEl = document.getElementById('edit-user-city');
+        const barangayEl = document.getElementById('edit-user-barangay');
+        await window.PSGC.onProvinceChange(province, { cityEl, barangayEl }).catch(() => {});
+        this._editUserUpdatePreview();
+    }
+
+    async _editUserCityChange() {
+        if (!window.PSGC) return;
+        const city = document.getElementById('edit-user-city')?.value || '';
+        const barangayEl = document.getElementById('edit-user-barangay');
+        if (city) {
+            await window.PSGC.loadBarangays(city, barangayEl).catch(() => {});
+            if (barangayEl) barangayEl.disabled = false;
+        } else {
+            window.PSGC.setSelectOptions(barangayEl, [], 'Select Barangay');
+            if (barangayEl) barangayEl.disabled = true;
+        }
+        this._editUserUpdatePreview();
+    }
+
+    _editUserUpdatePreview() {
+        const province = document.getElementById('edit-user-province')?.value?.trim() || '';
+        const city = document.getElementById('edit-user-city')?.value?.trim() || '';
+        const barangay = document.getElementById('edit-user-barangay')?.value?.trim() || '';
+        const street = document.getElementById('edit-user-street')?.value?.trim() || '';
+        const previewEl = document.getElementById('edit-user-address-preview');
+        if (!previewEl) return;
+        const composed = window.PSGC
+            ? window.PSGC.formatAddress({ street, barangay, city, province })
+            : [street, barangay, city, province].filter(Boolean).join(', ');
+        previewEl.value = composed;
     }
 
     async submitUserEdit(e) {
@@ -1481,19 +4056,37 @@ class AdminDashboard {
 
         const userId = document.getElementById('edit-user-id')?.value;
         const full_name = document.getElementById('edit-user-fullname')?.value || '';
+        const first_name = document.getElementById('edit-user-firstname')?.value || '';
+        const middle_name = document.getElementById('edit-user-middlename')?.value || '';
+        const last_name = document.getElementById('edit-user-lastname')?.value || '';
         const username = document.getElementById('edit-user-username')?.value || '';
         const email = document.getElementById('edit-user-email')?.value || '';
         const password = document.getElementById('edit-user-password')?.value || '';
-        const phone = document.getElementById('edit-user-phone')?.value || '';
-        const location = document.getElementById('edit-user-location')?.value || '';
+        const rawPhone = document.getElementById('edit-user-phone')?.value?.trim() || '';
+        const phone = rawPhone ? ('+63' + rawPhone.replace(/^\+63/, '')) : '';
+
+        // Build address from PSGC fields (use preview if already composed)
+        const province = document.getElementById('edit-user-province')?.value?.trim() || '';
+        const city = document.getElementById('edit-user-city')?.value?.trim() || '';
+        const barangay = document.getElementById('edit-user-barangay')?.value?.trim() || '';
+        const street = document.getElementById('edit-user-street')?.value?.trim() || '';
+        const addressPreview = document.getElementById('edit-user-address-preview')?.value?.trim() || '';
+        const address = (province || city || barangay || street)
+            ? (window.PSGC
+                ? window.PSGC.formatAddress({ street, barangay, city, province })
+                : [street, barangay, city, province].filter(Boolean).join(', '))
+            : addressPreview;
 
         const payload = {
             full_name: full_name.trim(),
             username: username.trim(),
             email: email.trim(),
             phone: phone.trim(),
-            address: location.trim(),
         };
+        if (first_name.trim()) payload.first_name = first_name.trim();
+        if (middle_name.trim()) payload.middle_name = middle_name.trim();
+        if (last_name.trim()) payload.last_name = last_name.trim();
+        if (address) payload.address = address;
         if (password.trim()) payload.password = password;
 
         try {
@@ -1511,6 +4104,7 @@ class AdminDashboard {
                 this.showMessage('User updated successfully!', 'success');
                 this.closeModal('edit-user-modal');
                 await this.loadUsers();
+                await this.loadFarmers();
             } else {
                 this.showMessage(data.message || 'Failed to update user', 'error');
             }
@@ -1520,49 +4114,271 @@ class AdminDashboard {
         }
     }
 
-    openProductEdit(productId) {
-        const modal = document.getElementById('edit-product-modal');
-        if (!modal) return;
-        document.getElementById('edit-product-id').value = productId;
-        const product = (this.lastProducts || []).find(p => p.id === productId);
-        if (product) {
-            document.getElementById('edit-product-name').value = product.name || '';
-            document.getElementById('edit-product-price').value = product.price || '';
-            document.getElementById('edit-product-stock').value = product.stock_quantity || '';
-            document.getElementById('edit-product-location').value = product.location || '';
-            document.getElementById('edit-product-description').value = product.description || '';
-            // Set image preview
-            const imgPreview = document.getElementById('edit-product-image-preview');
-            if (imgPreview) {
-                imgPreview.src = product.image_url || window.__PLACEHOLDER_IMAGE__;
-            }
-            // Reset file input
-            const fileInput = document.getElementById('edit-product-image');
-            if (fileInput) fileInput.value = '';
-            // Update char count
-            const descCount = document.getElementById('edit-product-description-count');
-            if (descCount) descCount.textContent = (product.description || '').length;
+    async submitUserCreate(e) {
+        e.preventDefault();
+
+        const first_name = document.getElementById('create-user-firstname')?.value?.trim() || '';
+        const middle_name = document.getElementById('create-user-middlename')?.value?.trim() || '';
+        const last_name = document.getElementById('create-user-lastname')?.value?.trim() || '';
+        const username = document.getElementById('create-user-username')?.value?.trim() || '';
+        const email = document.getElementById('create-user-email')?.value?.trim() || '';
+        const role = document.getElementById('create-user-role')?.value?.trim() || '';
+        const rawPhone = document.getElementById('create-user-phone')?.value?.trim() || '';
+        // Validate phone format: must be 10 digits starting with 9 if provided
+        if (rawPhone && !/^9[0-9]{9}$/.test(rawPhone)) {
+            this.showMessage('Phone must be 10 digits starting with 9 (e.g. 9123456789)', 'error');
+            return;
         }
-        modal.style.display = 'block';
+        const phone = rawPhone ? ('+63' + rawPhone.replace(/^\+63/, '')) : '';
+        const password = document.getElementById('create-user-password')?.value || '';
+        const full_name = [first_name, middle_name, last_name].filter(Boolean).join(' ').trim();
+        const submitBtn = document.getElementById('create-user-submit-btn');
+
+        if (!first_name || !last_name || !username || !email || !role || password.length < 6) {
+            this.showMessage('Please complete all required fields. Password must be at least 6 characters.', 'error');
+            return;
+        }
+
+        const confirmed = await this.adminConfirm(
+            `Name: ${full_name}\nEmail: ${email}\nUsername: ${username}\nRole: ${role}${phone ? `\nPhone: ${phone}` : ''}`,
+            { title: 'Create Account', danger: false, okLabel: 'Create' }
+        );
+        if (!confirmed) return;
+
+        const payload = {
+            full_name,
+            first_name,
+            middle_name: middle_name || null,
+            last_name,
+            username,
+            email,
+            role,
+            password,
+            phone: phone || null
+        };
+
+        try {
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Creating...';
+            }
+            const response = await fetch(`${this.apiBase}/admin/users`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to create user', 'error');
+                return;
+            }
+
+            this.showMessage('User created successfully!', 'success');
+            this.closeModal('create-user-modal');
+            await this.loadUsers();
+            if (role === 'farmer') {
+                await this.loadFarmers();
+            }
+        } catch (error) {
+            console.error('Error creating user:', error);
+            this.showMessage('Error creating user', 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Account';
+            }
+        }
+    }
+
+    openProductEdit(productId) {
+        const panel = document.getElementById('edit-product-panel');
+        const content = document.getElementById('edit-product-content');
+        if (!panel || !content) return;
+
+        const product = (this.lastProducts || []).find(p => p.id === productId);
+        if (!product) return;
+
+        // Load catalog names for the dropdown
+        const catalogNames = this.lastCatalogNames || [];
+        const catalogOptions = catalogNames.map(cn => 
+            `<option value="${cn.id}" ${cn.id === product.catalog_name_id ? 'selected' : ''}>${this.escapeHtml(cn.name)}</option>`
+        ).join('');
+
+        // Populate panel content
+        content.innerHTML = `
+            <input type="hidden" id="edit-product-id" value="${productId}">
+
+            <div class="card mb-3">
+                <img id="edit-product-image-preview"
+                     src="${product.image_url || ''}" alt="Product preview"
+                     class="card-img-top"
+                     style="height:200px;object-fit:cover;${product.image_url ? '' : 'display:none'}">
+                <div class="card-body p-2">
+                    <label for="edit-product-image" class="btn btn-sm w-100 d-flex align-items-center justify-content-center gap-2" style="background-color: #3b82f6; color: white; border: none;">
+                        <i class="bi bi-camera"></i>
+                        <span>Change Image</span>
+                    </label>
+                    <input id="edit-product-image" type="file" accept="image/*" class="visually-hidden">
+                    <span id="edit-product-image-spinner" class="spinner-border spinner-border-sm text-primary d-none ms-1"></span>
+                </div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label" for="edit-product-name">Product Name</label>
+                <select id="edit-product-name" class="form-select">
+                    ${catalogOptions}
+                </select>
+            </div>
+
+            <div class="form-row-2 mb-3">
+                <div class="form-group">
+                    <label class="form-label" for="edit-product-price">Price (₱)</label>
+                    <input type="number" id="edit-product-price"
+                           class="form-control" min="0" step="0.01" value="${product.price || ''}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="edit-product-stock">Stock</label>
+                    <input type="number" id="edit-product-stock"
+                           class="form-control" min="0" value="${product.stock_quantity || ''}">
+                </div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label" for="edit-product-location">Location</label>
+                <input type="text" id="edit-product-location" class="form-control" value="${this.escapeHtml(product.location || '')}">
+            </div>
+
+            <div class="form-group mb-2">
+                <label class="form-label" for="edit-product-description">Description</label>
+                <textarea id="edit-product-description"
+                          class="form-control" rows="3" maxlength="500">${this.escapeHtml(product.description || '')}</textarea>
+                <div class="form-hint">
+                    <span id="edit-product-description-count">${(product.description || '').length}</span>/500 characters
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">Farmer Information</h6>
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">Fullname:</label>
+                        <div class="fw-semibold">${this.escapeHtml(product.farmer_name || '—')}</div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">Username:</label>
+                        <div class="fw-semibold" style="color:#777171f0">${this.escapeHtml(product.farmer_username || '—')}</div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">Email:</label>
+                        <div class="text-muted">${this.escapeHtml(product.farmer_email || '—')}</div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label text-muted small">Address:</label>
+                        <div class="text-muted">${this.escapeHtml(product.farmer_address || '—')}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Set up event listeners
+        const descInput = document.getElementById('edit-product-description');
+        const descCount = document.getElementById('edit-product-description-count');
+        if (descInput && descCount) {
+            descInput.addEventListener('input', () => {
+                descCount.textContent = descInput.value.length;
+            });
+        }
+
+        // Image preview listener
+        const imageInput = document.getElementById('edit-product-image');
+        const imagePreview = document.getElementById('edit-product-image-preview');
+        if (imageInput && imagePreview) {
+            imageInput.addEventListener('change', () => {
+                const file = imageInput.files?.[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    imagePreview.src = event.target.result;
+                    imagePreview.style.display = '';
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        const disableBtn = document.getElementById('edit-product-disable-btn');
+        const isDisabled = !!product.is_admin_disabled;
+        if (disableBtn) {
+            disableBtn.textContent = isDisabled ? 'Enable' : 'Disable';
+            disableBtn.className = `btn btn-sm ${isDisabled ? 'btn-ac-green' : 'btn-ac-red'} me-auto`;
+            disableBtn.onclick = async () => {
+                if (!await this.adminConfirm(`Are you sure you want to ${isDisabled ? 'enable' : 'disable'} this product?`, { title: `${isDisabled ? 'Enable' : 'Disable'} Product`, danger: !isDisabled })) return;
+                this.toggleProductStatus(product.id, !isDisabled);
+                this.closeProductEdit();
+            };
+        }
+
+        // Save button
+        const saveBtn = document.getElementById('edit-product-save');
+        if (saveBtn) {
+            saveBtn.onclick = () => {
+                const event = new Event('submit', { bubbles: true, cancelable: true });
+                this.submitProductEdit(event);
+            };
+        }
+
+        // Cancel button
+        const cancelBtn = document.getElementById('edit-product-cancel');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => this.closeProductEdit();
+        }
+
+        // Close button
+        const closeBtn = document.getElementById('edit-product-panel-close');
+        if (closeBtn) {
+            closeBtn.onclick = () => this.closeProductEdit();
+        }
+
+        panel.classList.add('active');
+        panel.removeAttribute('inert');
+        this.syncPanelAccessibility();
     }
 
     async submitProductEdit(e) {
         e.preventDefault();
+        if (!await this.adminConfirm('Are you sure you want to save these product changes?', { title: 'Save Product Changes', danger: false })) {
+            return;
+        }
+
         const productId = document.getElementById('edit-product-id').value;
-        const name = document.getElementById('edit-product-name').value;
+        const catalogNameId = document.getElementById('edit-product-name').value;
         const price = document.getElementById('edit-product-price').value;
         const stock_quantity = document.getElementById('edit-product-stock').value;
         const location = document.getElementById('edit-product-location').value;
         const description = document.getElementById('edit-product-description').value;
         const imageInput = document.getElementById('edit-product-image');
         const formData = new FormData();
-        formData.append('name', name);
+        formData.append('catalog_name_id', catalogNameId);
         formData.append('price', price);
         formData.append('stock_quantity', stock_quantity);
         formData.append('location', location);
         formData.append('description', description);
         if (imageInput && imageInput.files && imageInput.files[0]) {
             formData.append('image', imageInput.files[0]);
+        }
+
+        // Show loading state
+        const saveBtn = document.getElementById('edit-product-save');
+        const spinner = document.getElementById('edit-product-save-spinner');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+        }
+        if (spinner) {
+            spinner.classList.remove('d-none');
         }
 
         try {
@@ -1576,7 +4392,7 @@ class AdminDashboard {
 
             if (response.ok) {
                 this.showMessage('Product updated successfully!', 'success');
-                this.closeModal('edit-product-modal');
+                this.closeProductEdit();
                 this.loadProducts();
             } else {
                 const errorData = await response.json();
@@ -1585,6 +4401,14 @@ class AdminDashboard {
         } catch (error) {
             console.error('Error updating product:', error);
             this.showMessage('Error updating product', 'error');
+        } finally {
+            // Hide loading state
+            if (saveBtn) {
+                saveBtn.disabled = false;
+            }
+            if (spinner) {
+                spinner.classList.add('d-none');
+            }
         }
     }
 
@@ -1594,7 +4418,7 @@ class AdminDashboard {
 
     async toggleUserDisabled(userId, disable) {
         const label = disable ? 'disable' : 'enable';
-        if (!confirm(`Are you sure you want to ${label} this user?`)) {
+        if (!await this.adminConfirm(`Are you sure you want to ${label} this user?`, { title: `${disable ? 'Disable' : 'Enable'} User`, danger: disable })) {
             return;
         }
 
@@ -1622,7 +4446,7 @@ class AdminDashboard {
 
     async toggleOrderDisabled(orderId, disable) {
         const label = disable ? 'disable' : 'enable';
-        if (!confirm(`Are you sure you want to ${label} this order?`)) {
+        if (!await this.adminConfirm(`Are you sure you want to ${label} this order?`, { title: `${disable ? 'Disable' : 'Enable'} Order`, danger: disable })) {
             return;
         }
 
@@ -1650,7 +4474,7 @@ class AdminDashboard {
 
     async toggleCategoryDisabled(categoryId, disable) {
         const label = disable ? 'disable' : 'enable';
-        if (!confirm(`Are you sure you want to ${label} this category?`)) {
+        if (!await this.adminConfirm(`Are you sure you want to ${label} this category?`, { title: `${disable ? 'Disable' : 'Enable'} Category`, danger: disable })) {
             return;
         }
 
@@ -1677,7 +4501,406 @@ class AdminDashboard {
 
     closeModal(modalId) {
         const modal = document.getElementById(modalId);
-        if (modal) modal.style.display = 'none';
+        if (modal) {
+            modal.classList.remove('open');
+            modal.style.display = '';
+        }
+        if (modalId === 'edit-product-modal') {
+            document.body.style.overflow = '';
+        }
+        const parentModalId = this.previousModalId;
+        this.previousModalId = null;
+        if (parentModalId) {
+            const parentModalEl = document.getElementById(parentModalId);
+            if (parentModalEl) {
+                parentModalEl.classList.add('open');
+            }
+        }
+    }
+
+    renderPagination(containerId, pg, onPageChange) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const { page, total, limit } = pg;
+        const totalPages = Math.max(1, Math.ceil(total / limit));
+
+        const start = (page - 1) * limit + 1;
+        const end = Math.min(page * limit, total);
+
+        // Always show count info; only show page buttons when needed
+        if (totalPages <= 1) {
+            container.innerHTML = `<span class="pagination-info">Showing ${start}–${end} of ${total}</span>`;
+            return;
+        }
+
+        const pages = [];
+        const range = 2;
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= page - range && i <= page + range)) pages.push(i);
+            else if (pages[pages.length - 1] !== '…') pages.push('…');
+        }
+
+        container.innerHTML = `
+            <span class="pagination-info">Showing ${start}–${end} of ${total}</span>
+            <div class="pagination-controls">
+                <button class="page-btn" ${page <= 1 ? 'disabled' : ''} data-page="${page - 1}">‹</button>
+                ${pages.map(p => p === '…'
+                    ? `<button class="page-btn" disabled>…</button>`
+                    : `<button class="page-btn ${p === page ? 'active' : ''}" data-page="${p}">${p}</button>`
+                ).join('')}
+                <button class="page-btn" ${page >= totalPages ? 'disabled' : ''} data-page="${page + 1}">›</button>
+            </div>
+        `;
+        container.querySelectorAll('[data-page]').forEach(btn => {
+            btn.addEventListener('click', () => onPageChange(Number(btn.getAttribute('data-page'))));
+        });
+    }
+
+    resetPaginationPage(section) {
+        if (this.pagination?.[section]) {
+            this.pagination[section].page = 1;
+        }
+    }
+
+    getPaginatedSlice(section, items) {
+        const list = Array.isArray(items) ? items : [];
+        const pg = this.pagination?.[section] || { page: 1, limit: Math.max(list.length, 1), total: list.length };
+        const totalPages = Math.max(1, Math.ceil(list.length / pg.limit));
+        pg.page = Math.min(Math.max(pg.page || 1, 1), totalPages);
+        pg.total = list.length;
+
+        const start = (pg.page - 1) * pg.limit;
+        return {
+            items: list.slice(start, start + pg.limit),
+            pageState: { page: pg.page, total: pg.total, limit: pg.limit }
+        };
+    }
+
+    getFilteredCategories() {
+        const search = document.getElementById('category-search-input')?.value?.trim().toLowerCase() || '';
+        const statusFilter = document.getElementById('category-status-filter')?.value || '';
+        return (this.lastCategories || []).filter((category) => {
+            const nameMatch = !search || (category.name || '').toLowerCase().includes(search);
+            const statusMatch = !statusFilter
+                || (statusFilter === 'active' && !category.is_disabled)
+                || (statusFilter === 'disabled' && !!category.is_disabled);
+            return nameMatch && statusMatch;
+        });
+    }
+
+    getFilteredCatalogNames() {
+        const search = document.getElementById('catalog-search-input')?.value?.trim().toLowerCase() || '';
+        const catId = document.getElementById('catalog-category-filter-bar')?.value || '';
+        const statusFilter = document.getElementById('catalog-status-filter')?.value || '';
+        return (this.lastCatalogNames || []).filter((item) => {
+            const nameMatch = !search || (item.name || '').toLowerCase().includes(search);
+            const catMatch = !catId || String(item.category_id) === catId;
+            const statusMatch = !statusFilter
+                || (statusFilter === 'active' && !item.is_disabled)
+                || (statusFilter === 'disabled' && !!item.is_disabled);
+            return nameMatch && catMatch && statusMatch;
+        });
+    }
+
+    renderRecentActivityList(activity) {
+        const el = document.getElementById('recent-activity-list');
+        if (!el) return;
+
+        const items = activity || [];
+        if (!items.length) {
+            el.innerHTML = `<div class="text-center text-muted py-3 small">No activity for this period</div>`;
+            this.renderPagination('activity-pagination', this.pagination.activity, () => {});
+            return;
+        }
+
+        const colorIcons = {
+            success: 'bi-check-circle-fill text-success',
+            primary: 'bi-pencil-fill text-primary',
+            danger: 'bi-x-circle-fill text-danger',
+            warning: 'bi-exclamation-circle-fill text-warning',
+            info: 'bi-info-circle-fill text-info',
+            secondary: 'bi-circle text-secondary',
+        };
+
+        el.innerHTML = items.map((entry) => {
+            const iconClass = colorIcons[entry.color] || 'bi-circle text-secondary';
+            const time = entry.created_at ? new Date(entry.created_at).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' }) : '';
+            const date = entry.created_at ? new Date(entry.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' }) : '';
+            return `
+                <div class="activity-item d-flex gap-2 py-2 border-bottom">
+                    <i class="bi ${iconClass} mt-1" style="font-size:.9rem;flex-shrink:0;"></i>
+                    <div class="flex-grow-1">
+                        <div class="small fw-semibold" style="color:#111">${this.escapeHtml(entry.description)}</div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted" style="font-size:.72rem">${this.escapeHtml(entry.actor)}</span>
+                            <span class="text-muted" style="font-size:.72rem">${date ? date + ' · ' : ''}${time}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        this.renderPagination('activity-pagination', this.pagination.activity, (page) => {
+            this.pagination.activity.page = page;
+            this.loadRecentActivity(this._activityPeriod || 'today', page);
+        });
+    }
+
+    renderTopProductsTable(products) {
+        this.destroySortableTable('top-products-table');
+        const tbody = document.getElementById('top-products-tbody');
+        if (!tbody) return;
+
+        if (!products.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3 small">No data for this period</td></tr>`;
+            this.renderPagination('top-products-pagination', this.pagination['top-products'], () => {});
+            this.refreshSortableTable('top-products-table', { columns: [{ select: 0, sortable: false }] });
+            return;
+        }
+
+        tbody.innerHTML = products.map((product) => `
+            <tr>
+                <td>
+                    ${product.image_url
+                        ? `<img src="${this.escapeHtml(product.image_url)}" class="product-thumb" alt="">`
+                        : `<div class="product-thumb-placeholder"><i class="bi bi-image"></i></div>`
+                    }
+                </td>
+                <td>
+                    <div class="fw-semibold small">${this.escapeHtml(product.name)}</div>
+                    <div class="text-muted" style="font-size:.7rem">#${product.id}</div>
+                </td>
+                <td class="small">${this.fmtCurrency(product.price)}</td>
+                <td class="small">${this.fmtNumber(product.sold_count)}</td>
+                <td class="small text-success fw-semibold">${this.fmtCurrency(product.revenue)}</td>
+            </tr>
+        `).join('');
+
+        this.renderPagination('top-products-pagination', this.pagination['top-products'], (page) => {
+            this.pagination['top-products'].page = page;
+            this.loadTopProducts(this._topProductsPeriod || 'today', page);
+        });
+
+        this.refreshSortableTable('top-products-table', { columns: [{ select: 0, sortable: false }] });
+    }
+
+    renderTopFarmersTable(farmers) {
+        this.destroySortableTable('top-farmers-table');
+        const tbody = document.getElementById('top-farmers-tbody');
+        if (!tbody) return;
+
+        if (!farmers.length) {
+            tbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted py-3 small">No data for this period</td></tr>`;
+            this.renderPagination('top-farmers-pagination', this.pagination['top-farmers'], () => {});
+            this.refreshSortableTable('top-farmers-table');
+            return;
+        }
+
+        tbody.innerHTML = farmers.map((farmer) => `
+            <tr>
+                <td>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="user-initials" style="width:28px;height:28px;font-size:.7rem">${(farmer.full_name || farmer.username || '?')[0].toUpperCase()}</div>
+                        <div>
+                            <div class="small fw-semibold">${this.escapeHtml(farmer.full_name || farmer.username)}</div>
+                            <div class="text-muted" style="font-size:.7rem">${farmer.order_count} orders</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="small text-success fw-semibold">${this.fmtCurrency(farmer.revenue)}</td>
+            </tr>
+        `).join('');
+
+        this.renderPagination('top-farmers-pagination', this.pagination['top-farmers'], (page) => {
+            this.pagination['top-farmers'].page = page;
+            this.loadTopFarmers(this._topFarmersPeriod || 'today', page);
+        });
+
+        this.refreshSortableTable('top-farmers-table');
+    }
+
+    renderOrders(orders) {
+        this.destroySortableTable('orders-table');
+        const tbody = document.getElementById('orders-tbody');
+        if (!tbody) return;
+
+        if (!orders.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No orders found</td></tr>`;
+            this.refreshSortableTable('orders-table', { columns: [{ select: 5, sortable: false }] });
+            return;
+        }
+
+        tbody.innerHTML = orders.map(order => {
+            const isDisabled = !!order.is_disabled;
+            const statusClass = isDisabled ? 'pending' : this.getStatusClass(order.status);
+            const statusLabel = isDisabled ? 'Disabled' : this.formatStatus(order.status);
+            const customerInfo = `
+                <div class="fw-semibold">${this.escapeHtml(order.full_name || '—')}${order.username ? ` <span style="color:#777171f0;font-size:.75rem">(${this.escapeHtml(order.username)})</span>` : ''}</div>
+                ${order.email ? `<div class="text-muted">${this.escapeHtml(order.email)}</div>` : ''}
+            `;
+            return `
+            <tr>
+                <td class="col-order">#${order.id}</td>
+                <td>${customerInfo}</td>
+                <td>${this.fmtCurrency(order.total_amount)}</td>
+                <td style="text-align:center">${this.renderStatus(statusLabel, isDisabled ? 'disabled' : order.status)}</td>
+                <td class="text-muted">${order.created_at ? new Date(order.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                <td>
+                    <button class="btn btn-sm py-0 px-2 btn-ac-green order-view-btn" data-order-id="${order.id}" type="button">View</button>
+                </td>
+            </tr>
+        `;
+        }).join('');
+
+        this.refreshSortableTable('orders-table', { columns: [{ select: 5, sortable: false }], defaultSort: [4, 'desc'] });
+    }
+
+    renderRecentSalesTable(orders) {
+        this.destroySortableTable('recent-sales-table');
+        const tbody = document.getElementById('recent-sales-tbody');
+        if (!tbody) return;
+
+        if (!orders.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3 small">No recent sales</td></tr>`;
+            this.renderPagination('recent-sales-pagination', this.pagination['recent-sales'], () => {});
+            this.refreshSortableTable('recent-sales-table');
+            return;
+        }
+
+        tbody.innerHTML = orders.map((order) => {
+            const customerName = order.full_name || (order.username ? `<span style="color:#777171f0">${this.escapeHtml(order.username)}</span>` : 'Customer');
+            return `
+            <tr>
+                <td class="small">#${order.id}</td>
+                <td class="small">${customerName}</td>
+                <td class="small">${this.escapeHtml(order.product_name || '—')}</td>
+                <td class="small">${this.fmtCurrency(order.total_amount)}</td>
+                <td>${this.renderStatus(this.formatStatus(order.status), order.status)}</td>
+            </tr>
+            `;
+        }).join('');
+
+        this.renderPagination('recent-sales-pagination', this.pagination['recent-sales'], (page) => {
+            this.pagination['recent-sales'].page = page;
+            this.loadRecentSales(this._recentSalesPeriod || 'today', page);
+        });
+
+        this.refreshSortableTable('recent-sales-table');
+    }
+
+    async fetchAllFarmers() {
+        const farmers = [];
+        const batchSize = 200;
+        let page = 1;
+        let total = 0;
+
+        while (true) {
+            const response = await fetch(`${this.apiBase}/admin/users?role=farmer&page=${page}&limit=${batchSize}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to load farmers page ${page}`);
+            }
+
+            const data = await response.json();
+            const batch = data.users || [];
+            total = Number(data.total || batch.length || 0);
+            farmers.push(...batch);
+
+            if (!batch.length || farmers.length >= total || batch.length < batchSize) {
+                break;
+            }
+
+            page += 1;
+        }
+
+        return { farmers, total };
+    }
+
+    async loadFarmers(tab = 'all', page = 1) {
+        try {
+            const pg = this.pagination?.farmers || { page: 1, total: 0, limit: 50 };
+            pg.page = page;
+            const search = (document.getElementById('farmers-search-input')?.value || '').trim();
+            const status = (document.getElementById('farmers-status-filter')?.value || '').trim();
+            const verification = (document.getElementById('farmers-verification-filter')?.value || '').trim();
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit),
+                role: 'farmer'
+            });
+            if (search) params.set('search', search);
+            if (status) params.set('status', status);
+            if (verification) params.set('verification', verification);
+
+            const response = await fetch(`${this.apiBase}/admin/users?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.lastFarmers = data.users || [];
+                pg.total = Number(data.total || 0);
+                this.renderFarmers(this.lastFarmers);
+                this.renderPagination('farmers-pagination', pg, (p) => this.loadFarmers(tab, p));
+            } else {
+                const tbody = document.getElementById('farmers-all-tbody');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load farmers. Please try again.</td></tr>`;
+                this.showMessage('Failed to load farmers', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading farmers:', error);
+            const tbody = document.getElementById('farmers-all-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load farmers. Please try again.</td></tr>`;
+            this.showMessage('Failed to load farmers', 'error');
+        }
+    }
+
+    renderFarmers(farmers) {
+        this.destroySortableTable('farmers-all-table');
+
+        // API now handles pagination, so render directly
+        const pagedFarmers = farmers;
+        const pageState = this.pagination?.farmers || { page: 1, total: farmers.length, limit: 50 };
+
+        // Helper: build a unified row for any farmer
+        const buildRow = (f) => {
+            const isDisabled = !!f.is_disabled;
+            const isVerified = !!f.is_verified;
+            const rating = f.rating ? `<span class="star-rating">★</span> ${Number(f.rating).toFixed(1)}` : '—';
+            return `
+                <tr>
+                    <td class="text-muted">${f.id}</td>
+                    <td class="fw-semibold">${this.escapeHtml(f.full_name || '—')}</td>
+                    <td style="color:#777171f0">${this.escapeHtml(f.username || '—')}</td>
+                    <td>${this.escapeHtml(f.email)}</td>
+                    <td>${rating}</td>
+                    <td>
+                        <div class="d-flex flex-column gap-1 align-items-start">
+                            ${this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active')}
+                            ${this.renderStatus(isVerified ? 'Verified' : 'Unverified', isVerified ? 'verified' : 'unverified')}
+                        </div>
+                    </td>
+                    <td class="text-muted">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                    <td>
+                        <button class="btn btn-sm py-0 px-2 btn-ac-green farmer-view-btn" data-farmer-id="${f.id}">View</button>
+                    </td>
+                </tr>`;
+        };
+
+        // ── All farmers table ──
+        const allTbody = document.getElementById('farmers-all-tbody');
+        if (allTbody) {
+            allTbody.innerHTML = pagedFarmers.length
+                ? pagedFarmers.map(f => buildRow(f)).join('')
+                : `<tr><td colspan="8" class="text-center text-muted py-4">No farmers found</td></tr>`;
+        }
+
+        this.refreshSortableTable('farmers-all-table', { columns: [{ select: 7, sortable: false }], defaultSort: [6, 'desc'] });
+
+        this.renderPagination('farmers-pagination', pageState, (page) => {
+            this.loadFarmers('all', page);
+        });
     }
 
     visitMainSite() {
@@ -1699,67 +4922,253 @@ class AdminDashboard {
             .replace(/'/g, '&#039;');
     }
 
-    updateWelcomeBanner() {
-        const banner = document.querySelector('.admin-welcome-banner');
-        const titleEl = document.querySelector('.welcome-title');
-        const sidebar = document.querySelector('.admin-sidebar');
-        const visitSiteBtn = document.getElementById('visit-site-btn');
-        const usersLink = document.getElementById('users-link');
-
-        if (banner && titleEl && sidebar) {
-            // Update banner class and title based on role
-            if (this.currentUserRole === 'super_admin') {
-                banner.classList.add('super-admin');
-                sidebar.classList.add('super-admin-sidebar');
-                titleEl.innerHTML = '<i class="fas fa-crown"></i> ADMIN';
-                // Show visit site button for super admin
-                if (visitSiteBtn) {
-                    visitSiteBtn.style.display = 'block';
-                }
-                // Change "Customers" to "Users" for super admin
-                if (usersLink) {
-                    usersLink.innerHTML = '<i class="fas fa-users"></i> Users';
-                }
-            } else {
-                banner.classList.remove('super-admin');
-                sidebar.classList.remove('super-admin-sidebar');
-                titleEl.innerHTML = '<i class="fas fa-crown"></i> Staff Dashboard';
-                // Hide visit site button for regular staff
-                if (visitSiteBtn) {
-                    visitSiteBtn.style.display = 'none';
-                }
-                // Keep "Customers" for regular admin
-                if (usersLink) {
-                    usersLink.innerHTML = '<i class="fas fa-users"></i> Customers';
-                }
-            }
-        }
+    showMessage(message, type = 'info') {
+        this.showToast(message, type);
     }
 
-    showMessage(message, type = 'info') {
-        // Create a simple toast notification
+    showToast(message, type = 'info') {
+        let stack = document.getElementById('admin-toast-stack');
+        if (!stack) {
+            stack = document.createElement('div');
+            stack.id = 'admin-toast-stack';
+            stack.className = 'admin-toast-stack';
+            document.body.appendChild(stack);
+        }
+
+        const typeClass = type === 'error' ? 'toast-error' : type === 'success' ? 'toast-success' : type === 'warning' ? 'toast-warning' : 'toast-info';
+
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed;
-            top: 100px;
-            right: 20px;
-            background: ${type === 'success' ? '#4caf50' : type === 'error' ? '#f44336' : '#2196f3'};
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 110000;
-            max-width: 300px;
+        toast.className = `admin-toast ${typeClass}`;
+        toast.innerHTML = `
+            <div class="toast-body"><p class="toast-msg">${this.escapeHtml(message)}</p></div>
+            <button class="toast-close" aria-label="Dismiss">&times;</button>
         `;
 
-        document.body.appendChild(toast);
+        const dismiss = () => {
+            toast.classList.add('dismissing');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        };
+        toast.querySelector('.toast-close').addEventListener('click', dismiss);
 
-        setTimeout(() => {
-            toast.remove();
-        }, 3000);
+        stack.appendChild(toast);
+        setTimeout(dismiss, 3500);
     }
+
+    adminConfirm(message, { title = 'Confirm Action', danger = true, okLabel = 'Confirm' } = {}) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('admin-confirm-modal');
+            if (!modal) {
+                console.warn('[adminConfirm] Confirm modal not found — rejecting action');
+                resolve(false);
+                return;
+            }
+
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            const okBtn = document.getElementById('confirm-ok-btn');
+            const cancelBtn = document.getElementById('confirm-cancel-btn');
+            okBtn.className = danger ? 'btn btn-sm px-4 btn-ac-red' : 'btn btn-sm px-4 btn-ac-green';
+            okBtn.textContent = okLabel;
+            modal.classList.add('open');
+
+            const done = (result) => {
+                modal.classList.remove('open');
+                okBtn.replaceWith(okBtn.cloneNode(true));
+                cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+                resolve(result);
+            };
+
+            document.getElementById('confirm-ok-btn').addEventListener('click', () => done(true), { once: true });
+            document.getElementById('confirm-cancel-btn').addEventListener('click', () => done(false), { once: true });
+        });
+    }
+
+    openCategoryEditModal(category) {
+        return new Promise((resolve) => {
+            const panel = document.getElementById('category-edit-panel');
+            const content = document.getElementById('category-edit-content');
+            if (!panel || !content) { resolve(null); return; }
+            const saveBtn = document.getElementById('category-edit-save');
+            const cancelBtn = document.getElementById('category-edit-cancel');
+            const closeBtn = document.getElementById('category-edit-panel-close');
+            const disableBtn = document.getElementById('category-edit-toggle-disable');
+            const deleteBtn = document.getElementById('category-edit-delete');
+
+            // Populate panel content
+            content.innerHTML = `
+                <div class="form-group mb-3">
+                    <label class="form-label">
+                        Category Name <span class="required-mark">*</span>
+                    </label>
+                    <input type="text" id="category-edit-name"
+                           class="form-control" placeholder="Category name" value="${this.escapeHtml(category.name || '')}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        Description
+                        <span class="form-label-hint">(optional, max 200 characters)</span>
+                    </label>
+                    <input type="text" id="category-edit-description"
+                           class="form-control" placeholder="Brief description"
+                           maxlength="200" value="${this.escapeHtml(category.description || '')}">
+                </div>
+            `;
+
+            const nameInput = document.getElementById('category-edit-name');
+            nameInput.classList.remove('is-invalid');
+
+            // Set Disable button label
+            if (disableBtn) {
+                const isDisabled = !!category.is_disabled;
+                disableBtn.textContent = isDisabled ? 'Enable' : 'Disable';
+                disableBtn.className = `btn btn-sm ${isDisabled ? 'btn-ac-green me-auto' : 'btn-ac-red me-auto'}`;
+            }
+
+            // Show delete button only for super_admin
+            if (deleteBtn) {
+                deleteBtn.style.display = this.currentUserRole === 'super_admin' ? 'inline-block' : 'none';
+            }
+
+            panel.classList.add('active');
+            panel.removeAttribute('inert');
+            this.syncPanelAccessibility();
+            nameInput.focus();
+
+            const done = (result) => {
+                panel.classList.remove('active');
+                panel.setAttribute('inert', '');
+                this.syncPanelAccessibility();
+                saveBtn.replaceWith(saveBtn.cloneNode(true));
+                cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+                closeBtn.replaceWith(closeBtn.cloneNode(true));
+                if (disableBtn) disableBtn.replaceWith(disableBtn.cloneNode(true));
+                if (deleteBtn) deleteBtn.replaceWith(deleteBtn.cloneNode(true));
+                resolve(result);
+            };
+
+            document.getElementById('category-edit-save').addEventListener('click', async () => {
+                const n = document.getElementById('category-edit-name').value.trim();
+                if (!n) { document.getElementById('category-edit-name').classList.add('is-invalid'); return; }
+                if (!await this.adminConfirm('Are you sure you want to save these changes?', { title: 'Save Category', danger: false })) return;
+                
+                // Show loading state
+                const saveBtn = document.getElementById('category-edit-save');
+                const spinner = document.getElementById('category-edit-save-spinner');
+                if (saveBtn) saveBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                
+                done({ action: 'save', name: n, description: document.getElementById('category-edit-description').value.trim() });
+                
+                // Hide loading state (after done is called, but we need to do it in the caller)
+                // Actually, since this is a Promise-based modal, the loading state should be handled by the caller
+                // For now, let's reset it after a short delay or let the caller handle it
+                setTimeout(() => {
+                    if (saveBtn) saveBtn.disabled = false;
+                    if (spinner) spinner.classList.add('d-none');
+                }, 100);
+            }, { once: true });
+            document.getElementById('category-edit-cancel').addEventListener('click', () => done(null), { once: true });
+            document.getElementById('category-edit-panel-close').addEventListener('click', () => done(null), { once: true });
+            document.getElementById('category-edit-toggle-disable')?.addEventListener('click', async () => {
+                if (!await this.adminConfirm(`Are you sure you want to ${category.is_disabled ? 'enable' : 'disable'} this category?`, { title: `${category.is_disabled ? 'Enable' : 'Disable'} Category`, danger: !category.is_disabled })) return;
+                done({ action: 'disable' });
+            }, { once: true });
+            document.getElementById('category-edit-delete')?.addEventListener('click', async () => {
+                if (!await this.adminConfirm('Are you sure you want to delete this category? This action cannot be undone.', { title: 'Delete Category', danger: true })) return;
+                done({ action: 'delete' });
+            }, { once: true });
+        });
+    }
+
+    openCatalogEditModal(item) {
+        return new Promise((resolve) => {
+            const panel = document.getElementById('catalog-edit-panel');
+            const content = document.getElementById('catalog-edit-content');
+            if (!panel || !content) { resolve(null); return; }
+            const saveBtn = document.getElementById('catalog-edit-save');
+            const cancelBtn = document.getElementById('catalog-edit-cancel');
+            const closeBtn = document.getElementById('catalog-edit-panel-close');
+            const disableBtn = document.getElementById('catalog-edit-toggle-disable');
+            // NOTE: Delete button removed from UI; reserved for superadmin only.
+
+            // Populate categories
+            const cats = this.lastCategories || [];
+            const catOptions = cats.map(c => `<option value="${c.id}" ${c.id == item.category_id ? 'selected' : ''}>${this.escapeHtml(c.name)}</option>`).join('');
+
+            // Populate panel content
+            content.innerHTML = `
+                <div class="form-group mb-3">
+                    <label class="form-label">
+                        Product Name <span class="required-mark">*</span>
+                    </label>
+                    <input type="text" id="catalog-edit-name"
+                           class="form-control" placeholder="Product name" value="${this.escapeHtml(item.name || '')}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        Category <span class="required-mark">*</span>
+                    </label>
+                    <select id="catalog-edit-category" class="form-select">${catOptions}</select>
+                </div>
+            `;
+
+            const nameInput = document.getElementById('catalog-edit-name');
+            nameInput.classList.remove('is-invalid');
+
+            // Set Disable button
+            if (disableBtn) {
+                const isDisabled = !!item.is_disabled;
+                disableBtn.textContent = isDisabled ? 'Enable' : 'Disable';
+                disableBtn.className = `btn btn-sm ${isDisabled ? 'btn-ac-green' : 'btn-ac-red'} me-auto`;
+            }
+
+            panel.classList.add('active');
+            panel.removeAttribute('inert');
+            this.syncPanelAccessibility();
+            nameInput.focus();
+
+            const done = (result) => {
+                panel.classList.remove('active');
+                panel.setAttribute('inert', '');
+                this.syncPanelAccessibility();
+                saveBtn.replaceWith(saveBtn.cloneNode(true));
+                cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+                closeBtn.replaceWith(closeBtn.cloneNode(true));
+                if (disableBtn) disableBtn.replaceWith(disableBtn.cloneNode(true));
+                resolve(result);
+            };
+
+            document.getElementById('catalog-edit-save').addEventListener('click', async () => {
+                const n = document.getElementById('catalog-edit-name').value.trim();
+                if (!n) { document.getElementById('catalog-edit-name').classList.add('is-invalid'); return; }
+                const cid = Number(document.getElementById('catalog-edit-category').value || 0);
+                if (!cid) return;
+                if (!await this.adminConfirm('Are you sure you want to save these changes?', { title: 'Save Product Name', danger: false })) return;
+                
+                // Show loading state
+                const saveBtn = document.getElementById('catalog-edit-save');
+                const spinner = document.getElementById('catalog-edit-save-spinner');
+                if (saveBtn) saveBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                
+                done({ action: 'save', name: n, category_id: cid });
+                
+                // Hide loading state after short delay
+                setTimeout(() => {
+                    if (saveBtn) saveBtn.disabled = false;
+                    if (spinner) spinner.classList.add('d-none');
+                }, 100);
+            }, { once: true });
+            document.getElementById('catalog-edit-cancel').addEventListener('click', () => done(null), { once: true });
+            document.getElementById('catalog-edit-panel-close').addEventListener('click', () => done(null), { once: true });
+            document.getElementById('catalog-edit-toggle-disable')?.addEventListener('click', async () => {
+                if (!await this.adminConfirm(`Are you sure you want to ${item.is_disabled ? 'enable' : 'disable'} this product?`, { title: `${item.is_disabled ? 'Enable' : 'Disable'} Product`, danger: !item.is_disabled })) return;
+                done({ action: 'disable' });
+            }, { once: true });
+            // NOTE: Delete action reserved for superadmin only; button removed from UI.
+        });
+    }
+
 }
 
 // Initialize admin dashboard when DOM is loaded
@@ -1767,3 +5176,8 @@ let adminDashboard;
 document.addEventListener('DOMContentLoaded', () => {
     adminDashboard = new AdminDashboard();
 });
+
+
+
+
+

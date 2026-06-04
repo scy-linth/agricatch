@@ -1,11 +1,11 @@
-const express = require('express');
+﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
 const { broadcastEvent } = require('../utils/realtime');
 
 const router = express.Router();
 
-// Status workflow: pending → confirmed → preparing → out_for_delivery → delivered
+// Status workflow: pending â†’ confirmed â†’ preparing â†’ out_for_delivery â†’ delivered
 // Can be cancelled at any point (except delivered)
 
 // Get user orders
@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (_) {
       return res.status(401).json({ message: 'Invalid token' });
     }
@@ -95,7 +95,7 @@ router.get('/farmer/:farmerId', async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (_) {
       return res.status(401).json({ message: 'Invalid token' });
     }
@@ -222,7 +222,7 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
       return res.status(400).json({ message: 'Invalid status' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
     const role = roleResult.rows[0]?.role;
 
@@ -256,7 +256,7 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
       return res.status(400).json({ message: 'Delivered orders cannot be updated' });
     }
 
-    // Strict status transition matrix - enforce workflow: pending → confirmed → preparing → out_for_delivery → delivered
+    // Strict status transition matrix - enforce workflow: pending â†’ confirmed â†’ preparing â†’ out_for_delivery â†’ delivered
     // Cancellation allowed from any status except delivered
     const validTransitions = {
       pending: ['confirmed', 'cancelled'],
@@ -370,7 +370,7 @@ router.get('/:id', async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Per-item order: order directly contains product info
     const result = await pool.query(`
@@ -427,7 +427,7 @@ router.post('/', async (req, res) => {
       return res.status(401).json({ message: 'Authentication required for ordering' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const {
       delivery_address,
       delivery_date,
@@ -677,7 +677,7 @@ router.put('/:id/status', async (req, res) => {
       return res.status(400).json({ message: 'Invalid order id' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Check if user is staff or farmer who owns the products in the order
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
@@ -866,7 +866,7 @@ router.put('/:id/cancel', async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Check if order belongs to user and can be cancelled
     const { reason } = req.body;
@@ -948,7 +948,7 @@ router.put('/:id/cancel-farmer', async (req, res) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
 
     if (userResult.rows[0].role !== 'staff') {

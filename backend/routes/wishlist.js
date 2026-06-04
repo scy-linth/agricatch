@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
 
@@ -8,7 +8,7 @@ const getUserFromToken = (req) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return null;
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    return jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     return null;
   }

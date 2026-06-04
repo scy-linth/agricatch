@@ -2135,18 +2135,7 @@ body.loading {
 
 .cart-sidebar.open {
     right: 0;
-}
-
-/* Force cart sidebar fixed in case of CSS conflicts or transformed ancestors */
-.cart-sidebar {
-    position: fixed !important;
-    top: 0 !important;
-    right: -420px !important;
-    height: 100vh !important;
-    z-index: 99999 !important;
-}
-.cart-sidebar.open {
-    right: 0 !important;
+    z-index: 10061; /* Above floating cart button (10060) */
 }
 
 /* Cart overlay - separate element for better control */
@@ -2690,101 +2679,6 @@ body.loading {
 #terms-modal .terms-modal-body {
     overflow-y: auto;
     flex: 1 1 auto;
-}
-
-#address-selector-modal {
-    z-index: 100050 !important;
-    position: fixed !important;
-}
-
-#address-selector-modal .modal-content {
-    position: relative;
-    z-index: 100051;
-    display: flex;
-    flex-direction: column;
-    max-height: 90vh;
-    overflow: hidden;
-}
-
-#address-selector-modal .modal-header {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: var(--white);
-    position: sticky;
-    top: 0;
-    z-index: 2;
-}
-
-#address-selector-modal .modal-header h3,
-#address-selector-modal .modal-header .close-btn {
-    color: var(--white);
-}
-
-.address-selector-body {
-    padding: 1.5rem;
-    overflow-y: auto;
-    flex: 1 1 auto;
-}
-
-.address-selector-body .form-group {
-    margin-bottom: 1rem;
-}
-
-.address-selection-preview {
-    margin-top: 0.75rem;
-    padding: 0.85rem 1rem;
-    border-radius: 10px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    font-size: 0.95rem;
-    color: #334155;
-    min-height: 52px;
-    display: flex;
-    align-items: center;
-}
-
-.address-selector-footer {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: flex-end;
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
-    background: var(--white);
-}
-
-.address-selector-actions {
-    margin-bottom: 0.75rem;
-}
-
-.address-selector-card {
-    display: grid;
-    gap: 0.65rem;
-    padding: 0;
-    border: none;
-    background: transparent;
-    margin-bottom: 0.6rem;
-}
-
-.address-selector-card .btn {
-    margin: 0;
-}
-
-.address-selector-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    text-align: left;
-    justify-content: flex-start;
-}
-
-.address-btn-title {
-    font-weight: 700;
-    color: var(--white);
-}
-
-.address-btn-subtext {
-    font-size: 0.82rem;
-    color: rgba(255, 255, 255, 0.85);
 }
 
 .readonly-display {
@@ -7335,6 +7229,7 @@ textarea.invalid:focus {
 
 .address-form input[type="text"],
 .address-form input[type="tel"],
+.address-form select,
 .address-form textarea {
     width: 100%;
     padding: 0.875rem;
@@ -7347,10 +7242,22 @@ textarea.invalid:focus {
 
 .address-form input[type="text"]:focus,
 .address-form input[type="tel"]:focus,
+.address-form select:focus,
 .address-form textarea:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.1);
+}
+
+.address-form select:disabled {
+    background: #f8fafc;
+    color: #64748b;
+    cursor: not-allowed;
+}
+
+#address-preview {
+    background: #f8fafc;
+    color: var(--text-color);
 }
 
 .address-form textarea {

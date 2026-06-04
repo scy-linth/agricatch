@@ -82,6 +82,9 @@
                             <div id="notifications-list" class="notifications-list">
                                 <!-- Notifications will be loaded here -->
                             </div>
+                            <div class="notifications-footer" style="padding:8px 12px;text-align:center;border-top:1px solid #f1f5f9;">
+                                <a href="notifications.html" style="font-size:0.85rem;color:#3b82f6;text-decoration:none;font-weight:500;">View all notifications</a>
+                            </div>
                         </div>
                     </div>
                     <div id="user-menu" class="user-menu">
@@ -274,9 +277,19 @@
                         <label for="my-account-username">Username</label>
                         <input type="text" id="my-account-username" maxlength="30" readonly>
                     </div>
-                    <div class="form-group">
-                        <label for="my-account-fullname">Full Name</label>
-                        <input type="text" id="my-account-fullname" required>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="my-account-firstname">First Name</label>
+                            <input type="text" id="my-account-firstname" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="my-account-middlename">Middle Name</label>
+                            <input type="text" id="my-account-middlename" placeholder="Optional">
+                        </div>
+                        <div class="form-group">
+                            <label for="my-account-lastname">Last Name</label>
+                            <input type="text" id="my-account-lastname" required>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="my-account-email">Email</label>
@@ -290,8 +303,21 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="my-account-address">Address</label>
-                        <textarea id="my-account-address" rows="3" required></textarea>
+                        <label>Address</label>
+                        <select id="my-account-zone" class="form-select">
+                            <option value="">Select Zone (Metro / North / South Luzon)</option>
+                        </select>
+                        <select id="my-account-province" class="form-select" disabled style="margin-top:8px">
+                            <option value="">Select Province</option>
+                        </select>
+                        <select id="my-account-city" class="form-select" disabled style="margin-top:8px">
+                            <option value="">Select City / Municipality</option>
+                        </select>
+                        <select id="my-account-barangay" class="form-select" disabled style="margin-top:8px">
+                            <option value="">Select Barangay</option>
+                        </select>
+                        <input type="text" id="my-account-street" class="form-input" placeholder="Street / Building / House No." style="margin-top:8px">
+                        <textarea id="my-account-address" class="form-textarea readonly-display" rows="2" placeholder="Address preview will appear here" readonly style="margin-top:8px"></textarea>
                     </div>
                     <div class="my-account-password-section">
                         <button type="button" class="btn btn-outline btn-full" id="toggle-my-password-section" aria-expanded="false" aria-controls="my-account-password-fields">
@@ -574,22 +600,24 @@
                             <small class="field-hint">Enter 10-digit mobile number (e.g., 929 819 6629)</small>
                         </div>
                         <div class="form-group">
-                            <label for="auth-address">
+                            <label for="auth-zone">
                                 Address
                                 <span class="required-indicator">*</span>
                             </label>
-                            <div class="address-selector-card">
-                                <button type="button" class="btn btn-primary btn-full address-selector-btn" id="open-address-selector-btn">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                    <span class="address-btn-title">Select Barangay / City / Province</span>
-                                </button>
-                            </div>
-                            <textarea id="auth-address" class="form-textarea readonly-display" rows="3" placeholder="Selected address will appear here" readonly required></textarea>
-                            <input type="hidden" id="auth-street">
-                            <input type="hidden" id="auth-island-group">
-                            <input type="hidden" id="auth-province">
-                            <input type="hidden" id="auth-city">
-                            <input type="hidden" id="auth-barangay">
+                            <select id="auth-zone" class="form-select" required>
+                                <option value="">Select Zone (Metro / North / South Luzon)</option>
+                            </select>
+                            <select id="auth-province" class="form-select" disabled required style="margin-top:6px">
+                                <option value="">Select Province</option>
+                            </select>
+                            <select id="auth-city" class="form-select" disabled required style="margin-top:6px">
+                                <option value="">Select City / Municipality</option>
+                            </select>
+                            <select id="auth-barangay" class="form-select" disabled required style="margin-top:6px">
+                                <option value="">Select Barangay</option>
+                            </select>
+                            <input type="text" id="auth-street" class="form-input" placeholder="House no., building, street" required style="margin-top:6px">
+                            <textarea id="auth-address" class="form-textarea readonly-display" rows="3" placeholder="Selected address will appear here" readonly required style="margin-top:6px"></textarea>
                             <small class="field-hint">Street/house no. + Barangay, City/Municipality, Province</small>
                         </div>
                         <div class="step-actions">
@@ -671,52 +699,6 @@
                 <p id="auth-mode-toggle">
                     <!-- Will be populated by JavaScript -->
                 </p>
-            </div>
-        </div>
-    </div>
-
-    <div id="address-selector-modal" class="modal">
-        <div class="modal-content modal-medium address-selector-modal">
-            <div class="modal-header">
-                <h3><i class="fas fa-map-marker-alt"></i> Select Address</h3>
-                <button class="close-btn" id="close-address-selector-btn">&times;</button>
-            </div>
-            <div class="modal-body address-selector-body">
-                <div class="form-group">
-                    <label for="address-island-group">Luzon Area (Metro/North/South)</label>
-                    <select id="address-island-group" class="form-input">
-                        <option value="">Select Luzon Area</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="address-province">Province (Luzon)</label>
-                    <select id="address-province" class="form-input" disabled>
-                        <option value="">Select Province</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="address-city">Municipality / City</label>
-                    <select id="address-city" class="form-input" disabled>
-                        <option value="">Select Municipality / City</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="address-barangay">Barangay</label>
-                    <select id="address-barangay" class="form-input" disabled>
-                        <option value="">Select Barangay</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="address-street-input">Street / Building / House No.</label>
-                    <input type="text" id="address-street-input" class="form-input" placeholder="House no., building, street">
-                    <small class="field-hint">Example: 123 ABC Bldg, Rizal St.</small>
-                </div>
-                <div class="address-selection-preview" id="address-selection-preview">
-                    Select values to preview the address.
-                </div>
-            </div>
-            <div class="modal-footer address-selector-footer">
-                <button type="button" class="btn btn-primary" id="address-selector-apply">Use Selected Address</button>
             </div>
         </div>
     </div>
@@ -889,6 +871,20 @@
                                 <!-- Checkout items will be loaded here -->
                             </div>
                         </div>
+                        <div class="checkout-price-breakdown">
+                            <div class="checkout-price-row">
+                                <span>Subtotal:</span>
+                                <span>₱<span id="checkout-subtotal">0.00</span></span>
+                            </div>
+                            <div class="checkout-price-row">
+                                <span>Delivery Fee:</span>
+                                <span>₱35.00</span>
+                            </div>
+                            <div class="checkout-price-row checkout-total-row">
+                                <span><strong>Total:</strong></span>
+                                <span><strong>₱<span id="checkout-total">0.00</span></strong></span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Delivery Information Section -->
@@ -898,19 +894,11 @@
                         </div>
                         
                         <div class="form-group">
-                            <label for="saved-addresses">
-                                <i class="fas fa-bookmark"></i> Use Saved Address
-                            </label>
-                            <select id="saved-addresses" class="form-select">
-                                <option value="">Select a saved address</option>
-                            </select>
-                            <button type="button" id="open-add-address-modal" class="btn-add-address">
-                                <i class="fas fa-plus-circle"></i> Add New Address
-                            </button>
-                        </div>
-
-                        <div class="form-divider">
-                            <span>Or enter manually</span>
+                            <label><i class="fas fa-map-marker-alt"></i> Delivery Address</label>
+                            <div class="checkout-fixed-address readonly-display" style="padding:10px 12px; border-radius:6px; background:#f8f9fa; border:1px solid #dee2e6; font-size:0.93em; line-height:1.5">
+                                <strong>Trabajo Market, M. Dela Fuente St., Sampaloc, Manila, Metro Manila</strong>
+                                <p style="margin:4px 0 0; color:#6c757d; font-size:0.88em"><i class="fas fa-info-circle"></i> All orders are delivered to Trabajo Market</p>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -929,13 +917,6 @@
                                 <input type="tel" id="checkout-phone" class="form-input" placeholder="929 819 6629" maxlength="12" required>
                             </div>
                             <small class="form-hint">Enter 10-digit mobile number (e.g., 929 819 6629)</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="delivery-address">
-                                Delivery Address <span class="required">*</span>
-                            </label>
-                            <textarea id="delivery-address" class="form-textarea" rows="3" placeholder="Enter your complete delivery address (street, barangay, city, province)" required></textarea>
                         </div>
 
                         <!-- Preferred delivery date removed per request -->
@@ -1026,22 +1007,54 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="floating-address-full">
-                        Address <span class="required">*</span>
+                    <label for="floating-address-zone">
+                        Zone <span class="required">*</span>
                     </label>
-                    <div class="address-selector-card">
-                        <button type="button" class="btn btn-primary btn-full address-selector-btn" id="open-address-selector-btn-floating">
-                            <i class="fas fa-map-marker-alt"></i>
-                            <span class="address-btn-title">Select Barangay / City / Province</span>
-                        </button>
-                    </div>
-                    <textarea id="floating-address-full" class="form-textarea readonly-display" rows="3" placeholder="Selected address will appear here" readonly required></textarea>
-                    <input type="hidden" id="floating-address-street">
-                    <input type="hidden" id="floating-address-island-group">
-                    <input type="hidden" id="floating-address-province">
-                    <input type="hidden" id="floating-address-city">
-                    <input type="hidden" id="floating-address-barangay">
-                    <small class="form-hint">Street/house no. + Barangay, City/Municipality, Province</small>
+                    <select id="floating-address-zone" class="form-select" required>
+                        <option value="">Select Zone (Metro / North / South Luzon)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-province">
+                        Province <span class="required">*</span>
+                    </label>
+                    <select id="floating-address-province" class="form-select" disabled required>
+                        <option value="">Select Province</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-city">
+                        City / Municipality <span class="required">*</span>
+                    </label>
+                    <select id="floating-address-city" class="form-select" disabled required>
+                        <option value="">Select City / Municipality</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-barangay">
+                        Barangay <span class="required">*</span>
+                    </label>
+                    <select id="floating-address-barangay" class="form-select" disabled required>
+                        <option value="">Select Barangay</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-street">
+                        Street / Building / House No. <span class="required">*</span>
+                    </label>
+                    <input type="text" id="floating-address-street" class="form-input" placeholder="Enter street, building, or house number" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-full">
+                        Address Preview
+                    </label>
+                    <textarea id="floating-address-full" class="form-textarea readonly-display" rows="3" placeholder="Formatted address will appear here" readonly required></textarea>
+                    <small class="form-hint">Street / Building / House No., Barangay, City / Municipality, Province</small>
                 </div>
 
                 <div class="form-group checkbox-group">
@@ -1174,6 +1187,8 @@
         };
     </script>
     <script src="https://www.google.com/recaptcha/api.js?onload=agriCatchRecaptchaOnLoad&render=explicit" defer></script>
+    <script src="/js/psgc.js"></script>
+    <script src="/js/config.js"></script>
     <script src="/js/app.js"></script>
     <script>
         // Handle hero video loading - ensure full video loads before playing

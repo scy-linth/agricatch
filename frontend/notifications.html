@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - AgriCatch</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <div class="logo-and-title">
+                        <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
+                        <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
+                    </div>
+                    <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
+                </div>
+                <nav class="nav" id="main-nav">
+                    <a href="/" class="nav-link">Home</a>
+                    <a href="/#products" class="nav-link">Products</a>
+                    <a href="/orders.html" class="nav-link">My Orders</a>
+                </nav>
+                <div class="header-actions">
+                    <a href="/" class="btn btn-secondary">Back to Shop</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="notifications-page" style="padding:32px 0 64px;">
+        <div class="container">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+                <div>
+                    <h2 style="margin:0 0 4px;"><i class="fas fa-bell" style="color:#3b82f6;margin-right:8px;"></i>Notifications</h2>
+                    <p style="color:#6b7280;margin:0;" id="notif-page-subtitle">Loading...</p>
+                </div>
+                <button id="notif-mark-all-btn" class="btn btn-secondary" type="button">
+                    <i class="fas fa-check-double"></i> Mark All as Read
+                </button>
+            </div>
+
+            <div id="notifications-page-list" style="display:flex;flex-direction:column;gap:10px;">
+                <div class="empty-state" style="text-align:center;padding:32px;">Loading notifications...</div>
+            </div>
+
+            <div id="notif-pagination" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:24px;"></div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>AgriCatch</h3>
+                    <p>Freshly Harvested! Pre-ordered for you! Your trusted source for fresh farm products.</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 AgriCatch. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/format.js"></script>
+    <script src="/js/notifications-page.js"></script>
+    <script>
+        // Mobile menu toggle
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mainNav = document.getElementById('main-nav');
+        if (mobileMenuToggle && mainNav) {
+            mobileMenuToggle.addEventListener('click', () => {
+                mainNav.classList.toggle('open');
+                const icon = mobileMenuToggle.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-bars');
+                    icon.classList.toggle('fa-times');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

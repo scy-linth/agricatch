@@ -66,11 +66,16 @@ class ProductPage {
         const container = document.getElementById('product-detail');
         if (!container) return;
 
-        // Prefer full image URL (Cloudinary). If missing, render an empty image element
-        // so the layout doesn't break. Avoid loading heavy placeholder images.
-        const imgSrc = product.image_url && product.image_url.trim() !== '' ? product.image_url : '';
+        // Update SEO meta tags with actual product data
         const safeName = this.escapeHtml(product.name || '');
         const safeDesc = this.escapeHtml(product.description || '');
+        const imgSrc = product.image_url && product.image_url.trim() !== '' ? product.image_url : '/images/logo.png';
+        document.title = `${product.name || 'Product'} - AgriCatch`;
+        document.querySelector('meta[property="og:title"]')?.setAttribute('content', `${product.name || 'Product'} - AgriCatch`);
+        document.querySelector('meta[property="og:description"]')?.setAttribute('content', product.description || 'Fresh farm products available for pre-order on AgriCatch.');
+        document.querySelector('meta[property="og:image"]')?.setAttribute('content', imgSrc);
+        document.querySelector('meta[name="description"]')?.setAttribute('content', product.description || 'Fresh farm products available for pre-order on AgriCatch.');
+
         const safeFarmer = this.escapeHtml(product.farmer_name || 'Local Farmer');
         const safeUnit = this.escapeHtml(product.unit || 'unit');
         const safeLocation = this.escapeHtml(product.farm_location || product.location || 'Unknown location');
@@ -185,13 +190,39 @@ class ProductPage {
     setupReviewForm() {
         const form = document.getElementById('review-form');
         if (!form) return;
+
+        // Setup star rating buttons
+        document.querySelectorAll('.review-star-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const value = Number(btn.getAttribute('data-rating') || 0);
+                this._setReviewRating(value);
+            });
+        });
+
         form.addEventListener('submit', (e) => this.submitReview(e));
+    }
+
+    _setReviewRating(value) {
+        const normalized = Math.max(0, Math.min(5, Number(value) || 0));
+        const hiddenInput = document.getElementById('review-rating');
+        const label = document.getElementById('review-rating-label');
+        if (hiddenInput) hiddenInput.value = normalized;
+        document.querySelectorAll('.review-star-btn').forEach((btn) => {
+            const starVal = Number(btn.getAttribute('data-rating') || 0);
+            btn.style.color = starVal <= normalized ? '#f59e0b' : '#d1d5db';
+        });
+        if (label) label.textContent = normalized > 0 ? `${normalized} star${normalized > 1 ? 's' : ''}` : 'Select a rating';
     }
 
     async submitReview(e) {
         e.preventDefault();
-        const rating = parseInt(document.getElementById('review-rating').value, 10);
+        const rating = parseInt(document.getElementById('review-rating').value || '0', 10);
         const comment = document.getElementById('review-comment').value;
+
+        if (!rating || rating < 1 || rating > 5) {
+            showToast('Please select a rating from 1 to 5 stars.', 'warning');
+            return;
+        }
 
         try {
             const response = await fetch(`${this.apiBase}/products/${this.productId}/reviews`, {
@@ -203,12 +234,17 @@ class ProductPage {
                 body: JSON.stringify({ rating, comment })
             });
             if (response.ok) {
-                document.getElementById('review-rating').value = '';
+                this._setReviewRating(0);
                 document.getElementById('review-comment').value = '';
                 this.loadReviews();
+                showToast('Review submitted successfully!', 'success');
+            } else {
+                const data = await response.json().catch(() => ({}));
+                showToast(data.message || 'Unable to submit review right now.', 'error');
             }
         } catch (error) {
             console.error('Error submitting review:', error);
+            showToast('Unable to submit review right now.', 'error');
         }
     }
 }

@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -18,11 +18,11 @@ const PASSWORD_RESET_MAX_REQUESTS_PER_HOUR = Number.parseInt(process.env.PASSWOR
 // Dev-only OTP surfacing toggle (do NOT enable in production)
 const DEV_SHOW_PASSWORD_RESET_OTP = (process.env.DEV_SHOW_PASSWORD_RESET_OTP === 'true') && process.env.NODE_ENV !== 'production';
 // Plaintext password mode:
-// - ALLOW_PLAINTEXT_PASSWORDS=true enables plaintext even in production (for thesis/demo only).
 // - DEV_PLAINTEXT_PASSWORDS=true works only outside production.
+// - ALLOW_PLAINTEXT_PASSWORDS is intentionally disallowed in production to prevent misconfiguration.
 const PLAINTEXT_PASSWORDS_ENABLED =
-  process.env.ALLOW_PLAINTEXT_PASSWORDS === 'true' ||
-  ((process.env.DEV_PLAINTEXT_PASSWORDS === 'true') && process.env.NODE_ENV !== 'production');
+  process.env.NODE_ENV !== 'production' &&
+  (process.env.ALLOW_PLAINTEXT_PASSWORDS === 'true' || process.env.DEV_PLAINTEXT_PASSWORDS === 'true');
 
 function isBcryptHash(value) {
   return typeof value === 'string' && value.startsWith('$2') && value.length > 20;
@@ -192,7 +192,7 @@ async function updateUserPassword(userId, passwordValue) {
 
 async function getLoginSelectFields() {
   const columns = await getUserColumns();
-  // Always include password fields — they are required for auth and must not be dropped
+  // Always include password fields â€” they are required for auth and must not be dropped
   // even if getUserColumns() returns an incomplete cache.
   const fields = ['id', 'username', 'email', 'full_name', 'role'];
   if (columns.has('is_disabled')) fields.push('is_disabled');
@@ -328,7 +328,7 @@ router.post('/register', async (req, res) => {
     // Create JWT token
     const token = jwt.sign(
       { id: user.id, username: user.username },
-      process.env.JWT_SECRET || 'your-jwt-secret',
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
@@ -440,7 +440,7 @@ router.post('/login', async (req, res) => {
     // Create JWT token
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
-      process.env.JWT_SECRET || 'your-jwt-secret',
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
@@ -500,12 +500,28 @@ router.get('/profile', async (req, res) => {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Return user profile from DB
+    const columns = await getUserColumns();
+    const selectFields = ['id', 'username', 'email', 'full_name', 'role', 'created_at'];
+    [
+      'first_name',
+      'middle_name',
+      'last_name',
+      'phone',
+      'address',
+      'shop_description',
+      'shop_banner_url',
+      'shop_avatar_url',
+      'is_verified',
+      'is_disabled',
+      'disabled_reason'
+    ].forEach((field) => {
+      if (columns.has(field)) selectFields.push(field);
+    });
 
     const result = await pool.query(
-      'SELECT id, username, email, full_name, phone, address, shop_description, shop_banner_url, shop_avatar_url, role, created_at FROM users WHERE id = $1',
+      `SELECT ${selectFields.join(', ')} FROM users WHERE id = $1`,
       [decoded.id]
     );
 
@@ -530,8 +546,28 @@ router.put('/profile', async (req, res) => {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
-    const { username, full_name, phone, address } = req.body;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const columns = await getUserColumns();
+    const hasColumn = (column) => columns.has(column);
+    const currentUserFields = ['id', 'username', 'full_name', 'first_name', 'middle_name', 'last_name']
+      .filter(hasColumn);
+    const profileRes = await pool.query(
+      `SELECT ${currentUserFields.join(', ')} FROM users WHERE id = $1`,
+      [decoded.id]
+    );
+    if (!profileRes.rows.length) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const currentUser = profileRes.rows[0];
+    const body = req.body || {};
+    const username = body.username;
+    const phone = body.phone;
+    const address = body.address;
+    const providedFirstName = Object.prototype.hasOwnProperty.call(body, 'first_name');
+    const providedMiddleName = Object.prototype.hasOwnProperty.call(body, 'middle_name');
+    const providedLastName = Object.prototype.hasOwnProperty.call(body, 'last_name');
+    const providedFullName = Object.prototype.hasOwnProperty.call(body, 'full_name');
 
     if (username && String(username).trim().length > 0) {
       const existing = await pool.query(
@@ -543,18 +579,81 @@ router.put('/profile', async (req, res) => {
       }
     }
 
-    await pool.query(
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+    const push = (column, value) => {
+      updates.push(`${column} = $${paramIndex++}`);
+      values.push(value);
+    };
+
+    if (typeof username !== 'undefined') {
+      const nextUsername = String(username || '').trim();
+      if (!nextUsername) {
+        return res.status(400).json({ message: 'Username cannot be empty' });
+      }
+      push('username', nextUsername);
+    }
+
+    const firstName = providedFirstName ? String(body.first_name || '').trim() : String(currentUser.first_name || '').trim();
+    const middleName = providedMiddleName ? String(body.middle_name || '').trim() : String(currentUser.middle_name || '').trim();
+    const lastName = providedLastName ? String(body.last_name || '').trim() : String(currentUser.last_name || '').trim();
+    const fallbackFullName = providedFullName ? String(body.full_name || '').trim() : String(currentUser.full_name || '').trim();
+
+    if (providedFirstName || providedMiddleName || providedLastName || providedFullName) {
+      if ((providedFirstName || providedLastName || providedMiddleName) && (!firstName || !lastName)) {
+        return res.status(400).json({ message: 'First name and last name are required when updating name fields' });
+      }
+
+      const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || fallbackFullName;
+      if (!displayName) {
+        return res.status(400).json({ message: 'Full name is required' });
+      }
+
+      if (hasColumn('full_name')) {
+        push('full_name', displayName);
+      }
+      if (providedFirstName || providedLastName || providedMiddleName) {
+        if (hasColumn('first_name')) push('first_name', firstName || null);
+        if (hasColumn('middle_name')) push('middle_name', middleName || null);
+        if (hasColumn('last_name')) push('last_name', lastName || null);
+      }
+    }
+
+    if (typeof phone !== 'undefined' && hasColumn('phone')) push('phone', String(phone || '').trim() || null);
+    if (typeof address !== 'undefined' && hasColumn('address')) push('address', String(address || '').trim() || null);
+
+    if (!updates.length) {
+      return res.status(400).json({ message: 'No profile fields to update' });
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(decoded.id);
+    const returningFields = [
+      'id',
+      'username',
+      'email',
+      'full_name',
+      'first_name',
+      'middle_name',
+      'last_name',
+      'phone',
+      'address',
+      'role',
+      'is_verified',
+      'is_disabled',
+      'disabled_reason',
+      'created_at'
+    ].filter(hasColumn);
+    const updated = await pool.query(
       `UPDATE users
-       SET username = COALESCE($1, username),
-           full_name = COALESCE($2, full_name),
-           phone = COALESCE($3, phone),
-           address = COALESCE($4, address),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5`,
-      [username || null, full_name || null, phone || null, address || null, decoded.id]
+       SET ${updates.join(', ')}
+       WHERE id = $${paramIndex}
+       RETURNING ${returningFields.join(', ')}`,
+      values
     );
 
-    res.json({ message: 'Profile updated successfully' });
+    res.json({ message: 'Profile updated successfully', user: updated.rows[0] });
 
   } catch (error) {
     console.error('Update profile error:', error);
@@ -812,7 +911,7 @@ router.put('/change-password', async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (_) {
       return res.status(401).json({ message: 'Invalid token.' });
     }
@@ -822,8 +921,8 @@ router.put('/change-password', async (req, res) => {
       return res.status(401).json({ message: 'Invalid token.' });
     }
 
-    const currentPassword = String(req.body?.currentPassword || '');
-    const newPassword = String(req.body?.newPassword || '');
+    const currentPassword = String(req.body?.currentPassword || req.body?.current_password || '');
+    const newPassword = String(req.body?.newPassword || req.body?.new_password || '');
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: 'Current password and new password are required.' });
     }

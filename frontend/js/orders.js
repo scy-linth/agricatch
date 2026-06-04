@@ -32,6 +32,9 @@ class OrdersPage {
             productName: ''
         };
         this.cancelDraftOrderId = null;
+        this.searchQuery = '';
+        this.dateFrom = '';
+        this.dateTo = '';
         this.init();
     }
 
@@ -165,6 +168,33 @@ class OrdersPage {
             if (e.target && e.target.id === 'order-reason-view-modal') {
                 this.closeReasonViewer();
             }
+        });
+
+        // Search and date filter listeners
+        const searchInput = document.getElementById('orders-search-input');
+        const dateFrom = document.getElementById('orders-date-from');
+        const dateTo = document.getElementById('orders-date-to');
+        const clearBtn = document.getElementById('orders-search-clear');
+        if (searchInput) searchInput.addEventListener('input', () => {
+            this.searchQuery = searchInput.value.trim().toLowerCase();
+            this.renderOrdersByStatus(this.currentStatus);
+        });
+        if (dateFrom) dateFrom.addEventListener('change', () => {
+            this.dateFrom = dateFrom.value;
+            this.renderOrdersByStatus(this.currentStatus);
+        });
+        if (dateTo) dateTo.addEventListener('change', () => {
+            this.dateTo = dateTo.value;
+            this.renderOrdersByStatus(this.currentStatus);
+        });
+        if (clearBtn) clearBtn.addEventListener('click', () => {
+            this.searchQuery = '';
+            this.dateFrom = '';
+            this.dateTo = '';
+            if (searchInput) searchInput.value = '';
+            if (dateFrom) dateFrom.value = '';
+            if (dateTo) dateTo.value = '';
+            this.renderOrdersByStatus(this.currentStatus);
         });
 
         document.querySelectorAll('.order-rating-star-btn').forEach((button) => {
@@ -349,13 +379,27 @@ class OrdersPage {
         const container = document.getElementById(`${status}-orders-list`);
         if (!container) return;
 
-        if (orders.length === 0) {
+        // Apply search + date filters
+        const q = this.searchQuery || '';
+        const fromMs = this.dateFrom ? new Date(this.dateFrom).getTime() : 0;
+        const toMs = this.dateTo ? new Date(this.dateTo + 'T23:59:59').getTime() : Infinity;
+        const filtered = orders.filter((order) => {
+            const item = (order.items && order.items[0]) || order;
+            const matchesSearch = !q
+                || String(order.id || '').includes(q)
+                || String(item.product_name || '').toLowerCase().includes(q);
+            const orderDate = new Date(order.created_at).getTime();
+            const matchesDate = (!fromMs || orderDate >= fromMs) && orderDate <= toMs;
+            return matchesSearch && matchesDate;
+        });
+
+        if (filtered.length === 0) {
             const statusLabel = this.formatStatusLabel(status);
-            container.innerHTML = `<div class="empty-state">No ${statusLabel} orders found.</div>`;
+            container.innerHTML = `<div class="empty-state">No ${statusLabel} orders found${q ? ' matching your search' : ''}.</div>`;
             return;
         }
 
-        container.innerHTML = orders.map(order => {
+        container.innerHTML = filtered.map(order => {
             const item = (order.items && order.items[0]) || order;
             const canCancel = (item.status || order.status || 'pending') === 'pending';
             const deliveredAtRaw = item.delivered_at || order.delivered_at || null;
@@ -368,12 +412,36 @@ class OrdersPage {
 
             const currentStatus = item.status || order.status || 'pending';
             const createdAt = new Date(order.created_at);
-            const displayDate = Number.isNaN(createdAt.getTime()) ? '—' : createdAt.toLocaleDateString();
-            const displayTime = Number.isNaN(createdAt.getTime()) ? '' : createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const displayDate = Number.isNaN(createdAt.getTime()) ? '—' : createdAt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' });
+            const displayTime = Number.isNaN(createdAt.getTime()) ? '' : createdAt.toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' });
             const cancellationReason = item.cancellation_reason || order.cancellation_reason || 'No reason provided.';
             const encodedReason = encodeURIComponent(cancellationReason);
             const encodedProductName = encodeURIComponent(item.product_name || 'Product');
             const quantity = Number(item.quantity || order.quantity || 1) || 1;
+
+            // Delivery tracking timeline
+            const steps = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered'];
+            const currentStepIdx = steps.indexOf(currentStatus);
+            const isCancelled = currentStatus === 'cancelled';
+            const timelineHtml = !isCancelled ? `
+                <div class="order-timeline" style="display:flex;align-items:center;gap:0;margin:12px 0 4px;overflow-x:auto;padding-bottom:2px;">
+                    ${steps.map((step, i) => {
+                        const done = i <= currentStepIdx;
+                        const active = i === currentStepIdx;
+                        const labels = { pending: 'Pending', confirmed: 'Confirmed', preparing: 'Preparing', out_for_delivery: 'On the Way', delivered: 'Delivered' };
+                        const color = done ? '#10b981' : '#d1d5db';
+                        const textColor = active ? '#059669' : done ? '#10b981' : '#9ca3af';
+                        return `
+                            <div style="display:flex;flex-direction:column;align-items:center;min-width:72px;">
+                                <div style="width:24px;height:24px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;${active ? 'box-shadow:0 0 0 3px #d1fae5;' : ''}">
+                                    ${done ? '<i class="fas fa-check" style="color:#fff;font-size:11px;"></i>' : `<span style="width:8px;height:8px;border-radius:50%;background:#fff;display:block;"></span>`}
+                                </div>
+                                <span style="font-size:10px;color:${textColor};margin-top:3px;text-align:center;font-weight:${active ? '600' : '400'};white-space:nowrap;">${labels[step]}</span>
+                            </div>
+                            ${i < steps.length - 1 ? `<div style="flex:1;height:2px;background:${i < currentStepIdx ? '#10b981' : '#e5e7eb'};min-width:20px;margin-bottom:18px;"></div>` : ''}
+                        `;
+                    }).join('')}
+                </div>` : '';
 
             return `
             <div class="order-card" data-order-id="${order.id}">
@@ -390,6 +458,7 @@ class OrdersPage {
                         <span style="font-weight: 600; color: ${this.getStatusColor(currentStatus)};">${this.formatStatusLabel(currentStatus)}</span>
                     </div>
                 </div>
+                ${timelineHtml}
                 <div class="order-item">
                     <img src="${item.image_url || window.__PLACEHOLDER_IMAGE__}" alt="${item.product_name || 'Product'}">
                     <div class="order-item-info">
@@ -410,6 +479,11 @@ class OrdersPage {
                             ${item.farmer_id ? `
                                 <button class="btn btn-small btn-primary" onclick="ordersPage.openChat(${order.id}, ${item.farmer_id}, '${encodedProductName}', ${quantity})">
                                     <i class="fas fa-comments"></i> Chat Vendor
+                                </button>
+                            ` : ''}
+                            ${isDelivered ? `
+                                <button class="btn btn-small btn-secondary" onclick="ordersPage.reorder(${order.id})" title="Add items back to cart">
+                                    <i class="fas fa-redo"></i> Re-order
                                 </button>
                             ` : ''}
                             ${canRateNow ? `
@@ -605,7 +679,7 @@ class OrdersPage {
             }
 
             if (!eligibilityRes.ok || !eligibility?.can_rate) {
-                alert((eligibility && eligibility.reason) || 'You can rate only delivered items within 1 month of delivery.');
+                showToast((eligibility && eligibility.reason) || 'You can rate only delivered items within 1 month of delivery.', 'warning');
                 return;
             }
 
@@ -619,7 +693,7 @@ class OrdersPage {
             });
         } catch (error) {
             console.error('Rate product error:', error);
-            alert('Unable to submit rating right now.');
+            showToast('Unable to submit rating right now.', 'error');
         }
     }
 
@@ -632,12 +706,12 @@ class OrdersPage {
         const comment = String(document.getElementById('order-rating-comment')?.value || '').trim();
 
         if (!productId) {
-            alert('Unable to submit rating right now.');
+            showToast('Unable to submit rating right now.', 'error');
             return;
         }
 
         if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
-            alert('Please select a rating from 1 to 5 stars.');
+            showToast('Please select a rating from 1 to 5 stars.', 'warning');
             return;
         }
 
@@ -673,16 +747,16 @@ class OrdersPage {
 
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
-                alert(payload?.message || 'Unable to submit rating right now.');
+                showToast(payload?.message || 'Unable to submit rating right now.', 'error');
                 return;
             }
 
-            alert('Your rating was saved successfully.');
+            showToast('Your rating was saved successfully.', 'success');
             this.closeRatingModal();
             this.loadOrders();
         } catch (error) {
             console.error('Submit rating error:', error);
-            alert('Unable to submit rating right now.');
+            showToast('Unable to submit rating right now.', 'error');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -720,11 +794,11 @@ class OrdersPage {
                 return true;
             }
             const payload = await response.json().catch(() => ({}));
-            alert(payload?.message || 'Unable to cancel order.');
+            showToast(payload?.message || 'Unable to cancel order.', 'error');
             return false;
         } catch (error) {
             console.error('Cancel order error:', error);
-            alert('Unable to cancel order right now.');
+            showToast('Unable to cancel order right now.', 'error');
             return false;
         }
     }
@@ -732,7 +806,7 @@ class OrdersPage {
 
     async openChat(orderId, farmerId, encodedProductName = '', quantity = 1) {
         if (!farmerId) {
-            alert('Farmer information not available');
+            showToast('Farmer information not available.', 'error');
             return;
         }
         const params = new URLSearchParams(window.location.search);
@@ -741,6 +815,36 @@ class OrdersPage {
         const productName = decodeURIComponent(String(encodedProductName || 'Product'));
         const safeQty = Number(quantity || 1) || 1;
         window.location.href = `/chat.html?farmerId=${farmerId}&orderId=${orderId}&productName=${encodeURIComponent(productName)}&quantity=${safeQty}&returnUrl=${encodeURIComponent(returnUrl)}`;
+    }
+
+    async reorder(orderId) {
+        const allOrders = Object.values(this.ordersByStatus).flat();
+        const order = allOrders.find((o) => Number(o.id) === Number(orderId));
+        if (!order) { showToast('Order not found.', 'error'); return; }
+        const item = (order.items && order.items[0]) || order;
+        const productId = item.product_id;
+        const quantity = Number(item.quantity || 1) || 1;
+        if (!productId) { showToast('Product information not available.', 'error'); return; }
+
+        try {
+            const response = await this.fetchWithApiFallback('/cart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ product_id: productId, quantity })
+            });
+            if (response.ok) {
+                showToast(`${item.product_name || 'Item'} added to your cart!`, 'success');
+            } else {
+                const data = await response.json().catch(() => ({}));
+                showToast(data.message || 'Unable to add item to cart.', 'error');
+            }
+        } catch (err) {
+            console.error('Reorder error:', err);
+            showToast('Unable to add item to cart right now.', 'error');
+        }
     }
 
     getStatusColor(status) {

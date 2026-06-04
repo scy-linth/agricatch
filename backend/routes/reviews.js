@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
 
@@ -8,7 +8,7 @@ const getUserFromToken = (req) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return null;
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    return jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
     return null;
   }
@@ -446,6 +446,63 @@ router.put('/orders/:id/customer-rating', async (req, res) => {
     return res.json({ message: 'Customer rating updated' });
   } catch (error) {
     console.error('Update customer rating error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get all reviews for the authenticated farmer's products
+router.get('/mine', async (req, res) => {
+  const user = getUserFromToken(req);
+  if (!user) return res.status(401).json({ message: 'Unauthorized' });
+  if (user.role !== 'farmer') return res.status(403).json({ message: 'Farmers only' });
+
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    const countResult = await pool.query(
+      `SELECT COUNT(r.id) AS total
+       FROM reviews r
+       JOIN products p ON p.id = r.product_id
+       WHERE p.farmer_id = $1`,
+      [user.id]
+    );
+    const total = Number(countResult.rows[0]?.total || 0);
+
+    const rows = await pool.query(
+      `SELECT r.id, r.rating, r.comment, r.created_at,
+              p.name AS product_name, p.id AS product_id,
+              u.username AS customer_name,
+              u.first_name, u.last_name
+       FROM reviews r
+       JOIN products p ON p.id = r.product_id
+       JOIN users u ON u.id = r.user_id
+       WHERE p.farmer_id = $1
+       ORDER BY r.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [user.id, limit, offset]
+    );
+
+    const aggResult = await pool.query(
+      `SELECT COALESCE(AVG(r.rating), 0)::numeric(3,2) AS avg_rating,
+              COUNT(r.id)::int AS total_reviews
+       FROM reviews r
+       JOIN products p ON p.id = r.product_id
+       WHERE p.farmer_id = $1`,
+      [user.id]
+    );
+
+    return res.json({
+      reviews: rows.rows,
+      total,
+      page,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      avgRating: Number(aggResult.rows[0]?.avg_rating || 0),
+      totalReviews: Number(aggResult.rows[0]?.total_reviews || 0)
+    });
+  } catch (error) {
+    console.error('Get farmer reviews error:', error);
     return res.status(500).json({ message: 'Server error' });
   }
 });

@@ -21,6 +21,14 @@ NODE_ENV=development
 DEV_PLAINTEXT_PASSWORDS=false
 ALLOW_PLAINTEXT_PASSWORDS=false
 
+# Privileged admin recovery/registration secret.
+# Always set this to a long random value in each environment.
+ADMIN_SECRET=replace_with_a_long_random_admin_secret
+
+# Dev-only OTP visibility toggles. Keep these false and never enable them in production.
+DEV_EXPOSE_OTP=false
+DEV_SHOW_PASSWORD_RESET_OTP=false
+
 # SMTP Configuration for OTP Emails
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -31,4 +39,9 @@ SMTP_PASSWORD=your-app-password
 # Google reCAPTCHA v2
 RECAPTCHA_SITE_KEY=your_recaptcha_site_key
 RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key
+
+# Cloudinary Configuration (for image uploads)
+CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 

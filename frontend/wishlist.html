@@ -32,9 +32,26 @@
 
     <main class="wishlist-page">
         <div class="container">
-            <div class="wishlist-header">
-                <h2>My Wishlist</h2>
-                <p>Save items you want to buy later.</p>
+            <div class="wishlist-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+                <div>
+                    <h2>My Wishlist <span id="wishlist-count-badge" style="font-size:0.9rem;font-weight:500;color:#6b7280;"></span></h2>
+                    <p>Save items you want to buy later.</p>
+                </div>
+                <button id="wishlist-add-all-btn" class="btn btn-primary" style="display:none;">
+                    <i class="fas fa-cart-plus"></i> Add All to Cart
+                </button>
+            </div>
+            <div class="wishlist-filters" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
+                <label for="wishlist-sort" style="font-size:0.9rem;font-weight:500;">Sort by:</label>
+                <select id="wishlist-sort" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                    <option value="date_desc">Newest First</option>
+                    <option value="date_asc">Oldest First</option>
+                    <option value="price_asc">Price: Low to High</option>
+                    <option value="price_desc">Price: High to Low</option>
+                </select>
+                <select id="wishlist-filter-category" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                    <option value="">All Categories</option>
+                </select>
             </div>
             <div id="wishlist-grid" class="products-grid">
                 <!-- Wishlist items will be rendered here -->

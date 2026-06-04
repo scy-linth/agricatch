@@ -54,6 +54,9 @@ LOGIN_CREDENTIALS.md
 SETUP_GUIDE_LOG.txt
 ADMIN_RECOVERY.md
 
+# Frontend config with sensitive keys
+frontend/js/config.js
+
 # PHPMailer (if not needed in repo)
 # PHPMailer-master/
 

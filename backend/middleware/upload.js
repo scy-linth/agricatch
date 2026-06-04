@@ -30,10 +30,15 @@ const createStorage = (baseDir, withDateFolder = false) => {
   });
 };
 
+const ALLOWED_MIMETYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
 const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
     return cb(new Error('Only JPG, JPEG, PNG, and WEBP files are allowed'), false);
+  }
+  if (!ALLOWED_MIMETYPES.includes(file.mimetype)) {
+    return cb(new Error('File content does not match an allowed image type'), false);
   }
   cb(null, true);
 };

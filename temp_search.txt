@@ -1,0 +1,4 @@
+' sortable: false }] });\n    }\n\n    clearOrdersFromUI() {\n        this.lastOrders = [];\n        this.renderOrders([]);\n        this.loadOrders();\n    }\n\n    // ─────────────────────────────────────────────────────'
+---
+"rn id.includes(q) || user.includes(q) || email.includes(q);\n            });\n        }\n\n        this.renderOrders(filtered);\n    }\n\n    startUnreadPolling() {\n        // Unread count is driven by SSE 'chat.message"
+---

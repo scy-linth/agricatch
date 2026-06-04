@@ -60,10 +60,53 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="address-full">
-                        Address <span class="required">*</span>
+                    <label for="address-zone">
+                        Zone <span class="required">*</span>
                     </label>
-                    <textarea id="address-full" rows="3" placeholder="Enter your complete address (street, barangay, city, province)" required></textarea>
+                    <select id="address-zone" required>
+                        <option value="">Select Zone (Metro / North / South Luzon)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="address-province">
+                        Province <span class="required">*</span>
+                    </label>
+                    <select id="address-province" disabled required>
+                        <option value="">Select Province</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="address-city">
+                        City / Municipality <span class="required">*</span>
+                    </label>
+                    <select id="address-city" disabled required>
+                        <option value="">Select City / Municipality</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="address-barangay">
+                        Barangay <span class="required">*</span>
+                    </label>
+                    <select id="address-barangay" disabled required>
+                        <option value="">Select Barangay</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="address-street">
+                        Street / Building / House No. <span class="required">*</span>
+                    </label>
+                    <input type="text" id="address-street" placeholder="Enter street, building, or house number" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="address-preview">
+                        Address Preview
+                    </label>
+                    <textarea id="address-preview" rows="3" readonly placeholder="Your formatted address will appear here"></textarea>
                 </div>
 
                 <div class="form-group checkbox-group">
@@ -100,6 +143,7 @@
         </div>
     </footer>
 
+    <script src="/js/psgc.js"></script>
     <script src="/js/addresses.js"></script>
     <script>
         // Mobile menu toggle

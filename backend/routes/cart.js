@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
 
@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     let userId = null;
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.id;
       } catch (error) {
         // Invalid token, treat as guest
@@ -169,7 +169,7 @@ router.post('/', async (req, res) => {
     let userId = null;
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.id;
       } catch (error) {
         // Invalid token, treat as guest
@@ -286,7 +286,7 @@ router.put('/:id', async (req, res) => {
     let userId = null;
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.id;
       } catch (error) {
         // Invalid token
@@ -358,7 +358,7 @@ router.delete('/:id', async (req, res) => {
     let userId = null;
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.id;
       } catch (error) {
         // Invalid token
@@ -403,7 +403,7 @@ router.delete('/', async (req, res) => {
     let userId = null;
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.id;
       } catch (error) {
         // Invalid token
@@ -436,7 +436,7 @@ router.post('/migrate', async (req, res) => {
       return res.status(400).json({ message: 'Session ID and authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id;
 
     // Get guest cart items
@@ -477,6 +477,12 @@ router.post('/migrate', async (req, res) => {
     console.error('Migrate cart error:', error);
     res.status(500).json({ message: 'Server error migrating cart' });
   }
+});
+
+// Alias: /merge mirrors /migrate (per master-plan.md spec)
+router.post('/merge', (req, res, next) => {
+  req.url = '/migrate';
+  router.handle(req, res, next);
 });
 
 module.exports = router;
