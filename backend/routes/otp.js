@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../utils/db');
 const { sendOtpEmail } = require('../utils/emailService');
 const { verifyRecaptchaToken } = require('../utils/recaptcha');
+const { writeAdminAuditLog } = require('../utils/auditLog');
 require('dotenv').config();
 
 const router = express.Router();
@@ -64,6 +65,14 @@ router.post('/send', async (req, res) => {
         return res.status(404).json({ message: 'Email not found' });
       }
     }
+
+    let userId = null;
+    try {
+      const userRes = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+      if (userRes.rows.length > 0) {
+        userId = userRes.rows[0].id;
+      }
+    } catch (_) {}
 
     try {
       const recentOtp = await pool.query(
@@ -161,6 +170,16 @@ router.post('/send', async (req, res) => {
 
     console.log('✅ OTP email sent successfully to:', email);
 
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: userId,
+      action: 'otp.sent',
+      entity: 'otps',
+      entity_id: insertedOtpId,
+      before: null,
+      after: { email, purpose, otp_id: insertedOtpId },
+      req
+    });
+
     const responseData = {
       message: dbErrorOccurred
         ? 'OTP sent to your email, but there was a server issue saving the OTP. Please try again if you do not receive the code.'
@@ -198,6 +217,15 @@ router.post('/verify', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: null,
+        action: 'otp.verify_failed',
+        entity: 'otps',
+        entity_id: null,
+        before: null,
+        after: { email, purpose, reason: 'not_found' },
+        req
+      });
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
@@ -205,11 +233,29 @@ router.post('/verify', async (req, res) => {
 
     if (new Date(otpRecord.expires_at) < new Date()) {
       await pool.query('UPDATE otps SET is_used = true WHERE id = $1', [otpRecord.id]);
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: null,
+        action: 'otp.verify_failed',
+        entity: 'otps',
+        entity_id: otpRecord.id,
+        before: null,
+        after: { email, purpose, reason: 'expired' },
+        req
+      });
       return res.status(400).json({ message: 'OTP has expired' });
     }
 
     if (otpRecord.attempts >= 5) {
       await pool.query('UPDATE otps SET is_used = true WHERE id = $1', [otpRecord.id]);
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: null,
+        action: 'otp.verify_failed',
+        entity: 'otps',
+        entity_id: otpRecord.id,
+        before: null,
+        after: { email, purpose, reason: 'too_many_attempts' },
+        req
+      });
       return res.status(400).json({ message: 'Too many failed attempts. Please request a new OTP.' });
     }
 
@@ -218,6 +264,15 @@ router.post('/verify', async (req, res) => {
         'UPDATE otps SET attempts = attempts + 1 WHERE id = $1',
         [otpRecord.id]
       );
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: null,
+        action: 'otp.verify_failed',
+        entity: 'otps',
+        entity_id: otpRecord.id,
+        before: null,
+        after: { email, purpose, reason: 'invalid_code', attempts: otpRecord.attempts + 1 },
+        req
+      });
       return res.status(400).json({
         message: 'Invalid OTP',
         attemptsLeft: 5 - (otpRecord.attempts + 1),
@@ -225,6 +280,16 @@ router.post('/verify', async (req, res) => {
     }
 
     await pool.query('UPDATE otps SET is_used = true WHERE id = $1', [otpRecord.id]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: null,
+      action: 'otp.verify_success',
+      entity: 'otps',
+      entity_id: otpRecord.id,
+      before: null,
+      after: { email, purpose },
+      req
+    });
 
     res.json({
       message: 'OTP verified successfully',

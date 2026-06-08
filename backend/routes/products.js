@@ -918,6 +918,7 @@ router.post('/', productUpload.single('image'), async (req, res) => {
     }
 
     await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS cloudinary_public_id VARCHAR(255)');
+    await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT \'approved\'');
 
     // Determine image URL/public id: prefer explicit image_url, but any uploaded file is always sent to Cloudinary.
     let imageUrl = null;
@@ -960,11 +961,11 @@ router.post('/', productUpload.single('image'), async (req, res) => {
 
     const result = await pool.query(`
       INSERT INTO products (name, description, price, category_id, farmer_id, stock_quantity,
-                           unit, image_url, location, harvest_date, expiry_date, cloudinary_public_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                           unit, image_url, location, harvest_date, expiry_date, cloudinary_public_id, is_available, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *
     `, [name, normalizedDescription, price, category_id, decoded.id, stock_quantity,
-         unit, imageUrl, productLocation, harvestDateValue, expiryDateValue, imagePublicId]);
+         unit, imageUrl, productLocation, harvestDateValue, expiryDateValue, imagePublicId, false, 'pending']);
 
     let createdProduct = result.rows[0];
 

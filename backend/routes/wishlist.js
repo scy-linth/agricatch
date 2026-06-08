@@ -1,6 +1,7 @@
 ﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
+const { requirePriceDropAlertsEnabled } = require('../middleware/featureFlags');
 
 const router = express.Router();
 
@@ -38,7 +39,7 @@ router.get('/', async (req, res) => {
 });
 
 // Add to wishlist
-router.post('/', async (req, res) => {
+router.post('/', requirePriceDropAlertsEnabled, async (req, res) => {
   try {
     const user = getUserFromToken(req);
     if (!user) {

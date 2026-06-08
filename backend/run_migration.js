@@ -1,27 +1,18 @@
-// Simple script to run database migrations
-const { Pool } = require('pg');
+// Simple script to run database migrations from backend directory
+require('dotenv').config();
+const { pool } = require('./utils/db');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../backend/.env') });
-
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'agricatch',
-  password: process.env.DB_PASSWORD || 'password',
-  port: process.env.DB_PORT || 5432,
-});
 
 async function runMigration() {
-  // Get migration file from command line argument or default to add_user_flagging.sql
   const migrationName = process.argv[2] || 'add_user_flagging.sql';
-  const migrationFile = path.join(__dirname, 'migrations', migrationName);
+  const migrationFile = path.join(__dirname, '../database/migrations', migrationName);
 
   if (!fs.existsSync(migrationFile)) {
     console.error(`✗ Migration file not found: ${migrationFile}`);
     console.log('Usage: node run_migration.js [migration-file.sql]');
     console.log('Available migrations:');
-    const migrationsDir = path.join(__dirname, 'migrations');
+    const migrationsDir = path.join(__dirname, '../database/migrations');
     fs.readdirSync(migrationsDir).forEach(file => {
       if (file.endsWith('.sql')) {
         console.log(`  - ${file}`);

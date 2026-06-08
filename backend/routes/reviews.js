@@ -237,6 +237,39 @@ router.post('/products/:id/reviews', async (req, res) => {
 
     await refreshFarmerRatingForProduct(productId);
 
+    // Real-time fraud alert: Check if this user has suspicious pattern
+    const patternCheck = await pool.query(`
+      SELECT 
+        COUNT(*) as review_count,
+        AVG(r.rating) as avg_rating,
+        COUNT(DISTINCT p.farmer_id) as unique_farmers
+      FROM reviews r
+      JOIN products p ON r.product_id = p.id
+      WHERE r.user_id = $1
+      GROUP BY r.user_id
+    `, [user.id]);
+
+    if (patternCheck.rows.length > 0) {
+      const pattern = patternCheck.rows[0];
+      // Flag if: 3+ reviews, 4.5+ avg rating, only 1 farmer
+      if (pattern.review_count >= 3 && pattern.avg_rating >= 4.5 && pattern.unique_farmers === 1) {
+        // Send notification to admin
+        try {
+          const adminResult = await pool.query(
+            "SELECT id FROM users WHERE role = 'staff' LIMIT 1"
+          );
+          if (adminResult.rows.length > 0) {
+            await pool.query(`
+              INSERT INTO notifications (user_id, type, message, is_read)
+              VALUES ($1, 'fraud_alert', $2, false)
+            `, [adminResult.rows[0].id, `Suspicious pattern detected: User ${user.username} (ID: ${user.id}) has ${pattern.review_count} reviews with ${pattern.avg_rating.toFixed(1)} avg rating from only 1 farmer`]);
+          }
+        } catch (notifErr) {
+          console.error('Failed to send fraud alert notification:', notifErr);
+        }
+      }
+    }
+
     res.status(201).json({ review: result.rows[0] });
   } catch (error) {
     if (error.code === '23505') {

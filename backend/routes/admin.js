@@ -641,6 +641,12 @@ router.get('/logs', requireAdmin, async (req, res) => {
     const values = [];
     let idx = 1;
 
+    // Staff can only see their own audit logs
+    if (req.user.role === 'staff') {
+      where.push(`actor_admin_id = $${idx++}`);
+      values.push(req.user.id);
+    }
+
     if (actor_admin_id) {
       where.push(`actor_admin_id = $${idx++}`);
       values.push(parseInt(actor_admin_id, 10));
@@ -1099,11 +1105,17 @@ router.get('/products', requireAdmin, async (req, res) => {
           whereValues.push(parseInt(category, 10));
         }
         if (status === 'available') {
-          whereParts.push(`p.is_available = true AND COALESCE(p.is_admin_disabled, false) = false AND COALESCE(u.is_disabled, false) = false`);
+          whereParts.push(`p.status = 'approved' AND p.is_available = true AND COALESCE(p.is_admin_disabled, false) = false AND COALESCE(u.is_disabled, false) = false`);
         } else if (status === 'disabled') {
           whereParts.push(`COALESCE(p.is_admin_disabled, false) = true`);
         } else if (status === 'unavailable') {
           whereParts.push(`p.is_available = false`);
+        } else if (status === 'pending') {
+          whereParts.push(`p.status = 'pending'`);
+        } else if (status === 'approved') {
+          whereParts.push(`p.status = 'approved'`);
+        } else if (status === 'rejected') {
+          whereParts.push(`p.status = 'rejected'`);
         }
         const whereSql = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
 
@@ -1169,6 +1181,70 @@ router.put('/products/:id/assign', requireAdmin, async (req, res) => {
     res.json({ message: 'Product reassigned successfully' });
   } catch (error) {
     console.error('Assign product error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Approve product (for product approvals)
+router.post('/products/:id/approve', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const productId = parseInt(id, 10);
+    if (!productId) return res.status(400).json({ message: 'Invalid product id' });
+
+    const productRes = await pool.query('SELECT id, is_available, is_admin_disabled FROM products WHERE id = $1', [productId]);
+    if (!productRes.rows.length) return res.status(404).json({ message: 'Product not found' });
+
+    const before = productRes.rows[0];
+    await pool.query('UPDATE products SET is_available = true, is_admin_disabled = false, status = $2 WHERE id = $1', [productId, 'approved']);
+    const afterRes = await pool.query('SELECT id, is_available, is_admin_disabled, status FROM products WHERE id = $1', [productId]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'product.approve',
+      entity: 'products',
+      entity_id: productId,
+      before,
+      after: afterRes.rows[0],
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'product.approve', entity: 'products', entity_id: productId, actor_admin_id: req.user.id });
+
+    res.json({ message: 'Product approved successfully' });
+  } catch (error) {
+    console.error('Approve product error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Reject product (for product approvals)
+router.post('/products/:id/reject', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const productId = parseInt(id, 10);
+    if (!productId) return res.status(400).json({ message: 'Invalid product id' });
+
+    const productRes = await pool.query('SELECT id, is_available, is_admin_disabled FROM products WHERE id = $1', [productId]);
+    if (!productRes.rows.length) return res.status(404).json({ message: 'Product not found' });
+
+    const before = productRes.rows[0];
+    await pool.query('UPDATE products SET is_available = false, is_admin_disabled = true, status = $2 WHERE id = $1', [productId, 'rejected']);
+    const afterRes = await pool.query('SELECT id, is_available, is_admin_disabled, status FROM products WHERE id = $1', [productId]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'product.reject',
+      entity: 'products',
+      entity_id: productId,
+      before,
+      after: afterRes.rows[0],
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'product.reject', entity: 'products', entity_id: productId, actor_admin_id: req.user.id });
+
+    res.json({ message: 'Product rejected successfully' });
+  } catch (error) {
+    console.error('Reject product error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -1424,9 +1500,14 @@ router.get('/orders', requireAdmin, async (req, res) => {
     }
 });
 
-// Update user role
+// Update user role (super_admin only)
 router.put('/users/:id/role', requireAdmin, async (req, res) => {
   try {
+    // Staff cannot change any user roles
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Only super admins can change user roles' });
+    }
+
     const { id } = req.params;
     const { role } = req.body;
     const targetUserId = parseInt(id, 10);
@@ -1439,23 +1520,13 @@ router.put('/users/:id/role', requireAdmin, async (req, res) => {
     if (targetResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
-    if (req.user.role !== 'super_admin' && targetResult.rows[0].role === 'super_admin') {
+    if (targetResult.rows[0].role === 'super_admin') {
       return res.status(403).json({ message: 'Cannot change super admin role' });
     }
 
-    // Only super_admin can promote users to staff role
-    if (role === 'staff' && req.user.role !== 'super_admin') {
-      return res.status(403).json({ message: 'Only super admins can promote users to staff' });
-    }
-
-    // Prevent a staff user from demoting themselves (locks you out of staff panel)
-    if (targetUserId === req.user.id && targetResult.rows[0].role === 'staff' && role !== 'staff') {
-      return res.status(400).json({ message: 'You cannot change your own staff role' });
-    }
-
-    // Regular staff users cannot change other staff roles, but super admin can
-    if (req.user.role !== 'super_admin' && targetResult.rows[0].role === 'staff' && targetUserId !== req.user.id) {
-      return res.status(403).json({ message: 'Cannot change role of another staff account' });
+    // Prevent superadmin from demoting themselves (locks you out of superadmin panel)
+    if (targetUserId === req.user.id && targetResult.rows[0].role === 'super_admin' && role !== 'super_admin') {
+      return res.status(400).json({ message: 'You cannot change your own super admin role' });
     }
 
     const beforeRes = await pool.query('SELECT id, role FROM users WHERE id = $1', [targetUserId]);
@@ -1775,10 +1846,14 @@ router.get('/categories', requireAdmin, async (req, res) => {
 
     const totalRes = await pool.query(`SELECT COUNT(*)::int AS count FROM categories ${whereSql}`, whereValues);
     const result = await pool.query(
-      `SELECT id, name, description, COALESCE(type, 'agricultural') AS type, is_disabled, created_at
-       FROM categories
+      `SELECT c.id, c.name, c.description, COALESCE(c.type, 'agricultural') AS type, c.is_disabled, c.created_at,
+              COALESCE(p.product_count, 0)::int AS product_count
+       FROM categories c
+       LEFT JOIN (
+         SELECT category_id, COUNT(*)::int AS product_count FROM products GROUP BY category_id
+       ) p ON p.category_id = c.id
        ${whereSql}
-       ORDER BY name ASC
+       ORDER BY c.name ASC
        LIMIT $${idx} OFFSET $${idx + 1}`,
       [...whereValues, limit, offset]
     );
@@ -2039,9 +2114,13 @@ router.get('/catalog-names', requireAdmin, async (req, res) => {
 
     const totalRes = await pool.query(`SELECT COUNT(*)::int AS count FROM product_name_catalog c ${whereSql}`, whereValues);
     const result = await pool.query(
-      `SELECT c.id, c.name, c.category_id, cat.name AS category_name, c.is_approved, c.source, c.created_at, COALESCE(c.is_disabled, false) AS is_disabled
+      `SELECT c.id, c.name, c.category_id, cat.name AS category_name, c.is_approved, c.source, c.created_at, COALESCE(c.is_disabled, false) AS is_disabled,
+              COALESCE(p.product_count, 0)::int AS product_count
        FROM product_name_catalog c
        LEFT JOIN categories cat ON cat.id = c.category_id
+       LEFT JOIN (
+         SELECT name, COUNT(*)::int AS product_count FROM products GROUP BY name
+       ) p ON p.name = c.name
        ${whereSql}
        ORDER BY c.name ASC
        LIMIT $${idx} OFFSET $${idx + 1}`,
@@ -2162,6 +2241,37 @@ router.patch('/catalog-names/:id', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('Admin patch catalog name error:', error);
     return res.status(500).json({ message: 'Server error updating catalog name' });
+  }
+});
+
+router.delete('/catalog-names/:id', requireAdmin, async (req, res) => {
+  try {
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Only super admins can delete catalog names' });
+    }
+    const id = Number(req.params.id || 0);
+    if (!id) return res.status(400).json({ message: 'Invalid catalog id' });
+
+    const beforeRes = await pool.query('SELECT * FROM product_name_catalog WHERE id = $1', [id]);
+    if (!beforeRes.rows.length) return res.status(404).json({ message: 'Catalog name not found' });
+
+    await pool.query('DELETE FROM product_name_catalog WHERE id = $1', [id]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'catalog_name.delete',
+      entity: 'product_name_catalog',
+      entity_id: id,
+      before: beforeRes.rows[0],
+      after: null,
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'catalog_name.delete', entity: 'product_name_catalog', entity_id: id, actor_admin_id: req.user.id });
+
+    return res.json({ message: 'Catalog name deleted' });
+  } catch (error) {
+    console.error('Admin delete catalog name error:', error);
+    return res.status(500).json({ message: 'Server error deleting catalog name' });
   }
 });
 
@@ -2846,6 +2956,275 @@ router.get('/farmers/:id/summary', requireAdmin, async (req, res) => {
 router.put('/users/:id/suspend', requireAdmin, async (req, res) => {
   req.body = { ...req.body, disable_type: 'suspended' };
   return disableUserHandler(req, res);
+});
+
+// GET /api/admin/suspicious-patterns - Detect suspicious behavioral patterns with pagination
+router.get('/suspicious-patterns', requireAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+
+    // Pattern 1: Customers who only order from one farmer with 5-star ratings
+    const [singleFarmerPattern, singleFarmerCount] = await Promise.all([
+      pool.query(`
+        SELECT 
+          o.user_id,
+          u.username,
+          u.email,
+          u.full_name,
+          COUNT(*) as order_count,
+          COUNT(DISTINCT p.farmer_id) as unique_farmers,
+          AVG(r.rating) as avg_rating,
+          COUNT(r.id) as review_count,
+          p.farmer_id as primary_farmer_id,
+          f.username as farmer_username,
+          f.email as farmer_email
+        FROM orders o
+        JOIN users u ON o.user_id = u.id
+        JOIN products p ON o.product_id = p.id
+        LEFT JOIN reviews r ON r.product_id = p.id AND r.user_id = o.user_id
+        LEFT JOIN users f ON p.farmer_id = f.id
+        WHERE u.role = 'customer'
+        GROUP BY o.user_id, u.username, u.email, u.full_name, p.farmer_id, f.username, f.email
+        HAVING COUNT(*) >= 3 
+          AND AVG(r.rating) >= 4.5
+          AND COUNT(DISTINCT p.farmer_id) = 1
+        ORDER BY order_count DESC, avg_rating DESC
+        LIMIT $1 OFFSET $2
+      `, [limit, offset]),
+      pool.query(`
+        SELECT COUNT(*) as total
+        FROM (
+          SELECT o.user_id
+          FROM orders o
+          JOIN users u ON o.user_id = u.id
+          JOIN products p ON o.product_id = p.id
+          LEFT JOIN reviews r ON r.product_id = p.id AND r.user_id = o.user_id
+          WHERE u.role = 'customer'
+          GROUP BY o.user_id
+          HAVING COUNT(*) >= 3 
+            AND AVG(r.rating) >= 4.5
+            AND COUNT(DISTINCT p.farmer_id) = 1
+        ) as sub
+      `)
+    ]);
+
+    // Pattern 2: Customers with same phone as farmers
+    const [samePhonePattern, samePhoneCount] = await Promise.all([
+      pool.query(`
+        SELECT 
+          c.id as customer_id,
+          c.username as customer_username,
+          c.email as customer_email,
+          c.phone,
+          f.id as farmer_id,
+          f.username as farmer_username,
+          f.email as farmer_email
+        FROM users c
+        JOIN users f ON c.phone = f.phone AND c.phone IS NOT NULL AND c.phone != ''
+        WHERE c.role = 'customer' AND f.role = 'farmer' AND c.id != f.id
+        LIMIT $1 OFFSET $2
+      `, [limit, offset]),
+      pool.query(`
+        SELECT COUNT(*) as total
+        FROM users c
+        JOIN users f ON c.phone = f.phone AND c.phone IS NOT NULL AND c.phone != ''
+        WHERE c.role = 'customer' AND f.role = 'farmer' AND c.id != f.id
+      `)
+    ]);
+
+    // Pattern 3: Similar email patterns (farmer+dummy@gmail.com)
+    const [similarEmailPattern, similarEmailCount] = await Promise.all([
+      pool.query(`
+        SELECT 
+          c.id as customer_id,
+          c.username as customer_username,
+          c.email as customer_email,
+          f.id as farmer_id,
+          f.username as farmer_username,
+          f.email as farmer_email
+        FROM users c
+        JOIN users f ON 
+          (c.email LIKE f.email || '+%' OR 
+           c.email LIKE '%' || SUBSTRING(f.email FROM POSITION('@' IN f.email)) OR
+           f.email LIKE c.email || '+%' OR
+           f.email LIKE '%' || SUBSTRING(c.email FROM POSITION('@' IN c.email)))
+        WHERE c.role = 'customer' AND f.role = 'farmer' AND c.id != f.id
+        LIMIT $1 OFFSET $2
+      `, [limit, offset]),
+      pool.query(`
+        SELECT COUNT(*) as total
+        FROM users c
+        JOIN users f ON 
+          (c.email LIKE f.email || '+%' OR 
+           c.email LIKE '%' || SUBSTRING(f.email FROM POSITION('@' IN f.email)) OR
+           f.email LIKE c.email || '+%' OR
+           f.email LIKE '%' || SUBSTRING(c.email FROM POSITION('@' IN c.email)))
+        WHERE c.role = 'customer' AND f.role = 'farmer' AND c.id != f.id
+      `)
+    ]);
+
+    res.json({
+      single_farmer_pattern: singleFarmerPattern.rows,
+      same_phone_pattern: samePhonePattern.rows,
+      similar_email_pattern: similarEmailPattern.rows,
+      pagination: {
+        page,
+        limit,
+        single_farmer_total: parseInt(singleFarmerCount.rows[0].total),
+        same_phone_total: parseInt(samePhoneCount.rows[0].total),
+        similar_email_total: parseInt(similarEmailCount.rows[0].total)
+      }
+    });
+  } catch (error) {
+    console.error('Suspicious patterns detection error:', error);
+    res.status(500).json({ message: 'Server error detecting suspicious patterns' });
+  }
+});
+
+// POST /api/admin/users/:id/flag - Flag a user for review
+router.post('/users/:id/flag', requireAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) return res.status(400).json({ message: 'Invalid user id' });
+
+    const { reason } = req.body;
+    if (!reason || String(reason).trim() === '') {
+      return res.status(400).json({ message: 'Flag reason is required' });
+    }
+
+    const userResult = await pool.query('SELECT id, username, is_flagged FROM users WHERE id = $1', [userId]);
+    if (!userResult.rows.length) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const before = userResult.rows[0];
+
+    await pool.query(
+      `UPDATE users 
+       SET is_flagged = true, 
+           flag_reason = $1, 
+           flagged_at = CURRENT_TIMESTAMP, 
+           flagged_by = $2 
+       WHERE id = $3`,
+      [String(reason).trim(), req.user.id, userId]
+    );
+
+    const afterResult = await pool.query('SELECT id, username, is_flagged, flag_reason, flagged_at FROM users WHERE id = $1', [userId]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'user.flag',
+      entity: 'users',
+      entity_id: userId,
+      before,
+      after: afterResult.rows[0],
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'user.flag', entity: 'users', entity_id: userId, actor_admin_id: req.user.id });
+
+    res.json({ message: 'User flagged successfully', user: afterResult.rows[0] });
+  } catch (error) {
+    console.error('Flag user error:', error);
+    res.status(500).json({ message: 'Server error flagging user' });
+  }
+});
+
+// POST /api/admin/users/:id/unflag - Remove flag from a user
+router.post('/users/:id/unflag', requireAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) return res.status(400).json({ message: 'Invalid user id' });
+
+    const userResult = await pool.query('SELECT id, username, is_flagged, flag_reason FROM users WHERE id = $1', [userId]);
+    if (!userResult.rows.length) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const before = userResult.rows[0];
+
+    await pool.query(
+      `UPDATE users 
+       SET is_flagged = false, 
+           flag_reason = NULL, 
+           flagged_at = NULL, 
+           flagged_by = NULL 
+       WHERE id = $1`,
+      [userId]
+    );
+
+    const afterResult = await pool.query('SELECT id, username, is_flagged FROM users WHERE id = $1', [userId]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'user.unflag',
+      entity: 'users',
+      entity_id: userId,
+      before,
+      after: afterResult.rows[0],
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'user.unflag', entity: 'users', entity_id: userId, actor_admin_id: req.user.id });
+
+    res.json({ message: 'User unflagged successfully', user: afterResult.rows[0] });
+  } catch (error) {
+    console.error('Unflag user error:', error);
+    res.status(500).json({ message: 'Server error unflagging user' });
+  }
+});
+
+// GET /api/admin/flagged-users - Get all flagged users with pagination
+router.get('/flagged-users', requireAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+
+    const [result, countResult] = await Promise.all([
+      pool.query(`
+        SELECT 
+          u.id,
+          u.username,
+          u.email,
+          u.full_name,
+          u.role,
+          u.phone,
+          u.is_flagged,
+          u.flag_reason,
+          u.flagged_at,
+          u.is_disabled,
+          u.disabled_reason,
+          a.username as flagged_by_username,
+          u.created_at
+        FROM users u
+        LEFT JOIN users a ON u.flagged_by = a.id
+        WHERE u.is_flagged = true
+        ORDER BY u.flagged_at DESC
+        LIMIT $1 OFFSET $2
+      `, [limit, offset]),
+      pool.query(`
+        SELECT COUNT(*) as total
+        FROM users u
+        WHERE u.is_flagged = true
+      `)
+    ]);
+
+    const total = parseInt(countResult.rows[0].total);
+
+    res.json({
+      flagged_users: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Get flagged users error:', error);
+    res.status(500).json({ message: 'Server error fetching flagged users' });
+  }
 });
 
 router.put('/users/:id/ban', requireAdmin, async (req, res) => {

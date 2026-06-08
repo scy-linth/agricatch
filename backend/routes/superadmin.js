@@ -4,62 +4,204 @@ const { pool } = require('../utils/db');
 const { writeAdminAuditLog } = require('../utils/auditLog');
 const { broadcastEvent } = require('../utils/realtime');
 const requireRole = require('../middleware/requireRole');
+const { requireAnnouncementsEnabled } = require('../middleware/featureFlags');
 
 const router = express.Router();
 const requireSuperAdmin = requireRole('super_admin');
-const OVERVIEW_SECURITY_ACTIONS = [
-  'login.failed',
-  'auth.login.failed',
-  'login.success',
-  'user.role.update',
-  'user.role_change',
-  'user.password_reset',
-  'auth.password.reset',
-  'user.disable',
-  'user.enable',
-  'user.create',
-  'feature_flag.update',
-  'auth.recover_admin'
-];
 
-// ── GET /api/superadmin/overview ──────────────────────────────────────────────
-router.get('/overview', requireSuperAdmin, async (req, res) => {
+// ── GET /api/superadmin/status ───────────────────────────────────────────────
+// Returns safe configuration and connectivity status for external services
+// No secrets are exposed; only configuration presence and safe details
+router.get('/status', requireSuperAdmin, async (req, res) => {
   try {
-    const actionPlaceholders = OVERVIEW_SECURITY_ACTIONS.map((_, index) => `$${index + 1}`).join(', ');
-    const [summaryRes, activityRes] = await Promise.all([
-      pool.query(
-        `SELECT
-           (SELECT COUNT(*)::int FROM users WHERE role IN ('staff', 'super_admin')) AS staff_count,
-           (SELECT COUNT(*)::int FROM users WHERE role = 'farmer') AS farmer_count,
-           (SELECT COUNT(*)::int FROM users WHERE role = 'customer') AS customer_count,
-           (SELECT COUNT(*)::int FROM users) AS total_users,
-           (SELECT COUNT(*)::int FROM users WHERE role = 'farmer' AND COALESCE(is_verified, false) = false AND COALESCE(is_disabled, false) = false) AS pending_verifications,
-           (SELECT COUNT(*)::int FROM orders WHERE DATE(created_at) = CURRENT_DATE) AS orders_today`
-      ),
-      pool.query(
-        `SELECT id, actor_admin_id, actor_admin_email, actor_admin_name, action, entity, entity_id,
-                ip_address, user_agent, created_at
-         FROM admin_audit_logs
-         WHERE action IN (${actionPlaceholders})
-         ORDER BY created_at DESC
-         LIMIT 8`,
-        OVERVIEW_SECURITY_ACTIONS
-      ).catch((err) => (err.code === '42P01' ? { rows: [] } : Promise.reject(err)))
-    ]);
+    const checkedAt = new Date().toISOString();
+    const services = [];
+
+    // Render Backend
+    const renderService = {
+      key: 'render',
+      name: 'Render Backend',
+      configured: false,
+      online: false,
+      status: 'not_detected',
+      last_checked: checkedAt,
+      last_configured: null,
+      details: {}
+    };
+    if (process.env.RENDER_SERVICE_NAME || process.env.RENDER_GIT_COMMIT || process.env.RENDER) {
+      renderService.configured = true;
+      renderService.online = true;
+      renderService.status = 'online';
+      renderService.details = {
+        service: process.env.RENDER_SERVICE_NAME || null,
+        environment: process.env.NODE_ENV || null,
+        commit: process.env.RENDER_GIT_COMMIT || null
+      };
+    }
+    services.push(renderService);
+
+    // Vercel Frontend (optional env vars)
+    const vercelService = {
+      key: 'vercel',
+      name: 'Vercel Frontend',
+      configured: false,
+      online: false,
+      status: 'not_detected',
+      last_checked: checkedAt,
+      last_configured: null,
+      details: {}
+    };
+    if (process.env.FRONTEND_PROVIDER === 'vercel' || process.env.VERCEL_PROJECT_NAME) {
+      vercelService.configured = true;
+      vercelService.status = 'configured';
+      vercelService.details = {
+        project: process.env.VERCEL_PROJECT_NAME || null,
+        url: process.env.FRONTEND_URL || null
+      };
+      // Optional: try to ping frontend if URL exists
+      if (process.env.FRONTEND_URL) {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 3000);
+          await fetch(process.env.FRONTEND_URL, { method: 'HEAD', signal: controller.signal });
+          clearTimeout(timeout);
+          vercelService.online = true;
+          vercelService.status = 'online';
+        } catch (e) {
+          vercelService.online = false;
+          vercelService.status = 'unreachable';
+        }
+      }
+    }
+    services.push(vercelService);
+
+    // Database
+    const dbService = {
+      key: 'database',
+      name: 'Database',
+      configured: false,
+      online: false,
+      status: 'not_configured',
+      last_checked: checkedAt,
+      last_configured: null,
+      details: {}
+    };
+    const dbUrl = process.env.DATABASE_URL || '';
+    const dbHost = process.env.DB_HOST || '';
+    const hasDbConfig = dbUrl || (dbHost && process.env.DB_USER && process.env.DB_NAME);
+    if (hasDbConfig) {
+      dbService.configured = true;
+      // Detect provider
+      const hostHint = (dbUrl || dbHost).toLowerCase();
+      if (hostHint.includes('supabase.co') || hostHint.includes('supabase.com')) {
+        dbService.provider = 'Supabase';
+      } else if (hostHint.includes('render.com')) {
+        dbService.provider = 'Render Postgres';
+      } else {
+        dbService.provider = 'PostgreSQL';
+      }
+      // Test connectivity
+      try {
+        await pool.query('SELECT 1');
+        dbService.online = true;
+        dbService.status = 'connected';
+        dbService.details = {
+          provider: dbService.provider,
+          ssl: !!require('../utils/db').pgSsl
+        };
+      } catch (e) {
+        dbService.online = false;
+        dbService.status = 'unreachable';
+        dbService.details = {
+          provider: dbService.provider,
+          error: String(e.message || 'Connection failed')
+        };
+      }
+    }
+    services.push(dbService);
+
+    // Cloudinary
+    const cloudinaryService = {
+      key: 'cloudinary',
+      name: 'Cloudinary',
+      configured: false,
+      online: false,
+      status: 'not_configured',
+      last_checked: checkedAt,
+      last_configured: null,
+      details: {}
+    };
+    const hasCloudinary = process.env.CLOUDINARY_URL ||
+      (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
+    if (hasCloudinary) {
+      cloudinaryService.configured = true;
+      cloudinaryService.status = 'configured';
+      cloudinaryService.details = {
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME || null
+      };
+      // Optional: could ping Cloudinary API, but keep it simple for now
+      cloudinaryService.online = true;
+    }
+    services.push(cloudinaryService);
+
+    // Resend Email
+    const resendService = {
+      key: 'resend',
+      name: 'Resend Email',
+      configured: false,
+      online: false,
+      status: 'not_configured',
+      last_checked: checkedAt,
+      last_configured: null,
+      details: {}
+    };
+    if (process.env.RESEND_API_KEY) {
+      resendService.configured = true;
+      resendService.status = 'configured';
+      resendService.details = {
+        from_email: process.env.RESEND_FROM_EMAIL || null
+      };
+      // Actual connectivity is tested during email sending
+      resendService.online = true;
+    } else if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+      resendService.name = 'SMTP Email (Fallback)';
+      resendService.configured = true;
+      resendService.status = 'configured';
+      resendService.details = {
+        host: process.env.SMTP_HOST,
+        user: process.env.SMTP_USER
+      };
+      resendService.online = true;
+    }
+    services.push(resendService);
+
+    // reCAPTCHA
+    const recaptchaService = {
+      key: 'recaptcha',
+      name: 'Google reCAPTCHA',
+      configured: false,
+      online: false,
+      status: 'not_configured',
+      last_checked: checkedAt,
+      last_configured: null,
+      details: {}
+    };
+    if (process.env.RECAPTCHA_SECRET_KEY) {
+      recaptchaService.configured = true;
+      recaptchaService.status = 'configured';
+      recaptchaService.details = {
+        site_key: process.env.RECAPTCHA_SITE_KEY || null
+      };
+      recaptchaService.online = true;
+    }
+    services.push(recaptchaService);
 
     res.json({
-      summary: summaryRes.rows[0] || {
-        staff_count: 0,
-        farmer_count: 0,
-        customer_count: 0,
-        total_users: 0,
-        pending_verifications: 0,
-        orders_today: 0
-      },
-      logs: activityRes.rows || []
+      checked_at: checkedAt,
+      services
     });
   } catch (err) {
-    console.error('Superadmin overview error:', err);
+    console.error('Superadmin status error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -75,7 +217,7 @@ router.get('/staff', requireSuperAdmin, async (req, res) => {
       `SELECT COUNT(*)::int AS count FROM users WHERE role IN ('staff', 'super_admin')`
     );
     const result = await pool.query(
-      `SELECT id, username, email, full_name, role, is_verified, is_disabled, created_at
+      `SELECT id, username, email, full_name, first_name, middle_name, last_name, role, is_verified, is_disabled, created_at
        FROM users
        WHERE role IN ('staff', 'super_admin')
        ORDER BY created_at DESC
@@ -90,22 +232,43 @@ router.get('/staff', requireSuperAdmin, async (req, res) => {
 });
 
 // ── POST /api/superadmin/announcements — broadcast platform notice ───────────
-router.post('/announcements', requireSuperAdmin, async (req, res) => {
+router.post('/announcements', requireSuperAdmin, requireAnnouncementsEnabled, async (req, res) => {
   try {
     const title = String(req.body?.title || '').trim();
     const message = String(req.body?.message || '').trim();
-    const audience = String(req.body?.audience || 'farmer').trim().toLowerCase();
+    const audience = String(req.body?.audience || 'all').trim().toLowerCase();
+    
     const audienceMap = {
       farmer: ['farmer'],
       customer: ['customer'],
-      all: ['farmer', 'customer']
+      admin: ['staff', 'super_admin'],
+      all: ['farmer', 'customer', 'staff', 'super_admin']
     };
-    const roles = audienceMap[audience];
 
     if (!title || !message) {
       return res.status(400).json({ message: 'title and message are required' });
     }
-    if (!roles) {
+
+    // Handle comma-separated audience values (e.g., "farmer,customer")
+    const audienceValues = audience.split(',').map(a => a.trim()).filter(a => a);
+    let roles = [];
+
+    if (audienceValues.length === 0) {
+      return res.status(400).json({ message: 'Invalid audience' });
+    }
+
+    // Map each audience value to its roles and combine
+    for (const aud of audienceValues) {
+      const mappedRoles = audienceMap[aud];
+      if (mappedRoles) {
+        roles.push(...mappedRoles);
+      }
+    }
+
+    // Remove duplicates
+    roles = [...new Set(roles)];
+
+    if (roles.length === 0) {
       return res.status(400).json({ message: 'Invalid audience' });
     }
 
@@ -395,22 +558,49 @@ router.get('/security-log', requireSuperAdmin, async (req, res) => {
 
     const SECURITY_ACTIONS = [
       'user.role_change', 'user.password_reset', 'user.create', 'user.disable', 'user.enable',
-      'login.failed', 'login.success', 'auth.recover_admin'
+      'login.failed', 'login.success', 'auth.recover_admin',
+      'otp.sent', 'otp.verify_success', 'otp.verify_failed'
     ];
-    const actionPlaceholders = SECURITY_ACTIONS.map((_, i) => `$${i + 1}`).join(', ');
+    
+    let actionFilter = req.query.action;
+    const dateFrom = req.query.date_from;
+    const dateTo = req.query.date_to;
+
+    let whereClause = `WHERE action IN (${SECURITY_ACTIONS.map((_, i) => `$${i + 1}`).join(', ')})`;
+    let queryParams = [...SECURITY_ACTIONS];
+    let paramIndex = SECURITY_ACTIONS.length + 1;
+
+    if (actionFilter && SECURITY_ACTIONS.includes(actionFilter)) {
+      whereClause = `WHERE action = $${paramIndex}`;
+      queryParams.push(actionFilter);
+      paramIndex++;
+    }
+
+    if (dateFrom) {
+      whereClause += ` AND created_at >= $${paramIndex}`;
+      queryParams.push(dateFrom);
+      paramIndex++;
+    }
+
+    if (dateTo) {
+      whereClause += ` AND created_at <= $${paramIndex}`;
+      queryParams.push(dateTo);
+      paramIndex++;
+    }
 
     const totalRes = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM admin_audit_logs WHERE action IN (${actionPlaceholders})`,
-      SECURITY_ACTIONS
+      `SELECT COUNT(*)::int AS count FROM admin_audit_logs ${whereClause}`,
+      queryParams
     );
+    
     const logsRes = await pool.query(
       `SELECT id, actor_admin_id, actor_admin_email, actor_admin_name, action, entity, entity_id,
               ip_address, user_agent, created_at
        FROM admin_audit_logs
-       WHERE action IN (${actionPlaceholders})
+       ${whereClause}
        ORDER BY created_at DESC
-       LIMIT $${SECURITY_ACTIONS.length + 1} OFFSET $${SECURITY_ACTIONS.length + 2}`,
-      [...SECURITY_ACTIONS, limit, offset]
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...queryParams, limit, offset]
     );
 
     res.json({ logs: logsRes.rows, total: totalRes.rows[0]?.count || 0, page, limit });

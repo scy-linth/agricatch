@@ -6,6 +6,8 @@ const { pool } = require('../utils/db');
 
 const { sendOtpEmail } = require('../utils/emailService');
 const { verifyRecaptchaToken } = require('../utils/recaptcha');
+const { writeAdminAuditLog } = require('../utils/auditLog');
+const { requireRegistrationsEnabled } = require('../middleware/featureFlags');
 
 const router = express.Router();
 
@@ -249,7 +251,7 @@ router.get('/check-username/:username', async (req, res) => {
 // Register new user
 // Note: For farmers, full_name should represent the shop/farm name (not personal name)
 // This will be displayed in chat conversations and shop profiles
-router.post('/register', async (req, res) => {
+router.post('/register', requireRegistrationsEnabled, async (req, res) => {
   try {
   // Registration relies on prior OTP verification (which enforces CAPTCHA when sending OTP),
   // so we do not require a separate reCAPTCHA token here to avoid blocking the final submit.
@@ -371,12 +373,30 @@ router.post('/login', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: null,
+        action: 'login.failed',
+        entity: 'users',
+        entity_id: null,
+        before: null,
+        after: { reason: 'user_not_found', identifier: loginIdentifier },
+        req
+      });
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     const user = result.rows[0];
 
     if (user.is_disabled) {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: user.id,
+        action: 'login.failed',
+        entity: 'users',
+        entity_id: user.id,
+        before: null,
+        after: { reason: 'account_disabled', identifier: loginIdentifier },
+        req
+      });
       return res.status(403).json({ message: 'Account disabled. Please contact support.' });
     }
 
@@ -425,6 +445,15 @@ router.post('/login', async (req, res) => {
     }
 
     if (!passwordOk) {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: user.id,
+        action: 'login.failed',
+        entity: 'users',
+        entity_id: user.id,
+        before: null,
+        after: { reason: 'invalid_password', identifier: loginIdentifier },
+        req
+      });
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -447,6 +476,16 @@ router.post('/login', async (req, res) => {
     // Remove password from response
     delete user.password;
     delete user.password_hash;
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: user.id,
+      action: 'login.success',
+      entity: 'users',
+      entity_id: user.id,
+      before: null,
+      after: { role: user.role, identifier: loginIdentifier },
+      req
+    });
 
     res.json({
       message: 'Login successful',
@@ -714,6 +753,16 @@ router.post('/forgot', async (req, res) => {
       console.error('Forgot password email send failed:', emailResult?.error);
     }
 
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: userId,
+      action: 'auth.recover_admin',
+      entity: 'users',
+      entity_id: userId,
+      before: null,
+      after: { email, purpose: 'password_reset' },
+      req
+    });
+
     if (DEV_SHOW_PASSWORD_RESET_OTP) {
       return res.json({ message: genericMessage, debugOtp: otp, expiresIn: PASSWORD_RESET_OTP_TTL_MINUTES * 60 });
     }
@@ -770,6 +819,16 @@ router.post('/forgot/resend', async (req, res) => {
     if (!emailResult?.success) {
       console.error('Forgot password resend email send failed:', emailResult?.error);
     }
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: userId,
+      action: 'auth.recover_admin',
+      entity: 'users',
+      entity_id: userId,
+      before: null,
+      after: { email, purpose: 'password_reset_resend' },
+      req
+    });
 
     if (DEV_SHOW_PASSWORD_RESET_OTP) {
       return res.json({ message: genericMessage, debugOtp: otp, expiresIn: PASSWORD_RESET_OTP_TTL_MINUTES * 60 });
