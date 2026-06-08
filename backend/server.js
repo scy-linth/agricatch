@@ -8,6 +8,7 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const { addSseClient, broadcastEvent } = require('./utils/realtime');
+const { checkMaintenanceMode } = require('./middleware/featureFlags');
 require('dotenv').config();
 const { pool } = require('./utils/db');
 
@@ -162,6 +163,9 @@ app.use(async (req, res, next) => {
 
   return next();
 });
+
+// Check maintenance mode - block all non-super_admin users when enabled
+app.use(checkMaintenanceMode);
 
 // DB migrations (best-effort)
 // Ensure OTP table exists
@@ -519,12 +523,10 @@ app.use(async (req, res, next) => {
         `
           INSERT INTO feature_flags (key, name, description, enabled)
           VALUES
-            ('guest_cart', 'Guest Cart', 'Allow unauthenticated users to add items to cart', true),
-            ('product_reviews', 'Product Reviews', 'Allow customers to leave reviews on products', true),
             ('price_drop_alerts', 'Price Drop Alerts', 'Notify users when wishlist items drop in price', true),
-            ('farmer_chat', 'Farmer-Customer Chat', 'Enable direct messaging between farmers and customers', true),
-            ('otp_verification', 'OTP Verification', 'Require OTP email verification on registration', true),
-            ('platform_announce', 'Platform Announcements', 'Show platform-wide announcements to farmers', false)
+            ('platform_announce', 'Platform Announcements', 'Show platform-wide announcements to all users', false),
+            ('maintenance_mode', 'Maintenance Mode', 'When enabled, only super_admin can access the site', false),
+            ('allow_registrations', 'Allow New Registrations', 'Allow customers and farmers to register new accounts', true)
           ON CONFLICT (key) DO NOTHING
         `
       );
@@ -880,6 +882,13 @@ try {
   console.error('âŒ Superadmin route failed to load:', error.message);
 }
 
+try {
+  app.use('/api/settings', require('./routes/settings'));
+  console.log('âœ… Settings route loaded successfully');
+} catch (error) {
+  console.error('âŒ Settings route failed to load:', error.message);
+}
+
 mountRoute({
   basePath: '/api/psgc',
   modulePath: './routes/psgc',
@@ -1039,6 +1048,7 @@ sendIngest({location:'server.js:148',message:'Setting up static file serving',da
 app.use(express.static(path.join(__dirname, '..', 'frontend'), {
   maxAge: 0,
   etag: false,
+  fallthrough: true,
   setHeaders: (res, path) => {
     if (path.endsWith('admin.js')) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
@@ -1099,6 +1109,28 @@ app.get('/', (req, res) => {
           <li>Email: juan@farm.ph | Password: password123 (Farmer)</li>
         </ul>
         <p><strong>Note:</strong> If you see this page, the frontend file couldn't be found. Please check the file path.</p>
+      </body>
+      </html>
+    `);
+  }
+});
+
+// 404 error page handler for unmatched routes
+app.use((req, res) => {
+  const fs = require('fs');
+  const errorPath = path.join(__dirname, '..', 'frontend', '404.html');
+
+  if (fs.existsSync(errorPath)) {
+    res.status(404).sendFile(errorPath);
+  } else {
+    res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>404 - Page Not Found | AgriCatch</title></head>
+      <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+        <h1 style="font-size: 80px; color: #4154f1; margin: 0;">404</h1>
+        <h2 style="color: #012970;">The page you are looking for doesn't exist.</h2>
+        <a href="/" style="display: inline-block; margin-top: 20px; padding: 12px 30px; background: #4154f1; color: white; text-decoration: none; border-radius: 50px;">Back to Home</a>
       </body>
       </html>
     `);
