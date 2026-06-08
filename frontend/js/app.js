@@ -282,6 +282,9 @@ class AgricultureMarket {
             this.checkAuthStatus();
             this.loadProductCategories();
             
+            // Fetch delivery fee on app load
+            this.fetchDeliveryFee();
+            
             // Load products - must be independent of registration state
             try {
                 this.loadProducts();
