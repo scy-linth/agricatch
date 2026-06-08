@@ -67,6 +67,55 @@ class AgricultureMarket {
         this.init();
     }
 
+    // Cache management for delivery fee
+    getCachedDeliveryFee() {
+        const cached = localStorage.getItem('cached_delivery_fee');
+        const timestamp = localStorage.getItem('cached_delivery_fee_timestamp');
+        
+        if (!cached || !timestamp) return null;
+        
+        const cacheAge = Date.now() - parseInt(timestamp);
+        const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+        
+        if (cacheAge > CACHE_TTL) {
+            // Cache expired
+            localStorage.removeItem('cached_delivery_fee');
+            localStorage.removeItem('cached_delivery_fee_timestamp');
+            return null;
+        }
+        
+        return parseFloat(cached);
+    }
+
+    setCachedDeliveryFee(value) {
+        localStorage.setItem('cached_delivery_fee', value.toString());
+        localStorage.setItem('cached_delivery_fee_timestamp', Date.now().toString());
+    }
+
+    async fetchDeliveryFee() {
+        try {
+            const response = await fetch(`${this.apiBase}/settings/delivery-fee`);
+            if (response.ok) {
+                const data = await response.json();
+                this.setCachedDeliveryFee(data.delivery_fee);
+                return data.delivery_fee;
+            }
+        } catch (error) {
+            console.error('Error fetching delivery fee:', error);
+        }
+        // Fallback to cached or default
+        return this.getCachedDeliveryFee() || 35;
+    }
+
+    getDeliveryFee() {
+        const cached = this.getCachedDeliveryFee();
+        if (cached !== null) return cached;
+        
+        // Fetch async and return default in the meantime
+        this.fetchDeliveryFee();
+        return 35;
+    }
+
     fmtNumber(value, options) {
         try {
             if (window.FormatUtil && typeof window.FormatUtil.number === 'function') {
