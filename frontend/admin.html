@@ -65,6 +65,13 @@
     <nav class="header-nav ms-auto">
         <ul class="d-flex align-items-center list-unstyled mb-0 gap-1">
 
+            <!-- Visit site button -->
+            <li class="nav-item">
+                <a id="visit-site-btn" class="btn btn-sm btn-outline-primary" href="/" target="_blank">
+                    <i class="bi bi-globe"></i> Visit Site
+                </a>
+            </li>
+
             <!-- Messages dropdown -->
             <li class="nav-item dropdown">
                 <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" aria-expanded="false" id="admin-float-chat-btn">
@@ -119,6 +126,7 @@
                     <li class="dropdown-header">
                         <h6 class="mb-0 fw-semibold" id="user-name-dd"></h6>
                         <span id="user-email" class="small text-muted"></span>
+                        <span id="header-role-badge" class="badge bg-primary ms-2" style="display:none"></span>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
@@ -247,6 +255,18 @@
                 <span>Farmers</span>
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#staff" data-section="staff">
+                <i class="fas fa-user-tie"></i>
+                <span>Staff</span>
+            </a>
+        </li>
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#all-users" data-section="all-users">
+                <i class="bi bi-people-fill"></i>
+                <span>All Users</span>
+            </a>
+        </li>
 
         <!-- ── Communication ───────────────────────────────────── -->
         <li class="nav-heading">Communication</li>
@@ -265,12 +285,53 @@
         </li>
 
         <!-- ── System ─────────────────────────────────────────── -->
-        <li class="nav-heading">System</li>
+        <li class="nav-heading">Security</li>
 
-        <li class="nav-item">
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#suspicious-patterns" data-section="suspicious-patterns">
+                <i class="bi bi-shield-exclamation"></i>
+                <span>Suspicious Patterns</span>
+            </a>
+        </li>
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#flagged-users" data-section="flagged-users">
+                <i class="bi bi-flag-fill"></i>
+                <span>Flagged Users</span>
+                <span id="flagged-users-badge" class="sidebar-badge" style="display:none">0</span>
+            </a>
+        </li>
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#security-log" data-section="security-log">
+                <i class="bi bi-shield-exclamation"></i>
+                <span>Security Log</span>
+            </a>
+        </li>
+        <li class="nav-item" data-roles="super_admin">
             <a class="nav-link collapsed sidebar-link" href="#logs" data-section="logs">
                 <i class="bi bi-journal-check"></i>
                 <span>Audit Logs</span>
+            </a>
+        </li>
+
+        <!-- ── Super Admin ─────────────────────────────────────── -->
+        <li class="nav-heading" data-roles="super_admin">Super Admin</li>
+
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#platform-settings" data-section="platform-settings">
+                <i class="bi bi-gear"></i>
+                <span>Platform Settings</span>
+            </a>
+        </li>
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#feature-flags" data-section="feature-flags">
+                <i class="bi bi-toggle-on"></i>
+                <span>Feature Flags</span>
+            </a>
+        </li>
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#broadcast" data-section="broadcast">
+                <i class="bi bi-broadcast"></i>
+                <span>Broadcast</span>
             </a>
         </li>
 
@@ -766,14 +827,13 @@
     <section id="users" class="admin-section-card">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title d-flex align-items-center justify-content-between">
+                <div class="section-header">
                     <button id="open-create-user-modal"
-                            class="btn btn-sm btn-ac-ghost-green d-flex align-items-center gap-1"
+                            class="btn btn-primary btn-sm"
                             type="button">
-                        <i class="bi bi-plus-lg"></i>
-                        <span>Create Customer</span>
+                        <i class="bi bi-plus-lg"></i> New Customer Account
                     </button>
-                </h5>
+                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -925,11 +985,11 @@
     <section id="categories" class="admin-section-card">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title d-flex align-items-center justify-content-between">
-                    <button id="show-add-category-form" class="btn btn-sm btn-ac-ghost-green d-flex align-items-center gap-1" type="button">
-                        <i class="bi bi-plus-lg"></i><span>Add Category</span>
+                <div class="section-header">
+                    <button id="show-add-category-form" class="btn btn-primary btn-sm" type="button">
+                        <i class="bi bi-plus-lg"></i> Add Category
                     </button>
-                </h5>
+                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -969,12 +1029,13 @@
                                 <th>ID</th>
                                 <th>Name</th>
                                 <th>Description</th>
+                                <th>Products</th>
                                 <th>Status</th>
                                 <th class="col-actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="categories-tbody">
-                            <tr><td colspan="5" class="table-placeholder">Loading…</td></tr>
+                            <tr><td colspan="6" class="table-placeholder">Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -991,11 +1052,11 @@
     <section id="catalog-products" class="admin-section-card">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title d-flex align-items-center justify-content-between">
-                    <button id="show-add-catalog-form" class="btn btn-sm btn-ac-ghost-green d-flex align-items-center gap-1" type="button">
-                        <i class="bi bi-plus-lg"></i><span>Add Product</span>
+                <div class="section-header">
+                    <button id="show-add-catalog-form" class="btn btn-primary btn-sm" type="button">
+                        <i class="bi bi-plus-lg"></i> Add Product
                     </button>
-                </h5>
+                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -1041,12 +1102,13 @@
                                 <th>ID</th>
                                 <th>Name</th>
                                 <th>Category</th>
+                                <th>Products</th>
                                 <th>Status</th>
                                 <th class="col-actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="catalog-names-tbody">
-                            <tr><td colspan="5" class="table-placeholder">Loading…</td></tr>
+                            <tr><td colspan="6" class="table-placeholder">Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1063,14 +1125,13 @@
     <section id="farmers" class="admin-section-card">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title d-flex align-items-center justify-content-between">
+                <div class="section-header">
                     <button id="open-create-farmer-modal"
-                            class="btn btn-sm btn-ac-ghost-green d-flex align-items-center gap-1"
+                            class="btn btn-primary btn-sm"
                             type="button">
-                        <i class="bi bi-plus-lg"></i>
-                        <span>Create Farmer</span>
+                        <i class="bi bi-plus-lg"></i> New Farmer Account
                     </button>
-                </h5>
+                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -1143,7 +1204,119 @@
 
 
     <!-- ════════════════════════════════════════════════════════════════
-         § 7 — AUDIT LOGS SECTION
+         § 7 — SUSPICIOUS PATTERNS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="suspicious-patterns" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-end align-items-center mb-3">
+                    <button id="detect-patterns-btn" class="btn btn-primary btn-sm" style="background: #41bf5b; border: none;">
+                        <i class="bi bi-search me-1"></i>Detect Patterns
+                    </button>
+                </div>
+
+                <!-- Pattern 1: Single Farmer Orders -->
+                <div class="mb-4">
+                    <h5 class="text-dark text-center fw-bold">Customers ordering from only one farmer with 5-star ratings</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Customer</th>
+                                    <th>Email</th>
+                                    <th>Orders</th>
+                                    <th>Avg Rating</th>
+                                    <th>Reviews</th>
+                                    <th>Farmer</th>
+                                    <th class="col-actions">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="single-farmer-pattern-tbody">
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted">Click "Detect Patterns" to scan</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Pattern 2: Same Phone Number -->
+                <div class="mb-4">
+                    <h5 class="text-dark text-center fw-bold">Customers with same phone as farmers</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Customer</th>
+                                    <th>Customer Email</th>
+                                    <th>Phone</th>
+                                    <th>Farmer</th>
+                                    <th>Farmer Email</th>
+                                    <th class="col-actions">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="same-phone-pattern-tbody">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Click "Detect Patterns" to scan</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="suspicious-patterns-pagination" class="pagination-container"></div>
+            </div>
+        </div>
+    </section><!-- /suspicious-patterns -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 8 — FLAGGED USERS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="flagged-users" class="admin-section-card">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-end align-items-center mb-3">
+                    <button id="refresh-flagged-btn" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Phone</th>
+                                <th>Flag Reason</th>
+                                <th>Flagged At</th>
+                                <th>Flagged By</th>
+                                <th>Status</th>
+                                <th class="col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="flagged-users-tbody">
+                            <tr>
+                                <td colspan="9">
+                                    <div class="table-skeleton">
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="flagged-users-pagination" class="pagination-container"></div>
+            </div>
+        </div>
+    </section><!-- /flagged-users -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 9 — AUDIT LOGS SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="logs" class="admin-section-card">
         <div class="card">
@@ -1250,7 +1423,354 @@
 
 
     <!-- ════════════════════════════════════════════════════════════════
-         § 8 — NOTIFICATIONS SECTION
+         § 8 — STAFF MANAGEMENT SECTION (superadmin only)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="staff" class="admin-section-card" data-roles="super_admin">
+        <div class="card">
+            <div class="card-body">
+                <div class="section-header">
+                    <button class="btn btn-primary btn-sm" id="create-staff-btn" type="button">
+                        <i class="bi bi-plus-lg"></i> New Staff Account
+                    </button>
+                </div>
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="staff" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="staff-status-filter" class="form-select form-select-sm">
+                            <option value="">Any status</option>
+                            <option value="active">Active</option>
+                            <option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Verification</label>
+                        <select id="staff-verification-filter" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="verified">Verified</option>
+                            <option value="unverified">Unverified</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="staff-search-input" class="form-control me-2"
+                                       placeholder="Name, username, or email…">
+                                <button id="staff-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
+                            </div>
+                            <button id="staff-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh staff"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="staff-table" class="table table-hover ac-table table-sm align-middle text-center">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th class="col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="staff-tbody">
+                            <tr><td colspan="8" class="text-center text-muted py-4">
+                                <span class="spinner-border spinner-border-sm"></span>
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="staff-pagination" class="pagination-container"></div>
+            </div>
+        </div>
+    </section><!-- /staff -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 9 — ALL USERS SECTION (superadmin only)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="all-users" class="admin-section-card" data-roles="super_admin">
+        <div class="card">
+            <div class="card-body">
+                <div class="section-header">
+                    <button class="btn btn-primary btn-sm" id="create-any-user-btn" type="button">
+                        <i class="bi bi-plus-lg"></i> New User
+                    </button>
+                </div>
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="all-users" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Role</label>
+                        <select id="all-users-role-filter" class="form-select form-select-sm">
+                            <option value="">All roles</option>
+                            <option value="super_admin">Super Admin</option>
+                            <option value="staff">Staff</option>
+                            <option value="farmer">Farmer</option>
+                            <option value="customer">Customer</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="all-users-status-filter" class="form-select form-select-sm">
+                            <option value="">Any status</option>
+                            <option value="active">Active</option>
+                            <option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Verification</label>
+                        <select id="all-users-verification-filter" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="verified">Verified</option>
+                            <option value="unverified">Unverified</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="all-users-search-input" class="form-control me-2"
+                                       placeholder="Name, username, or email…">
+                                <button id="all-users-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
+                            </div>
+                            <button id="all-users-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh users"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="all-users-table" class="table table-hover ac-table table-sm align-middle text-center">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th class="col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="all-users-tbody">
+                            <tr><td colspan="8" class="text-center text-muted py-4">
+                                <span class="spinner-border spinner-border-sm"></span>
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="all-users-pagination" class="pagination-container"></div>
+            </div>
+        </div>
+    </section><!-- /all-users -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 10 — PLATFORM SETTINGS SECTION (superadmin only)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="platform-settings" class="admin-section-card" data-roles="super_admin">
+        <div class="card">
+            <div class="card-body">
+                <!-- Service Status Card -->
+                <div class="card mb-3" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Service Status</h6>
+                            <button class="btn btn-sm btn-outline-secondary" id="refresh-status-btn" type="button">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        <div id="service-status-list">
+                            <div class="text-center py-3">
+                                <span class="spinner-border spinner-border-sm"></span>
+                            </div>
+                        </div>
+                        <p class="text-muted small mb-0 mt-2">
+                            <i class="bi bi-info-circle me-1"></i>
+                            To change API credentials, update the <code>.env</code> file and restart the server.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="settings-form">
+                    <div class="text-center py-5">
+                        <span class="spinner-border spinner-border-sm"></span>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end mt-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm me-2" id="refresh-settings-btn">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Cache
+                    </button>
+                    <button class="btn btn-primary btn-sm" id="save-settings-btn" type="button">
+                        <i class="bi bi-floppy"></i> Save All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section><!-- /platform-settings -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 11 — SECURITY LOG SECTION (superadmin only)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="security-log" class="admin-section-card" data-roles="super_admin">
+        <div class="card">
+            <div class="card-body">
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="security-log" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Action Type</label>
+                        <select id="seclog-action-filter" class="form-select form-select-sm">
+                            <option value="">All actions</option>
+                            <option value="login.failed">Failed Login</option>
+                            <option value="login.success">Login</option>
+                            <option value="user.role_change">Role Change</option>
+                            <option value="user.password_reset">Password Reset</option>
+                            <option value="user.create">User Create</option>
+                            <option value="user.disable">User Disable</option>
+                            <option value="user.enable">User Enable</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Date From</label>
+                        <input type="date" id="seclog-date-from" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Date To</label>
+                        <input type="date" id="seclog-date-to" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-md-auto col-sm-6 ms-md-auto">
+                        <button id="seclog-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh security log"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="seclog-table" class="table table-hover ac-table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Actor</th>
+                                <th>Action</th>
+                                <th>Entity</th>
+                                <th>IP</th>
+                                <th>User Agent</th>
+                            </tr>
+                        </thead>
+                        <tbody id="seclog-tbody">
+                            <tr><td colspan="6" class="text-center text-muted py-4">
+                                <span class="spinner-border spinner-border-sm"></span>
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="seclog-pagination" class="pagination-container"></div>
+            </div>
+        </div>
+    </section><!-- /security-log -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 12 — FEATURE FLAGS SECTION (superadmin only)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="feature-flags" class="admin-section-card" data-roles="super_admin">
+        <div class="card">
+            <div class="card-body">
+                <div class="section-header">
+                    <button class="btn btn-outline-secondary btn-sm" id="flags-refresh-btn" type="button">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                <p class="text-muted small">
+                    Toggle platform features on or off without a deployment. Changes take effect immediately.
+                </p>
+                <div id="feature-flags-list">
+                    <div class="text-center py-5">
+                        <span class="spinner-border spinner-border-sm"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section><!-- /feature-flags -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 14 — BROADCAST SECTION (superadmin only)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="broadcast" class="admin-section-card" data-roles="super_admin">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-megaphone"></i> Broadcast Announcement
+                </h5>
+                <p class="text-muted small">
+                    Send platform-wide announcements to specific user groups. Announcements appear in user notifications.
+                </p>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="announcement-title">Title</label>
+                        <input type="text" id="announcement-title" class="form-control" placeholder="Platform update">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Audience</label>
+                        <div class="d-flex flex-column gap-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="audience-farmer" value="farmer">
+                                <label class="form-check-label" for="audience-farmer">Farmers</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="audience-customer" value="customer">
+                                <label class="form-check-label" for="audience-customer">Customers</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="audience-admin" value="admin">
+                                <label class="form-check-label" for="audience-admin">Admins (Staff & Super Admin)</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" id="send-announcement-btn" type="button">
+                            <i class="bi bi-send"></i> Send Announcement
+                        </button>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="form-label" for="announcement-message">Message</label>
+                    <textarea id="announcement-message" class="form-control" rows="2" placeholder="Write the announcement that should appear in user notifications."></textarea>
+                </div>
+            </div>
+        </div>
+    </section><!-- /broadcast -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 13 — NOTIFICATIONS SECTION
          (Placeholder — title already mapped in admin.js, no backend yet)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="notifications" class="admin-section-card">
@@ -1475,12 +1995,13 @@
                                 <th>Farmer</th>
                                 <th>Price</th>
                                 <th>Stock</th>
+                                <th>Status</th>
                                 <th>Date</th>
                                 <th class="col-actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="product-approvals-tbody">
-                            <tr><td colspan="8" class="text-center text-muted py-4">
+                            <tr><td colspan="9" class="text-center text-muted py-4">
                                 <span class="spinner-border spinner-border-sm"></span>
                             </td></tr>
                         </tbody>
@@ -1820,7 +2341,7 @@
 <div id="create-user-modal" class="admin-modal-backdrop">
     <div class="admin-modal modal-lg">
         <div class="modal-header">
-            <h5 class="modal-title">
+            <h5 class="modal-title" id="create-user-modal-title">
                 <i class="bi bi-person-plus me-2 text-primary"></i>
                 Create User
             </h5>
@@ -1968,6 +2489,8 @@
     <div class="detail-panel-footer gap-2">
         <button class="btn btn-sm me-auto btn-ac-red"
                 id="category-edit-toggle-disable">Disable</button>
+        <button class="btn btn-sm btn-outline-danger me-auto"
+                id="category-edit-delete">Delete</button>
         <button class="btn btn-sm btn-secondary"
                 id="category-edit-cancel">Cancel</button>
         <button class="btn btn-sm btn-ac-green"
@@ -1998,6 +2521,8 @@
     <div class="detail-panel-footer gap-2">
         <button class="btn btn-sm me-auto btn-ac-red"
                 id="catalog-edit-toggle-disable">Disable</button>
+        <button class="btn btn-sm btn-outline-danger me-auto"
+                id="catalog-edit-delete">Delete</button>
         <button class="btn btn-sm btn-secondary"
                 id="catalog-edit-cancel">Cancel</button>
         <button class="btn btn-sm btn-ac-green"
@@ -2111,125 +2636,223 @@
     </div>
 </div>
 
-<!-- ── Customer Detail Panel ─────────────────────────────────────────── -->
-<aside id="customer-detail-panel" class="admin-detail-panel">
-    <div class="detail-panel-header">
-        <h3 class="detail-panel-title">Customer Details</h3>
-        <button id="close-customer-panel"
-                class="detail-panel-close"
-                aria-label="Close customer details">
-            <i class="bi bi-x-lg"></i>
-        </button>
-    </div>
-    <div class="detail-panel-body">
-        <ul class="nav nav-tabs nav-tabs-bordered" id="customerDetailTabs">
-            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cdt-overview">Overview</button></li>
-            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cdt-orders">Order History</button></li>
-            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cdt-addresses">Addresses</button></li>
-        </ul>
-        <div class="tab-content p-3">
-            <div class="tab-pane fade show active" id="cdt-overview">
-                <div class="row g-3" id="cdt-overview-content">
-                    <div class="text-center py-5"><span class="spinner-border"></span></div>
+<!-- ── Customer Detail Modal ─────────────────────────────────────────── -->
+<div id="customer-detail-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-lg">
+        <div class="modal-header">
+            <h4 class="modal-title">Customer Details</h4>
+            <button class="modal-close-btn" id="close-customer-modal" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <ul class="nav nav-tabs nav-tabs-bordered" id="customerDetailTabs">
+                <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cdt-overview">Overview</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cdt-orders">Order History</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cdt-addresses">Addresses</button></li>
+            </ul>
+            <div class="tab-content p-3">
+                <div class="tab-pane fade show active" id="cdt-overview">
+                    <div class="row g-3" id="cdt-overview-content">
+                        <div class="text-center py-5"><span class="spinner-border"></span></div>
+                    </div>
                 </div>
-            </div>
-            <div class="tab-pane fade" id="cdt-orders">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle small">
-                        <thead>
-                            <tr>
-                                <th>#</th><th>Product</th><th>Status</th><th>Total</th><th>Date</th>
-                            </tr>
-                        </thead>
-                        <tbody id="cdt-orders-tbody">
-                            <tr><td colspan="5" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>
-                        </tbody>
-                    </table>
+                <div class="tab-pane fade" id="cdt-orders">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle small">
+                            <thead>
+                                <tr>
+                                    <th>#</th><th>Product</th><th>Status</th><th>Total</th><th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cdt-orders-tbody">
+                                <tr><td colspan="5" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-            <div class="tab-pane fade" id="cdt-addresses">
-                <div id="cdt-addresses-content">
-                    <div class="text-center py-5"><span class="spinner-border"></span></div>
+                <div class="tab-pane fade" id="cdt-addresses">
+                    <div id="cdt-addresses-content">
+                        <div class="text-center py-5"><span class="spinner-border"></span></div>
+                    </div>
                 </div>
             </div>
         </div>
+        <div class="modal-footer gap-2">
+            <button class="btn btn-sm me-auto btn-ac-red" id="cdt-disable-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="cdt-disable-spinner"></span>
+                Disable
+            </button>
+            <button class="btn btn-sm btn-ac-green" id="cdt-enable-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="cdt-enable-spinner"></span>
+                Enable
+            </button>
+            <button class="btn btn-sm btn-ac-green" id="cdt-edit-btn" type="button">Edit</button>
+        </div>
     </div>
-    <div class="detail-panel-footer gap-2">
-        <button class="btn btn-sm me-auto btn-ac-red" id="cdt-disable-btn" type="button">
-            <span class="spinner-border spinner-border-sm d-none me-1" id="cdt-disable-spinner"></span>
-            Disable
-        </button>
-        <button class="btn btn-sm btn-ac-green" id="cdt-enable-btn" type="button">
-            <span class="spinner-border spinner-border-sm d-none me-1" id="cdt-enable-spinner"></span>
-            Enable
-        </button>
-        <button class="btn btn-sm btn-ac-green" id="cdt-edit-btn" type="button">Edit</button>
-    </div>
-</aside>
+</div>
 
-<!-- ── Farmer Detail Panel ─────────────────────────────────────────── -->
-<aside id="farmer-detail-panel" class="admin-detail-panel">
-    <div class="detail-panel-header">
-        <h3 class="detail-panel-title">Farmer Details</h3>
-        <button id="close-farmer-panel"
-                class="detail-panel-close"
-                aria-label="Close farmer details">
-            <i class="bi bi-x-lg"></i>
-        </button>
-    </div>
-    <div class="detail-panel-body">
-        <ul class="nav nav-tabs nav-tabs-bordered" id="farmerDetailTabs">
-            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#fdt-info">Info</button></li>
-            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#fdt-products">Products</button></li>
-            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#fdt-reviews">Reviews</button></li>
-        </ul>
-        <div class="tab-content p-3">
-            <div class="tab-pane fade show active" id="fdt-info">
-                <div class="row g-3" id="fdt-info-content">
-                    <div class="text-center py-5"><span class="spinner-border"></span></div>
+<!-- ── Farmer Detail Modal ─────────────────────────────────────────── -->
+<div id="farmer-detail-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-lg">
+        <div class="modal-header">
+            <h4 class="modal-title">Farmer Details</h4>
+            <button class="modal-close-btn" id="close-farmer-modal" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <ul class="nav nav-tabs nav-tabs-bordered" id="farmerDetailTabs">
+                <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#fdt-info">Info</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#fdt-products">Products</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#fdt-reviews">Reviews</button></li>
+            </ul>
+            <div class="tab-content p-3">
+                <div class="tab-pane fade show active" id="fdt-info">
+                    <div class="row g-3" id="fdt-info-content">
+                        <div class="text-center py-5"><span class="spinner-border"></span></div>
+                    </div>
                 </div>
-            </div>
-            <div class="tab-pane fade" id="fdt-products">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle small">
-                        <thead>
-                            <tr>
-                                <th>Product</th><th>Price</th><th>Stock</th><th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="fdt-products-tbody">
-                            <tr><td colspan="4" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>
-                        </tbody>
-                    </table>
+                <div class="tab-pane fade" id="fdt-products">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle small">
+                            <thead>
+                                <tr>
+                                    <th>Product</th><th>Price</th><th>Stock</th><th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fdt-products-tbody">
+                                <tr><td colspan="4" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-            <div class="tab-pane fade" id="fdt-reviews">
-                <div id="fdt-reviews-content">
-                    <div class="text-center py-5"><span class="spinner-border"></span></div>
+                <div class="tab-pane fade" id="fdt-reviews">
+                    <div id="fdt-reviews-content">
+                        <div class="text-center py-5"><span class="spinner-border"></span></div>
+                    </div>
                 </div>
             </div>
         </div>
+        <div class="modal-footer gap-2">
+            <button class="btn btn-sm me-auto btn-ac-red" id="fdt-disable-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-disable-spinner"></span>
+                Disable
+            </button>
+            <button class="btn btn-sm btn-ac-green" id="fdt-enable-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-enable-spinner"></span>
+                Enable
+            </button>
+            <button class="btn btn-sm d-none btn-ac-green" id="fdt-verify-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-verify-spinner"></span>
+                Verify
+            </button>
+            <button class="btn btn-sm d-none btn-ac-red" id="fdt-unverify-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-unverify-spinner"></span>
+                Unverify
+            </button>
+            <button class="btn btn-sm btn-ac-green" id="fdt-edit-btn" type="button">Edit</button>
+        </div>
     </div>
-    <div class="detail-panel-footer gap-2">
-        <button class="btn btn-sm me-auto btn-ac-red" id="fdt-disable-btn" type="button">
-            <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-disable-spinner"></span>
-            Disable
-        </button>
-        <button class="btn btn-sm btn-ac-green" id="fdt-enable-btn" type="button">
-            <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-enable-spinner"></span>
-            Enable
-        </button>
-        <button class="btn btn-sm d-none btn-ac-green" id="fdt-verify-btn" type="button">
-            <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-verify-spinner"></span>
-            Verify
-        </button>
-        <button class="btn btn-sm d-none btn-ac-red" id="fdt-unverify-btn" type="button">
-            <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-unverify-spinner"></span>
-            Unverify
-        </button>
-        <button class="btn btn-sm btn-ac-green" id="fdt-edit-btn" type="button">Edit</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     SUPERADMIN MODALS (toast, user modal)
+══════════════════════════════════════════════════════════════════════ -->
+<div id="sa-toast-stack" class="admin-toast-stack"></div>
+
+<!-- User Detail Modal (for Staff and All Users) -->
+<div id="sa-user-detail-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-lg">
+        <div class="modal-header">
+            <h4 class="modal-title">User Details</h4>
+            <button class="modal-close" id="sa-user-detail-modal-close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body">
+            <div id="sa-user-detail-content">
+                <div class="text-center py-5"><span class="spinner-border"></span></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-sm btn-secondary" id="sa-user-detail-modal-close-btn">Close</button>
+            <button class="btn btn-sm btn-primary" id="sa-user-detail-edit-btn">Edit User</button>
+            <button class="btn btn-sm btn-ac-red" id="sa-user-detail-disable-btn">Disable</button>
+            <button class="btn btn-sm btn-ac-green d-none" id="sa-user-detail-enable-btn">Enable</button>
+        </div>
     </div>
-</aside>
+</div>
+
+<div id="sa-user-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-lg">
+        <div class="modal-header">
+            <h4 class="modal-title" id="sa-user-modal-title">Create User</h4>
+            <button class="modal-close" id="sa-user-modal-close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <form id="sa-user-form" autocomplete="off">
+            <div class="modal-body">
+                <input type="hidden" id="sa-user-id">
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="sa-user-firstname">First Name</label>
+                        <input type="text" id="sa-user-firstname" class="form-control" placeholder="First name" autocomplete="given-name">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="sa-user-middlename">Middle Name <span class="text-muted">(optional)</span></label>
+                        <input type="text" id="sa-user-middlename" class="form-control" placeholder="Middle name" autocomplete="additional-name">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="sa-user-lastname">Last Name</label>
+                        <input type="text" id="sa-user-lastname" class="form-control" placeholder="Last name" autocomplete="family-name">
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-2">
+                    <div class="col-md-6">
+                        <label class="form-label" for="sa-user-username">Username <span class="text-danger">*</span></label>
+                        <input type="text" id="sa-user-username" class="form-control" placeholder="Username" required autocomplete="off">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="sa-user-email">Email <span class="text-danger">*</span></label>
+                        <input type="email" id="sa-user-email" class="form-control" placeholder="Email address" required autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-2">
+                    <div class="col-md-6">
+                        <label class="form-label" for="sa-user-role">Role <span class="text-danger">*</span></label>
+                        <select id="sa-user-role" class="form-select" required>
+                            <option value="">Select role…</option>
+                            <option value="customer">Customer</option>
+                            <option value="farmer">Farmer</option>
+                            <option value="staff">Staff</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="sa-user-password">
+                            Password
+                            <span id="sa-user-pw-required-label" class="text-danger">*</span>
+                            <span id="sa-user-pw-optional-label" class="text-muted" style="display:none;">(leave blank to keep)</span>
+                        </label>
+                        <div class="input-group">
+                            <input type="password" id="sa-user-password" class="form-control" placeholder="Min 8 characters" autocomplete="new-password">
+                            <button type="button" class="btn btn-outline-secondary" id="sa-user-pw-toggle" aria-label="Toggle password visibility">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <p class="form-text text-muted small">Stored as bcrypt hash. No email sent to the user.</p>
+                    </div>
+                </div>
+
+                <div id="sa-user-error" class="alert alert-danger mt-3" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="sa-user-modal-cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="sa-user-modal-save">Create User</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════════════════
      SCRIPTS
@@ -2258,4 +2881,5 @@ window.addEventListener('load', function () {
 </script>
 
 </body>
+</html>
 </html>

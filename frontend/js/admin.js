@@ -61,6 +61,20 @@ class AdminDashboard {
                 this.approveProduct(Number(btn.dataset.productId));
             } else if (btn.matches('.product-reject-btn')) {
                 this.rejectProduct(Number(btn.dataset.productId));
+            } else if (btn.matches('.staff-edit-btn')) {
+                this.openUserEdit(Number(btn.dataset.userId));
+            } else if (btn.matches('.staff-disable-btn')) {
+                this.toggleUserDisabled(Number(btn.dataset.userId), true);
+            } else if (btn.matches('.staff-enable-btn')) {
+                this.toggleUserDisabled(Number(btn.dataset.userId), false);
+            } else if (btn.matches('.all-users-edit-btn')) {
+                this.openUserEdit(Number(btn.dataset.userId));
+            } else if (btn.matches('.all-users-disable-btn')) {
+                this.toggleUserDisabled(Number(btn.dataset.userId), true);
+            } else if (btn.matches('.all-users-enable-btn')) {
+                this.toggleUserDisabled(Number(btn.dataset.userId), false);
+            } else if (btn.matches('.flagged-unflag-btn')) {
+                this.unflagUser(Number(btn.dataset.userId));
             }
         }, true);
     }
@@ -314,6 +328,11 @@ class AdminDashboard {
             'top-products': { page: 1, total: 0, limit: 5 },
             'top-farmers': { page: 1, total: 0, limit: 5 },
             'recent-sales': { page: 1, total: 0, limit: 5 },
+            'staff': { page: 1, total: 0, limit: 25 },
+            'all-users': { page: 1, total: 0, limit: 25 },
+            'suspicious-patterns': { page: 1, total: 0, limit: 50 },
+            'flagged-users': { page: 1, total: 0, limit: 50 },
+            'security-log': { page: 1, total: 0, limit: 50 },
         };
         this._kpiPeriods = { 'kpi-sales': 'today', 'kpi-revenue': 'today', 'kpi-customers': 'today', 'kpi-farmers': 'today' };
         this._reportPeriod = 'today';
@@ -488,7 +507,13 @@ class AdminDashboard {
 
     setupNavigation() {
         // Load saved section or default to overview
-        const savedSection = localStorage.getItem('adminActiveSection') || 'overview';
+        let savedSection = localStorage.getItem('adminActiveSection') || 'overview';
+        // Prevent staff from landing on super_admin-only sections
+        const sectionEl = document.getElementById(savedSection);
+        if (sectionEl && sectionEl.getAttribute('data-roles') === 'super_admin' && this.currentUserRole !== 'super_admin') {
+            savedSection = 'overview';
+            localStorage.setItem('adminActiveSection', savedSection);
+        }
         this.showSection(savedSection);
 
         // Add click handlers to sidebar links
@@ -528,6 +553,12 @@ class AdminDashboard {
     }
 
     showSection(sectionId) {
+        // Block staff from accessing super_admin-only sections
+        const sectionEl = document.getElementById(sectionId);
+        if (sectionEl && sectionEl.getAttribute('data-roles') === 'super_admin' && this.currentUserRole !== 'super_admin') {
+            this.showToast('Access denied: Super Admin only', 'error');
+            sectionId = 'overview';
+        }
         this.prevSection = this.activeSection;
         this.activeSection = sectionId;
         localStorage.setItem('adminActiveSection', sectionId);
@@ -588,10 +619,18 @@ class AdminDashboard {
                 'category-requests': 'Product Catalog Requests',
                 'product-approvals': 'Pending Approvals',
                 farmers: 'Farmer Management',
+                staff: 'Staff Management',
+                'all-users': 'All Users',
                 logs: 'Audit Logs',
                 chat: 'Chat & Support',
                 notifications: 'Notifications',
                 profile: 'My Profile',
+                broadcast: 'Broadcast Announcement',
+                'suspicious-patterns': 'Suspicious Patterns',
+                'flagged-users': 'Flagged Users',
+                'security-log': 'Security Log',
+                'platform-settings': 'Platform Settings',
+                'feature-flags': 'Feature Flags',
             };
             pageTitle.textContent = titles[sectionId] || 'Dashboard';
         }
@@ -609,10 +648,18 @@ class AdminDashboard {
                 'category-requests': 'Product Catalog Requests',
                 'product-approvals': 'Pending Approvals',
                 farmers: 'Farmers',
+                staff: 'Staff',
+                'all-users': 'All Users',
                 logs: 'Audit Logs',
                 chat: 'Chat & Support',
                 notifications: 'Notifications',
                 profile: 'My Profile',
+                broadcast: 'Broadcast',
+                'suspicious-patterns': 'Suspicious Patterns',
+                'flagged-users': 'Flagged Users',
+                'security-log': 'Security Log',
+                'platform-settings': 'Platform Settings',
+                'feature-flags': 'Feature Flags',
             };
             breadcrumbCurrent.textContent = breadcrumbLabels[sectionId] || 'Dashboard';
         }
@@ -660,6 +707,42 @@ class AdminDashboard {
         }
         if (sectionId === 'notifications') {
             this.loadNotifications();
+        }
+        if (sectionId === 'staff' && !this._loadedSections?.staff) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections.staff = true;
+            this.loadStaff();
+        }
+        if (sectionId === 'all-users' && !this._loadedSections?.['all-users']) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections['all-users'] = true;
+            this.loadAllUsers();
+        }
+        if (sectionId === 'suspicious-patterns' && !this._loadedSections?.['suspicious-patterns']) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections['suspicious-patterns'] = true;
+            this.loadSuspiciousPatterns();
+        }
+        if (sectionId === 'flagged-users' && !this._loadedSections?.['flagged-users']) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections['flagged-users'] = true;
+            this.loadFlaggedUsers();
+        }
+        if (sectionId === 'security-log' && !this._loadedSections?.['security-log']) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections['security-log'] = true;
+            this.loadSecurityLog();
+        }
+        if (sectionId === 'platform-settings' && !this._loadedSections?.['platform-settings']) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections['platform-settings'] = true;
+            this.loadPlatformSettings();
+            this.loadServiceStatus();
+        }
+        if (sectionId === 'feature-flags' && !this._loadedSections?.['feature-flags']) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections['feature-flags'] = true;
+            this.loadFeatureFlags();
         }
     }
 
@@ -720,6 +803,13 @@ class AdminDashboard {
                 // Apply role-based UI
                 const visitSiteBtn = document.getElementById('visit-site-btn');
                 if (visitSiteBtn) visitSiteBtn.style.display = this.currentUserRole === 'super_admin' ? 'block' : 'none';
+
+                // Hide super_admin-only sidebar items and sections for staff
+                if (this.currentUserRole !== 'super_admin') {
+                    document.querySelectorAll('[data-roles="super_admin"]').forEach(el => {
+                        el.style.display = 'none';
+                    });
+                }
             } else {
                 if (response.status === 401 || response.status === 403) {
                     try { localStorage.removeItem('token'); } catch (_) {}
@@ -895,6 +985,46 @@ class AdminDashboard {
             this.showToast('Customers refreshed', 'success');
         });
 
+        // Staff in-section filters
+        const staffSearchBtn = document.getElementById('staff-search-btn');
+        const staffSearchInput = document.getElementById('staff-search-input');
+        const staffStatusFilter = document.getElementById('staff-status-filter');
+        const staffVerificationFilter = document.getElementById('staff-verification-filter');
+        if (staffSearchBtn) staffSearchBtn.addEventListener('click', () => this.loadStaff(1));
+        if (staffSearchInput) staffSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadStaff(1); });
+        if (staffStatusFilter) staffStatusFilter.addEventListener('change', () => this.loadStaff(1));
+        if (staffVerificationFilter) staffVerificationFilter.addEventListener('change', () => this.loadStaff(1));
+
+        document.getElementById('staff-refresh-btn')?.addEventListener('click', () => {
+            ['staff-search-input','staff-status-filter','staff-verification-filter'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
+            });
+            this.loadStaff();
+            this.showToast('Staff refreshed', 'success');
+        });
+
+        // All Users in-section filters
+        const allUsersSearchBtn = document.getElementById('all-users-search-btn');
+        const allUsersSearchInput = document.getElementById('all-users-search-input');
+        const allUsersRoleFilter = document.getElementById('all-users-role-filter');
+        const allUsersStatusFilter = document.getElementById('all-users-status-filter');
+        const allUsersVerificationFilter = document.getElementById('all-users-verification-filter');
+        if (allUsersSearchBtn) allUsersSearchBtn.addEventListener('click', () => this.loadAllUsers(1));
+        if (allUsersSearchInput) allUsersSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadAllUsers(1); });
+        if (allUsersRoleFilter) allUsersRoleFilter.addEventListener('change', () => this.loadAllUsers(1));
+        if (allUsersStatusFilter) allUsersStatusFilter.addEventListener('change', () => this.loadAllUsers(1));
+        if (allUsersVerificationFilter) allUsersVerificationFilter.addEventListener('change', () => this.loadAllUsers(1));
+
+        document.getElementById('all-users-refresh-btn')?.addEventListener('click', () => {
+            ['all-users-search-input','all-users-role-filter','all-users-status-filter','all-users-verification-filter'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
+            });
+            this.loadAllUsers();
+            this.showToast('All users refreshed', 'success');
+        });
+
         document.getElementById('farmers-refresh-btn')?.addEventListener('click', () => {
             ['farmers-search-input','farmers-status-filter','farmers-verification-filter'].forEach(id => {
                 const el = document.getElementById(id);
@@ -940,6 +1070,8 @@ class AdminDashboard {
 
         document.getElementById('open-create-user-modal')?.addEventListener('click', () => this.openCreateUserModal('customer'));
         document.getElementById('open-create-farmer-modal')?.addEventListener('click', () => this.openCreateUserModal('farmer'));
+        document.getElementById('create-staff-btn')?.addEventListener('click', () => this.openCreateUserModal('staff'));
+        document.getElementById('create-any-user-btn')?.addEventListener('click', () => this.openCreateUserModal('customer'));
         document.getElementById('create-user-form')?.addEventListener('submit', (e) => this.submitUserCreate(e));
         const createUserPwToggle = document.getElementById('create-user-pw-toggle');
         const createUserPwInput  = document.getElementById('create-user-password');
@@ -968,6 +1100,7 @@ class AdminDashboard {
 
         document.getElementById('create-category-btn')?.addEventListener('click', () => this.createCategory());
         document.getElementById('add-catalog-name-btn')?.addEventListener('click', () => this.addCatalogName());
+        document.getElementById('send-announcement-btn')?.addEventListener('click', () => this.sendAnnouncement());
 
         // "Add Category" button → open the modal
         document.getElementById('show-add-category-form')?.addEventListener('click', () => {
@@ -1067,6 +1200,18 @@ class AdminDashboard {
         document.getElementById('catalog-category-filter-bar')?.addEventListener('change', runCatalogFilter);
         document.getElementById('catalog-status-filter')?.addEventListener('change', runCatalogFilter);
 
+        // Superadmin section buttons
+        document.getElementById('detect-patterns-btn')?.addEventListener('click', () => this.loadSuspiciousPatterns());
+        document.getElementById('refresh-flagged-btn')?.addEventListener('click', () => this.loadFlaggedUsers());
+        document.getElementById('seclog-refresh-btn')?.addEventListener('click', () => this.loadSecurityLog());
+        document.getElementById('flags-refresh-btn')?.addEventListener('click', () => this.loadFeatureFlags());
+        document.getElementById('refresh-status-btn')?.addEventListener('click', () => this.loadServiceStatus());
+
+        // Security log filters - auto-apply on change
+        document.getElementById('seclog-action-filter')?.addEventListener('change', () => this.loadSecurityLog());
+        document.getElementById('seclog-date-from')?.addEventListener('change', () => this.loadSecurityLog());
+        document.getElementById('seclog-date-to')?.addEventListener('change', () => this.loadSecurityLog());
+
         // Entries-per-page selects
         document.addEventListener('change', (e) => {
             const sel = e.target.closest('[data-entries-section]');
@@ -1091,6 +1236,9 @@ class AdminDashboard {
                 'top-products': () => this.loadTopProducts(this._topProductsPeriod || 'today'),
                 'top-farmers': () => this.loadTopFarmers(this._topFarmersPeriod || 'today'),
                 'recent-sales': () => this.loadRecentSales(this._recentSalesPeriod || 'today'),
+                'staff': () => this.loadStaff(),
+                'all-users': () => this.loadAllUsers(),
+                'security-log': () => this.loadSecurityLog(),
             };
             loaders[section]?.();
         });
@@ -1882,6 +2030,720 @@ class AdminDashboard {
     formatRole(role) {
         const map = { super_admin: 'Super Admin', staff: 'Staff', farmer: 'Farmer', customer: 'Customer' };
         return map[role] || role;
+    }
+
+    async loadStaff(page = 1) {
+        try {
+            const pg = this.pagination.staff;
+            pg.page = page;
+            const search = (document.getElementById('staff-search-input')?.value || '').trim();
+            const status = (document.getElementById('staff-status-filter')?.value || '').trim();
+            const verification = (document.getElementById('staff-verification-filter')?.value || '').trim();
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit),
+                role: 'staff'
+            });
+            if (search) params.set('search', search);
+            if (status) params.set('status', status);
+            if (verification) params.set('verification', verification);
+
+            const response = await fetch(`${this.apiBase}/admin/users?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.lastStaff = data.users || [];
+                pg.total = Number(data.total || 0);
+                this.renderStaff(this.lastStaff);
+                this.renderPagination('staff-pagination', pg, (p) => this.loadStaff(p));
+            } else {
+                const tbody = document.getElementById('staff-tbody');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load staff. Please try again.</td></tr>`;
+                this.showMessage('Failed to load staff', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading staff:', error);
+            const tbody = document.getElementById('staff-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load staff. Please try again.</td></tr>`;
+            this.showMessage('Failed to load staff', 'error');
+        }
+    }
+
+    renderStaff(users) {
+        this.destroySortableTable('staff-table');
+        const tbody = document.getElementById('staff-tbody');
+        if (!tbody) return;
+        if (!users.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No staff found</td></tr>`;
+            this.refreshSortableTable('staff-table', { columns: [{ select: 7, sortable: false }] });
+            return;
+        }
+        tbody.innerHTML = users.map(user => {
+            const isDisabled = !!user.is_disabled;
+            const statusBadge = this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
+            const canToggle = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId;
+
+            const actions = [
+                `<button class="btn btn-sm py-0 px-2 btn-ac-green staff-edit-btn" data-user-id="${user.id}">Edit</button>`,
+                canToggle
+                    ? (isDisabled
+                        ? `<button class="btn btn-sm py-0 px-2 btn-ac-green staff-enable-btn" data-user-id="${user.id}">Enable</button>`
+                        : `<button class="btn btn-sm py-0 px-2 btn-ac-red staff-disable-btn" data-user-id="${user.id}">Disable</button>`)
+                    : ''
+            ].filter(Boolean).join(' ');
+
+            return `
+                <tr>
+                    <td class="text-muted">${user.id}</td>
+                    <td>
+                        <div class="user-cell">
+                            <div class="user-cell-name">${this.escapeHtml(user.full_name || '—')}</div>
+                        </div>
+                    </td>
+                    <td style="color:#777171f0">${this.escapeHtml(user.username || '—')}</td>
+                    <td>${this.escapeHtml(user.email)}</td>
+                    <td>${this.formatRole(user.role)}</td>
+                    <td>
+                        <div class="d-flex flex-column gap-1 align-items-start">
+                            ${statusBadge}
+                        </div>
+                    </td>
+                    <td class="text-muted">${user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                    <td>${actions}</td>
+                </tr>
+            `;
+        }).join('');
+
+        this.refreshSortableTable('staff-table', { columns: [{ select: 7, sortable: false }], defaultSort: [6, 'desc'] });
+    }
+
+    applyStaffFilter() {
+        const q = (document.getElementById('staff-search-input')?.value || '').trim().toLowerCase();
+        const status = (document.getElementById('staff-status-filter')?.value || '').trim().toLowerCase();
+        const verification = (document.getElementById('staff-verification-filter')?.value || '').trim().toLowerCase();
+
+        let users = [...(this.lastStaff || [])];
+        if (q) {
+            users = users.filter(u =>
+                String(u.id || '').includes(q) ||
+                String(u.full_name || '').toLowerCase().includes(q) ||
+                String(u.username || '').toLowerCase().includes(q) ||
+                String(u.email || '').toLowerCase().includes(q)
+            );
+        }
+        if (status === 'active') users = users.filter(u => !u.is_disabled);
+        else if (status === 'disabled') users = users.filter(u => !!u.is_disabled);
+        if (verification === 'verified') users = users.filter(u => !!u.is_verified);
+        else if (verification === 'unverified') users = users.filter(u => !u.is_verified);
+
+        this.renderStaff(users);
+    }
+
+    async loadAllUsers(page = 1) {
+        try {
+            const pg = this.pagination['all-users'];
+            pg.page = page;
+            const search = (document.getElementById('all-users-search-input')?.value || '').trim();
+            const role = (document.getElementById('all-users-role-filter')?.value || '').trim();
+            const status = (document.getElementById('all-users-status-filter')?.value || '').trim();
+            const verification = (document.getElementById('all-users-verification-filter')?.value || '').trim();
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit)
+            });
+            if (search) params.set('search', search);
+            if (role) params.set('role', role);
+            if (status) params.set('status', status);
+            if (verification) params.set('verification', verification);
+
+            const response = await fetch(`${this.apiBase}/admin/users?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.lastAllUsers = data.users || [];
+                pg.total = Number(data.total || 0);
+                this.renderAllUsers(this.lastAllUsers);
+                this.renderPagination('all-users-pagination', pg, (p) => this.loadAllUsers(p));
+            } else {
+                const tbody = document.getElementById('all-users-tbody');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load users. Please try again.</td></tr>`;
+                this.showMessage('Failed to load users', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading all users:', error);
+            const tbody = document.getElementById('all-users-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load users. Please try again.</td></tr>`;
+            this.showMessage('Failed to load users', 'error');
+        }
+    }
+
+    renderAllUsers(users) {
+        this.destroySortableTable('all-users-table');
+        const tbody = document.getElementById('all-users-tbody');
+        if (!tbody) return;
+        if (!users.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No users found</td></tr>`;
+            this.refreshSortableTable('all-users-table', { columns: [{ select: 7, sortable: false }] });
+            return;
+        }
+        tbody.innerHTML = users.map(user => {
+            const isSuperAdmin = user.role === 'super_admin';
+            const isDisabled = !!user.is_disabled;
+            const statusBadge = isSuperAdmin ? '' : this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
+            const canToggle = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId && !isSuperAdmin;
+
+            const actions = [
+                `<button class="btn btn-sm py-0 px-2 btn-ac-green all-users-edit-btn" data-user-id="${user.id}">Edit</button>`,
+                canToggle
+                    ? (isDisabled
+                        ? `<button class="btn btn-sm py-0 px-2 btn-ac-green all-users-enable-btn" data-user-id="${user.id}">Enable</button>`
+                        : `<button class="btn btn-sm py-0 px-2 btn-ac-red all-users-disable-btn" data-user-id="${user.id}">Disable</button>`)
+                    : ''
+            ].filter(Boolean).join(' ');
+
+            return `
+                <tr>
+                    <td class="text-muted">${user.id}</td>
+                    <td>
+                        <div class="user-cell">
+                            <div class="user-cell-name">${this.escapeHtml(user.full_name || '—')}</div>
+                        </div>
+                    </td>
+                    <td style="color:#777171f0">${this.escapeHtml(user.username || '—')}</td>
+                    <td>${this.escapeHtml(user.email)}</td>
+                    <td>${this.formatRole(user.role)}</td>
+                    <td>
+                        <div class="d-flex flex-column gap-1 align-items-start">
+                            ${statusBadge}
+                        </div>
+                    </td>
+                    <td class="text-muted">${user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                    <td>${actions}</td>
+                </tr>
+            `;
+        }).join('');
+
+        this.refreshSortableTable('all-users-table', { columns: [{ select: 7, sortable: false }], defaultSort: [6, 'desc'] });
+    }
+
+    applyAllUsersFilter() {
+        const q = (document.getElementById('all-users-search-input')?.value || '').trim().toLowerCase();
+        const role = (document.getElementById('all-users-role-filter')?.value || '').trim().toLowerCase();
+        const status = (document.getElementById('all-users-status-filter')?.value || '').trim().toLowerCase();
+        const verification = (document.getElementById('all-users-verification-filter')?.value || '').trim().toLowerCase();
+
+        let users = [...(this.lastAllUsers || [])];
+        if (q) {
+            users = users.filter(u =>
+                String(u.id || '').includes(q) ||
+                String(u.full_name || '').toLowerCase().includes(q) ||
+                String(u.username || '').toLowerCase().includes(q) ||
+                String(u.email || '').toLowerCase().includes(q)
+            );
+        }
+        if (role) users = users.filter(u => u.role === role);
+        if (status === 'active') users = users.filter(u => !u.is_disabled);
+        else if (status === 'disabled') users = users.filter(u => !!u.is_disabled);
+        if (verification === 'verified') users = users.filter(u => !!u.is_verified);
+        else if (verification === 'unverified') users = users.filter(u => !u.is_verified);
+
+        this.renderAllUsers(users);
+    }
+
+    async loadSuspiciousPatterns(page = 1) {
+        try {
+            const pg = this.pagination['suspicious-patterns'] || { page: 1, total: 0, limit: 50 };
+            pg.page = page;
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit)
+            });
+
+            const response = await fetch(`${this.apiBase}/admin/suspicious-patterns?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.lastSuspiciousPatterns = data;
+                this.renderSuspiciousPatterns(data);
+
+                // Update pagination total using max of the two pattern counts
+                const pagination = data.pagination || {};
+                const maxTotal = Math.max(
+                    pagination.single_farmer_total || 0,
+                    pagination.same_phone_total || 0
+                );
+                pg.total = maxTotal;
+                this.renderPagination('suspicious-patterns-pagination', pg, (p) => this.loadSuspiciousPatterns(p));
+            } else {
+                const singleTbody = document.getElementById('single-farmer-pattern-tbody');
+                const phoneTbody = document.getElementById('same-phone-pattern-tbody');
+                if (singleTbody) singleTbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">Failed to load suspicious patterns. Please try again.</td></tr>`;
+                if (phoneTbody) phoneTbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Failed to load suspicious patterns. Please try again.</td></tr>`;
+                this.showMessage('Failed to load suspicious patterns', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading suspicious patterns:', error);
+            const singleTbody = document.getElementById('single-farmer-pattern-tbody');
+            const phoneTbody = document.getElementById('same-phone-pattern-tbody');
+            if (singleTbody) singleTbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">Failed to load suspicious patterns. Please try again.</td></tr>`;
+            if (phoneTbody) phoneTbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Failed to load suspicious patterns. Please try again.</td></tr>`;
+            this.showMessage('Failed to load suspicious patterns', 'error');
+        }
+    }
+
+    renderSuspiciousPatterns(data) {
+        const { single_farmer_pattern, same_phone_pattern } = data;
+
+        // Render single farmer pattern
+        const singleTbody = document.getElementById('single-farmer-pattern-tbody');
+        if (singleTbody) {
+            if (!single_farmer_pattern || !single_farmer_pattern.length) {
+                singleTbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No suspicious patterns detected</td></tr>`;
+            } else {
+                singleTbody.innerHTML = single_farmer_pattern.map(p => `
+                    <tr>
+                        <td class="fw-semibold">${this.escapeHtml(p.username || '—')}</td>
+                        <td>${this.escapeHtml(p.email || '—')}</td>
+                        <td class="text-muted">${p.order_count}</td>
+                        <td class="text-muted">${p.avg_rating ? p.avg_rating.toFixed(1) : '—'}</td>
+                        <td class="text-muted">${p.review_count || 0}</td>
+                        <td>${this.escapeHtml(p.farmer_username || '—')}</td>
+                        <td>
+                            <button class="btn btn-sm py-0 px-2 btn-ac-green suspicious-view-btn" data-user-id="${p.user_id}">View</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Render same phone pattern
+        const phoneTbody = document.getElementById('same-phone-pattern-tbody');
+        if (phoneTbody) {
+            if (!same_phone_pattern || !same_phone_pattern.length) {
+                phoneTbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No suspicious patterns detected</td></tr>`;
+            } else {
+                phoneTbody.innerHTML = same_phone_pattern.map(p => `
+                    <tr>
+                        <td class="fw-semibold">${this.escapeHtml(p.customer_username || '—')}</td>
+                        <td>${this.escapeHtml(p.customer_email || '—')}</td>
+                        <td class="text-muted">${this.escapeHtml(p.phone || '—')}</td>
+                        <td>${this.escapeHtml(p.farmer_username || '—')}</td>
+                        <td>${this.escapeHtml(p.farmer_email || '—')}</td>
+                        <td>
+                            <button class="btn btn-sm py-0 px-2 btn-ac-green suspicious-view-btn" data-user-id="${p.customer_id}">View</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+    }
+
+    async loadFlaggedUsers(page = 1) {
+        try {
+            const pg = this.pagination['flagged-users'] || { page: 1, total: 0, limit: 50 };
+            pg.page = page;
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit)
+            });
+
+            const response = await fetch(`${this.apiBase}/admin/flagged-users?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.lastFlaggedUsers = data.flagged_users || [];
+                pg.total = Number(data.pagination?.total || 0);
+                this.renderFlaggedUsers(this.lastFlaggedUsers);
+                this.renderPagination('flagged-users-pagination', pg, (p) => this.loadFlaggedUsers(p));
+            } else {
+                const tbody = document.getElementById('flagged-users-tbody');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-3">Failed to load flagged users. Please try again.</td></tr>`;
+                this.showMessage('Failed to load flagged users', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading flagged users:', error);
+            const tbody = document.getElementById('flagged-users-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-3">Failed to load flagged users. Please try again.</td></tr>`;
+            this.showMessage('Failed to load flagged users', 'error');
+        }
+    }
+
+    renderFlaggedUsers(users) {
+        this.destroySortableTable('flagged-users-table');
+        const tbody = document.getElementById('flagged-users-tbody');
+        if (!tbody) return;
+
+        if (!users.length) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No flagged users found</td></tr>`;
+            this.refreshSortableTable('flagged-users-table');
+            return;
+        }
+
+        tbody.innerHTML = users.map(user => {
+            const isDisabled = !!user.is_disabled;
+            const statusBadge = this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
+            return `
+                <tr>
+                    <td class="text-muted">${user.id}</td>
+                    <td class="fw-semibold">${this.escapeHtml(user.username || '—')}</td>
+                    <td>${this.escapeHtml(user.email || '—')}</td>
+                    <td>${this.escapeHtml(user.role || '—')}</td>
+                    <td class="text-muted">${this.escapeHtml(user.phone || '—')}</td>
+                    <td>${this.escapeHtml(user.flag_reason || '—')}</td>
+                    <td class="text-muted">${user.flagged_at ? new Date(user.flagged_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                    <td class="text-muted">${user.flagged_by_username || '—'}</td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            ${statusBadge}
+                            <button class="btn btn-sm py-0 px-2 btn-ac-green flagged-unflag-btn" data-user-id="${user.id}">Unflag</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        this.refreshSortableTable('flagged-users-table', { columns: [{ select: 8, sortable: false }] });
+    }
+
+    async unflagUser(userId) {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/users/${userId}/unflag`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                this.showMessage('User unflagged successfully', 'success');
+                this.loadFlaggedUsers();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to unflag user', 'error');
+            }
+        } catch (error) {
+            console.error('Error unflagging user:', error);
+            this.showMessage('Failed to unflag user', 'error');
+        }
+    }
+
+    async loadSecurityLog(page = 1) {
+        try {
+            const pg = this.pagination['security-log'] || { page: 1, total: 0, limit: 50 };
+            pg.page = page;
+            const actionFilter = document.getElementById('seclog-action-filter')?.value || '';
+            const dateFrom = document.getElementById('seclog-date-from')?.value || '';
+            const dateTo = document.getElementById('seclog-date-to')?.value || '';
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(pg.limit)
+            });
+            if (actionFilter) params.set('action', actionFilter);
+            if (dateFrom) params.set('date_from', dateFrom);
+            if (dateTo) params.set('date_to', dateTo);
+
+            const response = await fetch(`${this.apiBase}/superadmin/security-log?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.lastSecurityLogs = data.logs || [];
+                pg.total = Number(data.total || 0);
+                this.renderSecurityLog(this.lastSecurityLogs);
+                this.renderPagination('seclog-pagination', pg, (p) => this.loadSecurityLog(p));
+            } else {
+                const tbody = document.getElementById('seclog-tbody');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Failed to load security log. Please try again.</td></tr>`;
+                this.showMessage('Failed to load security log', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading security log:', error);
+            const tbody = document.getElementById('seclog-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Failed to load security log. Please try again.</td></tr>`;
+            this.showMessage('Failed to load security log', 'error');
+        }
+    }
+
+    renderSecurityLog(logs) {
+        this.destroySortableTable('seclog-table');
+        const tbody = document.getElementById('seclog-tbody');
+        if (!tbody) return;
+
+        if (!logs.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No security log entries found</td></tr>`;
+            this.refreshSortableTable('seclog-table');
+            return;
+        }
+
+        tbody.innerHTML = logs.map(log => {
+            return `
+                <tr>
+                    <td class="text-muted">${log.created_at ? new Date(log.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</td>
+                    <td>${this.escapeHtml(log.actor_admin_name || log.actor_admin_email || '—')}</td>
+                    <td>${this.escapeHtml(log.action || '—')}</td>
+                    <td>${this.escapeHtml(log.entity || '—')}</td>
+                    <td class="text-muted">${log.ip_address || '—'}</td>
+                    <td class="text-muted small">${this.escapeHtml(log.user_agent || '—')}</td>
+                </tr>
+            `;
+        }).join('');
+
+        this.refreshSortableTable('seclog-table', { columns: [{ select: 6, sortable: false }], defaultSort: [1, 'desc'] });
+    }
+
+    async loadPlatformSettings() {
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/settings`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.lastPlatformSettings = data.settings || {};
+                this.renderPlatformSettings(this.lastPlatformSettings);
+            } else {
+                const container = document.getElementById('settings-form');
+                if (container) container.innerHTML = `<div class="text-center text-danger py-4">Failed to load platform settings. Please try again.</div>`;
+                this.showMessage('Failed to load platform settings', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading platform settings:', error);
+            const container = document.getElementById('settings-form');
+            if (container) container.innerHTML = `<div class="text-center text-danger py-4">Failed to load platform settings. Please try again.</div>`;
+            this.showMessage('Failed to load platform settings', 'error');
+        }
+    }
+
+    async loadServiceStatus() {
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/status`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.renderServiceStatus(data);
+            } else {
+                const container = document.getElementById('service-status-list');
+                if (container) container.innerHTML = `<div class="text-center text-danger py-3">Failed to load service status. Please try again.</div>`;
+                this.showMessage('Failed to load service status', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading service status:', error);
+            const container = document.getElementById('service-status-list');
+            if (container) container.innerHTML = `<div class="text-center text-danger py-3">Failed to load service status. Please try again.</div>`;
+            this.showMessage('Failed to load service status', 'error');
+        }
+    }
+
+    renderServiceStatus(data) {
+        const container = document.getElementById('service-status-list');
+        if (!container) return;
+
+        const { services = [] } = data;
+        if (!services.length) {
+            container.innerHTML = `<div class="text-center text-muted py-3">No service status available</div>`;
+            return;
+        }
+
+        container.innerHTML = services.map(service => {
+            const statusClass = service.online ? 'text-success' : (service.configured ? 'text-warning' : 'text-muted');
+            const statusIcon = service.online ? 'bi-check-circle-fill' : (service.configured ? 'bi-exclamation-circle-fill' : 'bi-dash-circle');
+            const statusText = service.online ? 'Online' : (service.configured ? 'Configured (Offline)' : 'Not Configured');
+            
+            let detailsHtml = '';
+            if (service.details && Object.keys(service.details).length > 0) {
+                detailsHtml = Object.entries(service.details).map(([key, value]) => {
+                    if (value === null || value === undefined) return '';
+                    return `<div class="small text-muted"><strong>${key}:</strong> ${this.escapeHtml(String(value))}</div>`;
+                }).join('');
+            }
+
+            return `
+                <div class="card mb-2">
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-semibold">${this.escapeHtml(service.name)}</div>
+                                ${detailsHtml}
+                            </div>
+                            <div class="${statusClass}">
+                                <i class="bi ${statusIcon}"></i> ${statusText}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderPlatformSettings(settings) {
+        const container = document.getElementById('settings-form');
+        if (!container) return;
+
+        const entries = Object.entries(settings);
+        if (!entries.length) {
+            container.innerHTML = `<div class="text-center text-muted py-4">No platform settings configured</div>`;
+            return;
+        }
+
+        container.innerHTML = entries.map(([key, data]) => {
+            if (key === 'delivery_fee') {
+                return `
+                    <div class="mb-3">
+                        <label for="setting-delivery_fee" class="form-label fw-semibold">Delivery Fee (₱)</label>
+                        <input type="number" id="setting-delivery_fee" class="form-control platform-setting-input"
+                               data-key="${key}" min="0" step="1" value="${this.escapeHtml(data.value || '35')}">
+                        <div class="form-text text-muted">Set to 0 to disable delivery fee - it will not appear in checkout</div>
+                        <small class="text-muted">Last updated: ${data.updated_at ? new Date(data.updated_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</small>
+                    </div>
+                `;
+            }
+            return `
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">${this.escapeHtml(key)}</label>
+                    <input type="text" class="form-control platform-setting-input" data-key="${key}" value="${this.escapeHtml(data.value || '')}">
+                    <small class="text-muted">Last updated: ${data.updated_at ? new Date(data.updated_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</small>
+                </div>
+            `;
+        }).join('');
+
+        document.getElementById('save-settings-btn')?.addEventListener('click', () => this.savePlatformSettings());
+    }
+
+    async savePlatformSettings() {
+        const inputs = document.querySelectorAll('.platform-setting-input');
+        const updates = {};
+        inputs.forEach(input => {
+            updates[input.dataset.key] = input.value;
+        });
+
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify(updates)
+            });
+
+            if (response.ok) {
+                this.showMessage('Platform settings updated successfully', 'success');
+                this.loadPlatformSettings();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to update platform settings', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving platform settings:', error);
+            this.showMessage('Failed to update platform settings', 'error');
+        }
+    }
+
+    async loadFeatureFlags() {
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/flags`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.lastFeatureFlags = data.flags || [];
+                this.renderFeatureFlags(this.lastFeatureFlags);
+            } else {
+                const container = document.getElementById('feature-flags-list');
+                if (container) container.innerHTML = `<div class="text-center text-danger py-4">Failed to load feature flags. Please try again.</div>`;
+                this.showMessage('Failed to load feature flags', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading feature flags:', error);
+            const container = document.getElementById('feature-flags-list');
+            if (container) container.innerHTML = `<div class="text-center text-danger py-4">Failed to load feature flags. Please try again.</div>`;
+            this.showMessage('Failed to load feature flags', 'error');
+        }
+    }
+
+    renderFeatureFlags(flags) {
+        const container = document.getElementById('feature-flags-list');
+        if (!container) return;
+
+        if (!flags.length) {
+            container.innerHTML = `<div class="text-center text-muted py-4">No feature flags found</div>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="table-responsive">
+                <table class="table table-hover table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                            <th>Last Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${flags.map(flag => `
+                            <tr>
+                                <td class="text-muted">${this.escapeHtml(flag.key)}</td>
+                                <td class="fw-semibold">${this.escapeHtml(flag.name)}</td>
+                                <td class="text-muted small">${this.escapeHtml(flag.description || '—')}</td>
+                                <td>
+                                    <button class="btn btn-sm py-0 px-2 ${flag.enabled ? 'btn-ac-green' : 'btn-ac-red'} feature-flag-toggle-btn" data-key="${flag.key}" data-enabled="${flag.enabled}">
+                                        ${flag.enabled ? 'Enabled' : 'Disabled'}
+                                    </button>
+                                </td>
+                                <td class="text-muted">${flag.updated_at ? new Date(flag.updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        container.querySelectorAll('.feature-flag-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.key;
+                const currentEnabled = btn.dataset.enabled === 'true';
+                this.toggleFeatureFlag(key, !currentEnabled);
+            });
+        });
+    }
+
+    async toggleFeatureFlag(key, enabled) {
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/flags/${encodeURIComponent(key)}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ enabled })
+            });
+
+            if (response.ok) {
+                this.showMessage(`Feature flag ${enabled ? 'enabled' : 'disabled'} successfully`, 'success');
+                this.loadFeatureFlags();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to toggle feature flag', 'error');
+            }
+        } catch (error) {
+            console.error('Error toggling feature flag:', error);
+            this.showMessage('Failed to toggle feature flag', 'error');
+        }
     }
 
     async loadProducts(page = 1) {
@@ -2827,14 +3689,64 @@ class AdminDashboard {
                 })).concat(['<option value="__new__">+ Add New Category</option>']).join('');
                 reqCatSel.innerHTML = opts;
             }
-            // Restore category request panel context if it was open
-            if (restoreContext) {
-                this.openCategoryRequestPanel(restoreContext);
-                this._currentCategoryRequestId = null;
-            }
-        } catch (error) {
-            console.error('Create category error:', error);
+        } catch (err) {
+            console.error('Create category error:', err);
             this.showMessage('Failed to create category', 'error');
+        }
+    }
+
+    async sendAnnouncement() {
+        const titleEl = document.getElementById('announcement-title');
+        const messageEl = document.getElementById('announcement-message');
+        
+        const title = String(titleEl?.value || '').trim();
+        const message = String(messageEl?.value || '').trim();
+
+        // Read audience from checkboxes
+        const audienceFarmer = document.getElementById('audience-farmer');
+        const audienceCustomer = document.getElementById('audience-customer');
+        const audienceAdmin = document.getElementById('audience-admin');
+        
+        const selectedAudiences = [];
+        if (audienceFarmer?.checked) selectedAudiences.push('farmer');
+        if (audienceCustomer?.checked) selectedAudiences.push('customer');
+        if (audienceAdmin?.checked) selectedAudiences.push('admin');
+        
+        const audience = selectedAudiences.length > 0 ? selectedAudiences.join(',') : 'all';
+
+        if (!title) {
+            this.showMessage('Title is required', 'error');
+            return;
+        }
+        if (!message) {
+            this.showMessage('Message is required', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/announcements`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ title, message, audience })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to send announcement', 'error');
+                return;
+            }
+
+            this.showMessage('Announcement sent successfully', 'success');
+            if (titleEl) titleEl.value = '';
+            if (messageEl) messageEl.value = '';
+            if (audienceFarmer) audienceFarmer.checked = false;
+            if (audienceCustomer) audienceCustomer.checked = false;
+            if (audienceAdmin) audienceAdmin.checked = false;
+        } catch (err) {
+            console.error('Send announcement error:', err);
+            this.showMessage('Failed to send announcement', 'error');
         }
     }
 
@@ -3941,7 +4853,10 @@ class AdminDashboard {
         const modal = document.getElementById('edit-user-modal');
         if (!modal) return;
 
-        const user = (this.lastUsers || []).find(u => u.id === userId) || (this.lastFarmers || []).find(f => f.id === userId);
+        const user = (this.lastUsers || []).find(u => u.id === userId)
+            || (this.lastFarmers || []).find(f => f.id === userId)
+            || (this.lastStaff || []).find(u => u.id === userId)
+            || (this.lastAllUsers || []).find(u => u.id === userId);
         if (!user) return;
 
         const idEl = document.getElementById('edit-user-id');
@@ -4104,6 +5019,8 @@ class AdminDashboard {
                 this.showMessage('User updated successfully!', 'success');
                 this.closeModal('edit-user-modal');
                 await this.loadUsers();
+                await this.loadStaff();
+                await this.loadAllUsers();
                 await this.loadFarmers();
             } else {
                 this.showMessage(data.message || 'Failed to update user', 'error');
@@ -4180,6 +5097,8 @@ class AdminDashboard {
             this.showMessage('User created successfully!', 'success');
             this.closeModal('create-user-modal');
             await this.loadUsers();
+            await this.loadStaff();
+            await this.loadAllUsers();
             if (role === 'farmer') {
                 await this.loadFarmers();
             }
@@ -4434,6 +5353,9 @@ class AdminDashboard {
             if (response.ok) {
                 this.showMessage(`User ${disable ? 'disabled' : 'enabled'} successfully!`, 'success');
                 this.loadUsers();
+                this.loadStaff();
+                this.loadAllUsers();
+                this.loadFarmers();
                 this.loadDashboardStats();
             } else {
                 this.showMessage(data.message || `Failed to ${label} user`, 'error');
@@ -5012,6 +5934,12 @@ class AdminDashboard {
                            class="form-control" placeholder="Brief description"
                            maxlength="200" value="${this.escapeHtml(category.description || '')}">
                 </div>
+                <div class="form-group mt-4">
+                    <label class="form-label fw-semibold">Linked Products (${Number(category.product_count || 0)})</label>
+                    <div id="category-linked-products" class="border rounded p-2 bg-light" style="max-height: 200px; overflow-y: auto;">
+                        <span class="text-muted small">Loading linked products...</span>
+                    </div>
+                </div>
             `;
 
             const nameInput = document.getElementById('category-edit-name');
@@ -5033,6 +5961,9 @@ class AdminDashboard {
             panel.removeAttribute('inert');
             this.syncPanelAccessibility();
             nameInput.focus();
+
+            // Load linked products
+            this.loadCategoryLinkedProducts(category.id);
 
             const done = (result) => {
                 panel.classList.remove('active');
@@ -5167,6 +6098,33 @@ class AdminDashboard {
             }, { once: true });
             // NOTE: Delete action reserved for superadmin only; button removed from UI.
         });
+    }
+
+    async loadCategoryLinkedProducts(categoryId) {
+        const container = document.getElementById('category-linked-products');
+        if (!container) return;
+        container.innerHTML = '<span class="text-muted small">Loading...</span>';
+        try {
+            const response = await fetch(`${this.apiBase}/admin/products?category_id=${categoryId}&limit=20`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Failed to load');
+            const products = data.products || [];
+            if (!products.length) {
+                container.innerHTML = '<span class="text-muted small">No linked products.</span>';
+                return;
+            }
+            container.innerHTML = products.map(p => `
+                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                    <span class="small">${this.escapeHtml(p.name || '')}</span>
+                    <span class="badge bg-secondary small">${p.status || 'unknown'}</span>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Failed to load linked products:', error);
+            container.innerHTML = '<span class="text-danger small">Failed to load.</span>';
+        }
     }
 
 }
