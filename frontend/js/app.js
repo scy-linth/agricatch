@@ -5149,8 +5149,8 @@ class AgricultureMarket {
         }
 
         const subtotal = parseFloat(data.summary.subtotal) || 0;
-        const DELIVERY_FEE = 35;
-        const grandTotal = subtotal + DELIVERY_FEE;
+        const deliveryFee = this.getDeliveryFee();
+        const grandTotal = subtotal + (deliveryFee > 0 ? deliveryFee : 0);
 
         if (checkoutSubtotal) {
             checkoutSubtotal.textContent = this.fmtNumber(subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -5160,6 +5160,18 @@ class AgricultureMarket {
         }
         if (checkoutTotalFooter) {
             checkoutTotalFooter.textContent = this.fmtNumber(grandTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        
+        // Conditionally show/hide delivery fee
+        const checkoutDeliveryFeeRow = document.getElementById('checkout-delivery-fee-row');
+        const checkoutDeliveryFee = document.getElementById('checkout-delivery-fee');
+        if (checkoutDeliveryFeeRow && checkoutDeliveryFee) {
+            if (deliveryFee > 0) {
+                checkoutDeliveryFeeRow.style.display = 'flex';
+                checkoutDeliveryFee.textContent = this.fmtNumber(deliveryFee, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } else {
+                checkoutDeliveryFeeRow.style.display = 'none';
+            }
         }
     }
 
