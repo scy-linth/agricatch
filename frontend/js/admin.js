@@ -738,6 +738,13 @@ class AdminDashboard {
             this._loadedSections['platform-settings'] = true;
             this.loadPlatformSettings();
             this.loadServiceStatus();
+            
+            document.getElementById('refresh-settings-btn')?.addEventListener('click', () => {
+                localStorage.removeItem('cached_delivery_fee');
+                localStorage.removeItem('cached_delivery_fee_timestamp');
+                this.showMessage('Settings cache cleared. Refreshing...', 'info');
+                setTimeout(() => location.reload(), 1000);
+            });
         }
         if (sectionId === 'feature-flags' && !this._loadedSections?.['feature-flags']) {
             this._loadedSections = this._loadedSections || {};
