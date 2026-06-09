@@ -1996,9 +1996,10 @@ class AgricultureMarket {
             window.location.replace('/farmer.html');
             return;
         }
-        if (role === 'staff' || role === 'super_admin') {
+        if (role === 'staff') {
             window.location.replace('/admin.html');
         }
+        // super_admin can access the main site, no redirect
     }
 
     showUserMenu() {
@@ -2191,12 +2192,32 @@ class AgricultureMarket {
                 if (userNameEl) userNameEl.textContent = displayName;
                 if (userInitialEl) userInitialEl.textContent = String(displayName).charAt(0).toUpperCase();
 
-                // Show admin panel button for super admin
+                // Hide super-admin-panel-btn and my-account-btn for superadmin
                 const adminPanelBtn = document.getElementById('super-admin-panel-btn');
-                if (data.user.role === 'super_admin' && adminPanelBtn) {
-                    adminPanelBtn.style.display = 'inline-block';
+                const myAccountBtn = document.getElementById('my-account-btn');
+                if (data.user.role === 'super_admin') {
+                    if (adminPanelBtn) adminPanelBtn.style.display = 'none';
+                    if (myAccountBtn) myAccountBtn.style.display = 'none';
                 } else if (adminPanelBtn) {
                     adminPanelBtn.style.display = 'none';
+                }
+
+                // Show back to admin button for admin users (super_admin and staff)
+                const backToAdminBtn = document.getElementById('back-to-admin-btn');
+                if ((data.user.role === 'super_admin' || data.user.role === 'staff') && backToAdminBtn) {
+                    backToAdminBtn.style.display = 'inline-flex';
+                } else if (backToAdminBtn) {
+                    backToAdminBtn.style.display = 'none';
+                }
+
+                // Hide shopping bag and notifications for superadmin
+                const myOrdersBtn = document.getElementById('my-orders-btn');
+                const notificationsBtn = document.getElementById('notifications-btn');
+                const notificationsWrapper = document.querySelector('.notifications-wrapper');
+                if (data.user.role === 'super_admin') {
+                    if (myOrdersBtn) myOrdersBtn.style.display = 'none';
+                    if (notificationsBtn) notificationsBtn.style.display = 'none';
+                    if (notificationsWrapper) notificationsWrapper.style.display = 'none';
                 }
 
                 // Super admin can access main site via admin panel button (no auto-redirect)
@@ -4364,14 +4385,8 @@ class AgricultureMarket {
             }
             if (descriptionEl) descriptionEl.textContent = product.description || 'No description available.';
             if (farmerEl) {
-                const shopRating = this.fmtNumber(product.farmer_average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
                 const farmerName = product.farmer_name || product.full_name || 'Local Farmer';
-                farmerEl.textContent = '';
-                farmerEl.appendChild(document.createTextNode(`${farmerName} • Shop ${shopRating} `));
-                const star = document.createElement('i');
-                star.className = 'fas fa-star rating-icon';
-                star.setAttribute('aria-hidden', 'true');
-                farmerEl.appendChild(star);
+                farmerEl.textContent = farmerName;
             }
             if (farmerActionsEl) {
                 const farmerId = Number(product.farmer_id || 0);
@@ -4610,15 +4625,11 @@ class AgricultureMarket {
                         const badges = (item.badges || []).map((badge) => `<span class="status-pill">${this.escapeHtml(badge)}</span>`).join(' ');
                         const farmerName = this.escapeHtml(item.farmer_name || 'Farmer Shop');
                         const unit = this.escapeHtml(item.unit || 'item');
-                        const shopRating = this.fmtNumber(item.farmer_average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
                         const canOpen = Number(item.id) > 0;
                         return `
                             <div class="review-card ${canOpen ? 'clickable' : ''}" ${canOpen ? `onclick="app.showProductDetails(${Number(item.id)})" style="cursor:pointer;"` : ''}>
                                 <div class="review-header">
-                                    <div class="review-farmer-meta">
-                                        <strong>${farmerName}</strong>
-                                        <span class="review-shop-rating">${shopRating} <i class="fas fa-star rating-icon" aria-hidden="true"></i></span>
-                                    </div>
+                                    <strong>${farmerName}</strong>
                                     <span>${this.fmtCurrency(item.price)} / ${unit}</span>
                                 </div>
                                 <p>

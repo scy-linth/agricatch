@@ -80,7 +80,6 @@ class ProductPage {
         const safeUnit = this.escapeHtml(product.unit || 'unit');
         const safeLocation = this.escapeHtml(product.farm_location || product.location || 'Unknown location');
         const productRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-        const shopRating = this.fmtNumber(product.farmer_average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
         container.innerHTML = `
             <div class="product-card">
@@ -101,11 +100,6 @@ class ProductPage {
                             ${productRating}
                             <i class="fas fa-star rating-icon" aria-hidden="true"></i>
                             (${this.fmtNumber(product.total_reviews || 0)} reviews)
-                        </span>
-                        <span>
-                            Shop: ${shopRating}
-                            <i class="fas fa-star rating-icon" aria-hidden="true"></i>
-                            (${this.fmtNumber(product.farmer_total_reviews || 0)} reviews)
                         </span>
                         <span class="sales-count">${this.fmtNumber(product.sales_count || 0)} sold</span>
                     </div>
@@ -139,8 +133,6 @@ class ProductPage {
                     <p>
                         Sold: ${this.fmtNumber(item.sales_count || 0)}
                         • Product ${this.fmtNumber(item.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                        <i class="fas fa-star rating-icon" aria-hidden="true"></i>
-                        • Shop ${this.fmtNumber(item.farmer_average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                         <i class="fas fa-star rating-icon" aria-hidden="true"></i>
                     </p>
                     <p>${this.escapeHtml((item.badges || []).join(' • '))}</p>

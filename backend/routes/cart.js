@@ -130,6 +130,18 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Product ID is required' });
     }
 
+    // Prevent superadmin from adding to cart
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.role === 'super_admin') {
+          return res.status(403).json({ message: 'Super admin cannot add items to cart' });
+        }
+      } catch (e) {
+        // Invalid token, continue as guest
+      }
+    }
+
     // Check if product exists and is available
     const productResult = await pool.query(
       `SELECT p.id, p.stock_quantity, p.is_available, p.expiry_date,

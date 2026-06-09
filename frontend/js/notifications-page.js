@@ -91,7 +91,7 @@ class NotificationsPage {
                 <div style="flex:1;min-width:0;">
                     <div style="font-weight:${isRead ? '400' : '600'};font-size:0.97rem;color:#111827;margin-bottom:2px;">${this.escapeHtml(n.message || 'Notification')}</div>
                     <div style="font-size:0.83rem;color:#6b7280;">${date}</div>
-                    ${n.order_id ? `<div style="font-size:0.83rem;color:#3b82f6;margin-top:2px;"><a href="/orders.html?highlightOrderId=${n.order_id}" style="color:inherit;">View Order #${n.order_id}</a></div>` : ''}
+                    ${n.order_id ? `<div style="font-size:0.83rem;color:#3b82f6;margin-top:2px;"><a href="/orders.html?highlightOrderId=${n.order_id}" style="color:inherit;">View Pre-order #${n.order_id}</a></div>` : ''}
                 </div>
                 ${!isRead ? `<button class="btn btn-small btn-secondary notif-read-btn" data-notif-id="${n.id}" style="flex-shrink:0;white-space:nowrap;" title="Mark as read">
                     <i class="fas fa-check"></i>

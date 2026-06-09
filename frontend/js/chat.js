@@ -310,7 +310,7 @@ class ChatUI {
         const quantityParam = Number(params.get('quantity') || 0);
 
         const subtitleParts = [];
-        if (orderIdParam) subtitleParts.push(`Order #${orderIdParam}`);
+        if (orderIdParam) subtitleParts.push(`Pre-order #${orderIdParam}`);
         if (productNameParam) subtitleParts.push(decodeURIComponent(productNameParam));
         if (quantityParam > 0) subtitleParts.push(`Qty: ${quantityParam}`);
         const subtitleText = subtitleParts.join(' · ');

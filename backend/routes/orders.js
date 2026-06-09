@@ -429,6 +429,12 @@ router.post('/', async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Prevent superadmin from placing orders
+    if (decoded.role === 'super_admin') {
+      return res.status(403).json({ message: 'Super admin cannot place orders' });
+    }
+
     const {
       delivery_address,
       delivery_date,

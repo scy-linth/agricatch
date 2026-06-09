@@ -1498,7 +1498,7 @@ class FarmerDashboard {
         if (harvestVal) {
             if (harvestVal < today) {
                 this.setInputError(harvestEl, true);
-                this.showMessage('Harvest Date cannot be in the past.', 'error');
+                this.showMessage('Expected Harvest Date cannot be in the past.', 'error');
                 return false;
             }
         }
@@ -1508,7 +1508,7 @@ class FarmerDashboard {
             if (expiryVal <= harvestVal) {
                 this.setInputError(harvestEl, true);
                 this.setInputError(expiryEl, true);
-                this.showMessage('Expiry Date must be after the Harvest Date.', 'error');
+                this.showMessage('Best Before must be after the Expected Harvest Date.', 'error');
                 return false;
             }
         }
@@ -1517,7 +1517,7 @@ class FarmerDashboard {
         if (expiryVal && !harvestVal) {
             if (expiryVal <= today) {
                 this.setInputError(expiryEl, true);
-                this.showMessage('Expiry Date must be in the future.', 'error');
+                this.showMessage('Best Before must be in the future.', 'error');
                 return false;
             }
         }
@@ -2928,8 +2928,8 @@ class FarmerDashboard {
                     <div style="display:grid;gap:0.45rem;color:var(--text-secondary);line-height:1.5;">
                         <div><strong>Status:</strong> ${this.escapeHtml(status)}</div>
                         <div><strong>Stock:</strong> ${this.fmtNumber(product.stock_quantity || 0)}</div>
-                        <div><strong>Harvest Date:</strong> ${this.escapeHtml(harvestDate)}</div>
-                        <div><strong>Expiry Date:</strong> ${this.escapeHtml(expiryDate)}</div>
+                        <div><strong>Expected Harvest Date:</strong> ${this.escapeHtml(harvestDate)}</div>
+                        <div><strong>Best Before:</strong> ${this.escapeHtml(expiryDate)}</div>
                         <div><strong>Reviews:</strong> ${reviewCount} (${avgRating}★)</div>
                         <div><strong>Location:</strong> ${this.escapeHtml(product.location || 'Not specified')}</div>
                         <div><strong>Description:</strong> ${this.escapeHtml(product.description || 'No description provided.')}</div>
@@ -4005,7 +4005,7 @@ class FarmerDashboard {
                     <div class="order-head-left" style="display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
                         <span class="order-date" style="color: #64748b; font-size: 14px;">${dateLabel}</span>
                         <span class="order-time" style="color: #64748b; font-size: 14px;">${timeLabel}</span>
-                        <span class="order-id" style="font-weight: 700; font-size: 16px;">Order #${orderId}</span>
+                        <span class="order-id" style="font-weight: 700; font-size: 16px;">Pre-order #${orderId}</span>
                     </div>
                 </div>
                 
@@ -4025,10 +4025,10 @@ class FarmerDashboard {
                 </div>
 
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-                    <div style="font-weight: 700; margin-bottom: 12px; font-size: 14px;">Update Order Status</div>
+                    <div style="font-weight: 700; margin-bottom: 12px; font-size: 14px;">Update Pre-order Status</div>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         ${currentStatus === 'pending' ? `
-                            <button class="btn btn-primary btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">Confirm Order</button>
+                            <button class="btn btn-primary btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">Confirm Pre-order</button>
                             <button class="btn btn-danger btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">Cancel</button>
                         ` : currentStatus === 'confirmed' ? `
                             <button class="btn btn-primary btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="preparing">Start Preparing</button>
@@ -4105,7 +4105,7 @@ class FarmerDashboard {
 
         dropdown.innerHTML = matches.map((m) => (
             `<button type="button" class="orders-search-option" data-order-id="${this.escapeAttr(m.orderId)}" data-status="${this.escapeAttr(m.status)}">
-                <div class="title">Order #${this.escapeHtml(m.orderId)} • ${this.escapeHtml(m.product)}</div>
+                <div class="title">Pre-order #${this.escapeHtml(m.orderId)} • ${this.escapeHtml(m.product)}</div>
                 <div class="meta">Customer: ${this.escapeHtml(m.customer)} • ${this.escapeHtml(this.formatStatusLabel(m.status || 'pending'))}</div>
             </button>`
         )).join('');
@@ -4335,7 +4335,7 @@ class FarmerDashboard {
             });
 
             if (response.ok) {
-                this.showMessage(`Order status updated to ${newStatus}!`, 'success');
+                this.showMessage(`Pre-order status updated to ${newStatus}!`, 'success');
                 // Reload all order tabs to ensure order moves from old status to new status
                 await this.loadMyOrders();
                 // Defer tab switch so DOM updates from loadMyOrders are applied first, then switch to new status tab
@@ -4402,7 +4402,7 @@ class FarmerDashboard {
 
         const orderLabel = document.getElementById('customer-rating-order');
         if (orderLabel) {
-            orderLabel.textContent = `Order #${this.customerRatingDraft.orderId}`;
+            orderLabel.textContent = `Pre-order #${this.customerRatingDraft.orderId}`;
         }
 
         const submitBtn = document.getElementById('customer-rating-submit');

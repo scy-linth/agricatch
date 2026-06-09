@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Orders - AgriCatch</title>
+    <title>My Pre-orders - AgriCatch</title>
     <link rel="stylesheet" href="/css/styles.css">
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
 </head>
@@ -28,10 +28,10 @@
     <main class="orders-page">
         <div class="container">
             <div class="orders-header">
-                <h2>Order Management</h2>
-                <p>Track your orders and view order details.</p>
+                <h2>Pre-order Management</h2>
+                <p>Track your pre-orders and view pre-order details.</p>
                 <div class="orders-search-bar" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                    <input type="search" id="orders-search-input" placeholder="Search by product name or order ID..." style="flex:1;min-width:220px;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.95rem;">
+                    <input type="search" id="orders-search-input" placeholder="Search by product name or pre-order ID..." style="flex:1;min-width:220px;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.95rem;">
                     <input type="date" id="orders-date-from" title="From date" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
                     <input type="date" id="orders-date-to" title="To date" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
                     <button type="button" id="orders-search-clear" class="btn btn-secondary btn-small" style="white-space:nowrap;">Clear</button>
@@ -109,13 +109,13 @@
     <div id="order-cancel-modal" class="modal">
         <div class="modal-content modal-medium order-cancel-modal-content">
             <div class="modal-header">
-                <h3><i class="fas fa-ban"></i> Cancel Order</h3>
+                <h3><i class="fas fa-ban"></i> Cancel Pre-order</h3>
                 <button type="button" class="close-btn" id="close-order-cancel-modal">&times;</button>
             </div>
             <form id="order-cancel-form" class="order-cancel-form">
                 <div class="form-group">
                     <label for="order-cancel-reason-input">Reason for cancellation</label>
-                    <textarea id="order-cancel-reason-input" rows="4" maxlength="500" placeholder="Tell us why you are cancelling this order..."></textarea>
+                    <textarea id="order-cancel-reason-input" rows="4" maxlength="500" placeholder="Tell us why you are cancelling this pre-order..."></textarea>
                 </div>
                 <div class="form-actions order-cancel-actions">
                     <button type="button" class="btn btn-secondary" id="cancel-order-cancel-btn">Close</button>

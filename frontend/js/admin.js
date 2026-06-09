@@ -1575,8 +1575,8 @@ class AdminDashboard {
             'product.create': 'Added product', 'product.update': 'Updated product',
             'product.disable': 'Disabled product', 'product.enable': 'Enabled product',
             'product.assign': 'Reassigned product',
-            'order.status.update': 'Updated order status', 'order.disable': 'Disabled order',
-            'order.enable': 'Enabled order',
+            'order.status.update': 'Updated pre-order status', 'order.disable': 'Disabled pre-order',
+            'order.enable': 'Enabled pre-order',
             'category.create': 'Created category', 'category.update': 'Updated category',
             'category.disable': 'Disabled category', 'category.enable': 'Enabled category',
             'category.delete': 'Deleted category',
@@ -4775,14 +4775,14 @@ class AdminDashboard {
             });
 
             if (response.ok) {
-                this.showMessage('Order status updated successfully!', 'success');
+                this.showMessage('Pre-order status updated successfully!', 'success');
                 this.loadOrders();
             } else {
-                this.showMessage('Failed to update order status', 'error');
+                this.showMessage('Failed to update pre-order status', 'error');
             }
         } catch (error) {
-            console.error('Error updating order status:', error);
-            this.showMessage('Error updating order status', 'error');
+            console.error('Error updating pre-order status:', error);
+            this.showMessage('Error updating pre-order status', 'error');
         }
     }
 
@@ -4989,7 +4989,7 @@ class AdminDashboard {
 
         content.innerHTML = `
             <div class="panel-header">
-                <h3>Order #${order.id}</h3>
+                <h3>Pre-order #${order.id}</h3>
                 ${this.renderStatus(this.formatStatus(order.status), order.status)}
             </div>
             <div class="panel-section">
@@ -5067,7 +5067,7 @@ class AdminDashboard {
                 <div class="mt-2">
                     <button id="order-disable-btn-${order.id}" data-order-id="${order.id}" data-disable="${!order.is_disabled}"
                             class="btn w-100 btn-ac-red order-disable-btn" style="padding:8px;" type="button">
-                        ${order.is_disabled ? 'Enable Order' : 'Disable Order'}
+                        ${order.is_disabled ? 'Enable Pre-order' : 'Disable Pre-order'}
                     </button>
                 </div>
             </div>
@@ -5155,7 +5155,7 @@ class AdminDashboard {
         const farmerName = item?.farmer_name || 'Farmer';
 
         window.__chatContext = {
-            subtitle: `Order #${order.id} • Customer: ${order.customer_name || order.username || 'N/A'}`
+            subtitle: `Pre-order #${order.id} • Customer: ${order.customer_name || order.username || 'N/A'}`
         };
 
         this.showSection('chat');

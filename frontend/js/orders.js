@@ -451,10 +451,10 @@ class OrdersPage {
                             <div>${displayDate}</div>
                             <small>${displayTime}</small>
                         </div>
-                        <div class="order-id">Order #${order.id}</div>
+                        <div class="order-id">Pre-order #${order.id}</div>
                     </div>
                     <div class="order-status-line">
-                        <strong>Order Status:</strong>
+                        <strong>Pre-order Status:</strong>
                         <span style="font-weight: 600; color: ${this.getStatusColor(currentStatus)};">${this.formatStatusLabel(currentStatus)}</span>
                     </div>
                 </div>
@@ -483,7 +483,7 @@ class OrdersPage {
                             ` : ''}
                             ${isDelivered ? `
                                 <button class="btn btn-small btn-secondary" onclick="ordersPage.reorder(${order.id})" title="Add items back to cart">
-                                    <i class="fas fa-redo"></i> Re-order
+                                    <i class="fas fa-redo"></i> Re-pre-order
                                 </button>
                             ` : ''}
                             ${canRateNow ? `
