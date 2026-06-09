@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="/css/nicemain.css">
     <link rel="stylesheet" href="/vendor/simple-datatables/style.css">
     <!-- AgriCatch SaaS overrides — loaded LAST -->
-    <link rel="stylesheet" href="/css/agricatch-admin.css?v=ui-refinements-20260603g">
+    <link rel="stylesheet" href="/css/agricatch-admin.css?v=sections-rebuild-20260609">
 </head>
 <body>
 
@@ -655,7 +655,7 @@
                         <table id="top-farmers-table" class="table table-borderless ac-table">
                             <thead>
                                 <tr>
-                                    <th scope="col">Farmer</th>
+                                    <th scope="col" class="text-center">Farmer</th>
                                     <th scope="col">Revenue</th>
                                 </tr>
                             </thead>
@@ -703,7 +703,7 @@
                         <table id="top-products-table" class="table table-borderless ac-table">
                             <thead>
                                 <tr>
-                                    <th scope="col">Preview</th>
+                                    <th scope="col" class="text-center">IMG</th>
                                     <th scope="col">Product</th>
                                     <th scope="col">Price</th>
                                     <th scope="col">Sold</th>
@@ -729,6 +729,17 @@
          § 2 — ORDERS SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="orders" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-bag-check"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Order Management</h4>
+                <p class="ac-section-hero__sub">View, filter, and manage all customer orders across the platform.</p>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
                 <!-- Filter Bar -->
@@ -825,15 +836,24 @@
          § 3 — CUSTOMERS SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="users" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Customers</h4>
+                <p class="ac-section-hero__sub">Manage customer accounts, view profiles, and track user activity.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="open-create-user-modal" class="btn ac-btn-primary btn-sm" type="button">
+                    <i class="bi bi-plus-lg me-1"></i>New Customer
+                </button>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
-                <div class="section-header">
-                    <button id="open-create-user-modal"
-                            class="btn btn-primary btn-sm"
-                            type="button">
-                        <i class="bi bi-plus-lg"></i> New Customer Account
-                    </button>
-                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -903,6 +923,17 @@
          § 4 — PRODUCTS/LISTINGS SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="products" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-box-seam"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Products</h4>
+                <p class="ac-section-hero__sub">View and manage all product listings across the marketplace.</p>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
                 <!-- Filter Bar -->
@@ -983,13 +1014,24 @@
          § 5 — CATEGORIES SECTION (redesigned)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="categories" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-tags"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Categories</h4>
+                <p class="ac-section-hero__sub">Organize products into categories for better discovery.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="show-add-category-form" class="btn ac-btn-primary btn-sm" type="button">
+                    <i class="bi bi-plus-lg me-1"></i>Add Category
+                </button>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
-                <div class="section-header">
-                    <button id="show-add-category-form" class="btn btn-primary btn-sm" type="button">
-                        <i class="bi bi-plus-lg"></i> Add Category
-                    </button>
-                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -1050,13 +1092,24 @@
          § 5b — PRODUCTS CATALOG SECTION (catalog names)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="catalog-products" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-box-seam"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Products</h4>
+                <p class="ac-section-hero__sub">Manage product catalog including creation, editing, and status management.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="show-add-catalog-form" class="btn btn-sm ac-btn-primary" type="button">
+                    <i class="bi bi-plus-lg me-1"></i>Add Product
+                </button>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
-                <div class="section-header">
-                    <button id="show-add-catalog-form" class="btn btn-primary btn-sm" type="button">
-                        <i class="bi bi-plus-lg"></i> Add Product
-                    </button>
-                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -1123,15 +1176,24 @@
          § 6 — FARMERS SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="farmers" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-person-badge"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Farmers</h4>
+                <p class="ac-section-hero__sub">Manage farmer accounts, verify sellers, and track performance.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="open-create-farmer-modal" class="btn ac-btn-primary btn-sm" type="button">
+                    <i class="bi bi-plus-lg me-1"></i>New Farmer
+                </button>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
-                <div class="section-header">
-                    <button id="open-create-farmer-modal"
-                            class="btn btn-primary btn-sm"
-                            type="button">
-                        <i class="bi bi-plus-lg"></i> New Farmer Account
-                    </button>
-                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -1207,65 +1269,106 @@
          § 7 — SUSPICIOUS PATTERNS SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="suspicious-patterns" class="admin-section-card">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex justify-content-end align-items-center mb-3">
-                    <button id="detect-patterns-btn" class="btn btn-primary btn-sm" style="background: #41bf5b; border: none;">
-                        <i class="bi bi-search me-1"></i>Detect Patterns
-                    </button>
-                </div>
 
-                <!-- Pattern 1: Single Farmer Orders -->
-                <div class="mb-4">
-                    <h5 class="text-dark text-center fw-bold">Customers ordering from only one farmer with 5-star ratings</h5>
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Customer</th>
-                                    <th>Email</th>
-                                    <th>Orders</th>
-                                    <th>Avg Rating</th>
-                                    <th>Reviews</th>
-                                    <th>Farmer</th>
-                                    <th class="col-actions">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="single-farmer-pattern-tbody">
-                                <tr>
-                                    <td colspan="7" class="text-center text-muted">Click "Detect Patterns" to scan</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Pattern 2: Same Phone Number -->
-                <div class="mb-4">
-                    <h5 class="text-dark text-center fw-bold">Customers with same phone as farmers</h5>
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Customer</th>
-                                    <th>Customer Email</th>
-                                    <th>Phone</th>
-                                    <th>Farmer</th>
-                                    <th>Farmer Email</th>
-                                    <th class="col-actions">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="same-phone-pattern-tbody">
-                                <tr>
-                                    <td colspan="6" class="text-center text-muted">Click "Detect Patterns" to scan</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div id="suspicious-patterns-pagination" class="pagination-container"></div>
+        <!-- Section Hero Banner -->
+        <div class="ac-section-hero ac-section-hero--danger mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-shield-exclamation"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Suspicious Patterns</h4>
+                <p class="ac-section-hero__sub">Automated detection of review manipulation and account collusion patterns.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="detect-patterns-btn" class="btn ac-btn-primary btn-sm">
+                    <i class="bi bi-radar me-1"></i>Run Detection Scan
+                </button>
             </div>
         </div>
+
+        <!-- Pattern 1: Single Farmer Orders -->
+        <div class="card ac-data-card mb-3">
+            <div class="ac-data-card__header">
+                <div class="ac-data-card__header-left">
+                    <span class="ac-data-card__icon ac-data-card__icon--warning">
+                        <i class="bi bi-person-check"></i>
+                    </span>
+                    <div>
+                        <h6 class="ac-data-card__title">Single-Farmer Loyal Reviewers</h6>
+                        <p class="ac-data-card__subtitle">Customers who only order from one farmer and consistently give 5-star ratings</p>
+                    </div>
+                </div>
+                <span class="ac-data-card__badge" id="single-farmer-count-badge" style="display:none"></span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover ac-table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Email</th>
+                            <th>Orders</th>
+                            <th>Avg Rating</th>
+                            <th>Reviews</th>
+                            <th>Only Farmer</th>
+                            <th class="col-actions">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="single-farmer-pattern-tbody">
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <div class="ac-empty-scan">
+                                    <i class="bi bi-radar"></i>
+                                    <p>Click <strong>Run Detection Scan</strong> to analyze patterns</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pattern 2: Same Phone Number -->
+        <div class="card ac-data-card mb-3">
+            <div class="ac-data-card__header">
+                <div class="ac-data-card__header-left">
+                    <span class="ac-data-card__icon ac-data-card__icon--danger">
+                        <i class="bi bi-phone"></i>
+                    </span>
+                    <div>
+                        <h6 class="ac-data-card__title">Shared Phone Numbers</h6>
+                        <p class="ac-data-card__subtitle">Customers sharing the same phone number as a registered farmer (possible alt accounts)</p>
+                    </div>
+                </div>
+                <span class="ac-data-card__badge ac-data-card__badge--danger" id="same-phone-count-badge" style="display:none"></span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover ac-table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Customer Email</th>
+                            <th>Shared Phone</th>
+                            <th>Farmer</th>
+                            <th>Farmer Email</th>
+                            <th class="col-actions">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="same-phone-pattern-tbody">
+                        <tr>
+                            <td colspan="6" class="text-center py-5">
+                                <div class="ac-empty-scan">
+                                    <i class="bi bi-radar"></i>
+                                    <p>Click <strong>Run Detection Scan</strong> to analyze patterns</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="suspicious-patterns-pagination" class="pagination-container"></div>
+
     </section><!-- /suspicious-patterns -->
 
 
@@ -1273,45 +1376,66 @@
          § 8 — FLAGGED USERS SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="flagged-users" class="admin-section-card">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex justify-content-end align-items-center mb-3">
-                    <button id="refresh-flagged-btn" class="btn btn-outline-secondary btn-sm">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
-                </div>
 
-                <div class="table-responsive">
-                    <table class="table table-hover table-sm align-middle">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Email</th>
-                                <th>Role</th>
-                                <th>Phone</th>
-                                <th>Flag Reason</th>
-                                <th>Flagged At</th>
-                                <th>Flagged By</th>
-                                <th>Status</th>
-                                <th class="col-actions">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="flagged-users-tbody">
-                            <tr>
-                                <td colspan="9">
-                                    <div class="table-skeleton">
-                                        <div class="skeleton-row"></div>
-                                        <div class="skeleton-row"></div>
-                                        <div class="skeleton-row"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div id="flagged-users-pagination" class="pagination-container"></div>
+        <div class="ac-section-hero ac-section-hero--warning mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-flag-fill"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Flagged Users</h4>
+                <p class="ac-section-hero__sub">Users manually flagged for suspicious activity or policy violations. Review and unflag as needed.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="refresh-flagged-btn" class="btn btn-sm ac-btn-outline-muted">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                </button>
             </div>
         </div>
+
+        <div class="card ac-data-card">
+            <div class="ac-data-card__header">
+                <div class="ac-data-card__header-left">
+                    <span class="ac-data-card__icon ac-data-card__icon--warning">
+                        <i class="bi bi-person-exclamation"></i>
+                    </span>
+                    <div>
+                        <h6 class="ac-data-card__title">Flagged User List</h6>
+                        <p class="ac-data-card__subtitle">All accounts currently under review</p>
+                    </div>
+                </div>
+                <span class="ac-data-card__badge ac-data-card__badge--warning" id="flagged-users-count-badge" style="display:none"></span>
+            </div>
+            <div class="table-responsive">
+                <table id="flagged-users-table" class="table table-hover ac-table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Phone</th>
+                            <th>Flag Reason</th>
+                            <th>Flagged At</th>
+                            <th>Flagged By</th>
+                            <th class="col-actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="flagged-users-tbody">
+                        <tr>
+                            <td colspan="9">
+                                <div class="table-skeleton">
+                                    <div class="skeleton-row"></div>
+                                    <div class="skeleton-row"></div>
+                                    <div class="skeleton-row"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="flagged-users-pagination" class="pagination-container px-3 pb-3"></div>
+        </div>
+
     </section><!-- /flagged-users -->
 
 
@@ -1319,23 +1443,32 @@
          § 9 — AUDIT LOGS SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="logs" class="admin-section-card">
-        <div class="card">
-            <div class="card-body">
 
-                <!-- Filter bar — search-button gated -->
-                <div class="section-filter-bar row g-2 mb-3 align-items-end">
-                    <div class="col-md-1 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Show</label>
-                        <select class="form-select form-select-sm" data-entries-section="logs" style="min-width: 60px;">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-journal-text"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Audit Logs</h4>
+                <p class="ac-section-hero__sub">Track all admin actions and system events for accountability.</p>
+            </div>
+        </div>
+
+        <div class="card ac-data-card">
+            <div class="ac-data-card__header">
+                <div class="ac-data-card__header-left ac-filter-inline">
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Show</label>
+                        <select class="form-select form-select-sm ac-filter-select" data-entries-section="logs">
                             <option value="25" selected>25</option>
                             <option value="50">50</option>
                             <option value="100">100</option>
                             <option value="200">200</option>
                         </select>
                     </div>
-                    <div class="col-md-auto col-sm-6" style="min-width: 100px;">
-                        <label class="form-label small fw-semibold mb-1">Action</label>
-                        <select id="logs-action-filter" class="form-select form-select-sm">
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Action</label>
+                        <select id="logs-action-filter" class="form-select form-select-sm ac-filter-select">
                             <option value="">All actions</option>
                             <option value="user.create">Create</option>
                             <option value="user.update">Update</option>
@@ -1349,9 +1482,9 @@
                             <option value="category.update">Update Category</option>
                         </select>
                     </div>
-                    <div class="col-md-auto col-sm-6" style="min-width: 100px;">
-                        <label class="form-label small fw-semibold mb-1">Entity</label>
-                        <select id="logs-entity-filter" class="form-select form-select-sm">
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Entity</label>
+                        <select id="logs-entity-filter" class="form-select form-select-sm ac-filter-select">
                             <option value="">All entities</option>
                             <option value="users">Users</option>
                             <option value="products">Products</option>
@@ -1360,33 +1493,34 @@
                             <option value="farmers">Farmers</option>
                         </select>
                     </div>
-                    <div class="col-md-auto col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Admin</label>
-                        <select id="logs-actor-filter" class="form-select form-select-sm">
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Admin</label>
+                        <select id="logs-actor-filter" class="form-select form-select-sm ac-filter-select">
                             <option value="">All admins</option>
                         </select>
                     </div>
-                    <div class="col-md-auto col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">From</label>
-                        <input id="logs-date-from" type="date" class="form-control form-control-sm">
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">From</label>
+                        <input id="logs-date-from" type="date" class="form-control form-control-sm ac-filter-date">
                     </div>
-                    <div class="col-md-auto col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">To</label>
-                        <input id="logs-date-to" type="date" class="form-control form-control-sm">
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">To</label>
+                        <input id="logs-date-to" type="date" class="form-control form-control-sm ac-filter-date">
                     </div>
-                    <div class="col-md-4 col-sm-6 ms-md-auto">
-                        <label class="form-label small fw-semibold mb-1">Search</label>
-                        <div class="d-flex gap-2">
-                            <div class="input-group input-group-sm flex-grow-1">
-                                <input type="text" id="logs-search-input" class="form-control me-2" placeholder="Username or action…">
-                                <button id="logs-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
-                                    <i class="bi bi-search me-1"></i>Search
-                                </button>
-                            </div>
-                            <button id="logs-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh logs"><i class="bi bi-arrow-clockwise"></i></button>
-                        </div>
+                    <div class="ac-filter-group">
+                        <input type="text" id="logs-search-input" class="form-control form-control-sm ac-filter-select" placeholder="Username or action…">
+                    </div>
+                    <div class="ac-filter-group">
+                        <button id="logs-search-btn" class="btn ac-btn-primary btn-sm" type="button">
+                            <i class="bi bi-search me-1"></i>Search
+                        </button>
                     </div>
                 </div>
+                <button id="logs-refresh-btn" class="btn ac-btn-outline-muted btn-sm" type="button">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+            <div class="px-3 pb-3">
 
                 <div class="table-responsive">
                     <table id="logs-table" class="table table-hover ac-table table-sm align-middle">
@@ -1426,13 +1560,24 @@
          § 8 — STAFF MANAGEMENT SECTION (superadmin only)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="staff" class="admin-section-card" data-roles="super_admin">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-person-workspace"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Staff Management</h4>
+                <p class="ac-section-hero__sub">Manage staff accounts and permissions for platform administration.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button class="btn ac-btn-primary btn-sm" id="create-staff-btn" type="button">
+                    <i class="bi bi-plus-lg me-1"></i>New Staff
+                </button>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
-                <div class="section-header">
-                    <button class="btn btn-primary btn-sm" id="create-staff-btn" type="button">
-                        <i class="bi bi-plus-lg"></i> New Staff Account
-                    </button>
-                </div>
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
                     <div class="col-md-1 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Show</label>
@@ -1477,7 +1622,7 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Name</th>
+                                <th>FULL NAME</th>
                                 <th>Username</th>
                                 <th>Email</th>
                                 <th>Role</th>
@@ -1503,13 +1648,24 @@
          § 9 — ALL USERS SECTION (superadmin only)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="all-users" class="admin-section-card" data-roles="super_admin">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">All Users</h4>
+                <p class="ac-section-hero__sub">View and manage all user accounts across the platform.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button class="btn ac-btn-primary btn-sm" id="create-any-user-btn" type="button">
+                    <i class="bi bi-plus-lg me-1"></i>New User
+                </button>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
-                <div class="section-header">
-                    <button class="btn btn-primary btn-sm" id="create-any-user-btn" type="button">
-                        <i class="bi bi-plus-lg"></i> New User
-                    </button>
-                </div>
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
                     <div class="col-md-1 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Show</label>
@@ -1564,7 +1720,7 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Name</th>
+                                <th>FULL NAME</th>
                                 <th>Username</th>
                                 <th>Email</th>
                                 <th>Role</th>
@@ -1590,44 +1746,80 @@
          § 10 — PLATFORM SETTINGS SECTION (superadmin only)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="platform-settings" class="admin-section-card" data-roles="super_admin">
-        <div class="card">
-            <div class="card-body">
-                <!-- Service Status Card -->
-                <div class="card mb-3" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Service Status</h6>
-                            <button class="btn btn-sm btn-outline-secondary" id="refresh-status-btn" type="button">
-                                <i class="bi bi-arrow-clockwise"></i> Refresh
-                            </button>
-                        </div>
-                        <div id="service-status-list">
-                            <div class="text-center py-3">
-                                <span class="spinner-border spinner-border-sm"></span>
-                            </div>
-                        </div>
-                        <p class="text-muted small mb-0 mt-2">
-                            <i class="bi bi-info-circle me-1"></i>
-                            To change API credentials, update the <code>.env</code> file and restart the server.
-                        </p>
-                    </div>
-                </div>
 
-                <div id="settings-form">
-                    <div class="text-center py-5">
-                        <span class="spinner-border spinner-border-sm"></span>
-                    </div>
-                </div>
-                <div class="d-flex justify-content-end mt-3">
-                    <button type="button" class="btn btn-outline-secondary btn-sm me-2" id="refresh-settings-btn">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh Cache
-                    </button>
-                    <button class="btn btn-primary btn-sm" id="save-settings-btn" type="button">
-                        <i class="bi bi-floppy"></i> Save All
-                    </button>
-                </div>
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-gear-wide-connected"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Platform Settings</h4>
+                <p class="ac-section-hero__sub">Configure delivery fees, service integrations, and core platform behaviour.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button type="button" class="btn btn-sm ac-btn-outline-muted me-2" id="refresh-settings-btn">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh Cache
+                </button>
+                <button class="btn btn-sm ac-btn-primary" id="save-settings-btn" type="button">
+                    <i class="bi bi-floppy me-1"></i>Save All
+                </button>
             </div>
         </div>
+
+        <div class="row g-3">
+
+            <!-- Service Status column -->
+            <div class="col-lg-4">
+                <div class="card ac-data-card h-100">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-hdd-network"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Service Status</h6>
+                                <p class="ac-data-card__subtitle">Live connectivity checks</p>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm ac-btn-outline-muted" id="refresh-status-btn" type="button">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                    <div class="px-3 pb-3" id="service-status-list">
+                        <div class="text-center py-4">
+                            <span class="spinner-border spinner-border-sm text-success"></span>
+                        </div>
+                    </div>
+                    <div class="ac-data-card__footer">
+                        <i class="bi bi-info-circle me-1"></i>
+                        To update API credentials, edit the <code>.env</code> file and restart the server.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings form column -->
+            <div class="col-lg-8">
+                <div class="card ac-data-card">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-sliders"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Configuration</h6>
+                                <p class="ac-data-card__subtitle">Editable platform parameters</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3" id="settings-form">
+                        <div class="text-center py-5">
+                            <span class="spinner-border spinner-border-sm text-success"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
     </section><!-- /platform-settings -->
 
 
@@ -1635,21 +1827,37 @@
          § 11 — SECURITY LOG SECTION (superadmin only)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="security-log" class="admin-section-card" data-roles="super_admin">
-        <div class="card">
-            <div class="card-body">
-                <div class="section-filter-bar row g-2 mb-3 align-items-end">
-                    <div class="col-md-1 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Show</label>
-                        <select class="form-select form-select-sm" data-entries-section="security-log" style="min-width: 60px;">
+
+        <div class="ac-section-hero ac-section-hero--danger mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-shield-lock"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Security Log</h4>
+                <p class="ac-section-hero__sub">Audit trail for all sensitive authentication and access-control events.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="seclog-refresh-btn" class="btn btn-sm ac-btn-outline-muted" type="button">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+
+        <div class="card ac-data-card">
+            <div class="ac-data-card__header">
+                <div class="ac-data-card__header-left ac-filter-inline">
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Show</label>
+                        <select class="form-select form-select-sm ac-filter-select" data-entries-section="security-log">
                             <option value="10">10</option>
                             <option value="25" selected>25</option>
                             <option value="50">50</option>
                         </select>
                     </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Action Type</label>
-                        <select id="seclog-action-filter" class="form-select form-select-sm">
-                            <option value="">All actions</option>
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Event</label>
+                        <select id="seclog-action-filter" class="form-select form-select-sm ac-filter-select">
+                            <option value="">All events</option>
                             <option value="login.failed">Failed Login</option>
                             <option value="login.success">Login</option>
                             <option value="user.role_change">Role Change</option>
@@ -1659,40 +1867,38 @@
                             <option value="user.enable">User Enable</option>
                         </select>
                     </div>
-                    <div class="col-md-3 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Date From</label>
-                        <input type="date" id="seclog-date-from" class="form-control form-control-sm">
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">From</label>
+                        <input type="date" id="seclog-date-from" class="form-control form-control-sm ac-filter-date">
                     </div>
-                    <div class="col-md-3 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Date To</label>
-                        <input type="date" id="seclog-date-to" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-md-auto col-sm-6 ms-md-auto">
-                        <button id="seclog-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh security log"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">To</label>
+                        <input type="date" id="seclog-date-to" class="form-control form-control-sm ac-filter-date">
                     </div>
                 </div>
-                <div class="table-responsive">
-                    <table id="seclog-table" class="table table-hover ac-table table-sm align-middle">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Actor</th>
-                                <th>Action</th>
-                                <th>Entity</th>
-                                <th>IP</th>
-                                <th>User Agent</th>
-                            </tr>
-                        </thead>
-                        <tbody id="seclog-tbody">
-                            <tr><td colspan="6" class="text-center text-muted py-4">
-                                <span class="spinner-border spinner-border-sm"></span>
-                            </td></tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div id="seclog-pagination" class="pagination-container"></div>
             </div>
+            <div class="table-responsive">
+                <table id="seclog-table" class="table table-hover ac-table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Actor</th>
+                            <th>Action</th>
+                            <th>Entity</th>
+                            <th>IP Address</th>
+                            <th>User Agent</th>
+                        </tr>
+                    </thead>
+                    <tbody id="seclog-tbody">
+                        <tr><td colspan="6" class="text-center py-4">
+                            <span class="spinner-border spinner-border-sm text-success"></span>
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="seclog-pagination" class="pagination-container px-3 pb-3"></div>
         </div>
+
     </section><!-- /security-log -->
 
 
@@ -1700,23 +1906,41 @@
          § 12 — FEATURE FLAGS SECTION (superadmin only)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="feature-flags" class="admin-section-card" data-roles="super_admin">
-        <div class="card">
-            <div class="card-body">
-                <div class="section-header">
-                    <button class="btn btn-outline-secondary btn-sm" id="flags-refresh-btn" type="button">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
-                </div>
-                <p class="text-muted small">
-                    Toggle platform features on or off without a deployment. Changes take effect immediately.
-                </p>
-                <div id="feature-flags-list">
-                    <div class="text-center py-5">
-                        <span class="spinner-border spinner-border-sm"></span>
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-toggles"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Feature Flags</h4>
+                <p class="ac-section-hero__sub">Toggle platform features on or off without redeploying. Changes take effect immediately.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button class="btn btn-sm ac-btn-outline-muted" id="flags-refresh-btn" type="button">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+
+        <div class="card ac-data-card">
+            <div class="ac-data-card__header">
+                <div class="ac-data-card__header-left">
+                    <span class="ac-data-card__icon ac-data-card__icon--primary">
+                        <i class="bi bi-toggle-on"></i>
+                    </span>
+                    <div>
+                        <h6 class="ac-data-card__title">All Feature Flags</h6>
+                        <p class="ac-data-card__subtitle">Click a flag to toggle it on or off</p>
                     </div>
                 </div>
             </div>
+            <div id="feature-flags-list" class="px-3 pb-3">
+                <div class="text-center py-5">
+                    <span class="spinner-border spinner-border-sm text-success"></span>
+                </div>
+            </div>
         </div>
+
     </section><!-- /feature-flags -->
 
 
@@ -1724,48 +1948,112 @@
          § 14 — BROADCAST SECTION (superadmin only)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="broadcast" class="admin-section-card" data-roles="super_admin">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="bi bi-megaphone"></i> Broadcast Announcement
-                </h5>
-                <p class="text-muted small">
-                    Send platform-wide announcements to specific user groups. Announcements appear in user notifications.
-                </p>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label" for="announcement-title">Title</label>
-                        <input type="text" id="announcement-title" class="form-control" placeholder="Platform update">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Audience</label>
-                        <div class="d-flex flex-column gap-2">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="audience-farmer" value="farmer">
-                                <label class="form-check-label" for="audience-farmer">Farmers</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="audience-customer" value="customer">
-                                <label class="form-check-label" for="audience-customer">Customers</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="audience-admin" value="admin">
-                                <label class="form-check-label" for="audience-admin">Admins (Staff & Super Admin)</label>
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-broadcast"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Broadcast</h4>
+                <p class="ac-section-hero__sub">Send platform-wide announcements to specific user groups. Delivered as in-app notifications.</p>
+            </div>
+        </div>
+
+        <div class="row g-3">
+
+            <!-- Compose card -->
+            <div class="col-lg-8">
+                <div class="card ac-data-card">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-megaphone"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Compose Announcement</h6>
+                                <p class="ac-data-card__subtitle">Fill in the title and message body</p>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4 d-flex align-items-end">
-                        <button class="btn btn-primary w-100" id="send-announcement-btn" type="button">
-                            <i class="bi bi-send"></i> Send Announcement
+                    <div class="px-3 pb-3">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="announcement-title">Title</label>
+                            <input type="text" id="announcement-title" class="form-control" placeholder="e.g. Scheduled Maintenance Tonight">
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label fw-semibold" for="announcement-message">Message</label>
+                            <textarea id="announcement-message" class="form-control" rows="4" placeholder="Write the announcement body that users will see in their notifications..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audience + Send card -->
+            <div class="col-lg-4">
+                <div class="card ac-data-card h-100 d-flex flex-column">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-people"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Target Audience</h6>
+                                <p class="ac-data-card__subtitle">Select who receives this broadcast</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 flex-grow-1">
+                        <div class="ac-audience-option">
+                            <label class="ac-audience-label" for="audience-all">
+                                <span class="ac-audience-icon ac-audience-icon--primary"><i class="bi bi-globe"></i></span>
+                                <span class="ac-audience-info">
+                                    <span class="ac-audience-name">All Users</span>
+                                    <span class="ac-audience-desc">Send to everyone</span>
+                                </span>
+                                <input class="form-check-input ms-auto" type="checkbox" id="audience-all" value="all">
+                            </label>
+                        </div>
+                        <div class="ac-audience-option">
+                            <label class="ac-audience-label" for="audience-customer">
+                                <span class="ac-audience-icon ac-audience-icon--blue"><i class="bi bi-person"></i></span>
+                                <span class="ac-audience-info">
+                                    <span class="ac-audience-name">Customers</span>
+                                    <span class="ac-audience-desc">All registered buyers</span>
+                                </span>
+                                <input class="form-check-input ms-auto" type="checkbox" id="audience-customer" value="customer">
+                            </label>
+                        </div>
+                        <div class="ac-audience-option">
+                            <label class="ac-audience-label" for="audience-farmer">
+                                <span class="ac-audience-icon ac-audience-icon--green"><i class="bi bi-person-badge"></i></span>
+                                <span class="ac-audience-info">
+                                    <span class="ac-audience-name">Farmers</span>
+                                    <span class="ac-audience-desc">All registered sellers</span>
+                                </span>
+                                <input class="form-check-input ms-auto" type="checkbox" id="audience-farmer" value="farmer">
+                            </label>
+                        </div>
+                        <div class="ac-audience-option">
+                            <label class="ac-audience-label" for="audience-admin">
+                                <span class="ac-audience-icon ac-audience-icon--purple"><i class="bi bi-shield-check"></i></span>
+                                <span class="ac-audience-info">
+                                    <span class="ac-audience-name">Admins</span>
+                                    <span class="ac-audience-desc">Staff &amp; Super Admins</span>
+                                </span>
+                                <input class="form-check-input ms-auto" type="checkbox" id="audience-admin" value="admin">
+                            </label>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3 mt-auto pt-3">
+                        <button class="btn ac-btn-primary w-100" id="send-announcement-btn" type="button">
+                            <i class="bi bi-send me-2"></i>Send Announcement
                         </button>
                     </div>
                 </div>
-                <div class="mt-3">
-                    <label class="form-label" for="announcement-message">Message</label>
-                    <textarea id="announcement-message" class="form-control" rows="2" placeholder="Write the announcement that should appear in user notifications."></textarea>
-                </div>
             </div>
+
         </div>
+
     </section><!-- /broadcast -->
 
 
@@ -1774,16 +2062,24 @@
          (Placeholder — title already mapped in admin.js, no backend yet)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="notifications" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-bell"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Notifications</h4>
+                <p class="ac-section-hero__sub">System alerts and account activity notifications.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button class="btn btn-sm ac-btn-outline-muted" id="notif-mark-all-btn">
+                    <i class="bi bi-check2-all me-1"></i>Mark All Read
+                </button>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
-                <div class="section-filter-bar d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <p class="text-muted small mb-0">System alerts and account activity</p>
-                    </div>
-                    <button class="btn btn-sm btn-outline-secondary" id="notif-mark-all-btn">
-                        <i class="bi bi-check2-all me-1"></i>Mark All Read
-                    </button>
-                </div>
                 <div id="notifications-list">
                     <div class="text-center py-4">
                         <span class="spinner-border spinner-border-sm text-success"></span>
@@ -1807,6 +2103,17 @@
          because all its target IDs are preserved below.
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="chat" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-chat-dots"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Support Chat</h4>
+                <p class="ac-section-hero__sub">Manage customer support conversations and inquiries.</p>
+            </div>
+        </div>
+
         <!-- admin-chat-drawer INSIDE the section: becomes a full-width inbox panel.
              CSS makes it position:static + full height when inside .admin-section-card.
              chat.js still toggles .active on it — CSS makes that a no-op here. -->
@@ -1878,9 +2185,19 @@
          § 10 — CATEGORY REQUESTS SECTION (Name Requests)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="category-requests" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-tag"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Category Requests</h4>
+                <p class="ac-section-hero__sub">Review and approve/reject farmer-requested product categories.</p>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
-                <p class="text-muted small mb-3">Review and approve/reject farmer-requested product names.</p>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -1946,9 +2263,19 @@
          § 11 — PRODUCT APPROVALS SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="product-approvals" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Product Approvals</h4>
+                <p class="ac-section-hero__sub">Review and approve farmer product listings before they go live.</p>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
-                <p class="text-muted small mb-3">Review and approve farmer product listings before they go live.</p>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -2016,6 +2343,17 @@
          § 12 — PROFILE SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="profile" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-person-circle"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Profile</h4>
+                <p class="ac-section-hero__sub">View and edit your admin account details and preferences.</p>
+            </div>
+        </div>
+
         <div class="row g-3">
 
             <!-- Profile card (left col) -->
@@ -2205,16 +2543,17 @@
 
 <!-- ── Confirm Dialog ─────────────────────────────────────────────── -->
 <div id="admin-confirm-modal" class="admin-modal-backdrop">
-    <div class="admin-modal modal-confirm">
-        <div class="modal-body" style="background: linear-gradient(135deg, #dc2626, #991b1b); color: white; border-radius: 14px 14px 0 0;">
-            <h4 id="confirm-title" class="confirm-title" style="color: white; margin-top: 8px;">Are you sure?</h4>
-            <p id="confirm-message" class="confirm-message" style="color: rgba(255,255,255,0.95);">
-                This action cannot be undone.
-            </p>
+    <div class="admin-modal ac-confirm-modal">
+        <div class="ac-confirm-modal__body">
+            <div id="confirm-icon" class="ac-confirm-modal__icon ac-confirm-modal__icon--danger">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <h4 id="confirm-title" class="ac-confirm-modal__title">Are you sure?</h4>
+            <pre id="confirm-message" class="ac-confirm-modal__message">This action cannot be undone.</pre>
         </div>
-        <div class="modal-footer justify-content-center gap-2" style="border-top: none; padding-top: 16px;">
-            <button id="confirm-cancel-btn" class="btn btn-sm px-4 btn-secondary">Cancel</button>
-            <button id="confirm-ok-btn" class="btn btn-sm px-4 btn-ac-red">Confirm</button>
+        <div class="ac-confirm-modal__footer">
+            <button id="confirm-cancel-btn" class="btn ac-btn-outline-muted">Cancel</button>
+            <button id="confirm-ok-btn" class="btn ac-btn-primary">Confirm</button>
         </div>
     </div>
 </div>
@@ -2641,7 +2980,7 @@
     <div class="admin-modal modal-lg">
         <div class="modal-header">
             <h4 class="modal-title">Customer Details</h4>
-            <button class="modal-close-btn" id="close-customer-modal" aria-label="Close">
+            <button class="modal-close-btn" data-close-modal="customer-detail-modal" aria-label="Close">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -2697,7 +3036,7 @@
     <div class="admin-modal modal-lg">
         <div class="modal-header">
             <h4 class="modal-title">Farmer Details</h4>
-            <button class="modal-close-btn" id="close-farmer-modal" aria-label="Close">
+            <button class="modal-close-btn" data-close-modal="farmer-detail-modal" aria-label="Close">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
@@ -2752,6 +3091,88 @@
                 Unverify
             </button>
             <button class="btn btn-sm btn-ac-green" id="fdt-edit-btn" type="button">Edit</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Staff Detail Modal ───────────────────────────────────────────── -->
+<div id="staff-detail-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-lg">
+        <div class="modal-header">
+            <h4 class="modal-title">Staff Details</h4>
+            <button class="modal-close-btn" data-close-modal="staff-detail-modal" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <ul class="nav nav-tabs nav-tabs-bordered" id="staffDetailTabs">
+                <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#sdt-overview">Overview</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#sdt-activity">Activity</button></li>
+            </ul>
+            <div class="tab-content p-3">
+                <div class="tab-pane fade show active" id="sdt-overview">
+                    <div class="row g-3" id="sdt-overview-content">
+                        <div class="text-center py-5"><span class="spinner-border"></span></div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="sdt-activity">
+                    <div id="sdt-activity-content">
+                        <div class="text-center py-5"><span class="spinner-border"></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer gap-2">
+            <button class="btn btn-sm me-auto btn-ac-red" id="sdt-disable-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="sdt-disable-spinner"></span>
+                Disable
+            </button>
+            <button class="btn btn-sm btn-ac-green" id="sdt-enable-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="sdt-enable-spinner"></span>
+                Enable
+            </button>
+            <button class="btn btn-sm btn-ac-green" id="sdt-edit-btn" type="button">Edit</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── All Users Detail Modal ───────────────────────────────────────── -->
+<div id="all-users-detail-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-lg">
+        <div class="modal-header">
+            <h4 class="modal-title">User Details</h4>
+            <button class="modal-close-btn" data-close-modal="all-users-detail-modal" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <ul class="nav nav-tabs nav-tabs-bordered" id="allUsersDetailTabs">
+                <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#adt-overview">Overview</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#adt-activity">Activity</button></li>
+            </ul>
+            <div class="tab-content p-3">
+                <div class="tab-pane fade show active" id="adt-overview">
+                    <div class="row g-3" id="adt-overview-content">
+                        <div class="text-center py-5"><span class="spinner-border"></span></div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="adt-activity">
+                    <div id="adt-activity-content">
+                        <div class="text-center py-5"><span class="spinner-border"></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer gap-2">
+            <button class="btn btn-sm me-auto btn-ac-red" id="adt-disable-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="adt-disable-spinner"></span>
+                Disable
+            </button>
+            <button class="btn btn-sm btn-ac-green" id="adt-enable-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="adt-enable-spinner"></span>
+                Enable
+            </button>
+            <button class="btn btn-sm btn-ac-green" id="adt-edit-btn" type="button">Edit</button>
         </div>
     </div>
 </div>

@@ -280,14 +280,16 @@ app.use(checkMaintenanceMode);
       await safeQuery('categories name lower index', 'CREATE UNIQUE INDEX IF NOT EXISTS categories_name_lower_unique ON categories (LOWER(name))');
       await safeQuery('categories.type column', "ALTER TABLE categories ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'agricultural'");
       await safeQuery('categories.is_disabled column', 'ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT false');
-      await safeQuery(
-        'default category',
-        `
-          INSERT INTO categories (name, description)
-          VALUES ('Agricultural Products', 'Fresh vegetables, fruits, grains, and other farm products')
-          ON CONFLICT (name) DO NOTHING
-        `
-      );
+      // NOTE: Auto-insert of default category disabled to prevent reappearing categories
+      // after admin deletion. Categories should be managed manually through the admin panel.
+      // await safeQuery(
+      //   'default category',
+      //   `
+      //     INSERT INTO categories (name, description)
+      //     VALUES ('Agricultural Products', 'Fresh vegetables, fruits, grains, and other farm products')
+      //     ON CONFLICT (name) DO NOTHING
+      //   `
+      // );
 
       await safeQuery(
         'products table',

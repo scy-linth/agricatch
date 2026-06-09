@@ -25,6 +25,8 @@ class AdminDashboard {
         this.activeSection = 'overview';
         this.prevSection = 'overview';
         this.previousModalId = null;
+        this.modalZIndex = 1080;
+        this.selectedNotifId = null;
 
         if (!this.token) {
             window.location.href = '/?login=1';
@@ -43,6 +45,8 @@ class AdminDashboard {
                 this.openCustomerDetailModal(Number(btn.dataset.userId));
             } else if (btn.matches('.product-edit-btn')) {
                 this.openProductEdit(Number(btn.dataset.productId));
+            } else if (btn.matches('.product-delete-btn')) {
+                this.deleteProduct(Number(btn.dataset.productId));
             } else if (btn.matches('.order-view-btn')) {
                 this.viewOrderDetails(Number(btn.dataset.orderId));
             } else if (btn.matches('.audit-log-view-btn')) {
@@ -55,24 +59,18 @@ class AdminDashboard {
                 this.openCategoryRequestPanel(Number(btn.dataset.requestId));
             } else if (btn.matches('.farmer-view-btn')) {
                 this.openFarmerDetailModal(Number(btn.dataset.farmerId));
+            } else if (btn.matches('.staff-view-btn')) {
+                this.openStaffDetailModal(Number(btn.dataset.userId));
+            } else if (btn.matches('.all-users-view-btn')) {
+                this.openAllUsersDetailModal(Number(btn.dataset.userId));
+            } else if (btn.matches('.toggle-modal-password-btn')) {
+                this.toggleModalPasswordVisibility();
             } else if (btn.matches('.category-requests-view-btn')) {
                 this.showSection('category-requests');
             } else if (btn.matches('.product-approve-btn')) {
                 this.approveProduct(Number(btn.dataset.productId));
             } else if (btn.matches('.product-reject-btn')) {
                 this.rejectProduct(Number(btn.dataset.productId));
-            } else if (btn.matches('.staff-edit-btn')) {
-                this.openUserEdit(Number(btn.dataset.userId));
-            } else if (btn.matches('.staff-disable-btn')) {
-                this.toggleUserDisabled(Number(btn.dataset.userId), true);
-            } else if (btn.matches('.staff-enable-btn')) {
-                this.toggleUserDisabled(Number(btn.dataset.userId), false);
-            } else if (btn.matches('.all-users-edit-btn')) {
-                this.openUserEdit(Number(btn.dataset.userId));
-            } else if (btn.matches('.all-users-disable-btn')) {
-                this.toggleUserDisabled(Number(btn.dataset.userId), true);
-            } else if (btn.matches('.all-users-enable-btn')) {
-                this.toggleUserDisabled(Number(btn.dataset.userId), false);
             } else if (btn.matches('.flagged-unflag-btn')) {
                 this.unflagUser(Number(btn.dataset.userId));
             }
@@ -500,6 +498,18 @@ class AdminDashboard {
             es.addEventListener('chat.message', () => {
                 if (typeof this._refreshUnread === 'function') this._refreshUnread();
             });
+
+            es.addEventListener('notification.created', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    if (data.user_id === this.currentUserId) {
+                        this.loadNotifications();
+                    }
+                } catch (e) {
+                    // If parsing fails, refresh anyway as fallback
+                    this.loadNotifications();
+                }
+            });
         } catch (e) {
             // ignore
         }
@@ -695,6 +705,11 @@ class AdminDashboard {
             this._loadedSections.categoryRequests = true;
             this.loadCategoryRequests();
         }
+        if (sectionId === 'product-approvals' && !this._loadedSections?.productApprovals) {
+            this._loadedSections = this._loadedSections || {};
+            this._loadedSections.productApprovals = true;
+            this.loadProductApprovals();
+        }
         if (sectionId === 'farmers' && !this._loadedSections?.farmers) {
             this._loadedSections = this._loadedSections || {};
             this._loadedSections.farmers = true;
@@ -838,6 +853,9 @@ class AdminDashboard {
     setupEventListeners() {
         document.getElementById('logout-btn')?.addEventListener('click', () => this.logout());
         document.getElementById('visit-site-btn')?.addEventListener('click', () => this.visitMainSite());
+
+        // Audience checkbox mutual exclusion
+        this.setupAudienceCheckboxes();
 
         // Dropdown navigation links
         document.getElementById('show-all-notifications-link')?.addEventListener('click', (e) => {
@@ -1685,12 +1703,20 @@ class AdminDashboard {
             const changeProp = metric + 'Change';
             const change = stats[changeProp] ?? 0;
             if (changeEl) {
-                const isPos = change >= 0;
-                changeEl.className = `small fw-bold ${isPos ? 'text-success' : 'text-danger'}`;
-                changeEl.textContent = `${isPos ? '+' : ''}${change}%`;
+                if (period !== 'all') {
+                    const isPos = change >= 0;
+                    changeEl.className = `small fw-bold ${isPos ? 'text-success' : 'text-danger'}`;
+                    changeEl.textContent = `${isPos ? '+' : ''}${change}%`;
+                } else {
+                    changeEl.textContent = '';
+                }
             }
-            if (changeLabelEl && period !== 'all') {
-                changeLabelEl.textContent = ` vs prev ${period}`;
+            if (changeLabelEl) {
+                if (period !== 'all') {
+                    changeLabelEl.textContent = ` vs prev ${period}`;
+                } else {
+                    changeLabelEl.textContent = '';
+                }
             }
         } catch (err) {
             console.warn('KPI card error:', err);
@@ -1731,7 +1757,22 @@ class AdminDashboard {
                 dataLabels: { enabled: false },
                 stroke: { curve: 'smooth', width: 2 },
                 fill: { type: 'gradient', gradient: { opacityFrom: .6, opacityTo: .1 } },
-                xaxis: { categories: labels, tickAmount: Math.min(labels.length, 7) },
+                markers: {
+                    size: 4,
+                    colors: ['#2d7a3a', '#4154f1', '#ff771d', '#9b59b6'],
+                    strokeColors: '#fff',
+                    strokeWidth: 2,
+                    hover: { size: 6 }
+                },
+                xaxis: { 
+                    categories: labels, 
+                    tickAmount: Math.min(labels.length, 7),
+                    labels: { 
+                        style: { colors: '#6c757d', fontSize: '12px' },
+                        rotate: -45,
+                        rotateAlways: true
+                    }
+                },
                 yaxis: [
                     { labels: { formatter: v => '₱' + this.fmtNumber(v) } },
                     { opposite: true, labels: { formatter: v => this.fmtNumber(v) } }
@@ -2010,16 +2051,16 @@ class AdminDashboard {
             return `
                 <tr>
                     <td class="text-muted">${user.id}</td>
-                    <td>
-                        <div class="user-cell">
+                    <td class="text-center">
+                        <div class="user-cell text-center">
                             <div class="user-cell-name">${this.escapeHtml(fullName)}</div>
                         </div>
                     </td>
                     <td style="color:#777171f0">${this.escapeHtml(user.username || '—')}</td>
                     <td>${this.escapeHtml(user.email)}</td>
                     <td>${rating}</td>
-                    <td>
-                        <div class="d-flex flex-column gap-1 align-items-start">
+                    <td class="text-center">
+                        <div class="d-flex flex-column gap-1 align-items-center">
                             ${statusBadge}
                         </div>
                     </td>
@@ -2091,30 +2132,22 @@ class AdminDashboard {
         tbody.innerHTML = users.map(user => {
             const isDisabled = !!user.is_disabled;
             const statusBadge = this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
-            const canToggle = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId;
 
-            const actions = [
-                `<button class="btn btn-sm py-0 px-2 btn-ac-green staff-edit-btn" data-user-id="${user.id}">Edit</button>`,
-                canToggle
-                    ? (isDisabled
-                        ? `<button class="btn btn-sm py-0 px-2 btn-ac-green staff-enable-btn" data-user-id="${user.id}">Enable</button>`
-                        : `<button class="btn btn-sm py-0 px-2 btn-ac-red staff-disable-btn" data-user-id="${user.id}">Disable</button>`)
-                    : ''
-            ].filter(Boolean).join(' ');
+            const actions = `<button class="btn btn-sm py-0 px-2 btn-ac-green staff-view-btn" data-user-id="${user.id}">View</button>`;
 
             return `
                 <tr>
                     <td class="text-muted">${user.id}</td>
-                    <td>
-                        <div class="user-cell">
+                    <td class="text-center">
+                        <div class="user-cell text-center">
                             <div class="user-cell-name">${this.escapeHtml(user.full_name || '—')}</div>
                         </div>
                     </td>
                     <td style="color:#777171f0">${this.escapeHtml(user.username || '—')}</td>
                     <td>${this.escapeHtml(user.email)}</td>
                     <td>${this.formatRole(user.role)}</td>
-                    <td>
-                        <div class="d-flex flex-column gap-1 align-items-start">
+                    <td class="text-center">
+                        <div class="d-flex flex-column gap-1 align-items-center">
                             ${statusBadge}
                         </div>
                     </td>
@@ -2165,6 +2198,10 @@ class AdminDashboard {
             if (role) params.set('role', role);
             if (status) params.set('status', status);
             if (verification) params.set('verification', verification);
+            // Superadmin gets password field for modal
+            if (this.currentUserRole === 'super_admin') {
+                params.set('include_password', 'true');
+            }
 
             const response = await fetch(`${this.apiBase}/admin/users?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` },
@@ -2203,30 +2240,22 @@ class AdminDashboard {
             const isSuperAdmin = user.role === 'super_admin';
             const isDisabled = !!user.is_disabled;
             const statusBadge = isSuperAdmin ? '' : this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
-            const canToggle = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId && !isSuperAdmin;
 
-            const actions = [
-                `<button class="btn btn-sm py-0 px-2 btn-ac-green all-users-edit-btn" data-user-id="${user.id}">Edit</button>`,
-                canToggle
-                    ? (isDisabled
-                        ? `<button class="btn btn-sm py-0 px-2 btn-ac-green all-users-enable-btn" data-user-id="${user.id}">Enable</button>`
-                        : `<button class="btn btn-sm py-0 px-2 btn-ac-red all-users-disable-btn" data-user-id="${user.id}">Disable</button>`)
-                    : ''
-            ].filter(Boolean).join(' ');
+            const actions = `<button class="btn btn-sm py-0 px-2 btn-ac-green all-users-view-btn" data-user-id="${user.id}">View</button>`;
 
             return `
                 <tr>
                     <td class="text-muted">${user.id}</td>
-                    <td>
-                        <div class="user-cell">
+                    <td class="text-center">
+                        <div class="user-cell text-center">
                             <div class="user-cell-name">${this.escapeHtml(user.full_name || '—')}</div>
                         </div>
                     </td>
                     <td style="color:#777171f0">${this.escapeHtml(user.username || '—')}</td>
                     <td>${this.escapeHtml(user.email)}</td>
                     <td>${this.formatRole(user.role)}</td>
-                    <td>
-                        <div class="d-flex flex-column gap-1 align-items-start">
+                    <td class="text-center">
+                        <div class="d-flex flex-column gap-1 align-items-center">
                             ${statusBadge}
                         </div>
                     </td>
@@ -2563,31 +2592,27 @@ class AdminDashboard {
         }
 
         container.innerHTML = services.map(service => {
-            const statusClass = service.online ? 'text-success' : (service.configured ? 'text-warning' : 'text-muted');
+            const badgeClass = service.online ? 'ac-service-badge--online' : (service.configured ? 'ac-service-badge--warning' : 'ac-service-badge--offline');
             const statusIcon = service.online ? 'bi-check-circle-fill' : (service.configured ? 'bi-exclamation-circle-fill' : 'bi-dash-circle');
             const statusText = service.online ? 'Online' : (service.configured ? 'Configured (Offline)' : 'Not Configured');
-            
+
             let detailsHtml = '';
             if (service.details && Object.keys(service.details).length > 0) {
                 detailsHtml = Object.entries(service.details).map(([key, value]) => {
                     if (value === null || value === undefined) return '';
-                    return `<div class="small text-muted"><strong>${key}:</strong> ${this.escapeHtml(String(value))}</div>`;
+                    return `<div class="ac-service-detail"><strong>${key}:</strong> ${this.escapeHtml(String(value))}</div>`;
                 }).join('');
             }
 
             return `
-                <div class="card mb-2">
-                    <div class="card-body py-2">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-semibold">${this.escapeHtml(service.name)}</div>
-                                ${detailsHtml}
-                            </div>
-                            <div class="${statusClass}">
-                                <i class="bi ${statusIcon}"></i> ${statusText}
-                            </div>
-                        </div>
+                <div class="ac-service-item">
+                    <div>
+                        <div class="ac-service-name">${this.escapeHtml(service.name)}</div>
+                        ${detailsHtml}
                     </div>
+                    <span class="ac-service-badge ${badgeClass}">
+                        <i class="bi ${statusIcon}"></i>${statusText}
+                    </span>
                 </div>
             `;
         }).join('');
@@ -2689,42 +2714,27 @@ class AdminDashboard {
             return;
         }
 
-        container.innerHTML = `
-            <div class="table-responsive">
-                <table class="table table-hover table-sm align-middle">
-                    <thead>
-                        <tr>
-                            <th>Key</th>
-                            <th>Name</th>
-                            <th>Description</th>
-                            <th>Status</th>
-                            <th>Last Updated</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${flags.map(flag => `
-                            <tr>
-                                <td class="text-muted">${this.escapeHtml(flag.key)}</td>
-                                <td class="fw-semibold">${this.escapeHtml(flag.name)}</td>
-                                <td class="text-muted small">${this.escapeHtml(flag.description || '—')}</td>
-                                <td>
-                                    <button class="btn btn-sm py-0 px-2 ${flag.enabled ? 'btn-ac-green' : 'btn-ac-red'} feature-flag-toggle-btn" data-key="${flag.key}" data-enabled="${flag.enabled}">
-                                        ${flag.enabled ? 'Enabled' : 'Disabled'}
-                                    </button>
-                                </td>
-                                <td class="text-muted">${flag.updated_at ? new Date(flag.updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+        container.innerHTML = flags.map(flag => `
+            <div class="ac-flag-row">
+                <div class="flex-grow-1 min-width-0">
+                    <div class="ac-flag-name">${this.escapeHtml(flag.name)}</div>
+                    <div class="ac-flag-desc">${this.escapeHtml(flag.description || '')}</div>
+                </div>
+                <div class="ac-flag-meta">
+                    <span class="text-muted" style="font-size:.74rem">${flag.updated_at ? new Date(flag.updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</span>
+                    <label class="ac-toggle-switch">
+                        <input type="checkbox" class="feature-flag-toggle-input" data-key="${flag.key}" ${flag.enabled ? 'checked' : ''}>
+                        <span class="ac-toggle-slider"></span>
+                    </label>
+                </div>
             </div>
-        `;
+        `).join('');
 
-        container.querySelectorAll('.feature-flag-toggle-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const key = btn.dataset.key;
-                const currentEnabled = btn.dataset.enabled === 'true';
-                this.toggleFeatureFlag(key, !currentEnabled);
+        container.querySelectorAll('.feature-flag-toggle-input').forEach(input => {
+            input.addEventListener('change', () => {
+                const key = input.dataset.key;
+                const newEnabled = input.checked;
+                this.toggleFeatureFlag(key, newEnabled);
             });
         });
     }
@@ -2833,6 +2843,7 @@ class AdminDashboard {
                 <td class="text-muted" data-order="${createdOrder}">${createdLabel}</td>
                 <td>
                     <button class="btn btn-sm py-0 px-2 btn-ac-green product-edit-btn" data-product-id="${product.id}">Edit</button>
+                    <button class="btn btn-sm py-0 px-2 btn-ac-red product-delete-btn" data-product-id="${product.id}">Delete</button>
                 </td>
             </tr>
         `;
@@ -2851,7 +2862,6 @@ class AdminDashboard {
     //  Customer detail modal
     // ────────────────────────────────────────────────────────────
     async openCustomerDetailModal(userId) {
-        if (typeof bootstrap === 'undefined') return;
         try {
             const res = await fetch(`${this.apiBase}/admin/customers/${userId}/summary`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -2981,12 +2991,11 @@ class AdminDashboard {
                 }
             }; }
 
-            // Show side panel instead of modal
-            const panel = document.getElementById('customer-detail-panel');
-            if (panel) {
-                panel.removeAttribute('inert');
-                panel.classList.add('active');
-                this.syncPanelAccessibility();
+            const modal = document.getElementById('customer-detail-modal');
+            if (modal) {
+                this.modalZIndex++;
+                modal.style.zIndex = this.modalZIndex;
+                modal.classList.add('open');
             }
         } catch (err) {
             console.error('Customer detail error:', err);
@@ -2997,7 +3006,6 @@ class AdminDashboard {
     //  Farmer detail modal
     // ────────────────────────────────────────────────────────────
     async openFarmerDetailModal(farmerId) {
-        if (typeof bootstrap === 'undefined') return;
         try {
             const res = await fetch(`${this.apiBase}/admin/farmers/${farmerId}/summary`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -3161,15 +3169,232 @@ class AdminDashboard {
                 }
             };
 
-            // Show side panel instead of modal
-            const panel = document.getElementById('farmer-detail-panel');
-            if (panel) {
-                panel.removeAttribute('inert');
-                panel.classList.add('active');
-                this.syncPanelAccessibility();
+            const modal = document.getElementById('farmer-detail-modal');
+            if (modal) {
+                this.modalZIndex++;
+                modal.style.zIndex = this.modalZIndex;
+                modal.classList.add('open');
             }
         } catch (err) {
             console.error('Farmer detail error:', err);
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  Staff detail modal
+    // ────────────────────────────────────────────────────────────
+    async openStaffDetailModal(userId) {
+        try {
+            const user = (this.lastStaff || []).find(u => u.id === Number(userId));
+            if (!user) {
+                const ov = document.getElementById('sdt-overview-content');
+                if (ov) ov.innerHTML = `<div class="text-center text-danger py-3">Staff not found. Please refresh the list.</div>`;
+                this.showToast('Staff not found', 'error');
+                return;
+            }
+
+            const ov = document.getElementById('sdt-overview-content');
+            if (ov) ov.innerHTML = `
+                <div class="row g-2 mb-3">
+                    ${[
+                        ['Full Name', user.full_name || '—'], ['Username', user.username || '—'],
+                        ['Email', user.email || '—'], ['Phone', user.phone || '—'],
+                        ['Role', this.formatRole(user.role)],
+                        ['Status', user.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
+                        ['Joined', user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
+                    ].map(([k,v]) => `<div class="col-6"><div class="text-muted small">${k}</div><div class="fw-semibold small">${v}</div></div>`).join('')}
+                </div>
+            `;
+
+            const activityEl = document.getElementById('sdt-activity-content');
+            if (activityEl) activityEl.innerHTML = `<div class="text-muted small py-3 text-center">Activity log not implemented</div>`;
+
+            const isDisabled = !!user.is_disabled;
+            const canToggle = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId;
+            const disableBtn = document.getElementById('sdt-disable-btn');
+            const enableBtn  = document.getElementById('sdt-enable-btn');
+            const editBtn    = document.getElementById('sdt-edit-btn');
+
+            if (disableBtn) disableBtn.style.display = (isDisabled || !canToggle) ? 'none' : '';
+            if (enableBtn)  enableBtn.style.display  = (!isDisabled || !canToggle) ? 'none' : '';
+            if (editBtn)    editBtn.style.display    = canToggle ? '' : 'none';
+
+            if (editBtn) { editBtn.onclick = () => { this.previousModalId = 'staff-detail-modal'; this.openUserEdit(userId); }; }
+
+            if (disableBtn) { disableBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to disable this staff member?', { title: 'Disable Staff', danger: true })) return;
+                const spinner = document.getElementById('sdt-disable-spinner');
+                if (disableBtn) disableBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                const r = await fetch(`${this.apiBase}/admin/users/${userId}/disable`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({ is_disabled: true })
+                });
+                if (disableBtn) disableBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (r.ok) {
+                    this.showToast('Staff disabled', 'success');
+                    disableBtn.style.display = 'none';
+                    if (enableBtn) enableBtn.style.display = '';
+                    const ov = document.getElementById('sdt-overview-content');
+                    if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Active<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Disabled</span>');
+                    this.loadStaff();
+                }
+            }; }
+
+            if (enableBtn) { enableBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to enable this staff member?', { title: 'Enable Staff', danger: false })) return;
+                const spinner = document.getElementById('sdt-enable-spinner');
+                if (enableBtn) enableBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                const r = await fetch(`${this.apiBase}/admin/users/${userId}/enable`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` }
+                });
+                if (enableBtn) enableBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (r.ok) {
+                    this.showToast('Staff enabled', 'success');
+                    enableBtn.style.display = 'none';
+                    if (disableBtn) disableBtn.style.display = '';
+                    const ov = document.getElementById('sdt-overview-content');
+                    if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Disabled<\/span>/, '<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Active</span>');
+                    this.loadStaff();
+                }
+            }; }
+
+            const modal = document.getElementById('staff-detail-modal');
+            if (modal) {
+                this.modalZIndex++;
+                modal.style.zIndex = this.modalZIndex;
+                modal.classList.add('open');
+            }
+        } catch (err) {
+            console.error('Staff detail error:', err);
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────
+    //  All Users detail modal
+    // ────────────────────────────────────────────────────────────
+    async openAllUsersDetailModal(userId) {
+        try {
+            const user = (this.lastAllUsers || []).find(u => u.id === Number(userId));
+            if (!user) {
+                const ov = document.getElementById('adt-overview-content');
+                if (ov) ov.innerHTML = `<div class="text-center text-danger py-3">User not found. Please refresh the list.</div>`;
+                this.showToast('User not found', 'error');
+                return;
+            }
+
+            const ov = document.getElementById('adt-overview-content');
+            const overviewFields = [
+                ['Full Name', user.full_name || '—'], ['Username', user.username || '—'],
+                ['Email', user.email || '—'], ['Phone', user.phone || '—'],
+                ['Role', this.formatRole(user.role)],
+                ['Status', user.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
+                ['Joined', user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
+            ];
+
+            // Add password field for superadmin
+            if (this.currentUserRole === 'super_admin' && user.password) {
+                overviewFields.push(['Password', `<span class="password-modal-masked" data-password="${this.escapeHtml(user.password)}" data-is-masked="true">${'•'.repeat(Math.min(user.password.length, 20))}</span> <button class="btn btn-sm btn-link p-0 ms-1 toggle-modal-password-btn text-dark"><i class="bi bi-eye"></i></button>`]);
+            }
+
+            if (ov) ov.innerHTML = `
+                <div class="row g-2 mb-3">
+                    ${overviewFields.map(([k,v]) => `<div class="col-6"><div class="text-muted small">${k}</div><div class="fw-semibold small">${v}</div></div>`).join('')}
+                </div>
+            `;
+
+            const activityEl = document.getElementById('adt-activity-content');
+            if (activityEl) activityEl.innerHTML = `<div class="text-muted small py-3 text-center">Activity log not implemented</div>`;
+
+            const isSuperAdmin = user.role === 'super_admin';
+            const isDisabled = !!user.is_disabled;
+            const canToggle = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId && !isSuperAdmin;
+            const disableBtn = document.getElementById('adt-disable-btn');
+            const enableBtn  = document.getElementById('adt-enable-btn');
+            const editBtn    = document.getElementById('adt-edit-btn');
+
+            if (disableBtn) disableBtn.style.display = (isDisabled || !canToggle) ? 'none' : '';
+            if (enableBtn)  enableBtn.style.display  = (!isDisabled || !canToggle) ? 'none' : '';
+            if (editBtn)    editBtn.style.display    = canToggle ? '' : 'none';
+
+            if (editBtn) { editBtn.onclick = () => { this.previousModalId = 'all-users-detail-modal'; this.openUserEdit(userId); }; }
+
+            if (disableBtn) { disableBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to disable this user?', { title: 'Disable User', danger: true })) return;
+                const spinner = document.getElementById('adt-disable-spinner');
+                if (disableBtn) disableBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                const r = await fetch(`${this.apiBase}/admin/users/${userId}/disable`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({ is_disabled: true })
+                });
+                if (disableBtn) disableBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (r.ok) {
+                    this.showToast('User disabled', 'success');
+                    disableBtn.style.display = 'none';
+                    if (enableBtn) enableBtn.style.display = '';
+                    const ov = document.getElementById('adt-overview-content');
+                    if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Active<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Disabled</span>');
+                    this.loadAllUsers();
+                }
+            }; }
+
+            if (enableBtn) { enableBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to enable this user?', { title: 'Enable User', danger: false })) return;
+                const spinner = document.getElementById('adt-enable-spinner');
+                if (enableBtn) enableBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                const r = await fetch(`${this.apiBase}/admin/users/${userId}/enable`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` }
+                });
+                if (enableBtn) enableBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (r.ok) {
+                    this.showToast('User enabled', 'success');
+                    enableBtn.style.display = 'none';
+                    if (disableBtn) disableBtn.style.display = '';
+                    const ov = document.getElementById('adt-overview-content');
+                    if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Disabled<\/span>/, '<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Active</span>');
+                    this.loadAllUsers();
+                }
+            }; }
+
+            const modal = document.getElementById('all-users-detail-modal');
+            if (modal) {
+                this.modalZIndex++;
+                modal.style.zIndex = this.modalZIndex;
+                modal.classList.add('open');
+            }
+        } catch (err) {
+            console.error('All Users detail error:', err);
+        }
+    }
+
+    toggleModalPasswordVisibility() {
+        const passwordSpan = document.querySelector('.password-modal-masked');
+        const toggleBtn = document.querySelector('.toggle-modal-password-btn');
+        if (!passwordSpan || !toggleBtn) return;
+
+        const isMasked = passwordSpan.dataset.isMasked === 'true';
+        const password = passwordSpan.dataset.password;
+
+        if (isMasked) {
+            passwordSpan.textContent = password;
+            passwordSpan.dataset.isMasked = 'false';
+            toggleBtn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+        } else {
+            const masked = '•'.repeat(Math.min(password.length, 20));
+            passwordSpan.textContent = masked;
+            passwordSpan.dataset.isMasked = 'true';
+            toggleBtn.innerHTML = '<i class="bi bi-eye"></i>';
         }
     }
 
@@ -3332,7 +3557,10 @@ class AdminDashboard {
             const unread = items.filter(n => !n.is_read).length;
             const badge  = document.getElementById('notif-badge');
             const count  = document.getElementById('notif-count');
-            if (badge) badge.style.display = unread ? '' : 'none';
+            if (badge) {
+                badge.textContent = unread > 99 ? '99+' : String(unread);
+                badge.style.display = unread ? '' : 'none';
+            }
             if (count) count.textContent = unread > 99 ? '99+' : String(unread);
         } catch (err) {
             const l = document.getElementById('notifications-list');
@@ -3362,7 +3590,7 @@ class AdminDashboard {
             const bg = n.is_read ? '' : 'bg-success bg-opacity-10';
             return `<li>
                 <a class="dropdown-item d-flex align-items-start ${bg} py-2 notif-header-link"
-                    href="#" data-section="notifications">
+                    href="#" data-section="notifications" data-id="${n.id}">
                     <i class="bi ${ic} me-2 mt-1 flex-shrink-0"></i>
                     <div>
                         <div class="small ${n.is_read ? '' : 'fw-semibold'}">${this.escapeHtml(n.title || 'Notification')}</div>
@@ -3374,12 +3602,26 @@ class AdminDashboard {
 
         // Add event listeners for header notification links
         dropdownList.querySelectorAll('.notif-header-link').forEach(link => {
-            link.addEventListener('click', (e) => {
+            link.addEventListener('click', async (e) => {
                 e.preventDefault();
+                const notifId = Number(link.dataset.id);
+                this.selectedNotifId = notifId;
+                if (notifId && !link.classList.contains('is-read')) {
+                    await this.markNotifRead(notifId, null);
+                    link.classList.add('is-read');
+                }
                 const section = link.dataset.section;
                 if (section) this.navigateTo(section);
             });
         });
+
+        // Mark all as read when dropdown closes
+        const notifDropdown = dropdownList.closest('.dropdown-menu');
+        if (notifDropdown) {
+            notifDropdown.addEventListener('hidden.bs.dropdown', () => {
+                this.markAllNotifsRead();
+            });
+        }
     }
 
     renderNotifications(items) {
@@ -3405,8 +3647,9 @@ class AdminDashboard {
             const bgCls      = n.is_read ? '' : 'bg-success bg-opacity-10 border-start border-success border-3';
             const relTime    = this._relativeTime(new Date(n.created_at));
             const cursorCls  = n.is_read ? '' : 'cursor-pointer';
+            const selectedCls = this.selectedNotifId === n.id ? 'bg-warning bg-opacity-25 border-warning border-3' : '';
             return `
-            <div class="d-flex align-items-start gap-3 py-3 px-3 ${bgCls} border-bottom notif-item ${cursorCls}" data-id="${n.id}">
+            <div class="d-flex align-items-start gap-3 py-3 px-3 ${bgCls} ${selectedCls} border-bottom notif-item ${cursorCls}" data-id="${n.id}">
                 <div class="flex-shrink-0 mt-1"><i class="bi ${iconClass} fs-5"></i></div>
                 <div class="flex-grow-1">
                     <div class="${unreadCls} small">${this.escapeHtml(n.title || 'Notification')}</div>
@@ -3418,6 +3661,15 @@ class AdminDashboard {
                     <i class="bi bi-check2"></i></button>` : ''}
             </div>`;
         }).join('');
+
+        // Scroll to selected notification and clear selection
+        if (this.selectedNotifId) {
+            const selectedItem = list.querySelector(`[data-id="${this.selectedNotifId}"]`);
+            if (selectedItem) {
+                selectedItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            this.selectedNotifId = null;
+        }
 
         // Add event listeners for notification items
         list.querySelectorAll('.notif-item').forEach(item => {
@@ -3463,7 +3715,10 @@ class AdminDashboard {
             if (countEl) {
                 const next = Math.max(0, (parseInt(countEl.textContent) || 0) - 1);
                 countEl.textContent = next > 99 ? '99+' : String(next);
-                if (badge) badge.style.display = next ? '' : 'none';
+                if (badge) {
+                    badge.textContent = next > 99 ? '99+' : String(next);
+                    badge.style.display = next ? '' : 'none';
+                }
             }
         } catch (err) {
             console.error('Failed to mark notification as read:', err);
@@ -3604,7 +3859,7 @@ class AdminDashboard {
         const pg = this.pagination.categories || { page: 1, total: 0, limit: 50 };
 
         if (!filtered.length) {
-            tbody.innerHTML = `<tr><td colspan="5" class="table-placeholder">No categories found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="table-placeholder">No categories found.</td></tr>`;
         } else {
             tbody.innerHTML = filtered.map((category) => {
             const isDisabled = !!category.is_disabled;
@@ -3614,6 +3869,7 @@ class AdminDashboard {
                 <td>${category.id}</td>
                 <td>${this.escapeHtml(category.name || '')}</td>
                 <td>${this.escapeHtml(category.description || '—')}</td>
+                <td>${category.product_count || 0}</td>
                 <td>${statusPill}</td>
                 <td>
                     <button class="btn btn-sm py-0 px-2 btn-ac-green category-edit-btn" data-category-id="${category.id}">Edit</button>
@@ -3627,7 +3883,7 @@ class AdminDashboard {
             this.loadCategories(page);
         });
 
-        this.refreshSortableTable('categories-table', { columns: [{ select: 4, sortable: false }] });
+        this.refreshSortableTable('categories-table', { columns: [{ select: 5, sortable: false }] });
 
         const catalogCategorySelect = document.getElementById('catalog-category-select');
         if (catalogCategorySelect) {
@@ -3705,21 +3961,39 @@ class AdminDashboard {
     async sendAnnouncement() {
         const titleEl = document.getElementById('announcement-title');
         const messageEl = document.getElementById('announcement-message');
-        
+
         const title = String(titleEl?.value || '').trim();
         const message = String(messageEl?.value || '').trim();
 
         // Read audience from checkboxes
+        const audienceAll = document.getElementById('audience-all');
         const audienceFarmer = document.getElementById('audience-farmer');
         const audienceCustomer = document.getElementById('audience-customer');
         const audienceAdmin = document.getElementById('audience-admin');
-        
+
         const selectedAudiences = [];
-        if (audienceFarmer?.checked) selectedAudiences.push('farmer');
-        if (audienceCustomer?.checked) selectedAudiences.push('customer');
-        if (audienceAdmin?.checked) selectedAudiences.push('admin');
-        
+        const audienceDisplayNames = [];
+
+        if (audienceAll?.checked) {
+            selectedAudiences.push('all');
+            audienceDisplayNames.push('All Users');
+        } else {
+            if (audienceFarmer?.checked) {
+                selectedAudiences.push('farmer');
+                audienceDisplayNames.push('Farmers');
+            }
+            if (audienceCustomer?.checked) {
+                selectedAudiences.push('customer');
+                audienceDisplayNames.push('Customers');
+            }
+            if (audienceAdmin?.checked) {
+                selectedAudiences.push('admin');
+                audienceDisplayNames.push('Admins');
+            }
+        }
+
         const audience = selectedAudiences.length > 0 ? selectedAudiences.join(',') : 'all';
+        const audienceDisplay = selectedAudiences.length > 0 ? audienceDisplayNames.join(', ') : 'All users';
 
         if (!title) {
             this.showMessage('Title is required', 'error');
@@ -3729,6 +4003,13 @@ class AdminDashboard {
             this.showMessage('Message is required', 'error');
             return;
         }
+
+        // Show confirmation with announcement details
+        const confirmed = await this.adminConfirm(
+            `Title: ${title}\n\nMessage:\n${message}\n\nAudience: ${audienceDisplay}`,
+            { title: 'Send Announcement', danger: false, okLabel: 'Send' }
+        );
+        if (!confirmed) return;
 
         try {
             const response = await fetch(`${this.apiBase}/superadmin/announcements`, {
@@ -3748,6 +4029,7 @@ class AdminDashboard {
             this.showMessage('Announcement sent successfully', 'success');
             if (titleEl) titleEl.value = '';
             if (messageEl) messageEl.value = '';
+            if (audienceAll) audienceAll.checked = false;
             if (audienceFarmer) audienceFarmer.checked = false;
             if (audienceCustomer) audienceCustomer.checked = false;
             if (audienceAdmin) audienceAdmin.checked = false;
@@ -3755,6 +4037,34 @@ class AdminDashboard {
             console.error('Send announcement error:', err);
             this.showMessage('Failed to send announcement', 'error');
         }
+    }
+
+    setupAudienceCheckboxes() {
+        const audienceAll = document.getElementById('audience-all');
+        const audienceFarmer = document.getElementById('audience-farmer');
+        const audienceCustomer = document.getElementById('audience-customer');
+        const audienceAdmin = document.getElementById('audience-admin');
+
+        if (audienceAll) {
+            audienceAll.addEventListener('change', () => {
+                if (audienceAll.checked) {
+                    if (audienceFarmer) audienceFarmer.checked = false;
+                    if (audienceCustomer) audienceCustomer.checked = false;
+                    if (audienceAdmin) audienceAdmin.checked = false;
+                }
+            });
+        }
+
+        const specificCheckboxes = [audienceFarmer, audienceCustomer, audienceAdmin];
+        specificCheckboxes.forEach(checkbox => {
+            if (checkbox) {
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked && audienceAll) {
+                        audienceAll.checked = false;
+                    }
+                });
+            }
+        });
     }
 
     async loadCatalogNames(page = 1) {
@@ -3796,11 +4106,11 @@ class AdminDashboard {
         const pg = this.pagination['catalog-products'] || { page: 1, total: 0, limit: 50 };
 
         if (!filtered.length) {
-            tbody.innerHTML = `<tr><td colspan="5" style="color:#64748b;">No catalog names yet.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="color:#64748b;">No catalog names yet.</td></tr>`;
             this.renderPagination('catalog-products-pagination', pg, (page) => {
                 this.loadCatalogNames(page);
             });
-            this.refreshSortableTable('catalog-products-table', { columns: [{ select: 4, sortable: false }] });
+            this.refreshSortableTable('catalog-products-table', { columns: [{ select: 5, sortable: false }] });
             return;
         }
 
@@ -3812,6 +4122,7 @@ class AdminDashboard {
                 <td>${item.id}</td>
                 <td>${this.escapeHtml(item.name || '')}</td>
                 <td>${this.escapeHtml(item.category_name || '—')}</td>
+                <td>${item.product_count || 0}</td>
                 <td>${statusPill}</td>
                 <td>
                     <button class="btn btn-sm py-0 px-2 btn-ac-green catalog-edit-btn" data-catalog-id="${item.id}">Edit</button>
@@ -3928,11 +4239,9 @@ class AdminDashboard {
             }
         } else if (result.action === 'disable') {
             await this.toggleCatalogNameDisabled(catalogId, !item.is_disabled);
+        } else if (result.action === 'delete') {
+            await this.deleteCatalogName(catalogId);
         }
-        // NOTE: Delete action reserved for superadmin only; disabled in UI.
-        // } else if (result.action === 'delete') {
-        //     await this.deleteCatalogName(catalogId);
-        // }
     }
 
     async editCategory(categoryId) {
@@ -4482,7 +4791,42 @@ class AdminDashboard {
     }
 
     async deleteProduct(productId) {
-        return this.toggleProductStatus(productId, true);
+        if (!await this.adminConfirm('Are you sure you want to permanently delete this product? This action cannot be undone.', { title: 'Delete Product', danger: true })) return;
+
+        // Find the delete button and show loading state
+        const btn = document.querySelector(`.product-delete-btn[data-product-id="${productId}"]`);
+        const originalText = btn?.innerHTML;
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i>';
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/products/${productId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (response.ok) {
+                this.showMessage('Product deleted successfully!', 'success');
+                this.loadProducts();
+                this.loadDashboardStats();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to delete product', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting product:', error);
+            this.showMessage('Error deleting product', 'error');
+        } finally {
+            // Restore button state
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText || 'Delete';
+            }
+        }
     }
 
     async toggleProductStatus(productId, isAvailable) {
@@ -4608,7 +4952,11 @@ class AdminDashboard {
     }
 
     renderStatus(text, statusKey) {
-        return `<span style="color:${this.getStatusColor(statusKey)};background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">${text}</span>`;
+        const key = (statusKey || '').toString().toLowerCase();
+        const cls = this.getStatusClass(key);
+        const direct = ['active','disabled','approved','rejected','verified','unverified','available','unavailable'];
+        const pillClass = direct.includes(key) ? key : cls;
+        return `<span class="status-pill ${pillClass}">${text}</span>`;
     }
 
     toggleChatDrawer(show) {
@@ -4924,6 +5272,8 @@ class AdminDashboard {
         if (barangayEl) barangayEl.onchange = () => this._editUserUpdatePreview();
         if (streetEl) streetEl.oninput = () => this._editUserUpdatePreview();
 
+        this.modalZIndex++;
+        modal.style.zIndex = this.modalZIndex;
         modal.classList.add('open');
     }
 
@@ -5433,6 +5783,7 @@ class AdminDashboard {
         if (modal) {
             modal.classList.remove('open');
             modal.style.display = '';
+            modal.style.zIndex = '';
         }
         if (modalId === 'edit-product-modal') {
             document.body.style.overflow = '';
@@ -5442,6 +5793,8 @@ class AdminDashboard {
         if (parentModalId) {
             const parentModalEl = document.getElementById(parentModalId);
             if (parentModalEl) {
+                this.modalZIndex--;
+                parentModalEl.style.zIndex = this.modalZIndex;
                 parentModalEl.classList.add('open');
             }
         }
@@ -5589,7 +5942,7 @@ class AdminDashboard {
 
         tbody.innerHTML = products.map((product) => `
             <tr>
-                <td>
+                <td class="text-center">
                     ${product.image_url
                         ? `<img src="${this.escapeHtml(product.image_url)}" class="product-thumb" alt="">`
                         : `<div class="product-thumb-placeholder"><i class="bi bi-image"></i></div>`
@@ -5627,13 +5980,10 @@ class AdminDashboard {
 
         tbody.innerHTML = farmers.map((farmer) => `
             <tr>
-                <td>
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="user-initials" style="width:28px;height:28px;font-size:.7rem">${(farmer.full_name || farmer.username || '?')[0].toUpperCase()}</div>
-                        <div>
-                            <div class="small fw-semibold">${this.escapeHtml(farmer.full_name || farmer.username)}</div>
-                            <div class="text-muted" style="font-size:.7rem">${farmer.order_count} orders</div>
-                        </div>
+                <td class="text-center">
+                    <div>
+                        <div class="small fw-semibold">${this.escapeHtml(farmer.full_name || farmer.username)}</div>
+                        <div class="text-muted" style="font-size:.7rem">${farmer.order_count} orders</div>
                     </div>
                 </td>
                 <td class="small text-success fw-semibold">${this.fmtCurrency(farmer.revenue)}</td>
@@ -5804,8 +6154,8 @@ class AdminDashboard {
                     <td style="color:#777171f0">${this.escapeHtml(f.username || '—')}</td>
                     <td>${this.escapeHtml(f.email)}</td>
                     <td>${rating}</td>
-                    <td>
-                        <div class="d-flex flex-column gap-1 align-items-start">
+                    <td style="text-align:center">
+                        <div class="d-flex flex-column gap-1 align-items-center">
                             ${this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active')}
                             ${this.renderStatus(isVerified ? 'Verified' : 'Unverified', isVerified ? 'verified' : 'unverified')}
                         </div>
@@ -5894,9 +6244,18 @@ class AdminDashboard {
 
             document.getElementById('confirm-title').textContent = title;
             document.getElementById('confirm-message').textContent = message;
+            const iconEl = document.getElementById('confirm-icon');
+            if (iconEl) {
+                iconEl.className = danger
+                    ? 'ac-confirm-modal__icon ac-confirm-modal__icon--danger'
+                    : 'ac-confirm-modal__icon ac-confirm-modal__icon--success';
+                iconEl.innerHTML = danger
+                    ? '<i class="bi bi-exclamation-triangle-fill"></i>'
+                    : '<i class="bi bi-send-check-fill"></i>';
+            }
             const okBtn = document.getElementById('confirm-ok-btn');
             const cancelBtn = document.getElementById('confirm-cancel-btn');
-            okBtn.className = danger ? 'btn btn-sm px-4 btn-ac-red' : 'btn btn-sm px-4 btn-ac-green';
+            okBtn.className = danger ? 'btn btn-sm btn-ac-red' : 'btn btn-sm ac-btn-primary';
             okBtn.textContent = okLabel;
             modal.classList.add('open');
 
@@ -5943,7 +6302,10 @@ class AdminDashboard {
                 </div>
                 <div class="form-group mt-4">
                     <label class="form-label fw-semibold">Linked Products (${Number(category.product_count || 0)})</label>
-                    <div id="category-linked-products" class="border rounded p-2 bg-light" style="max-height: 200px; overflow-y: auto;">
+                    <div class="small text-muted mb-2">
+                        Shows all products and farmers linked to this category.
+                    </div>
+                    <div id="category-linked-products" class="border rounded p-2 bg-light" style="max-height: 420px; overflow-y: auto;">
                         <span class="text-muted small">Loading linked products...</span>
                     </div>
                 </div>
@@ -5969,7 +6331,6 @@ class AdminDashboard {
             this.syncPanelAccessibility();
             nameInput.focus();
 
-            // Load linked products
             this.loadCategoryLinkedProducts(category.id);
 
             const done = (result) => {
@@ -6027,7 +6388,7 @@ class AdminDashboard {
             const cancelBtn = document.getElementById('catalog-edit-cancel');
             const closeBtn = document.getElementById('catalog-edit-panel-close');
             const disableBtn = document.getElementById('catalog-edit-toggle-disable');
-            // NOTE: Delete button removed from UI; reserved for superadmin only.
+            const deleteBtn = document.getElementById('catalog-edit-delete');
 
             // Populate categories
             const cats = this.lastCategories || [];
@@ -6048,6 +6409,12 @@ class AdminDashboard {
                     </label>
                     <select id="catalog-edit-category" class="form-select">${catOptions}</select>
                 </div>
+                <div class="form-group mt-3">
+                    <label class="form-label fw-semibold">Linked Products (${Number(item.product_count || 0)})</label>
+                    <div id="catalog-linked-products" class="border rounded p-2 bg-light" style="max-height: 200px; overflow-y: auto;">
+                        <span class="text-muted small">Loading linked products...</span>
+                    </div>
+                </div>
             `;
 
             const nameInput = document.getElementById('catalog-edit-name');
@@ -6060,10 +6427,18 @@ class AdminDashboard {
                 disableBtn.className = `btn btn-sm ${isDisabled ? 'btn-ac-green' : 'btn-ac-red'} me-auto`;
             }
 
+            // Show delete button only for super_admin
+            if (deleteBtn) {
+                deleteBtn.style.display = this.currentUserRole === 'super_admin' ? 'inline-block' : 'none';
+            }
+
             panel.classList.add('active');
             panel.removeAttribute('inert');
             this.syncPanelAccessibility();
             nameInput.focus();
+
+            // Load linked products
+            this.loadCatalogLinkedProducts(item.name);
 
             const done = (result) => {
                 panel.classList.remove('active');
@@ -6073,6 +6448,7 @@ class AdminDashboard {
                 cancelBtn.replaceWith(cancelBtn.cloneNode(true));
                 closeBtn.replaceWith(closeBtn.cloneNode(true));
                 if (disableBtn) disableBtn.replaceWith(disableBtn.cloneNode(true));
+                if (deleteBtn) deleteBtn.replaceWith(deleteBtn.cloneNode(true));
                 resolve(result);
             };
 
@@ -6103,16 +6479,19 @@ class AdminDashboard {
                 if (!await this.adminConfirm(`Are you sure you want to ${item.is_disabled ? 'enable' : 'disable'} this product?`, { title: `${item.is_disabled ? 'Enable' : 'Disable'} Product`, danger: !item.is_disabled })) return;
                 done({ action: 'disable' });
             }, { once: true });
-            // NOTE: Delete action reserved for superadmin only; button removed from UI.
+            document.getElementById('catalog-edit-delete')?.addEventListener('click', async () => {
+                if (!await this.adminConfirm('Are you sure you want to delete this product name? This action cannot be undone.', { title: 'Delete Product Name', danger: true })) return;
+                done({ action: 'delete' });
+            }, { once: true });
         });
     }
 
     async loadCategoryLinkedProducts(categoryId) {
         const container = document.getElementById('category-linked-products');
         if (!container) return;
-        container.innerHTML = '<span class="text-muted small">Loading...</span>';
+        container.innerHTML = '<span class="text-muted small">Loading linked products...</span>';
         try {
-            const response = await fetch(`${this.apiBase}/admin/products?category_id=${categoryId}&limit=20`, {
+            const response = await fetch(`${this.apiBase}/admin/categories/${categoryId}/products`, {
                 headers: { Authorization: `Bearer ${this.token}` }
             });
             const data = await response.json();
@@ -6122,15 +6501,74 @@ class AdminDashboard {
                 container.innerHTML = '<span class="text-muted small">No linked products.</span>';
                 return;
             }
-            container.innerHTML = products.map(p => `
-                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-                    <span class="small">${this.escapeHtml(p.name || '')}</span>
-                    <span class="badge bg-secondary small">${p.status || 'unknown'}</span>
-                </div>
-            `).join('');
+            container.innerHTML = products.map((product) => {
+                const farmerLabel = product.farmer_name || product.farmer_username || product.farmer_email || 'Unknown farmer';
+                const availability = product.is_admin_disabled ? 'Admin disabled' : (product.is_available ? 'Available' : 'Unavailable');
+                return `
+                    <div class="border rounded bg-white p-2 mb-2">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <div class="small fw-semibold">#${product.id} ${this.escapeHtml(product.name || '')}</div>
+                                <div class="small text-muted">Farmer: ${this.escapeHtml(farmerLabel)}</div>
+                                ${product.farmer_email ? `<div class="small text-muted">${this.escapeHtml(product.farmer_email)}</div>` : ''}
+                            </div>
+                            <span class="badge bg-secondary small">${this.escapeHtml(product.status || availability)}</span>
+                        </div>
+                        <div class="small text-muted mt-1">
+                            ₱${Number(product.price || 0).toFixed(2)}
+                            · Stock: ${Number(product.stock_quantity || 0)} ${this.escapeHtml(product.unit || '')}
+                            · ${availability}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         } catch (error) {
             console.error('Failed to load linked products:', error);
-            container.innerHTML = '<span class="text-danger small">Failed to load.</span>';
+            container.innerHTML = `<span class="text-danger small">Failed to load: ${this.escapeHtml(error.message || 'Unknown error')}</span>`;
+        }
+    }
+
+    async loadCatalogLinkedProducts(catalogName) {
+        const container = document.getElementById('catalog-linked-products');
+        if (!container) return;
+        container.innerHTML = '<span class="text-muted small">Loading linked products...</span>';
+        try {
+            const response = await fetch(`${this.apiBase}/admin/products?search=${encodeURIComponent(catalogName)}&limit=20`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Failed to load');
+            const products = data.products || [];
+            // Filter products that match the catalog name exactly
+            const matchingProducts = products.filter(p => p.name === catalogName);
+            if (!matchingProducts.length) {
+                container.innerHTML = '<span class="text-muted small">No linked products.</span>';
+                return;
+            }
+            container.innerHTML = matchingProducts.map((product) => {
+                const farmerLabel = product.farmer_name || product.farmer_username || product.farmer_email || 'Unknown farmer';
+                const availability = product.is_admin_disabled ? 'Admin disabled' : (product.is_available ? 'Available' : 'Unavailable');
+                return `
+                    <div class="border rounded bg-white p-2 mb-2">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <div class="small fw-semibold">#${product.id} ${this.escapeHtml(product.name || '')}</div>
+                                <div class="small text-muted">Farmer: ${this.escapeHtml(farmerLabel)}</div>
+                                ${product.farmer_email ? `<div class="small text-muted">${this.escapeHtml(product.farmer_email)}</div>` : ''}
+                            </div>
+                            <span class="badge bg-secondary small">${this.escapeHtml(product.status || availability)}</span>
+                        </div>
+                        <div class="small text-muted mt-1">
+                            ₱${Number(product.price || 0).toFixed(2)}
+                            · Stock: ${Number(product.stock_quantity || 0)} ${this.escapeHtml(product.unit || '')}
+                            · ${availability}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Failed to load linked products:', error);
+            container.innerHTML = `<span class="text-danger small">Failed to load: ${this.escapeHtml(error.message || 'Unknown error')}</span>`;
         }
     }
 

@@ -1,9 +1,12 @@
 /*
-  Refreshes demo catalog and executes an end-to-end smoke test:
-  - removes old smoke users/products/orders/reviews
+  WARNING: This script will RECREATE products with NEW IDs.
+  Only run this for testing/demo purposes. It will:
+  - remove old smoke users/products/orders/reviews
   - creates alias farmer accounts (Batman/Superman/etc.)
   - ensures at least one realistic product per non-fishery category with Cloudinary image URLs
   - runs customer order + farmer status progression + customer review smoke flow
+
+  If you delete products manually and then run this script, they will reappear with different IDs.
 */
 
 require('dotenv').config();

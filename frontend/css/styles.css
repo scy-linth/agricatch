@@ -6720,7 +6720,7 @@ textarea.invalid:focus {
 
 .notification-item.unread {
     background: #ecfdf5;
-    border-left: 3px solid var(--primary-color);
+    box-shadow: inset 3px 0 0 0 var(--primary-color);
 }
 
 .notification-item:hover {

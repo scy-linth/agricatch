@@ -1,3 +1,12 @@
+/*
+  WARNING: This script will RECREATE products with NEW IDs if they don't exist.
+  Only run this for testing/demo purposes. It will:
+  - Insert 20 specific demo products into the database
+  - Skip products that already exist (by name and farmer_id)
+
+  If you delete products manually and then run this script, they may reappear with different IDs.
+*/
+
 const { Pool } = require('pg');
 
 const pgSsl = String(process.env.DB_HOST || '').includes('render.com')

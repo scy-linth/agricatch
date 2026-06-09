@@ -1,6 +1,7 @@
 ﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
+const { broadcastEvent } = require('../utils/realtime');
 
 const router = express.Router();
 
@@ -263,6 +264,7 @@ router.post('/products/:id/reviews', async (req, res) => {
               INSERT INTO notifications (user_id, type, message, is_read)
               VALUES ($1, 'fraud_alert', $2, false)
             `, [adminResult.rows[0].id, `Suspicious pattern detected: User ${user.username} (ID: ${user.id}) has ${pattern.review_count} reviews with ${pattern.avg_rating.toFixed(1)} avg rating from only 1 farmer`]);
+            broadcastEvent('notification.created', { user_id: adminResult.rows[0].id });
           }
         } catch (notifErr) {
           console.error('Failed to send fraud alert notification:', notifErr);

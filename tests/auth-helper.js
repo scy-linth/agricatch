@@ -44,12 +44,18 @@ async function getAdminToken() {
   });
 
   try {
-    // Find an admin user — backend requireAdmin needs 'staff' or 'super_admin'
+    // Prefer super_admin for testing all sections
     let result = await pool.query(
-      `SELECT id, email, username, role FROM users WHERE role = 'staff' OR role = 'super_admin' OR role = 'admin' OR role = 'superadmin' LIMIT 1`
+      `SELECT id, email, username, role FROM users WHERE role = 'super_admin' OR role = 'superadmin' LIMIT 1`
     );
     if (result.rows.length === 0) {
-      // Fallback: just get any user
+      // Fallback to staff or admin
+      result = await pool.query(
+        `SELECT id, email, username, role FROM users WHERE role = 'staff' OR role = 'admin' LIMIT 1`
+      );
+    }
+    if (result.rows.length === 0) {
+      // Last resort: just get any user
       result = await pool.query(
         `SELECT id, email, username, role FROM users LIMIT 1`
       );

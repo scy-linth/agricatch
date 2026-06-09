@@ -323,6 +323,7 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
         INSERT INTO notifications (user_id, type, title, message, order_id, product_id)
         VALUES ($1, 'order_update', 'Order update', $2, $3, $4)
       `, [order.customer_id, message, orderId, order.product_id]);
+      broadcastEvent('notification.created', { user_id: order.customer_id });
 
       await client.query('COMMIT');
 
@@ -576,6 +577,7 @@ router.post('/', async (req, res) => {
               INSERT INTO notifications (user_id, type, title, message, order_id)
               VALUES ($1, 'order_placed', 'New Order Received', $2, $3)
             `, [farmerId, message, orderId]);
+            broadcastEvent('notification.created', { user_id: farmerId });
             await client.query('RELEASE SAVEPOINT create_order_notify_sp');
             console.log(`[Create Order] Notification sent to farmer ${farmerId} for order #${orderId}`);
           } catch (notifError) {
@@ -802,6 +804,7 @@ router.put('/:id/status', async (req, res) => {
           orderData.product_id
         ]
       );
+      broadcastEvent('notification.created', { user_id: orderInfo.rows[0].user_id });
 
       // Update sales stats if delivered
       if (status === 'delivered') {
@@ -921,6 +924,7 @@ router.put('/:id/cancel', async (req, res) => {
          VALUES ($1, $2, $3, $4, $5)`,
         [decoded.id, 'order_update', 'Order cancelled', `Order #${id} (${orderResult.rows[0].product_name}) was cancelled.`, id]
       );
+      broadcastEvent('notification.created', { user_id: decoded.id });
 
       res.json({ message: 'Order cancelled successfully' });
 
@@ -1017,6 +1021,7 @@ router.put('/:id/cancel-farmer', async (req, res) => {
        VALUES ($1, $2, $3, $4, $5)`,
       [orderInfo.rows[0].user_id, 'order_update', 'Order cancelled by farmer', `Order #${id} (${orderInfo.rows[0].product_name}) was cancelled by the farmer.`, id]
     );
+    broadcastEvent('notification.created', { user_id: orderInfo.rows[0].user_id });
 
     res.json({ message: 'Order cancelled successfully' });
   } catch (error) {

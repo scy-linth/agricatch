@@ -282,6 +282,12 @@ router.post('/announcements', requireSuperAdmin, requireAnnouncementsEnabled, as
       [title, message, roles]
     );
 
+    // Broadcast notification.created event for each recipient
+    const notifiedUserIds = insertRes.rows.map(row => row.user_id);
+    for (const userId of notifiedUserIds) {
+      broadcastEvent('notification.created', { user_id: userId });
+    }
+
     await writeAdminAuditLog(pool, {
       actor_admin_id: req.user.id,
       action: 'announcement.broadcast',

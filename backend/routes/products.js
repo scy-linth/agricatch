@@ -217,35 +217,9 @@ const ensureProductCatalogSchema = async () => {
 
   await pool.query(`ALTER TABLE product_name_requests ADD COLUMN IF NOT EXISTS requested_category_name VARCHAR(120)`);
 
-  for (const groupName of FEATURED_CATEGORY_GROUPS) {
-    await pool.query(
-      `INSERT INTO categories (name, description, type)
-       VALUES ($1, $2, 'agricultural')
-       ON CONFLICT (name) DO UPDATE SET
-         description = EXCLUDED.description,
-         type = COALESCE(categories.type, EXCLUDED.type)`,
-      [groupName, `${groupName} category`]
-    );
-  }
-
-  const categoryRows = await pool.query(
-    `SELECT id, name FROM categories WHERE name = ANY($1::text[])`,
-    [FEATURED_CATEGORY_GROUPS]
-  );
-  const categoryMap = new Map(categoryRows.rows.map((row) => [row.name, row.id]));
-
-  for (const [groupName, names] of Object.entries(DEFAULT_PRODUCT_CATALOG)) {
-    const categoryId = categoryMap.get(groupName);
-    if (!categoryId) continue;
-    for (const itemName of names) {
-      await pool.query(
-        `INSERT INTO product_name_catalog (category_id, name, source, is_approved)
-         VALUES ($1, $2, 'system', true)
-         ON CONFLICT (name) DO NOTHING`,
-        [categoryId, itemName]
-      );
-    }
-  }
+  // NOTE: Auto-creation of default categories disabled to prevent reappearing categories
+  // after admin deletion. Categories should be managed manually through the admin panel.
+  // Original code that auto-created FEATURED_CATEGORY_GROUPS has been removed.
 };
 
 // Get farm categories for product forms and featured filters
@@ -1203,7 +1177,7 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
   }
 });
 
-// Delete product (for farmers)
+// Delete product (for farmers) - hard delete
 router.delete('/:id', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -1225,26 +1199,6 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ message: 'You can only delete your own products' });
     }
 
-    const orderHistoryCheck = await pool.query(
-      `SELECT COUNT(*) as count FROM orders WHERE product_id = $1`,
-      [id]
-    );
-
-    if (parseInt(orderHistoryCheck.rows[0].count, 10) > 0) {
-      await pool.query(
-        'UPDATE products SET is_available = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-        [id]
-      );
-
-      broadcastEvent('product.updated', {
-        action: 'product.disable',
-        product_id: Number(id),
-        farmer_id: Number(decoded.id)
-      });
-
-      return res.json({ message: 'Product disabled because order history exists.' });
-    }
-
     // Delete related records first to avoid foreign key constraint errors
     try {
       // Delete from cart
@@ -1257,15 +1211,15 @@ router.delete('/:id', async (req, res) => {
       await pool.query('DELETE FROM notifications WHERE product_id = $1', [id]);
       // Note: We keep orders and order_items as historical records
       // They can reference a deleted product (product_id will remain but product won't exist)
-      
+
       // Delete the product
       await pool.query('DELETE FROM products WHERE id = $1', [id]);
     } catch (deleteError) {
       console.error('Delete product error:', deleteError);
       // If foreign key constraint error, provide helpful message
       if (deleteError.code === '23503') {
-        return res.status(400).json({ 
-          message: 'Cannot delete product due to existing related records. Please contact support.' 
+        return res.status(400).json({
+          message: 'Cannot delete product due to existing related records. Please contact support.'
         });
       }
       throw deleteError;

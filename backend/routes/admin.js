@@ -271,6 +271,7 @@ const cancelOrdersForFarmer = async (client, farmerId, reason) => {
       orderId: row.id,
       productId: row.product_id
     });
+    broadcastEvent('notification.created', { user_id: row.customer_id });
   }
 
   return rows;
@@ -305,6 +306,7 @@ const cancelOrdersForCustomer = async (client, customerId, reason) => {
       orderId: row.id,
       productId: row.product_id
     });
+    broadcastEvent('notification.created', { user_id: row.farmer_id });
   }
 
   return rows;
@@ -356,6 +358,7 @@ const disableUserHandler = async (req, res, reasonOverride = null) => {
         title: 'Account disabled',
         message: reason
       });
+      broadcastEvent('notification.created', { user_id: userId });
 
       if (targetUser.role === 'farmer') {
         await client.query(
@@ -439,6 +442,7 @@ const enableUserHandler = async (req, res) => {
       title: 'Account enabled',
       message: 'Your account has been enabled.'
     });
+    broadcastEvent('notification.created', { user_id: userId });
 
     await writeAdminAuditLog(pool, {
       actor_admin_id: req.user.id,
@@ -535,6 +539,11 @@ router.get('/users', requireAdmin, async (req, res) => {
       'disabled_reason',
       'disable_type'
     ].filter(hasUserColumn);
+
+    // Superadmin can request password field
+    if (req.query.include_password === 'true' && req.user.role === 'super_admin' && hasUserColumn('password')) {
+      selectFields.push('password');
+    }
     const result = await pool.query(
       `SELECT ${selectFields.join(', ')} FROM users ${whereSql} ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
       [...whereValues, limit, offset]
@@ -1609,6 +1618,7 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
         message: `Your order status is now: ${statusLabels[status] || status}`,
         orderId: parseInt(id, 10)
       });
+      broadcastEvent('notification.created', { user_id: ordUserId });
     }
 
     await writeAdminAuditLog(pool, {
@@ -1741,35 +1751,72 @@ router.put('/users/:id/enable', requireAdmin, enableUserHandler);
 // Legacy delete endpoint now disables the user
 router.delete('/users/:id', requireAdmin, async (req, res) => disableUserHandler(req, res, 'Account disabled by admin'));
 
-// Delete product
+// Delete product (hard delete)
 router.delete('/products/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const productResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    const productResult = await pool.query('SELECT id, farmer_id, image_url, cloudinary_public_id FROM products WHERE id = $1', [id]);
     if (productResult.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    await pool.query(
-      'UPDATE products SET is_admin_disabled = true, admin_disabled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-      [id]
-    );
+    const product = productResult.rows[0];
+
+    // Delete related records first to avoid foreign key constraint errors
+    try {
+      // Delete from cart
+      await pool.query('DELETE FROM cart WHERE product_id = $1', [id]);
+      // Delete from wishlist
+      await pool.query('DELETE FROM wishlist WHERE product_id = $1', [id]);
+      // Delete from reviews
+      await pool.query('DELETE FROM reviews WHERE product_id = $1', [id]);
+      // Delete from notifications
+      await pool.query('DELETE FROM notifications WHERE product_id = $1', [id]);
+      // Note: We keep orders and order_items as historical records
+      // They can reference a deleted product (product_id will remain but product won't exist)
+
+      // Delete the product
+      await pool.query('DELETE FROM products WHERE id = $1', [id]);
+    } catch (deleteError) {
+      console.error('Delete product error:', deleteError);
+      // If foreign key constraint error, provide helpful message
+      if (deleteError.code === '23503') {
+        return res.status(400).json({
+          message: 'Cannot delete product due to existing related records. Please contact support.'
+        });
+      }
+      throw deleteError;
+    }
+
+    // Delete image from Cloudinary if it exists
+    const imageUrl = product.image_url;
+    const cloudPublicId = product.cloudinary_public_id;
+    if (cloudPublicId || (imageUrl && /^https:\/\/res\.cloudinary\.com\//.test(String(imageUrl)))) {
+      try {
+        const publicIdToDelete = cloudPublicId || extractCloudinaryPublicId(imageUrl);
+        if (publicIdToDelete) {
+          await cloudinary.uploader.destroy(publicIdToDelete, { resource_type: 'image' });
+        }
+      } catch (cloudErr) {
+        console.warn('Cloudinary deletion failed for', cloudPublicId || imageUrl, cloudErr && (cloudErr.message || cloudErr));
+      }
+    }
 
     await writeAdminAuditLog(pool, {
       actor_admin_id: req.user.id,
-      action: 'product.disable',
+      action: 'product.delete',
       entity: 'products',
       entity_id: parseInt(id, 10),
-      before: productResult.rows[0],
-      after: { id: parseInt(id, 10), is_admin_disabled: true },
+      before: product,
+      after: null,
       req
     });
-    broadcastEvent('admin.audit', { action: 'product.disable', entity: 'products', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
+    broadcastEvent('admin.audit', { action: 'product.delete', entity: 'products', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
 
-    res.json({ message: 'Product disabled successfully' });
+    res.json({ message: 'Product deleted successfully' });
   } catch (error) {
-    console.error('Disable product error:', error);
-    res.status(500).json({ message: 'Server error disabling product' });
+    console.error('Delete product error:', error);
+    res.status(500).json({ message: 'Server error deleting product' });
   }
 });
 
@@ -1857,10 +1904,61 @@ router.get('/categories', requireAdmin, async (req, res) => {
        LIMIT $${idx} OFFSET $${idx + 1}`,
       [...whereValues, limit, offset]
     );
+
     return res.json({ categories: result.rows, total: totalRes.rows[0]?.count || 0, page, limit });
   } catch (error) {
     console.error('Admin get categories error:', error);
     return res.status(500).json({ message: 'Server error fetching categories' });
+  }
+});
+
+router.get('/categories/:id', requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id || 0);
+    if (!id) return res.status(400).json({ message: 'Invalid category id' });
+
+    const result = await pool.query(
+      `SELECT id, name, description, COALESCE(type, 'agricultural') AS type, COALESCE(is_disabled, false) AS is_disabled, created_at
+       FROM categories
+       WHERE id = $1`,
+      [id]
+    );
+    if (!result.rows.length) return res.status(404).json({ message: 'Category not found' });
+
+    return res.json({ category: result.rows[0] });
+  } catch (error) {
+    console.error('Admin get category error:', error);
+    return res.status(500).json({ message: 'Server error fetching category' });
+  }
+});
+
+router.get('/categories/:id/products', requireAdmin, async (req, res) => {
+  try {
+    const categoryId = Number(req.params.id || 0);
+    if (!categoryId) return res.status(400).json({ message: 'Invalid category id' });
+
+    const result = await pool.query(
+      `SELECT p.id, p.name, p.description, p.price, p.stock_quantity, p.unit, p.status,
+              p.is_available, COALESCE(p.is_admin_disabled, false) AS is_admin_disabled,
+              p.farmer_id, u.full_name AS farmer_name, u.username AS farmer_username, u.email AS farmer_email,
+              COALESCE(u.is_disabled, false) AS farmer_is_disabled
+       FROM products p
+       LEFT JOIN users u ON u.id = p.farmer_id
+       WHERE p.category_id = $1
+       ORDER BY p.created_at DESC`,
+      [categoryId]
+    );
+
+    const farmerIds = new Set(result.rows.map((product) => product.farmer_id).filter(Boolean));
+
+    return res.json({
+      products: result.rows,
+      product_count: result.rows.length,
+      farmer_count: farmerIds.size
+    });
+  } catch (error) {
+    console.error('Admin get category products error:', error);
+    return res.status(500).json({ message: 'Server error fetching category products' });
   }
 });
 
@@ -1932,12 +2030,16 @@ router.put('/categories/:id', requireAdmin, async (req, res) => {
     if (typeof name !== 'undefined') {
       const trimmed = normalizeCategoryName(name);
       if (!trimmed) return res.status(400).json({ message: 'Category name cannot be empty' });
-      const duplicate = await pool.query(
-        'SELECT id FROM categories WHERE LOWER(name) = $1 AND id <> $2 LIMIT 1',
-        [normalizeCategoryKey(trimmed), id]
-      );
-      if (duplicate.rows.length) {
-        return res.status(409).json({ message: 'Category name already exists' });
+      // Only check for duplicates if the name is actually changing
+      const currentName = beforeRes.rows[0].name;
+      if (normalizeCategoryKey(trimmed) !== normalizeCategoryKey(currentName)) {
+        const duplicate = await pool.query(
+          'SELECT id FROM categories WHERE LOWER(name) = $1 AND id <> $2 LIMIT 1',
+          [normalizeCategoryKey(trimmed), id]
+        );
+        if (duplicate.rows.length) {
+          return res.status(409).json({ message: 'Category name already exists' });
+        }
       }
       updates.push(`name = $${idx++}`);
       values.push(trimmed);
@@ -2026,10 +2128,30 @@ router.delete('/categories/:id', requireAdmin, async (req, res) => {
       [id]
     );
     const usage = usageResult.rows[0] || { product_count: 0, request_count: 0, catalog_count: 0 };
+
+    // Get farmers who have products in this category
+    const farmersResult = await pool.query(
+      `SELECT DISTINCT u.id, u.username, u.full_name, u.email
+       FROM products p
+       JOIN users u ON p.farmer_id = u.id
+       WHERE p.category_id = $1
+       LIMIT 10`,
+      [id]
+    );
+
     const inUseCount = Number(usage.product_count || 0) + Number(usage.request_count || 0) + Number(usage.catalog_count || 0);
     if (inUseCount > 0) {
+      const reasons = [];
+      if (usage.product_count > 0 && farmersResult.rows.length > 0) {
+        const farmerNames = farmersResult.rows.map(f => f.full_name || f.username || f.email).join(', ');
+        reasons.push(`${usage.product_count} product(s) by: ${farmerNames}`);
+      } else if (usage.product_count > 0) {
+        reasons.push(`${usage.product_count} product(s)`);
+      }
+      if (usage.request_count > 0) reasons.push(`${usage.request_count} request(s)`);
+      if (usage.catalog_count > 0) reasons.push(`${usage.catalog_count} catalog name(s)`);
       return res.status(409).json({
-        message: 'Category cannot be deleted because it is still used by products or requests. Disable it instead.'
+        message: `Category cannot be deleted because it is still used by ${reasons.join(', ')}. Disable it instead.`
       });
     }
 
@@ -2601,24 +2723,29 @@ router.get('/dashboard/report', requireAdmin, async (req, res) => {
       SELECT
         ${groupExpr} AS period_label,
         COUNT(*) FILTER (WHERE o.status != 'cancelled') AS sales,
-        COALESCE(SUM(o.total_amount) FILTER (WHERE o.status NOT IN ('cancelled','disabled')), 0) AS revenue,
-        COUNT(DISTINCT o.user_id) AS customers,
-        COUNT(DISTINCT p.farmer_id) AS farmers
+        COALESCE(SUM(o.total_amount) FILTER (WHERE o.status NOT IN ('cancelled','disabled')), 0) AS revenue
       FROM orders o
-      LEFT JOIN products p ON p.id = o.product_id
       WHERE ${filterExpr}
         AND COALESCE(o.is_disabled, false) = false
       GROUP BY ${groupExpr}
+      HAVING COUNT(*) FILTER (WHERE o.status != 'cancelled') > 0
       ORDER BY ${groupExpr} ASC
     `;
-    const rows = (await pool.query(sql)).rows;
+    const [rowsRes, totalCustomersRes, totalFarmersRes] = await Promise.all([
+      pool.query(sql),
+      pool.query("SELECT COUNT(*) AS count FROM users WHERE role = 'customer' AND COALESCE(is_disabled, false) = false"),
+      pool.query("SELECT COUNT(*) AS count FROM users WHERE role = 'farmer' AND COALESCE(is_disabled, false) = false")
+    ]);
+    const rows = rowsRes.rows;
+    const totalCustomers = parseInt(totalCustomersRes.rows[0]?.count || 0, 10);
+    const totalFarmers = parseInt(totalFarmersRes.rows[0]?.count || 0, 10);
 
     const data = rows.map(r => ({
       label: r.period_label,
       sales: parseInt(r.sales) || 0,
       revenue: parseFloat(r.revenue) || 0,
-      customers: parseInt(r.customers) || 0,
-      farmers: parseInt(r.farmers) || 0,
+      customers: totalCustomers,
+      farmers: totalFarmers,
     }));
 
     const result = { data };
@@ -2818,7 +2945,9 @@ router.get('/dashboard/recent-activity', requireAdmin, async (req, res) => {
 
     const activity = rows.map(r => ({
       id: r.id, action: r.action, entity: r.entity, entity_id: r.entity_id,
-      description: `${humanize(r.action)} (${r.entity} #${r.entity_id})`,
+      description: r.entity_id
+        ? `${humanize(r.action)} (${r.entity} #${r.entity_id})`
+        : `${humanize(r.action)} (${r.entity})`,
       actor: r.actor_admin_name || r.actor_admin_email || 'Admin',
       created_at: r.created_at, color: getColor(r.action),
     }));

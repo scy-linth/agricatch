@@ -1,3 +1,12 @@
+/*
+  WARNING: This script will RECREATE products with NEW IDs if they don't exist.
+  Only run this for testing/demo purposes. It will:
+  - Ensure demo farmers, customers, and products are present
+  - Insert products if a product with the same farmer_id and name does not already exist
+
+  If you delete products manually and then run this script, they may reappear with different IDs.
+*/
+
 const bcrypt = require('bcryptjs');
 const { Pool } = require('pg');
 

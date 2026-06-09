@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "seed:extra-products": "node scripts/seed_extra_products.js",
-    "seed:refresh-catalog-smoke": "node scripts/refresh_catalog_and_smoke.js",
+    "seed:extra-products": "echo 'WARNING: This script recreates products with new IDs. Uncomment in package.json to use.'",
+    "seed:refresh-catalog-smoke": "echo 'WARNING: This script recreates products with new IDs. Uncomment in package.json to use.'",
     "clean:placeholders": "node scripts/clean_placeholder_products.js",
     "clean:cloudinary-unused": "node scripts/cleanup_cloudinary_unused.js",
     "clean:cloudinary-unused:confirm": "node scripts/cleanup_cloudinary_unused.js --confirm",
