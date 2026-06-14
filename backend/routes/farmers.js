@@ -251,6 +251,61 @@ router.get('/me/metrics', async (req, res) => {
       ORDER BY ${dateSelect} ASC
     `, paramsRange);
 
+    // Orders by day (all non-cancelled orders)
+    const ordersByDayResult = await pool.query(`
+      SELECT TO_CHAR(${dateSelect}, 'YYYY-MM-DD') AS day,
+             COUNT(*)::int AS orders
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+        AND o.status != 'cancelled'
+      GROUP BY ${dateSelect}
+      ORDER BY ${dateSelect} ASC
+    `, paramsRange);
+
+    // Items sold by day (delivered orders only)
+    const itemsSoldByDayResult = await pool.query(`
+      SELECT TO_CHAR(${dateSelect}, 'YYYY-MM-DD') AS day,
+             COALESCE(SUM(o.quantity), 0)::int AS items_sold
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        ${rangeWhere}
+        AND o.status = 'delivered'
+      GROUP BY ${dateSelect}
+      ORDER BY ${dateSelect} ASC
+    `, paramsRange);
+
+    // Products by day (available products)
+    let productWhere = '';
+    let productParams = [user.id];
+    if (hasCustom) {
+      productWhere = `AND p.created_at >= $2::date AND p.created_at < ($3::date + INTERVAL '1 day')`;
+      productParams = [user.id, from, to];
+    } else if (isAllTime) {
+      productWhere = '';
+      productParams = [user.id];
+    } else {
+      productWhere = `
+        AND p.created_at >= (CURRENT_DATE - (($2::int - 1) * INTERVAL '1 day'))
+        AND p.created_at < (CURRENT_DATE + INTERVAL '1 day')
+      `;
+      productParams = [user.id, Number(rangeDays || 30)];
+    }
+
+    const productsByDayResult = await pool.query(`
+      SELECT TO_CHAR(${dateSelect}, 'YYYY-MM-DD') AS day,
+             COUNT(DISTINCT p.id)::int AS products
+      FROM products p
+      WHERE p.farmer_id = $1
+        AND p.is_available = true
+        AND p.status = 'approved'
+        ${productWhere}
+      GROUP BY ${dateSelect}
+      ORDER BY ${dateSelect} ASC
+    `, productParams);
+
     // Orders by status (all statuses)
     const ordersByStatusResult = await pool.query(`
       SELECT o.status, COUNT(*)::int AS count
@@ -279,6 +334,7 @@ router.get('/me/metrics', async (req, res) => {
     const topProductsResult = await pool.query(`
       SELECT p.id AS product_id,
              p.name AS product_name,
+             p.image AS product_image,
              COALESCE(SUM(o.quantity), 0)::int AS sold_qty,
              COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
       FROM orders o
@@ -286,7 +342,7 @@ router.get('/me/metrics', async (req, res) => {
       WHERE p.farmer_id = $1
         ${rangeWhere}
         AND o.status = 'delivered'
-      GROUP BY p.id, p.name
+      GROUP BY p.id, p.name, p.image
       ORDER BY sold_qty DESC, revenue DESC
       LIMIT 5
     `, paramsRange);
@@ -298,7 +354,8 @@ router.get('/me/metrics', async (req, res) => {
              o.total_amount,
              o.created_at,
              u.full_name AS customer_name,
-             p.name AS product_name
+             p.name AS product_name,
+             p.image AS product_image
       FROM orders o
       JOIN products p ON o.product_id = p.id
       LEFT JOIN users u ON o.user_id = u.id
@@ -317,10 +374,23 @@ router.get('/me/metrics', async (req, res) => {
         date: r.day,
         revenue: Number(r.revenue) || 0
       })),
+      ordersByDay: ordersByDayResult.rows.map(r => ({
+        date: r.day,
+        orders: Number(r.orders) || 0
+      })),
+      itemsSoldByDay: itemsSoldByDayResult.rows.map(r => ({
+        date: r.day,
+        items_sold: Number(r.items_sold) || 0
+      })),
+      productsByDay: productsByDayResult.rows.map(r => ({
+        date: r.day,
+        products: Number(r.products) || 0
+      })),
       ordersByStatus,
       topProducts: topProductsResult.rows.map(r => ({
         product_id: r.product_id,
         product_name: r.product_name,
+        product_image: r.product_image,
         sold_qty: Number(r.sold_qty) || 0,
         revenue: Number(r.revenue) || 0
       })),
@@ -330,7 +400,8 @@ router.get('/me/metrics', async (req, res) => {
         total_amount: Number(r.total_amount) || 0,
         created_at: r.created_at,
         customer_name: r.customer_name,
-        product_name: r.product_name
+        product_name: r.product_name,
+        product_image: r.product_image
       }))
     });
   } catch (error) {
