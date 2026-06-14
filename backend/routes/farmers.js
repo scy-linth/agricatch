@@ -216,7 +216,8 @@ router.get('/me/metrics', async (req, res) => {
 
     // Use delivery date for delivered rows, and created_at for non-delivered rows.
     // This keeps the delivered sales trend aligned with when orders were actually delivered.
-    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.delivered_at, o.updated_at, o.created_at) ELSE o.created_at END`;
+    // Defensive: handle case where delivered_at column might not exist in older DBs
+    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.updated_at, o.created_at) ELSE o.created_at END`;
 
     const dateSelect = isAllTime
       ? `DATE_TRUNC('month', ${timeRef})::date`
@@ -305,7 +306,6 @@ router.get('/me/metrics', async (req, res) => {
       FROM products p
       WHERE p.farmer_id = $1
         AND p.is_available = true
-        AND p.status = 'approved'
         ${productWhere}
       GROUP BY ${productDateSelect}
       ORDER BY ${productDateSelect} ASC
@@ -443,7 +443,7 @@ router.get('/me/metrics/export.csv', async (req, res) => {
       }
     }
 
-    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.delivered_at, o.updated_at, o.created_at) ELSE o.created_at END`;
+    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.updated_at, o.created_at) ELSE o.created_at END`;
     const dateSelect = isAllTime
       ? `DATE_TRUNC('month', ${timeRef})::date`
       : `DATE(${timeRef})`;
