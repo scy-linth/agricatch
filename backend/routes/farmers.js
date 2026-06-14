@@ -278,6 +278,11 @@ router.get('/me/metrics', async (req, res) => {
     `, paramsRange);
 
     // Products by day (available products)
+    // For products, we use created_at directly (no timeRef like orders)
+    const productDateSelect = isAllTime
+      ? `DATE_TRUNC('month', p.created_at)::date`
+      : `DATE(p.created_at)`;
+
     let productWhere = '';
     let productParams = [user.id];
     if (hasCustom) {
@@ -295,15 +300,15 @@ router.get('/me/metrics', async (req, res) => {
     }
 
     const productsByDayResult = await pool.query(`
-      SELECT TO_CHAR(${dateSelect}, 'YYYY-MM-DD') AS day,
+      SELECT TO_CHAR(${productDateSelect}, 'YYYY-MM-DD') AS day,
              COUNT(DISTINCT p.id)::int AS products
       FROM products p
       WHERE p.farmer_id = $1
         AND p.is_available = true
         AND p.status = 'approved'
         ${productWhere}
-      GROUP BY ${dateSelect}
-      ORDER BY ${dateSelect} ASC
+      GROUP BY ${productDateSelect}
+      ORDER BY ${productDateSelect} ASC
     `, productParams);
 
     // Orders by status (all statuses)
