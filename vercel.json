@@ -1,6 +1,7 @@
 {
   "version": 2,
   "buildCommand": "npm run build:config",
+  "outputDirectory": "frontend",
   "rewrites": [
     {
       "source": "/api/:path*",
