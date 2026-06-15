@@ -1385,6 +1385,8 @@ class FarmerDashboard {
         const editName = document.getElementById('edit-product-name');
         const addCategory = document.getElementById('product-category');
         const editCategory = document.getElementById('edit-product-category');
+        const addUnit = document.getElementById('product-unit');
+        const editUnit = document.getElementById('edit-product-unit');
 
         if (addName) {
             addName.readOnly = true;
@@ -1428,6 +1430,13 @@ class FarmerDashboard {
 
         const editPrice = document.getElementById('edit-product-price');
         if (editPrice) editPrice.addEventListener('focus', () => this.updatePriceSuggestion('edit'));
+
+        if (addUnit) {
+            addUnit.addEventListener('change', () => this.updatePriceSuggestion('add'));
+        }
+        if (editUnit) {
+            editUnit.addEventListener('change', () => this.updatePriceSuggestion('edit'));
+        }
 
         this.syncProductNameAvailability('add');
         this.syncProductNameAvailability('edit');
