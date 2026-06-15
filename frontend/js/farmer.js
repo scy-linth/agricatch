@@ -22,20 +22,16 @@ class FarmerDashboard {
         this.currentShopProfile = null;
         this.isShopProfileEditing = false;
 
-        this.overviewRangeDays = 30;
-        this.overviewRangeMode = 'all'; // 'days' | 'all' | 'custom'
-        this.overviewCustomFrom = null; // YYYY-MM-DD
-        this.overviewCustomTo = null;   // YYYY-MM-DD
-        this.overviewCharts = { sales: null, status: null, topProducts: null };
+        this.overviewCharts = { sales: null, status: null };
         this.overviewMetrics = null;
         this.hasLoadedOrders = false;
         this.isSubmittingAddProduct = false;
         this.isSubmittingEditProduct = false;
         this.overviewRecentOrdersCache = [];
-        this.recentOrdersPage = 1;
-        this.recentOrdersPerPage = 8;
+        this.overviewTopProductsCache = [];
         this.overviewLastFetchAt = 0;
         this.overviewFetchInFlight = null;
+        this.sortableTables = {};
         this.overviewRefreshTimer = null;
         this.myProductsCache = [];
         this.catalogProductNames = [];
@@ -177,9 +173,183 @@ class FarmerDashboard {
         return `₱${(Number.isFinite(n) ? n : 0).toFixed(2)}`;
     }
 
+    _periodToRangeDays(period) {
+        const p = String(period || '').trim().toLowerCase();
+        if (p === 'today') return '1';
+        if (p === 'week') return '7';
+        if (p === 'month') return '30';
+        if (p === 'year') return '365';
+        if (p === 'all') return 'all';
+        return '30';
+    }
+
+    _periodLabel(period) {
+        const map = { today: 'Today', week: 'This Week', month: 'This Month', year: 'This Year', all: 'All Time' };
+        return map[String(period || '').trim().toLowerCase()] || 'Today';
+    }
+
+    _comparisonLabel(period) {
+        const map = { today: 'vs prev today', week: 'vs prev week', month: 'vs prev month', year: 'vs prev year', all: 'vs prev period' };
+        return map[String(period || '').trim().toLowerCase()] || 'vs prev today';
+    }
+
+    _syncAllPeriods(period) {
+        this._reportPeriod = period;
+        this._statusPeriod = period;
+        // Recent Orders and Top Products are NOT synced with period filter
+        // this._recentOrdersPeriod = period;
+        // this._topProductsPeriod = period;
+        for (const key of Object.keys(this._kpiPeriods)) {
+            this._kpiPeriods[key] = period;
+        }
+        // Update all period labels
+        const periodText = this._periodLabel(period);
+        const periodLabels = [
+            'total-orders-period-label',
+            'items-sold-period-label',
+            'total-revenue-period-label',
+            'reports-period-label',
+            'status-period-label'
+        ];
+        periodLabels.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = `| ${periodText}`;
+        });
+        // Update all comparison labels
+        const comparisonText = this._comparisonLabel(period);
+        const comparisonLabels = [
+            'total-orders-change-label',
+            'items-sold-change-label',
+            'total-revenue-change-label'
+        ];
+        comparisonLabels.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = comparisonText;
+        });
+        // Clear cached data when switching periods (but not for Recent Orders/Top Products)
+        this.overviewMetrics = null;
+        // Don't clear Recent Orders and Top Products cache since they're independent
+        // this.overviewRecentOrdersCache = [];
+        // this.overviewTopProductsCache = [];
+        this.overviewLastFetchAt = 0;
+    }
+
+    destroySortableTable(tableId) {
+        const existing = this.sortableTables?.[tableId];
+        if (existing && typeof existing.destroy === 'function') {
+            try {
+                existing.destroy();
+            } catch (_) {}
+            delete this.sortableTables[tableId];
+        }
+    }
+
+    refreshSortableTable(tableId, options = {}) {
+        const existing = this.sortableTables?.[tableId];
+        if (existing && typeof existing.destroy === 'function') {
+            try {
+                existing.destroy();
+            } catch (_) {}
+            delete this.sortableTables[tableId];
+        }
+
+        if (!window.simpleDatatables?.DataTable) return;
+
+        const table = document.getElementById(tableId);
+        if (!table) return;
+
+        const bodyRows = Array.from(table.querySelectorAll('tbody tr'));
+        const hasSortableRows = bodyRows.some((row) => row.children.length > 1);
+        if (!hasSortableRows) return;
+
+        const dataTableOptions = {
+            searchable: false,
+            paging: false,
+            perPageSelect: false,
+            sortable: true,
+            fixedHeight: false,
+            destroyable: true,
+            labels: {
+                placeholder: '',
+                noRows: 'No entries found',
+                noResults: 'No results found'
+            },
+            ...options
+        };
+
+        if (options.defaultSort) {
+            dataTableOptions.sort = options.defaultSort;
+        }
+
+        this.sortableTables[tableId] = new window.simpleDatatables.DataTable(table, dataTableOptions);
+        this.sortableTables[tableId]?.wrapperDOM?.classList.add('admin-sortable-wrapper');
+    }
+
+    getStatusClass(status) {
+        if (['pending'].includes(status)) return 'pending';
+        if (['confirmed'].includes(status)) return 'confirmed';
+        if (['preparing', 'out_for_delivery'].includes(status)) return 'preparing';
+        if (status === 'delivered') return 'delivered';
+        if (status === 'cancelled') return 'cancelled';
+        if (status === 'refunded') return 'refunded';
+        return 'completed';
+    }
+
+    renderStatus(text, statusKey) {
+        const key = (statusKey || '').toString().toLowerCase();
+        const cls = this.getStatusClass(key);
+        const direct = ['active','disabled','approved','rejected','verified','unverified','available','unavailable','no_stock'];
+        const pillClass = direct.includes(key) ? key : cls;
+        return `<span class="status-pill ${pillClass}">${text}</span>`;
+    }
+
+    renderPagination(containerId, pg, onPageChange) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const { page, total, limit } = pg;
+        const totalPages = Math.max(1, Math.ceil(total / limit));
+        const start = (page - 1) * limit + 1;
+        const end = Math.min(page * limit, total);
+        if (totalPages <= 1) {
+            container.innerHTML = `<span class="pagination-info">Showing ${start}–${end} of ${total}</span>`;
+            return;
+        }
+        const pages = [];
+        const range = 2;
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= page - range && i <= page + range)) pages.push(i);
+            else if (pages[pages.length - 1] !== '…') pages.push('…');
+        }
+        container.innerHTML = `
+            <span class="pagination-info">Showing ${start}–${end} of ${total}</span>
+            <div class="pagination-controls">
+                <button class="page-btn" ${page <= 1 ? 'disabled' : ''} data-page="${page - 1}">‹</button>
+                ${pages.map(p => p === '…'
+                    ? `<button class="page-btn" disabled>…</button>`
+                    : `<button class="page-btn ${p === page ? 'active' : ''}" data-page="${p}">${p}</button>`
+                ).join('')}
+                <button class="page-btn" ${page >= totalPages ? 'disabled' : ''} data-page="${page + 1}">›</button>
+            </div>
+        `;
+        container.querySelectorAll('[data-page]').forEach(btn => {
+            btn.addEventListener('click', () => onPageChange(Number(btn.getAttribute('data-page'))));
+        });
+    }
+
     init() {
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
+        // Dashboard period state (mirrors admin.js patterns)
+        this._kpiPeriods = { 'kpi-products': 'all', 'kpi-orders': 'today', 'kpi-sold': 'today', 'kpi-revenue': 'today' };
+        this._reportPeriod = 'today';
+        this._statusPeriod = 'today';
+        this._recentOrdersPeriod = 'today';
+        this._topProductsPeriod = 'today';
+        this.pagination = {
+            'recent-orders': { page: 1, total: 0, limit: 5 },
+            'top-products': { page: 1, total: 0, limit: 5 },
+            'products': { page: 1, total: 0, limit: 50 },
+        };
         this.showDeniedBanner();
         this.checkFarmerAuth();
         this.setupEventListeners();
@@ -225,7 +395,6 @@ class FarmerDashboard {
             modal.classList.add('active');
             document.documentElement.classList.add('modal-open');
             document.body.classList.add('modal-open');
-            await this.loadRequestCategories();
             await this.loadRequestHistory();
         } catch (e) {
             console.error('Open request modal error:', e);
@@ -290,91 +459,20 @@ class FarmerDashboard {
         document.body.classList.remove('modal-open');
     }
 
-    async loadRequestCategories() {
-        try {
-            const res = await fetch(`${this.apiBase}/products/categories`, {
-                headers: { Authorization: `Bearer ${this.token}` }
-            });
-            if (!res.ok) return;
-            const data = await res.json();
-            const categories = Array.isArray(data.categories) ? data.categories : [];
-            const categoryEl = document.getElementById('request-product-category');
-            const newCategoryToggle = document.getElementById('request-new-category-toggle');
-            const newCategoryInput = document.getElementById('request-new-category-name');
-            if (!categoryEl) return;
-            categoryEl.innerHTML = ['<option value="">Select category</option>']
-                .concat(categories.map((c) => `<option value="${String(c.id)}">${this.escapeAttr(c.name)}</option>`))
-                .join('');
-
-            const setNewCategoryActive = (active) => {
-                if (!newCategoryToggle) return;
-                newCategoryToggle.classList.toggle('active', !!active);
-                newCategoryToggle.setAttribute('aria-pressed', active ? 'true' : 'false');
-            };
-            const isNewCategoryActive = () => !!newCategoryToggle?.classList.contains('active');
-
-            setNewCategoryActive(false);
-            if (newCategoryInput) {
-                newCategoryInput.value = '';
-                newCategoryInput.style.display = 'none';
-            }
-
-            const syncRequestCategoryState = () => {
-                const nameEl = document.getElementById('request-product-name');
-                if (!nameEl) return;
-                const has = !!String(categoryEl.value || '').trim();
-                const typedNewCategory = !!String(newCategoryInput?.value || '').trim();
-                const isRequestingNewCategory = isNewCategoryActive() || typedNewCategory;
-                if (typedNewCategory && newCategoryToggle && !isNewCategoryActive()) {
-                    setNewCategoryActive(true);
-                }
-                nameEl.disabled = !(has || isRequestingNewCategory);
-                if (!has && !isRequestingNewCategory) nameEl.placeholder = 'Choose category first';
-                else nameEl.placeholder = 'Enter requested product name';
-                categoryEl.disabled = isRequestingNewCategory;
-                if (newCategoryInput) newCategoryInput.style.display = isRequestingNewCategory ? '' : 'none';
-            };
-
-            categoryEl.onchange = syncRequestCategoryState;
-            if (newCategoryToggle) {
-                newCategoryToggle.onclick = (e) => {
-                    e.preventDefault();
-                    setNewCategoryActive(!isNewCategoryActive());
-                    if (!isNewCategoryActive() && newCategoryInput) newCategoryInput.value = '';
-                    syncRequestCategoryState();
-                };
-            }
-            if (newCategoryInput) newCategoryInput.oninput = syncRequestCategoryState;
-            syncRequestCategoryState();
-        } catch (e) {
-            console.error('Load request categories error:', e);
-        }
-    }
-
     async handleSubmitRequestForm(e) {
         try {
             e.preventDefault();
-            const categoryEl = document.getElementById('request-product-category');
             const nameEl = document.getElementById('request-product-name');
             const notesEl = document.getElementById('request-product-notes');
-            const newCategoryToggle = document.getElementById('request-new-category-toggle');
-            const newCategoryNameEl = document.getElementById('request-new-category-name');
-            if (!categoryEl || !nameEl) return;
-            const categoryId = String(categoryEl.value || '').trim();
+            if (!nameEl) return;
             const name = String(nameEl.value || '').trim();
             const notes = String(notesEl?.value || '').trim();
-            const requestedCategoryName = String(newCategoryNameEl?.value || '').trim();
-            const isRequestingNewCategory = !!newCategoryToggle?.classList.contains('active') || !!requestedCategoryName;
-            if (!categoryId && !isRequestingNewCategory) return this.showMessage('Please choose a category.', 'error');
-            if (isRequestingNewCategory && !requestedCategoryName) return this.showMessage('Please enter the new category name.', 'error');
             if (!name) return this.showMessage('Please enter the product name.', 'error');
 
             const res = await fetch(`${this.apiBase}/products/category-requests`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
                 body: JSON.stringify({
-                    category_id: categoryId ? Number(categoryId) : null,
-                    requested_category_name: isRequestingNewCategory ? requestedCategoryName : null,
                     name,
                     notes
                 })
@@ -384,7 +482,6 @@ class FarmerDashboard {
             this.showMessage('Request submitted for staff approval.', 'success');
             // reset
             (document.getElementById('request-product-form-modal') || {}).reset?.();
-            await this.loadRequestCategories();
             await this.loadRequestHistory();
         } catch (err) {
             console.error('Submit request error:', err);
@@ -735,39 +832,13 @@ class FarmerDashboard {
     }
 
     setupEventListeners() {
-        // Mobile sidebar toggle
-        const mobileMenuToggle = document.getElementById('farmer-mobile-menu-toggle');
-        const farmerSidebar = document.getElementById('farmer-sidebar');
-        const sidebarOverlay = document.getElementById('farmer-sidebar-overlay');
-        const closeSidebar = () => {
-            if (farmerSidebar) farmerSidebar.classList.remove('open');
-            if (sidebarOverlay) sidebarOverlay.classList.remove('active');
-            const icon = mobileMenuToggle?.querySelector('i');
-            if (icon) {
-                icon.classList.add('fa-bars');
-                icon.classList.remove('fa-times');
-            }
-        };
-        if (mobileMenuToggle && farmerSidebar) {
-            mobileMenuToggle.addEventListener('click', () => {
-                farmerSidebar.classList.toggle('open');
-                if (sidebarOverlay) sidebarOverlay.classList.toggle('active');
-                const icon = mobileMenuToggle.querySelector('i');
-                if (icon) {
-                    icon.classList.toggle('fa-bars');
-                    icon.classList.toggle('fa-times');
-                }
-            });
-            if (sidebarOverlay) {
-                sidebarOverlay.addEventListener('click', closeSidebar);
-            }
-            // Close sidebar when clicking on a link
-            document.querySelectorAll('.sidebar-link').forEach(link => {
-                link.addEventListener('click', () => {
-                    if (window.innerWidth <= 768) {
-                        closeSidebar();
-                    }
-                });
+        // Sidebar toggle button (same pattern as admin.js)
+        const toggleBtn = document.getElementById('farmer-sidebar-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.body.classList.toggle('toggle-sidebar');
             });
         }
 
@@ -803,11 +874,6 @@ class FarmerDashboard {
                     if (drop) drop.classList.remove('open');
                 }, 120);
             });
-        }
-
-        const exportBtn = document.getElementById('overview-export-csv-btn');
-        if (exportBtn) {
-            exportBtn.addEventListener('click', () => this.exportOverviewCsv());
         }
 
         const accountBtn = document.getElementById('farmer-account-btn');
@@ -871,54 +937,92 @@ class FarmerDashboard {
             sidebarLogoutBtn.addEventListener('click', () => this.logout());
         }
 
-        const recentPrev = document.getElementById('overview-recent-prev');
-        if (recentPrev) {
-            recentPrev.addEventListener('click', () => {
-                this.recentOrdersPage = Math.max(1, Number(this.recentOrdersPage || 1) - 1);
-                this.renderOverviewRecentOrders(this.overviewRecentOrdersCache);
-            });
-        }
-        const recentNext = document.getElementById('overview-recent-next');
-        if (recentNext) {
-            recentNext.addEventListener('click', () => {
-                const totalPages = Math.max(1, Math.ceil((this.overviewRecentOrdersCache?.length || 0) / this.recentOrdersPerPage));
-                this.recentOrdersPage = Math.min(totalPages, Number(this.recentOrdersPage || 1) + 1);
-                this.renderOverviewRecentOrders(this.overviewRecentOrdersCache);
-            });
-        }
+        // KPI card period filters (removed from HTML, keeping for reference)
+        // document.addEventListener('click', (e) => {
+        //     const link = e.target.closest('.kpi-period-filter');
+        //     if (!link) return;
+        //     e.preventDefault();
+        //     const card = link.dataset.card;
+        //     const period = link.dataset.period;
+        //     if (card && period) {
+        //         const dropdown = link.closest('.dropdown-menu');
+        //         if (dropdown) {
+        //             dropdown.querySelectorAll('.kpi-period-filter').forEach(item => item.classList.remove('active'));
+        //             link.classList.add('active');
+        //         }
+        //         this._kpiPeriods[card] = period;
+        //         this._syncAllPeriods(period);
+        //         this.loadOverviewMetrics({ force: true });
+        //     }
+        // });
 
-        const overviewRangeSelect = document.getElementById('overview-range-select');
-        if (overviewRangeSelect) {
-            overviewRangeSelect.addEventListener('change', () => {
-                this.setOverviewRange(overviewRangeSelect.value);
-            });
-        }
+        // Reports chart period filter
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.report-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._syncAllPeriods(period);
+            this.loadOverviewMetrics({ force: true });
+        });
 
-        const customApplyBtn = document.getElementById('overview-custom-apply');
-        if (customApplyBtn) {
-            customApplyBtn.addEventListener('click', () => {
-                const fromInput = document.getElementById('overview-from');
-                const toInput = document.getElementById('overview-to');
-                const from = String(fromInput?.value || '').trim();
-                const to = String(toInput?.value || '').trim();
-                if (!from || !to) {
-                    this.showMessage('Please choose both From and To dates.', 'error');
-                    return;
+        // Status chart period filter
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.status-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._syncAllPeriods(period);
+            this.loadOverviewMetrics({ force: true });
+        });
+
+        // Total orders period filter
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.total-orders-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._syncAllPeriods(period);
+            this.loadOverviewMetrics({ force: true });
+        });
+
+        // Items sold period filter
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.items-sold-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._syncAllPeriods(period);
+            this.loadOverviewMetrics({ force: true });
+        });
+
+        // Total revenue period filter
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.total-revenue-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._syncAllPeriods(period);
+            this.loadOverviewMetrics({ force: true });
+        });
+
+
+        // Entries-per-page change handlers
+        document.querySelectorAll('select[data-entries-section]').forEach(sel => {
+            sel.addEventListener('change', () => {
+                const section = sel.dataset.entriesSection;
+                const pg = this.pagination[section];
+                if (pg) {
+                    pg.limit = Number(sel.value) || 5;
+                    pg.page = 1;
+                    if (section === 'products') {
+                        this.loadMyProducts();
+                    } else {
+                        this.loadOverviewMetrics({ force: true });
+                    }
                 }
-                if (from > to) {
-                    this.showMessage('From date must be before To date.', 'error');
-                    return;
-                }
-                this.setOverviewCustomRange(from, to);
             });
-        }
-
-        const customCancelBtn = document.getElementById('overview-custom-cancel');
-        if (customCancelBtn) {
-            customCancelBtn.addEventListener('click', () => {
-                this.hideOverviewCustomPanel();
-            });
-        }
+        });
 
         // Tab switching
         document.getElementById('list-products-tab')?.addEventListener('click', () => this.switchTab('list-products'));
@@ -979,12 +1083,11 @@ class FarmerDashboard {
         document.getElementById('delivered-orders-tab')?.addEventListener('click', () => this.switchOrderTab('delivered'));
         document.getElementById('cancelled-orders-tab')?.addEventListener('click', () => this.switchOrderTab('cancelled'));
 
-        // Product filters
-        document.querySelectorAll('input[name="product-status-filter"]').forEach((radio) => {
-            radio.addEventListener('change', () => this.filterProducts());
-        });
+        // Product filters (updated for table layout)
         document.getElementById('product-category-filter')?.addEventListener('change', () => this.filterProducts());
-        document.getElementById('product-sort-select')?.addEventListener('change', () => this.filterProducts());
+        document.getElementById('product-status-filter')?.addEventListener('change', () => this.filterProducts());
+        document.getElementById('products-search-btn')?.addEventListener('click', () => this.filterProducts());
+        document.getElementById('products-refresh-btn')?.addEventListener('click', () => this.loadMyProducts());
         
         // Optional refresh buttons (check if they exist)
         const refreshOrdersBtn = document.getElementById('refresh-orders-btn');
@@ -1015,6 +1118,17 @@ class FarmerDashboard {
         const previewOverlay = previewModal?.querySelector('.product-details-overlay');
         if (previewCloseBtn) previewCloseBtn.addEventListener('click', () => this.closeMyProductPreview());
         if (previewOverlay) previewOverlay.addEventListener('click', () => this.closeMyProductPreview());
+
+        // Product edit button (event delegation)
+        document.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.product-edit-btn');
+            if (editBtn) {
+                const productId = Number(editBtn.getAttribute('data-product-id'));
+                if (productId && !isNaN(productId)) {
+                    this.editProduct(productId);
+                }
+            }
+        });
 
         // Detail panel actions (event delegation)
         document.addEventListener('click', (e) => {
@@ -1049,32 +1163,26 @@ class FarmerDashboard {
         // Initialize date rules for product forms
         this.setupProductDateConstraints();
 
-        // Low stock filter
-        const lowStockFilter = document.getElementById('product-low-stock-filter');
-        if (lowStockFilter) {
-            lowStockFilter.addEventListener('change', () => this.filterProducts());
-        }
-
-        // Batch action bar
-        const batchSelectAll = document.getElementById('batch-select-all');
-        if (batchSelectAll) {
-            batchSelectAll.addEventListener('change', () => {
-                const checked = batchSelectAll.checked;
-                document.querySelectorAll('#my-products-grid .product-select-cb').forEach(cb => {
-                    cb.checked = checked;
-                });
-                this.updateBatchBar();
-            });
-        }
-        document.getElementById('batch-mark-available-btn')?.addEventListener('click', () => this.handleBatchAction('available'));
-        document.getElementById('batch-mark-soldout-btn')?.addEventListener('click', () => this.handleBatchAction('soldout'));
-        document.getElementById('batch-delete-btn')?.addEventListener('click', () => this.handleBatchAction('delete'));
-        document.getElementById('batch-cancel-btn')?.addEventListener('click', () => {
-            document.querySelectorAll('#my-products-grid .product-select-cb').forEach(cb => { cb.checked = false; });
-            const batchAll = document.getElementById('batch-select-all');
-            if (batchAll) batchAll.checked = false;
-            this.updateBatchBar();
-        });
+        // Batch action bar (removed from HTML, keeping for reference)
+        // const batchSelectAll = document.getElementById('batch-select-all');
+        // if (batchSelectAll) {
+        //     batchSelectAll.addEventListener('change', () => {
+        //         const checked = batchSelectAll.checked;
+        //         document.querySelectorAll('#my-products-grid .product-select-cb').forEach(cb => {
+        //             cb.checked = checked;
+        //         });
+        //         this.updateBatchBar();
+        //     });
+        // }
+        // document.getElementById('batch-mark-available-btn')?.addEventListener('click', () => this.handleBatchAction('available'));
+        // document.getElementById('batch-mark-soldout-btn')?.addEventListener('click', () => this.handleBatchAction('soldout'));
+        // document.getElementById('batch-delete-btn')?.addEventListener('click', () => this.handleBatchAction('delete'));
+        // document.getElementById('batch-cancel-btn')?.addEventListener('click', () => {
+        //     document.querySelectorAll('#my-products-grid .product-select-cb').forEach(cb => { cb.checked = false; });
+        //     const batchAll = document.getElementById('batch-select-all');
+        //     if (batchAll) batchAll.checked = false;
+        //     this.updateBatchBar();
+        // });
     }
 
     async loadProductCatalogNames(categoryId = null) {
@@ -1129,6 +1237,7 @@ class FarmerDashboard {
             return;
         }
 
+        const isAlreadyOpen = listEl.classList.contains('open');
         const query = forceAll ? '' : String(nameInput.value || '').trim().toLowerCase();
         const source = Array.isArray(this.catalogProductNames) ? this.catalogProductNames : [];
         const matches = source
@@ -1141,10 +1250,15 @@ class FarmerDashboard {
             return;
         }
 
-        listEl.innerHTML = matches.map((name) => (
-            `<button type="button" class="product-name-option" data-name="${this.escapeAttr(name)}">${this.escapeHtml(name)}</button>`
-        )).join('');
-        listEl.classList.add('open');
+        const currentValue = String(nameInput.value || '').trim().toLowerCase();
+        listEl.innerHTML = matches.map((name) => {
+            const isSelected = currentValue && String(name).toLowerCase() === currentValue;
+            return `<button type="button" class="product-name-option${isSelected ? ' selected' : ''}" data-name="${this.escapeAttr(name)}">${this.escapeHtml(name)}</button>`;
+        }).join('');
+        // Only open dropdown when user explicitly triggered it (forceAll) or it was already open
+        if (forceAll || isAlreadyOpen) {
+            listEl.classList.add('open');
+        }
         this.productNameActiveIndex[mode] = -1;
 
         listEl.querySelectorAll('.product-name-option').forEach((btn) => {
@@ -1254,12 +1368,16 @@ class FarmerDashboard {
             nameInput.value = '';
             nameInput.placeholder = 'Choose category first';
             if (hint) hint.textContent = 'Suggested lowest price: —';
-            this.renderProductNameSuggestions(mode);
+            // Clear dropdown
+            const listEl = document.getElementById(isEdit ? 'edit-product-name-suggestions' : 'product-name-suggestions');
+            if (listEl) {
+                listEl.classList.remove('open');
+                listEl.innerHTML = '';
+            }
             return;
         }
 
         nameInput.placeholder = 'Select product name';
-        this.renderProductNameSuggestions(mode);
     }
 
     setupProductSuggestionListeners() {
@@ -1298,6 +1416,8 @@ class FarmerDashboard {
             this.updatePriceSuggestion('add');
         });
         if (editCategory) editCategory.addEventListener('change', async () => {
+            const editNameEl = document.getElementById('edit-product-name');
+            if (editNameEl) editNameEl.value = '';
             this.syncProductNameAvailability('edit');
             await this.loadProductCatalogNames(editCategory.value || null);
             this.updatePriceSuggestion('edit');
@@ -1358,6 +1478,7 @@ class FarmerDashboard {
         const isEdit = mode === 'edit';
         const nameInput = document.getElementById(isEdit ? 'edit-product-name' : 'product-name');
         const categoryInput = document.getElementById(isEdit ? 'edit-product-category' : 'product-category');
+        const unitInput = document.getElementById(isEdit ? 'edit-product-unit' : 'product-unit');
         const priceInput = document.getElementById(isEdit ? 'edit-product-price' : 'product-price');
         const hint = document.getElementById(isEdit ? 'edit-product-price-suggestion' : 'product-price-suggestion');
 
@@ -1365,6 +1486,7 @@ class FarmerDashboard {
 
         const name = String(nameInput.value || '').trim();
         const categoryId = String(categoryInput?.value || '').trim();
+        const unit = String(unitInput?.value || '').trim();
         if (!name) {
             hint.textContent = 'Suggested lowest price: —';
             return;
@@ -1374,6 +1496,7 @@ class FarmerDashboard {
             hint.textContent = 'Suggested lowest price: checking...';
             const params = new URLSearchParams({ name });
             if (categoryId) params.set('category_id', categoryId);
+            if (unit) params.set('unit', unit);
 
             const response = await fetch(`${this.apiBase}/products/pricing/suggestion?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -1552,6 +1675,20 @@ class FarmerDashboard {
         const titleEl = document.getElementById('farmer-page-title');
         if (titleEl) titleEl.textContent = titles[safeSection] || 'Overview';
 
+        // Update breadcrumb
+        const breadcrumbCurrent = document.getElementById('breadcrumb-current');
+        if (breadcrumbCurrent) {
+            const breadcrumbLabels = {
+                overview: 'Farmer Dashboard',
+                products: 'My Products',
+                orders: 'Orders',
+                reviews: 'Reviews',
+                shop: 'Shop Profile',
+                chat: 'Messages'
+            };
+            breadcrumbCurrent.textContent = breadcrumbLabels[safeSection] || 'Farmer Dashboard';
+        }
+
         // Load data when switching to specific sections
         if (safeSection === 'orders') {
             this.loadMyOrders();
@@ -1626,8 +1763,7 @@ class FarmerDashboard {
             }
 
             // Load farmer stats
-            const params = this.buildOverviewRangeSearchParams();
-            const statsUrl = `${this.apiBase}/farmers/me/stats?${params.toString()}`;
+            const statsUrl = `${this.apiBase}/farmers/me/stats`;
             const statsResponse = await fetch(statsUrl, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
@@ -2011,40 +2147,6 @@ class FarmerDashboard {
         return `${y}-${m}-${day}`;
     }
 
-    showOverviewCustomPanel() {
-        const panel = document.getElementById('overview-custom-panel');
-        if (!panel) return;
-
-        const fromInput = document.getElementById('overview-from');
-        const toInput = document.getElementById('overview-to');
-
-        // Prefill: keep previous custom selection if available, otherwise default to last 30 days.
-        if (fromInput && !String(fromInput.value || '').trim()) {
-            if (this.overviewCustomFrom) {
-                fromInput.value = this.overviewCustomFrom;
-            } else {
-                const today = new Date();
-                const start = new Date(today);
-                start.setDate(start.getDate() - 29);
-                fromInput.value = this.formatLocalDateInputValue(start);
-            }
-        }
-        if (toInput && !String(toInput.value || '').trim()) {
-            if (this.overviewCustomTo) {
-                toInput.value = this.overviewCustomTo;
-            } else {
-                toInput.value = this.formatLocalDateInputValue(new Date());
-            }
-        }
-
-        panel.style.display = 'block';
-    }
-
-    hideOverviewCustomPanel() {
-        const panel = document.getElementById('overview-custom-panel');
-        if (panel) panel.style.display = 'none';
-    }
-
     async loadAnnouncements() {
         const el = document.getElementById('farmer-announcements');
         const countEl = document.getElementById('farmer-announce-count');
@@ -2075,63 +2177,10 @@ class FarmerDashboard {
         }
     }
 
-    buildOverviewRangeSearchParams() {
-        const params = new URLSearchParams();
-        if (this.overviewRangeMode === 'custom' && this.overviewCustomFrom && this.overviewCustomTo) {
-            params.set('from', this.overviewCustomFrom);
-            params.set('to', this.overviewCustomTo);
-        } else {
-            const rangeParam = this.overviewRangeMode === 'all' ? 'all' : String(this.overviewRangeDays);
-            params.set('rangeDays', rangeParam);
-        }
-        return params;
-    }
-
-    setOverviewRange(range) {
-        const value = String(range || '').trim().toLowerCase();
-
-        if (value === 'custom') {
-            this.showOverviewCustomPanel();
-            return;
-        }
-
-        this.hideOverviewCustomPanel();
-        this.overviewCustomFrom = null;
-        this.overviewCustomTo = null;
-
-        if (value === 'all') {
-            this.overviewRangeMode = 'all';
-        } else {
-            const days = Number(value);
-            if (!Number.isFinite(days) || days <= 0) return;
-            this.overviewRangeMode = 'days';
-            this.overviewRangeDays = days;
-        }
-
-        const select = document.getElementById('overview-range-select');
-        if (select) {
-            select.value = this.overviewRangeMode === 'all' ? 'all' : String(this.overviewRangeDays);
-        }
-
-        this.loadOverviewMetrics({ force: true });
-    }
-
-    setOverviewCustomRange(from, to) {
-        this.overviewRangeMode = 'custom';
-        this.overviewCustomFrom = from;
-        this.overviewCustomTo = to;
-        this.hideOverviewCustomPanel();
-
-        const select = document.getElementById('overview-range-select');
-        if (select) select.value = 'custom';
-
-        this.loadOverviewMetrics({ force: true });
-    }
-
     async loadOverviewMetrics({ force = false } = {}) {
         try {
             if (!this.token) return;
-            if (!document.getElementById('overview-sales-chart')) return;
+            if (!document.getElementById('reportsChart')) return;
 
             const now = Date.now();
             if (!force && now - this.overviewLastFetchAt < 5000) return;
@@ -2141,7 +2190,21 @@ class FarmerDashboard {
             const lastUpdatedEl = document.getElementById('overview-last-updated');
             if (lastUpdatedEl) lastUpdatedEl.textContent = 'Refreshing report…';
 
-            const params = this.buildOverviewRangeSearchParams();
+            const rangeDays = this._periodToRangeDays(this._reportPeriod);
+            const params = new URLSearchParams();
+            params.set('rangeDays', rangeDays);
+            // Also pass entries-per-page limits for backend to use if supported
+            const roPg = this.pagination['recent-orders'];
+            const tpPg = this.pagination['top-products'];
+            if (roPg) {
+                params.set('recentOrdersLimit', String(roPg.limit));
+                params.set('recentOrdersPage', String(roPg.page));
+            }
+            if (tpPg) {
+                params.set('topProductsLimit', String(tpPg.limit));
+                params.set('topProductsPage', String(tpPg.page));
+            }
+
             const url = `${this.apiBase}/farmers/me/metrics?${params.toString()}`;
             this.overviewFetchInFlight = fetch(url, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -2153,7 +2216,6 @@ class FarmerDashboard {
                 })
                 .then((metrics) => {
                     this.overviewMetrics = metrics;
-                    this.recentOrdersPage = 1;
                     this.renderOverview(metrics);
                 })
                 .catch((err) => {
@@ -2175,40 +2237,48 @@ class FarmerDashboard {
         const lastUpdatedEl = document.getElementById('overview-last-updated');
         if (lastUpdatedEl) {
             const ts = new Date();
-            const rangeLabel = (metrics?.range === 'all')
-                ? 'All time'
-                : (metrics?.range === 'custom' && metrics?.from && metrics?.to)
-                    ? `Custom: ${metrics.from} to ${metrics.to}`
-                    : `Last ${metrics?.rangeDays || this.overviewRangeDays} days`;
-            lastUpdatedEl.textContent = `${rangeLabel} • Updated: ${ts.toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+            const periodLabel = this._periodLabel(this._reportPeriod);
+            lastUpdatedEl.textContent = `${periodLabel} • Updated: ${ts.toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+        }
+
+        // Update period labels on all widgets (synced via _syncAllPeriods, but also update here for initial load)
+        const periodText = this._periodLabel(this._reportPeriod);
+        const periodLabels = [
+            'total-orders-period-label',
+            'items-sold-period-label',
+            'total-revenue-period-label',
+            'reports-period-label',
+            'status-period-label'
+        ];
+        periodLabels.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = `| ${periodText}`;
+        });
+
+        // Recent Orders and Top Products are independent - use their own periods
+        const roLbl = document.getElementById('recent-orders-period-label');
+        if (roLbl) roLbl.textContent = `| ${this._periodLabel(this._recentOrdersPeriod)}`;
+        const tpLbl = document.getElementById('top-products-period-label');
+        if (tpLbl) tpLbl.textContent = `| ${this._periodLabel(this._topProductsPeriod)}`;
+
+        // Load KPI cards with their current periods
+        for (const [card, period] of Object.entries(this._kpiPeriods)) {
+            this.loadKpiCard(card, period, metrics);
         }
 
         const statusCounts = this.getOverviewStatusCounts(metrics);
 
+        this.loadFarmerReportsChart(this._reportPeriod);
         this.renderOverviewCharts(metrics, statusCounts);
-        this.renderOverviewRecentOrders(metrics.recentOrders || []);
-        this.renderOverviewTopProductsList(metrics.topProducts || []);
-
-        const totalOrders = Object.values(statusCounts).reduce((sum, value) => sum + Number(value || 0), 0);
-        const totalSold = Number(statusCounts.delivered || 0);
-        const totalRevenue = (Array.isArray(metrics?.revenueByDay)
-            ? metrics.revenueByDay.reduce((sum, row) => sum + Number(row?.revenue || 0), 0)
-            : 0);
-
-        const totalOrdersEl = document.getElementById('total-orders');
-        const totalSoldEl = document.getElementById('total-sold');
-        const totalRevenueEl = document.getElementById('total-revenue');
-        if (totalOrdersEl) totalOrdersEl.textContent = this.fmtNumber(totalOrders);
-        if (totalSoldEl) totalSoldEl.textContent = this.fmtNumber(totalSold);
-        if (totalRevenueEl) totalRevenueEl.textContent = this.fmtCurrency(totalRevenue);
+        this.renderRecentOrdersTable(metrics.recentOrders || []);
+        this.renderTopProductsTable(metrics.topProducts || []);
     }
 
     getOverviewStatusCounts(metrics) {
         const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
         const apiCounts = metrics?.ordersByStatus || {};
         const useLiveOrderCounts =
-            this.hasLoadedOrders &&
-            (String(metrics?.range || '').toLowerCase() === 'all' || this.overviewRangeMode === 'all');
+            this.hasLoadedOrders && String(metrics?.range || '').toLowerCase() === 'all';
 
         return statuses.reduce((acc, status) => {
             const sourceCount = useLiveOrderCounts
@@ -2219,9 +2289,46 @@ class FarmerDashboard {
         }, {});
     }
 
-    renderOverviewTopProductsList(topProducts) {
-        const wrap = document.getElementById('overview-top-products-list');
-        if (!wrap) return;
+    loadKpiCard(card, period, metrics) {
+        const periodLabel = this._periodLabel(period);
+        const periodEl = document.getElementById(`${card}-period`);
+        if (periodEl) periodEl.textContent = `| ${periodLabel}`;
+
+        const valEl = document.getElementById('my-products');
+        if (card === 'kpi-products' && valEl) {
+            // Product count is static (current total listings)
+            if (this.myProductsCache) {
+                valEl.textContent = this.fmtNumber(this.myProductsCache.length);
+            }
+            return;
+        }
+
+        // For orders, sold, revenue — derive from the metrics data.
+        // Since /farmers/me/metrics returns data for a single period,
+        // all KPIs share the same data. If period differs from _reportPeriod,
+        // metrics reflect _reportPeriod; ideally we'd refetch per card.
+        const statusCounts = this.getOverviewStatusCounts(metrics);
+        if (card === 'kpi-orders') {
+            const totalOrders = Object.values(statusCounts).reduce((sum, v) => sum + Number(v || 0), 0);
+            const el = document.getElementById('total-orders');
+            if (el) el.textContent = this.fmtNumber(totalOrders);
+        }
+        if (card === 'kpi-sold') {
+            const el = document.getElementById('total-sold');
+            if (el) el.textContent = this.fmtNumber(statusCounts.delivered || 0);
+        }
+        if (card === 'kpi-revenue') {
+            const totalRevenue = (Array.isArray(metrics?.revenueByDay)
+                ? metrics.revenueByDay.reduce((sum, row) => sum + Number(row?.revenue || 0), 0)
+                : 0);
+            const el = document.getElementById('total-revenue');
+            if (el) el.textContent = this.fmtCurrency(totalRevenue);
+        }
+    }
+
+    renderTopProductsTable(topProducts) {
+        const tbody = document.getElementById('top-products-tbody');
+        if (!tbody) return;
 
         const list = (Array.isArray(topProducts) ? topProducts : [])
             .slice()
@@ -2230,30 +2337,60 @@ class FarmerDashboard {
                 if (soldDiff !== 0) return soldDiff;
                 return Number(b.revenue || 0) - Number(a.revenue || 0);
             });
+        this.overviewTopProductsCache = list;
+        const pg = this.pagination['top-products'];
+        pg.total = list.length;
+
         if (list.length === 0) {
-            wrap.innerHTML = '<div class="empty-state"><p>No sales yet.</p></div>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3 small">No sales yet</td></tr>';
+            this.renderPagination('top-products-pagination', pg, () => {});
             return;
         }
 
-        wrap.innerHTML = list.map((p, idx) => {
+        const start = (pg.page - 1) * pg.limit;
+        const pageItems = list.slice(start, start + pg.limit);
+
+        tbody.innerHTML = pageItems.map(p => {
             const sold = Number(p.sold_qty || 0);
-            const totalSales = Number(p.total_sales || p.order_count || 0);
             const revenue = this.fmtCurrency(p.revenue || 0);
-            const averagePrice = sold > 0 ? this.fmtCurrency((Number(p.revenue || 0) / sold) || 0) : this.fmtCurrency(0);
-            const searchText = `${p.product_name} ${sold} ${totalSales} ${revenue} ${averagePrice}`.toLowerCase();
+            const price = this.fmtCurrency(p.price || 0);
+            const productImage = p.product_image || '/images/placeholder-product.jpg';
             return `
-                <div class="overview-row" data-search-text="${this.escapeAttr(searchText)}">
-                    <div class="overview-row-main">
-                        <div class="overview-row-title">${idx + 1}. ${this.escapeHtml(p.product_name || 'Product')}</div>
-                        <div class="overview-row-sub">Items Sold: ${this.fmtNumber(sold)} • Total Sales: ${this.fmtNumber(totalSales)}</div>
-                    </div>
-                    <div class="overview-row-meta">
-                        <span class="overview-amount">${revenue}</span>
-                        <span class="overview-pill">Avg: ${averagePrice}</span>
-                    </div>
-                </div>
+            <tr>
+                <td class="text-center"><img src="${this.escapeHtml(productImage)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;"></td>
+                <td class="small">${this.escapeHtml(p.product_name || '—')}</td>
+                <td class="small text-center">${price}</td>
+                <td class="small text-center">${this.fmtNumber(sold)}</td>
+                <td class="small text-center">${revenue}</td>
+            </tr>
             `;
         }).join('');
+
+        this.renderPagination('top-products-pagination', pg, (page) => {
+            pg.page = page;
+            this.renderTopProductsTable(this.overviewTopProductsCache);
+        });
+
+        // Initialize simple-datatables with admin.js pattern
+        if (typeof window.simpleDatatables?.DataTable !== 'undefined') {
+            const existing = this.sortableTables?.['top-products-table'];
+            if (existing && typeof existing.destroy === 'function') {
+                try { existing.destroy(); } catch (_) {}
+                delete this.sortableTables['top-products-table'];
+            }
+            const table = document.getElementById('top-products-table');
+            if (table) {
+                this.sortableTables['top-products-table'] = new window.simpleDatatables.DataTable(table, {
+                    searchable: false,
+                    paging: false,
+                    perPageSelect: false,
+                    sortable: true,
+                    fixedHeight: false,
+                    destroyable: true,
+                    labels: { placeholder: '', noRows: 'No entries found', noResults: 'No results found' }
+                });
+            }
+        }
     }
 
     renderOverviewStatusBreakdown(metrics, statusCounts = null) {
@@ -2329,194 +2466,244 @@ class FarmerDashboard {
         return { labels, values };
     }
 
-    renderOverviewCharts(metrics, statusCounts = null) {
-        if (typeof Chart === 'undefined') return;
+    async loadFarmerReportsChart(period) {
+        try {
+            const res = await fetch(`${this.apiBase}/farmers/me/report?period=${period}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const { data } = await res.json();
 
-        // Sales (delivered) trend
-        const salesCanvas = document.getElementById('overview-sales-chart');
-        if (salesCanvas) {
-            let labels = [];
-            let values = [];
-            if (metrics?.range === 'all') {
-                const rows = Array.isArray(metrics.revenueByDay) ? metrics.revenueByDay : [];
-                const parsedRows = rows
-                    .map((row) => ({ key: this.normalizeDateKey(row?.date), revenue: Number(row?.revenue) || 0 }))
-                    .filter((row) => !!row.key);
-                labels = parsedRows.map((row) => row.key);
-                values = parsedRows.map((row) => row.revenue);
-            } else if (metrics?.range === 'custom' && metrics?.from && metrics?.to) {
-                const filled = this.buildDateSpanLabels(metrics.revenueByDay, metrics.from, metrics.to);
-                labels = filled.labels;
-                values = filled.values;
-            } else {
-                const days = Number(metrics.rangeDays) || this.overviewRangeDays;
-                const filled = this.buildLastNDaysLabels(metrics.revenueByDay, days);
-                labels = filled.labels;
-                values = filled.values;
+            const el = document.getElementById('reportsChart');
+            if (!el) return;
+
+            if (this.overviewCharts.reports) {
+                this.overviewCharts.reports.destroy();
+                this.overviewCharts.reports = null;
             }
-            const cfg = {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets: [{
-                        label: 'Sales',
-                        data: values,
-                        tension: 0.35,
-                        fill: true
-                    }]
+            el.innerHTML = '';
+
+            if (typeof ApexCharts === 'undefined') return;
+
+            if (!data || data.length === 0) {
+                el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:350px;color:#9ca3af;font-size:14px;">No data available</div>';
+                return;
+            }
+
+            const labels = data.map(d => {
+                const dt = new Date(d.label);
+                if (period === 'today') return dt.getHours() + ':00';
+                if (period === 'year' || period === 'all') return dt.toLocaleString('default', { month: 'short' });
+                return dt.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+            });
+
+            this.overviewCharts.reports = new ApexCharts(el, {
+                series: [
+                    { name: 'Revenue (₱)', data: data.map(d => parseFloat(d.revenue) || 0) },
+                    { name: 'Orders', data: data.map(d => parseInt(d.orders) || 0) },
+                    { name: 'Items Sold', data: data.map(d => parseInt(d.items_sold) || 0) },
+                ],
+                chart: {
+                    height: 350,
+                    type: 'area',
+                    toolbar: { show: false },
+                    animations: {
+                        enabled: true,
+                        easing: 'easeinout',
+                        speed: 800,
+                    }
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => this.fmtCurrency(ctx.parsed.y || 0)
-                            }
+                markers: {
+                    size: 4,
+                    hover: {
+                        size: 8,
+                        sizeOffset: 4
+                    }
+                },
+                colors: ['#4154f1', '#2eca6a', '#ff771d'],
+                fill: {
+                    type: 'gradient',
+                    gradient: {
+                        shadeIntensity: 1,
+                        opacityFrom: 0.3,
+                        opacityTo: 0.4,
+                        stops: [0, 90, 100]
+                    }
+                },
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 2, hover: { width: 4 } },
+                xaxis: {
+                    categories: labels,
+                    tickAmount: Math.min(labels.length, 7),
+                },
+                yaxis: [
+                    { labels: { formatter: v => '₱' + this.fmtNumber(v) } },
+                    { opposite: true, labels: { formatter: v => String(Math.round(v)) } },
+                ],
+                tooltip: {
+                    shared: true,
+                    intersect: false,
+                    y: {
+                        formatter: (v, { seriesIndex }) => seriesIndex === 0 ? '₱' + Number(v).toLocaleString() : String(Math.round(v))
+                    }
+                },
+                states: {
+                    hover: {
+                        filter: {
+                            type: 'darken',
+                            value: 0.1
                         }
-                    },
-                    scales: {
-                        x: { ticks: { maxTicksLimit: 6 } },
-                        y: {
-                            ticks: {
-                                callback: (v) => this.fmtCurrency(v, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-                            }
-                        }
                     }
-                }
-            };
-
-            if (this.overviewCharts.sales) {
-                this.overviewCharts.sales.data.labels = cfg.data.labels;
-                this.overviewCharts.sales.data.datasets[0].data = cfg.data.datasets[0].data;
-                this.overviewCharts.sales.update();
-            } else {
-                this.overviewCharts.sales = new Chart(salesCanvas, cfg);
-            }
-        }
-
-        // Orders by status
-        const statusCanvas = document.getElementById('overview-status-chart');
-        if (statusCanvas) {
-            const statusKeys = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
-            const counts = statusCounts || this.getOverviewStatusCounts(metrics);
-            const data = statusKeys.map(k => Number(counts?.[k] || 0));
-            const cfg = {
-                type: 'doughnut',
-                data: {
-                    labels: statusKeys.map(k => this.formatStatusLabel(k)),
-                    datasets: [{
-                        data,
-                        backgroundColor: statusKeys.map(k => this.getStatusColor(k))
-                    }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    }
-                }
-            };
-
-            if (this.overviewCharts.status) {
-                this.overviewCharts.status.data.labels = cfg.data.labels;
-                this.overviewCharts.status.data.datasets[0].data = cfg.data.datasets[0].data;
-                this.overviewCharts.status.update();
-            } else {
-                this.overviewCharts.status = new Chart(statusCanvas, cfg);
-            }
-        }
-
-        // Top products (bar)
-        const topCanvas = document.getElementById('overview-top-products-chart');
-        if (topCanvas) {
-            const top = (Array.isArray(metrics.topProducts) ? metrics.topProducts : [])
-                .slice()
-                .sort((a, b) => {
-                    const soldDiff = Number(b.sold_qty || 0) - Number(a.sold_qty || 0);
-                    if (soldDiff !== 0) return soldDiff;
-                    return Number(b.revenue || 0) - Number(a.revenue || 0);
-                });
-            const labels = top.map(p => p.product_name);
-            const values = top.map(p => Number(p.sold_qty || 0));
-            const cfg = {
-                type: 'bar',
-                data: {
-                    labels,
-                    datasets: [{
-                        label: 'Sold Qty',
-                        data: values
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        x: { ticks: { maxRotation: 0, autoSkip: true } },
-                        y: { beginAtZero: true }
-                    }
-                }
-            };
-
-            if (this.overviewCharts.topProducts) {
-                this.overviewCharts.topProducts.data.labels = cfg.data.labels;
-                this.overviewCharts.topProducts.data.datasets[0].data = cfg.data.datasets[0].data;
-                this.overviewCharts.topProducts.update();
-            } else {
-                this.overviewCharts.topProducts = new Chart(topCanvas, cfg);
-            }
+            });
+            this.overviewCharts.reports.render();
+        } catch (err) {
+            console.warn('Farmer reports chart error:', err);
         }
     }
 
-    renderOverviewRecentOrders(orders) {
-        const wrap = document.getElementById('overview-recent-orders');
-        if (!wrap) return;
+    renderOverviewCharts(metrics, statusCounts = null) {
+        // Orders by status pie chart — Chart.js (NiceAdmin style)
+        const statusWrap = document.getElementById('statusChart');
+        if (!statusWrap) return;
 
-        const list = Array.isArray(orders) ? orders : [];
-        this.overviewRecentOrdersCache = list;
+        const statusKeys = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+        const counts = statusCounts || this.getOverviewStatusCounts(metrics);
+        const data = statusKeys.map(k => Number(counts?.[k] || 0));
+        const totalOrders = data.reduce((sum, val) => sum + val, 0);
 
-        const totalPages = Math.max(1, Math.ceil(list.length / this.recentOrdersPerPage));
-        this.recentOrdersPage = Math.min(Math.max(1, Number(this.recentOrdersPage || 1)), totalPages);
+        if (this.overviewCharts.status) {
+            this.overviewCharts.status.destroy();
+            this.overviewCharts.status = null;
+        }
+        statusWrap.innerHTML = '';
 
-        const pageLabel = document.getElementById('overview-recent-page');
-        if (pageLabel) pageLabel.textContent = `${this.recentOrdersPage}/${totalPages}`;
-
-        const prevBtn = document.getElementById('overview-recent-prev');
-        if (prevBtn) prevBtn.disabled = this.recentOrdersPage <= 1;
-        const nextBtn = document.getElementById('overview-recent-next');
-        if (nextBtn) nextBtn.disabled = this.recentOrdersPage >= totalPages;
-
-        if (list.length === 0) {
-            wrap.innerHTML = '<div class="empty-state"><p>No recent orders.</p></div>';
+        if (totalOrders === 0) {
+            statusWrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:320px;color:#9ca3af;font-size:14px;">No orders yet</div>';
             return;
         }
 
-        const start = (this.recentOrdersPage - 1) * this.recentOrdersPerPage;
-        const pageItems = list.slice(start, start + this.recentOrdersPerPage);
+        if (typeof Chart === 'undefined') return;
 
-        wrap.innerHTML = pageItems.map(o => {
-            const date = o.created_at ? new Date(o.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '';
-            const amount = this.fmtCurrency(o.total_amount || 0);
-            const status = this.formatStatusLabel(o.status);
-            const searchText = `${o.id} ${o.customer_name || ''} ${o.product_name || ''} ${status}`.toLowerCase();
+        const canvas = document.createElement('canvas');
+        canvas.style.maxHeight = '320px';
+        statusWrap.appendChild(canvas);
+
+        this.overviewCharts.status = new Chart(canvas, {
+            type: 'pie',
+            data: {
+                labels: statusKeys.map(k => this.formatStatusLabel(k)),
+                datasets: [{
+                    label: 'Orders',
+                    data,
+                    backgroundColor: statusKeys.map(k => this.getStatusColor(k)),
+                    hoverOffset: 15,
+                    hoverBorderColor: '#fff',
+                    hoverBorderWidth: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                animation: {
+                    animateScale: true,
+                    animateRotate: true,
+                    duration: 800,
+                    easing: 'easeOutQuart'
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 16, font: { size: 12 }, usePointStyle: true },
+                        onHover: (event, legendItem, legend) => {
+                            event.native.target.style.cursor = 'pointer';
+                            const chart = legend.chart;
+                            if (legendItem) {
+                                chart.setActiveElements([{ datasetIndex: 0, index: legendItem.index }]);
+                                chart.update('none');
+                            }
+                        },
+                        onLeave: (event, legendItem, legend) => {
+                            event.native.target.style.cursor = 'default';
+                            const chart = legend.chart;
+                            chart.setActiveElements([]);
+                            chart.update('none');
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ` ${ctx.label}: ${ctx.parsed} orders`
+                        }
+                    }
+                },
+                onHover: (event, elements) => {
+                    event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                }
+            }
+        });
+    }
+
+    renderRecentOrdersTable(orders) {
+        const tbody = document.getElementById('recent-orders-tbody');
+        if (!tbody) return;
+
+        const list = Array.isArray(orders) ? orders : [];
+        this.overviewRecentOrdersCache = list;
+        const pg = this.pagination['recent-orders'];
+        pg.total = list.length;
+
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3 small">No recent orders</td></tr>';
+            this.renderPagination('recent-orders-pagination', pg, () => {});
+            return;
+        }
+
+        const start = (pg.page - 1) * pg.limit;
+        const pageItems = list.slice(start, start + pg.limit);
+
+        tbody.innerHTML = pageItems.map(o => {
+            const statusLabel = this.formatStatusLabel(o.status);
+            const customerName = o.customer_name || 'Customer';
+            const productImage = o.product_image || '/images/placeholder-product.jpg';
+            const price = this.fmtCurrency(o.price || 0);
             return `
-                <div class="overview-row" data-search-text="${this.escapeAttr(searchText)}">
-                    <div class="overview-row-main">
-                        <div class="overview-row-title">#${o.id} • ${this.escapeHtml(o.product_name || 'Product')}</div>
-                        <div class="overview-row-sub">${this.escapeHtml(o.customer_name || 'Customer')} • ${date}</div>
-                    </div>
-                    <div class="overview-row-meta">
-                        <span class="overview-pill" data-status="${this.escapeAttr(o.status)}">${status}</span>
-                        <span class="overview-amount">${amount}</span>
-                    </div>
-                </div>
+            <tr>
+                <td class="small text-center">#${o.id}</td>
+                <td class="text-center"><img src="${this.escapeHtml(productImage)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;"></td>
+                <td class="small">${this.escapeHtml(o.product_name || '—')}</td>
+                <td class="small">${this.escapeHtml(customerName)}</td>
+                <td class="small text-center">${price}</td>
+                <td class="small text-center">${this.fmtCurrency(o.total_amount)}</td>
+                <td class="text-center"><span class="badge bg-${this.getStatusBadgeColor(o.status)}">${statusLabel}</span></td>
+            </tr>
             `;
         }).join('');
+
+        this.renderPagination('recent-orders-pagination', pg, (page) => {
+            pg.page = page;
+            this.renderRecentOrdersTable(this.overviewRecentOrdersCache);
+        });
+
+        // Initialize simple-datatables with admin.js pattern
+        if (typeof window.simpleDatatables?.DataTable !== 'undefined') {
+            const existing = this.sortableTables?.['recent-orders-table'];
+            if (existing && typeof existing.destroy === 'function') {
+                try { existing.destroy(); } catch (_) {}
+                delete this.sortableTables['recent-orders-table'];
+            }
+            const table = document.getElementById('recent-orders-table');
+            if (table) {
+                this.sortableTables['recent-orders-table'] = new window.simpleDatatables.DataTable(table, {
+                    searchable: false,
+                    paging: false,
+                    perPageSelect: false,
+                    sortable: true,
+                    fixedHeight: false,
+                    destroyable: true,
+                    labels: { placeholder: '', noRows: 'No entries found', noResults: 'No results found' }
+                });
+            }
+        }
     }
 
     renderOverviewLowStock() {
@@ -2562,71 +2749,33 @@ class FarmerDashboard {
         }
     }
 
-    async exportOverviewCsv() {
-        try {
-            const btn = document.getElementById('overview-export-csv-btn');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting…';
-            }
-
-            const params = this.buildOverviewRangeSearchParams();
-            const url = `${this.apiBase}/farmers/me/metrics/export.csv?${params.toString()}`;
-            const res = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-
-            if (!res.ok) {
-                const json = await res.json().catch(() => ({}));
-                throw new Error(json.message || 'Export failed');
-            }
-
-            const blob = await res.blob();
-            const fallbackSuffix = this.overviewRangeMode === 'custom'
-                ? `${this.overviewCustomFrom || 'from'}_to_${this.overviewCustomTo || 'to'}`
-                : (this.overviewRangeMode === 'all' ? 'all' : `${this.overviewRangeDays}d`);
-            const filename = this.parseFilenameFromDisposition(res.headers.get('Content-Disposition'))
-                || `farmer_overview_${new Date().toISOString().slice(0, 10)}_${fallbackSuffix}.csv`;
-
-            const urlObj = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = urlObj;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(urlObj);
-
-            this.showMessage('Export downloaded!', 'success');
-        } catch (error) {
-            console.error('Export CSV error:', error);
-            this.showMessage(error.message || 'Export failed', 'error');
-        } finally {
-            const btn = document.getElementById('overview-export-csv-btn');
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-file-arrow-down"></i> Export CSV';
-            }
-        }
-    }
-
     renderMyProducts(products) {
-        const container = document.getElementById('my-products-grid');
+        this.destroySortableTable('products-table');
+        const tbody = document.getElementById('products-tbody');
+        if (!tbody) return;
 
-        if (products.length === 0) {
-            container.innerHTML = '<div class="empty-state"><p>You haven\'t added any products yet.</p><p>Add your first product in the "Add Product" tab!</p></div>';
+        // Update KPI cards
+        this.updateProductKPIs(products);
+
+        if (!products.length) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No products found</td></tr>`;
+            this.refreshSortableTable('products-table', { columns: [{ select: 0, sortable: false }, { select: 8, sortable: false }] });
             return;
         }
 
-        container.innerHTML = products.map(product => {
+        tbody.innerHTML = products.map(product => {
             const stock = Number(product.stock_quantity ?? 0);
             const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
-            const status = !isAvailable ? 'disabled' : (stock <= 0 ? 'no_stock' : 'available');
-            const displayStatus = !isAvailable ? 'Disabled' : (stock <= 0 ? 'No Stock' : 'Available');
+            const statusLabel = !isAvailable ? 'Disabled' : (stock <= 0 ? 'No Stock' : 'Available');
+            const statusKey = !isAvailable ? 'disabled' : (stock <= 0 ? 'no_stock' : 'available');
             const reviewCount = Number(product.total_reviews || 0);
             const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
             const categoryName = String(product.category_name || '').trim();
-            // Normalize image URL (handle relative paths and placeholder-like strings)
+            const createdAt = product.created_at ? new Date(product.created_at) : null;
+            const createdLabel = createdAt ? createdAt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+            const createdOrder = createdAt ? createdAt.getTime() : 0;
+
+            // Normalize image URL
             let productImageUrl = product.image_url || '';
             if (productImageUrl && !productImageUrl.startsWith('http') && !productImageUrl.startsWith('/')) {
                 productImageUrl = '/' + productImageUrl;
@@ -2635,52 +2784,55 @@ class FarmerDashboard {
                 productImageUrl = '/images/logo.png';
             }
 
-            // Low stock badge
-            let stockBadge = '';
-            if (isAvailable) {
-                if (stock === 0) {
-                    stockBadge = '<span class="badge badge-danger" style="position:absolute;top:6px;right:6px;font-size:0.75rem;z-index:2;">Out of Stock</span>';
-                } else if (stock <= 5) {
-                    stockBadge = `<span class="badge badge-warning" style="position:absolute;top:6px;right:6px;font-size:0.75rem;z-index:2;">Low Stock (${stock})</span>`;
-                }
-            }
+            const thumb = productImageUrl
+                ? `<img src="${this.escapeHtml(productImageUrl)}" class="product-thumb" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">`
+                : '';
+            const placeholder = `<div class="product-thumb-placeholder" ${productImageUrl ? 'style="display:none"' : ''}><i class="bi bi-image"></i></div>`;
 
             return `
-            <div class="product-card" data-status="${status}" data-stock-quantity="${stock}" data-category="${this.escapeAttr(categoryName)}" data-price="${Number(product.price || 0)}" data-rating="${Number(product.average_rating || 0)}" data-reviews="${reviewCount}" data-created-at="${this.escapeAttr(product.created_at || '')}" style="position:relative;">
-                <label class="product-batch-check" style="position:absolute;top:6px;left:6px;z-index:3;background:rgba(255,255,255,0.85);border-radius:4px;padding:2px 4px;cursor:pointer;" title="Select" onclick="event.stopPropagation()">
-                    <input type="checkbox" class="product-select-cb" data-id="${product.id}" onchange="farmerDashboard.updateBatchBar()">
-                </label>
-                ${stockBadge}
-                <div class="product-card-main" onclick="farmerDashboard.openMyProductPreview(${product.id})" style="cursor:pointer;">
-                    <img src="${this.escapeAttr(productImageUrl)}"
-                         alt="${this.escapeAttr(product.name)}" class="product-image" onerror="this.src='/images/logo.png'">
-                    <div class="product-info">
-                        <h3 class="product-name">${this.escapeHtml(product.name)}</h3>
-                        <div class="product-price">${this.fmtCurrency(product.price)} per ${this.escapeHtml(product.unit)}</div>
-                        <div class="product-details">
-                            <span class="product-status">${displayStatus}</span> |
-                            Stock: ${stock}
-                        </div>
-                        <div class="product-meta product-card-summary">
-                            <span>Reviews: ${this.fmtNumber(reviewCount)} • ${avgRating}★</span>
-                        </div>
-                        <div class="product-card-click-hint" aria-hidden="true">Click card to view details</div>
-                    </div>
-                </div>
-                <div class="product-card-actions" style="padding:0.4rem 0.6rem;border-top:1px solid var(--border-color,#e2e8f0);" onclick="event.stopPropagation()">
-                    <button type="button" class="btn btn-secondary btn-small" style="font-size:0.8rem;" title="Duplicate this product" onclick="farmerDashboard.duplicateProduct(${product.id})"><i class="fas fa-copy"></i> Duplicate</button>
-                </div>
-            </div>
+            <tr>
+                <td>${thumb}${placeholder}</td>
+                <td class="text-muted">${product.id}</td>
+                <td class="fw-semibold">${this.escapeHtml(product.name)}</td>
+                <td class="text-muted">${this.escapeHtml(categoryName || '—')}</td>
+                <td>${this.fmtCurrency(product.price)}</td>
+                <td>${this.fmtNumber(stock)}</td>
+                <td>${this.renderStatus(statusLabel, statusKey)}</td>
+                <td class="text-muted">${reviewCount} (${avgRating}★)</td>
+                <td>
+                    <button class="btn btn-sm py-0 px-2 btn-ac-green product-edit-btn" data-product-id="${product.id}">Edit</button>
+                </td>
+            </tr>
         `;
         }).join('');
 
         this.refreshProductCategoryFilterOptions(products);
+        this.refreshSortableTable('products-table', { columns: [{ select: 0, sortable: false }, { select: 8, sortable: false }], defaultSort: [7, 'desc'] });
+    }
 
-        // Apply current filters after re-render
-        this.filterProducts();
+    updateProductKPIs(products) {
+        const total = products.length;
+        const active = products.filter(p => {
+            const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+            const stock = Number(p.stock_quantity ?? 0);
+            return isAvailable && stock > 0;
+        }).length;
+        const lowStock = products.filter(p => {
+            const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+            const stock = Number(p.stock_quantity ?? 0);
+            return isAvailable && stock > 0 && stock <= 5;
+        }).length;
+        const pending = products.filter(p => p.status === 'pending').length;
 
-        // Reset batch bar after re-render
-        this.updateBatchBar();
+        const totalEl = document.getElementById('kpi-total-products');
+        const activeEl = document.getElementById('kpi-active-products');
+        const lowStockEl = document.getElementById('kpi-low-stock');
+        const pendingEl = document.getElementById('kpi-pending-products');
+
+        if (totalEl) totalEl.textContent = total;
+        if (activeEl) activeEl.textContent = active;
+        if (lowStockEl) lowStockEl.textContent = lowStock;
+        if (pendingEl) pendingEl.textContent = pending;
     }
 
     updateBatchBar() {
@@ -3380,104 +3532,24 @@ class FarmerDashboard {
     }
 
     filterProducts() {
-        const searchTerm = (document.getElementById('products-search-input')?.value || '').toLowerCase().trim();
-        const statusFilter = document.querySelector('input[name="product-status-filter"]:checked')?.value || 'all';
-        const categoryFilter = (document.getElementById('product-category-filter')?.value || '').toLowerCase().trim();
-        const lowStockOnly = document.getElementById('product-low-stock-filter')?.checked || false;
+        // Table-based filtering handled by simple-datatables
+        // This function is kept for compatibility but delegates to the table
+        const table = this.sortableTables['products-table'];
+        if (table) {
+            const searchTerm = (document.getElementById('products-search-input')?.value || '').toLowerCase().trim();
+            const statusFilter = (document.getElementById('product-status-filter')?.value || '').toLowerCase().trim();
+            const categoryFilter = (document.getElementById('product-category-filter')?.value || '').toLowerCase().trim();
 
-        const productCards = document.querySelectorAll('#my-products-grid .product-card');
-
-        productCards.forEach(card => {
-            const name = card.querySelector('.product-name').textContent.toLowerCase();
-            const cardStatus = String(card.getAttribute('data-status') || '').toLowerCase();
-            const cardCategory = String(card.getAttribute('data-category') || '').toLowerCase().trim();
-            const cardStock = Number(card.getAttribute('data-stock-quantity') || 0);
-
-            const matchesSearch = !searchTerm || name.includes(searchTerm);
-            const matchesStatus = statusFilter === 'all' || cardStatus === statusFilter;
-            const matchesCategory = !categoryFilter || cardCategory === categoryFilter;
-            const matchesLowStock = !lowStockOnly || (cardStock <= 5 && cardStatus !== 'disabled');
-
-            if (matchesSearch && matchesStatus && matchesCategory && matchesLowStock) {
-                card.style.display = '';
-            } else {
-                card.style.display = 'none';
-            }
-        });
-
-        this.applyProductSort();
-
-        // Show empty message when no product cards are visible after filtering
-        try {
-            const container = document.getElementById('my-products-grid');
-            if (container) {
-                const cards = Array.from(container.querySelectorAll('.product-card'));
-                const visible = cards.filter(c => (c.style.display || '') !== 'none');
-                let emptyEl = container.querySelector('.filter-empty-state');
-                if (visible.length === 0) {
-                    if (!emptyEl) {
-                        emptyEl = document.createElement('div');
-                        emptyEl.className = 'filter-empty-state empty-state';
-                        emptyEl.innerHTML = '<p>No products match the selected filters.</p>';
-                        container.appendChild(emptyEl);
-                    } else {
-                        emptyEl.style.display = '';
-                    }
-                } else if (emptyEl) {
-                    emptyEl.style.display = 'none';
-                }
-            }
-        } catch (e) {
-            console.warn('Could not update empty-state message for products', e);
+            // Apply filters using simple-datatables API
+            table.search = searchTerm;
+            table.page = 1;
+            table.update();
         }
     }
 
     applyProductSort() {
-        const container = document.getElementById('my-products-grid');
-        if (!container) return;
-
-        const sortBy = String(document.getElementById('product-sort-select')?.value || 'latest').trim();
-        const cards = Array.from(container.querySelectorAll('.product-card'));
-
-        const getTimestamp = (card) => {
-            const raw = String(card.getAttribute('data-created-at') || '').trim();
-            const ts = raw ? Date.parse(raw) : NaN;
-            return Number.isFinite(ts) ? ts : 0;
-        };
-
-        cards.sort((a, b) => {
-            const nameA = String(a.querySelector('.product-name')?.textContent || '').toLowerCase();
-            const nameB = String(b.querySelector('.product-name')?.textContent || '').toLowerCase();
-            const catA = String(a.getAttribute('data-category') || '').toLowerCase();
-            const catB = String(b.getAttribute('data-category') || '').toLowerCase();
-            const priceA = Number(a.getAttribute('data-price') || 0);
-            const priceB = Number(b.getAttribute('data-price') || 0);
-            const stockA = Number(a.getAttribute('data-stock-quantity') || 0);
-            const stockB = Number(b.getAttribute('data-stock-quantity') || 0);
-            const ratingA = Number(a.getAttribute('data-rating') || 0);
-            const ratingB = Number(b.getAttribute('data-rating') || 0);
-            const reviewsA = Number(a.getAttribute('data-reviews') || 0);
-            const reviewsB = Number(b.getAttribute('data-reviews') || 0);
-            const createdA = getTimestamp(a);
-            const createdB = getTimestamp(b);
-
-            switch (sortBy) {
-                case 'name_asc': return nameA.localeCompare(nameB);
-                case 'name_desc': return nameB.localeCompare(nameA);
-                case 'category_asc': return catA.localeCompare(catB) || nameA.localeCompare(nameB);
-                case 'price_low_high': return priceA - priceB;
-                case 'price_high_low': return priceB - priceA;
-                case 'stock_low_high': return stockA - stockB;
-                case 'stock_high_low': return stockB - stockA;
-                case 'rating_high_low': return ratingB - ratingA || reviewsB - reviewsA;
-                case 'reviews_high_low': return reviewsB - reviewsA || ratingB - ratingA;
-                case 'latest':
-                default:
-                    return createdB - createdA;
-            }
-        });
-
-        cards.forEach((card) => container.appendChild(card));
+        // Sorting handled by simple-datatables column headers
+        // This function is kept for compatibility
     }
 
     openAccountPanel() {
@@ -4194,6 +4266,18 @@ class FarmerDashboard {
             'cancelled': '#ef4444'
         };
         return colors[status] || '#64748b';
+    }
+
+    getStatusBadgeColor(status) {
+        const map = {
+            'pending': 'warning',
+            'confirmed': 'primary',
+            'preparing': 'info',
+            'out_for_delivery': 'info',
+            'delivered': 'success',
+            'cancelled': 'danger'
+        };
+        return map[status] || 'secondary';
     }
 
     formatStatusLabel(status) {
