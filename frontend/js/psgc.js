@@ -1,5 +1,8 @@
 (function initPsgc(global) {
-  const API_BASE = '/api/psgc';
+  const host = String(global.location?.hostname || '').toLowerCase();
+  const API_BASE = host === 'agricatch.store' || host === 'www.agricatch.store'
+    ? 'https://agricatch.onrender.com/api/psgc'
+    : '/api/psgc';
 
   // The only zones served by this system
   const ZONES = [
