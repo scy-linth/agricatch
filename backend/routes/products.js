@@ -283,9 +283,7 @@ router.post('/category-requests', async (req, res) => {
     const categoryId = Number.isFinite(parsedCategoryId) && parsedCategoryId > 0 ? parsedCategoryId : 0;
 
     if (!name) return res.status(400).json({ message: 'Product name is required' });
-    if (!categoryId && !requestedCategoryName) {
-      return res.status(400).json({ message: 'Category is required' });
-    }
+    // Category is now optional - staff will determine it
     if (requestedCategoryName.length > 120) {
       return res.status(400).json({ message: 'Requested category is too long (max 120 chars)' });
     }
@@ -547,6 +545,7 @@ router.get('/pricing/suggestion', async (req, res) => {
   try {
     const rawName = String(req.query.name || '').trim();
     const categoryId = req.query.category_id;
+    const unit = req.query.unit;
 
     if (!rawName) {
       return res.status(400).json({ message: 'name is required' });
@@ -554,12 +553,17 @@ router.get('/pricing/suggestion', async (req, res) => {
 
     const baseName = rawName.split('(')[0].trim();
 
-    const runSuggestionQuery = async (opts = { withCategory: false }) => {
+    const runSuggestionQuery = async (opts = { withCategory: false, withUnit: false }) => {
       const params = [rawName, baseName ? `${baseName}%` : rawName];
       let whereCategory = '';
+      let whereUnit = '';
       if (opts.withCategory && categoryId) {
         params.push(Number(categoryId));
         whereCategory = ` AND p.category_id = $${params.length}`;
+      }
+      if (opts.withUnit && unit) {
+        params.push(unit);
+        whereUnit = ` AND p.unit = $${params.length}`;
       }
 
       const result = await pool.query(
@@ -587,6 +591,7 @@ router.get('/pricing/suggestion', async (req, res) => {
               OR p.name ILIKE $2
             )
             ${whereCategory}
+            ${whereUnit}
         `,
         params
       );
@@ -594,11 +599,13 @@ router.get('/pricing/suggestion', async (req, res) => {
       return result.rows?.[0] || {};
     };
 
-    // First try category-scoped suggestion (if category is selected), then
-    // fall back to system-wide history if no delivered samples exist in that category.
-    let row = await runSuggestionQuery({ withCategory: !!categoryId });
+    // First try category+unit-scoped suggestion, then fall back to unit-only, then system-wide
+    let row = await runSuggestionQuery({ withCategory: !!categoryId, withUnit: !!unit });
     if (categoryId && Number(row.sample_count || 0) <= 0) {
-      row = await runSuggestionQuery({ withCategory: false });
+      row = await runSuggestionQuery({ withCategory: false, withUnit: !!unit });
+    }
+    if (unit && Number(row.sample_count || 0) <= 0) {
+      row = await runSuggestionQuery({ withCategory: false, withUnit: false });
     }
 
     const normalizedKey = rawName.toLowerCase();
@@ -607,6 +614,7 @@ router.get('/pricing/suggestion', async (req, res) => {
 
     return res.json({
       name: rawName,
+      unit: unit || null,
       suggested_lowest_price: hasSample
         ? (row.lowest_price ? Number(row.lowest_price) : null)
         : (fallback ? fallback.lowest : null),
