@@ -48,6 +48,9 @@ class FarmerDashboard {
         }
 
         this.init();
+
+        // Setup chat scroll observer after initialization
+        setTimeout(() => this.setupChatScrollObserver(), 500);
     }
 
     getInitialApiBase() {
@@ -4657,8 +4660,8 @@ class FarmerDashboard {
             }
             const productName = item.product_name || order.product_name || 'Product';
             const quantity = item.quantity || order.quantity || 1;
-            const price = item.price || order.price || 0;
-            const totalAmount = item.total_amount || order.total_amount || 0;
+            const price = Number(String(item.price || order.price || 0).replace(/[^\d.-]/g, '')) || 0;
+            const totalAmount = Number(String(item.total_amount || order.total_amount || 0).replace(/[^\d.-]/g, '')) || 0;
             const orderId = Number(order.id);
             const orderDate = order.created_at ? new Date(order.created_at) : null;
             const deliveryAddress = String(order.delivery_address || '').trim();
