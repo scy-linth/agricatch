@@ -1200,6 +1200,12 @@ class FarmerDashboard {
                 if (!customerId) return;
                 this.openChatWithCustomer(customerId, orderId || null);
             }
+
+            if (action === 'rate-customer') {
+                const orderId = Number(btn.getAttribute('data-order-id'));
+                if (!orderId) return;
+                this.rateCustomerForOrder(orderId);
+            }
         });
 
         // Initialize date rules for product forms
@@ -3681,7 +3687,17 @@ class FarmerDashboard {
                             if (provinceEl) provinceEl.value = parsed.province || '';
                             if (cityEl) cityEl.value = parsed.city || '';
                             if (barangayEl) barangayEl.value = parsed.barangay || '';
-                            if (streetEl) streetEl.value = parsed.street || '';
+                            // Only set street field if it doesn't contain the full address (avoid duplication)
+                            if (streetEl) {
+                                const streetValue = parsed.street || '';
+                                // Check if street value contains city/province/barangay keywords (indicates parsing error)
+                                const hasAddressKeywords = streetValue.match(/barangay|city|municipality|province/i);
+                                if (!hasAddressKeywords && streetValue.length < 100) {
+                                    streetEl.value = streetValue;
+                                } else {
+                                    streetEl.value = '';
+                                }
+                            }
                             if (previewEl) previewEl.value = location;
                             
                             // Enable cascading selects based on parsed values
@@ -4415,13 +4431,6 @@ class FarmerDashboard {
 
         this.applyOrdersSearch();
         this.renderOrdersSearchDropdown();
-
-        container.querySelectorAll('[data-action="rate-customer"]').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const orderId = Number(btn.getAttribute('data-order-id') || 0);
-                this.rateCustomerForOrder(orderId);
-            });
-        });
 
         this.updateOrdersTabCounts();
     }
