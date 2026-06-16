@@ -21,6 +21,7 @@ class FarmerDashboard {
         this.activeSection = 'overview';
         this.currentShopProfile = null;
         this.isShopProfileEditing = false;
+        this.currentAddressTarget = null;
 
         this.overviewCharts = { sales: null, status: null };
         this.overviewMetrics = null;
@@ -36,7 +37,6 @@ class FarmerDashboard {
         this.overviewRefreshTimer = null;
         this.myProductsCache = [];
         this.catalogProductNames = [];
-        this.ordersSearchActiveIndex = -1;
         this.productNameActiveIndex = { add: -1, edit: -1 };
         this.realtimeSource = null;
         this.customerRatingDraft = { orderId: null, rating: 0, hasExisting: false };
@@ -337,7 +337,7 @@ class FarmerDashboard {
         });
     }
 
-    init() {
+    async init() {
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
         // Dashboard period state (mirrors admin.js patterns)
@@ -352,7 +352,7 @@ class FarmerDashboard {
             'products': { page: 1, total: 0, limit: 50 },
         };
         this.showDeniedBanner();
-        this.checkFarmerAuth();
+        await this.checkFarmerAuth();
         this.setupEventListeners();
         this.setupRequestModal();
         this.loadCategories();
@@ -419,7 +419,11 @@ class FarmerDashboard {
         
         // Auto-fill location from shop address
         const shopLocation = this.currentShopProfile?.location || '';
+        const locationDisplay = document.getElementById('product-location-display');
         const locationInput = document.getElementById('product-location');
+        if (locationDisplay) {
+            locationDisplay.value = shopLocation;
+        }
         if (locationInput) {
             locationInput.value = shopLocation;
         }
@@ -870,6 +874,11 @@ class FarmerDashboard {
             });
         }
 
+        // Sidebar overlay — clicking backdrop closes sidebar on mobile
+        document.getElementById('sidebar-overlay')?.addEventListener('click', () => {
+            document.body.classList.remove('toggle-sidebar');
+        });
+
         document.getElementById('add-product-form')?.addEventListener('submit', (e) => this.handleAddProduct(e));
         document.getElementById('edit-product-form')?.addEventListener('submit', (e) => this.handleEditProduct(e));
         document.getElementById('save-shop-profile-btn')?.addEventListener('click', (e) => this.handleShopProfileUpdate(e));
@@ -883,6 +892,88 @@ class FarmerDashboard {
             cancelShopBtn.addEventListener('click', () => this.cancelShopProfileEdit());
         }
 
+        // Shop address modal
+        this.initShopPsgc();
+        const shopAddrModal = document.getElementById('shop-address-modal');
+        const openShopAddrBtn = document.getElementById('open-shop-address-modal');
+        const closeShopAddrBtn = document.getElementById('close-shop-address-modal');
+        const cancelShopAddrBtn = document.getElementById('cancel-shop-address-modal');
+        const confirmShopAddrBtn = document.getElementById('confirm-shop-address-modal');
+        const openShopAddr = async () => {
+            const currentLocation = document.getElementById('shop-location-input')?.value?.trim() || '';
+            const zoneEl = document.getElementById('shop-location-zone');
+            const provinceEl = document.getElementById('shop-location-province');
+            const cityEl = document.getElementById('shop-location-city');
+            const barangayEl = document.getElementById('shop-location-barangay');
+            const streetEl = document.getElementById('shop-location-street');
+            const previewEl = document.getElementById('shop-location-full');
+
+            // Reset fields first
+            if (zoneEl) zoneEl.value = '';
+            if (provinceEl) { provinceEl.value = ''; provinceEl.disabled = true; }
+            if (cityEl) { cityEl.value = ''; cityEl.disabled = true; }
+            if (barangayEl) { barangayEl.value = ''; barangayEl.disabled = true; }
+            if (streetEl) streetEl.value = '';
+            if (previewEl) previewEl.value = currentLocation;
+
+            // Parse existing address into PSGC fields if possible
+            if (currentLocation && window.PSGC) {
+                try {
+                    const parsed = window.PSGC.parseAddress(currentLocation);
+                    if (parsed) {
+                        if (zoneEl) zoneEl.value = parsed.zone || '';
+                        if (provinceEl) provinceEl.value = parsed.province || '';
+                        if (cityEl) cityEl.value = parsed.city || '';
+                        if (barangayEl) barangayEl.value = parsed.barangay || '';
+                        if (streetEl) streetEl.value = parsed.street || '';
+
+                        // Trigger cascades to populate dependent dropdowns
+                        if (parsed.zone && zoneEl) {
+                            await window.PSGC.onZoneChange(parsed.zone, { provinceEl, cityEl, barangayEl }).catch(() => {});
+                            if (provinceEl) provinceEl.disabled = false;
+                        }
+                        if (parsed.province && provinceEl) {
+                            await window.PSGC.onProvinceChange(parsed.province, { cityEl, barangayEl }).catch(() => {});
+                            if (cityEl) cityEl.disabled = false;
+                        }
+                        if (parsed.city && cityEl) {
+                            await window.PSGC.loadBarangays(parsed.city, barangayEl).catch(() => {});
+                            if (barangayEl) barangayEl.disabled = false;
+                        }
+
+                        // Re-apply parsed values after cascades (dropdowns may have been repopulated)
+                        if (zoneEl) zoneEl.value = parsed.zone || '';
+                        if (provinceEl) provinceEl.value = parsed.province || '';
+                        if (cityEl) cityEl.value = parsed.city || '';
+                        if (barangayEl) barangayEl.value = parsed.barangay || '';
+                        if (streetEl) streetEl.value = parsed.street || '';
+                        if (previewEl) {
+                            previewEl.value = window.PSGC.formatAddress({
+                                street: parsed.street || '',
+                                barangay: parsed.barangay || '',
+                                city: parsed.city || '',
+                                province: parsed.province || ''
+                            });
+                        }
+                    }
+                } catch (_) {
+                    // If parsing fails, just show the raw address in preview
+                }
+            }
+
+            shopAddrModal?.classList.add('open');
+        };
+        const closeShopAddr = () => shopAddrModal?.classList.remove('open');
+        if (openShopAddrBtn) openShopAddrBtn.addEventListener('click', () => openShopAddr());
+        if (closeShopAddrBtn) closeShopAddrBtn.addEventListener('click', closeShopAddr);
+        if (cancelShopAddrBtn) cancelShopAddrBtn.addEventListener('click', closeShopAddr);
+        if (confirmShopAddrBtn) confirmShopAddrBtn.addEventListener('click', () => {
+            const previewEl = document.getElementById('shop-location-full');
+            const displayEl = document.getElementById('shop-location-input');
+            if (displayEl && previewEl) displayEl.value = previewEl.value;
+            closeShopAddr();
+        });
+
         const productsSearchInput = document.getElementById('products-search-input');
         if (productsSearchInput) {
             productsSearchInput.addEventListener('input', () => this.filterProducts());
@@ -892,15 +983,24 @@ class FarmerDashboard {
         if (ordersSearchInput) {
             ordersSearchInput.addEventListener('input', () => {
                 this.applyOrdersSearch();
-                this.renderOrdersSearchDropdown();
             });
-            ordersSearchInput.addEventListener('focus', () => this.renderOrdersSearchDropdown());
-            ordersSearchInput.addEventListener('keydown', (e) => this.handleOrdersSearchKeydown(e));
-            ordersSearchInput.addEventListener('blur', () => {
-                setTimeout(() => {
-                    const drop = document.getElementById('orders-search-dropdown');
-                    if (drop) drop.classList.remove('open');
-                }, 120);
+            ordersSearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.applyOrdersSearch();
+                }
+            });
+        }
+
+        const ordersSearchBtn = document.getElementById('orders-search-btn');
+        if (ordersSearchBtn) {
+            ordersSearchBtn.addEventListener('click', () => this.applyOrdersSearch());
+        }
+
+        const ordersRefreshBtn = document.getElementById('orders-refresh-btn');
+        if (ordersRefreshBtn) {
+            ordersRefreshBtn.addEventListener('click', () => {
+                document.getElementById('orders-search-input').value = '';
+                this.applyOrdersSearch();
             });
         }
 
@@ -1134,25 +1234,91 @@ class FarmerDashboard {
             editImageInput.addEventListener('change', () => this.previewImage(editImageInput, 'edit-product-image-preview'));
         }
 
-        // Initialize PSGC for edit product location
-        this.initEditProductPsgc();
+        // Initialize PSGC for product location (shared for add and edit)
+        this.initProductPsgc();
 
-        // Edit product address modal controls
-        const openAddrBtn = document.getElementById('open-edit-product-address-modal');
-        const closeAddrBtn = document.getElementById('close-edit-product-address-modal');
-        const cancelAddrBtn = document.getElementById('cancel-edit-product-address-modal');
-        const confirmAddrBtn = document.getElementById('confirm-edit-product-address-modal');
-        const addrModal = document.getElementById('edit-product-address-modal');
+        // Product address modal controls (shared for add and edit)
+        const openAddAddrBtn = document.getElementById('open-add-product-address-modal');
+        const openEditAddrBtn = document.getElementById('open-edit-product-address-modal');
+        const closeAddrBtn = document.getElementById('close-product-address-modal');
+        const cancelAddrBtn = document.getElementById('cancel-product-address-modal');
+        const confirmAddrBtn = document.getElementById('confirm-product-address-modal');
+        const addrModal = document.getElementById('product-address-modal');
 
-        const openAddrModal = () => addrModal?.classList.add('open');
+        const openAddrModal = async (targetDisplayId) => {
+            this.currentAddressTarget = targetDisplayId;
+            const currentLocation = document.getElementById(targetDisplayId)?.value?.trim() || '';
+            const zoneEl = document.getElementById('product-location-zone');
+            const provinceEl = document.getElementById('product-location-province');
+            const cityEl = document.getElementById('product-location-city');
+            const barangayEl = document.getElementById('product-location-barangay');
+            const streetEl = document.getElementById('product-location-street');
+            const previewEl = document.getElementById('product-location-full');
+
+            // Reset fields first
+            if (zoneEl) zoneEl.value = '';
+            if (provinceEl) { provinceEl.value = ''; provinceEl.disabled = true; }
+            if (cityEl) { cityEl.value = ''; cityEl.disabled = true; }
+            if (barangayEl) { barangayEl.value = ''; barangayEl.disabled = true; }
+            if (streetEl) streetEl.value = '';
+            if (previewEl) previewEl.value = currentLocation;
+
+            // Parse existing address into PSGC fields if possible
+            if (currentLocation && window.PSGC) {
+                try {
+                    const parsed = window.PSGC.parseAddress(currentLocation);
+                    if (parsed) {
+                        if (zoneEl) zoneEl.value = parsed.zone || '';
+                        if (provinceEl) provinceEl.value = parsed.province || '';
+                        if (cityEl) cityEl.value = parsed.city || '';
+                        if (barangayEl) barangayEl.value = parsed.barangay || '';
+                        if (streetEl) streetEl.value = parsed.street || '';
+
+                        // Trigger cascades to populate dependent dropdowns
+                        if (parsed.zone && zoneEl) {
+                            await window.PSGC.onZoneChange(parsed.zone, { provinceEl, cityEl, barangayEl }).catch(() => {});
+                            if (provinceEl) provinceEl.disabled = false;
+                        }
+                        if (parsed.province && provinceEl) {
+                            await window.PSGC.onProvinceChange(parsed.province, { cityEl, barangayEl }).catch(() => {});
+                            if (cityEl) cityEl.disabled = false;
+                        }
+                        if (parsed.city && cityEl) {
+                            await window.PSGC.loadBarangays(parsed.city, barangayEl).catch(() => {});
+                            if (barangayEl) barangayEl.disabled = false;
+                        }
+
+                        // Re-apply parsed values after cascades (dropdowns may have been repopulated)
+                        if (zoneEl) zoneEl.value = parsed.zone || '';
+                        if (provinceEl) provinceEl.value = parsed.province || '';
+                        if (cityEl) cityEl.value = parsed.city || '';
+                        if (barangayEl) barangayEl.value = parsed.barangay || '';
+                        if (streetEl) streetEl.value = parsed.street || '';
+                        if (previewEl) {
+                            previewEl.value = window.PSGC.formatAddress({
+                                street: parsed.street || '',
+                                barangay: parsed.barangay || '',
+                                city: parsed.city || '',
+                                province: parsed.province || ''
+                            });
+                        }
+                    }
+                } catch (_) {
+                    // If parsing fails, just show the raw address in preview
+                }
+            }
+
+            addrModal?.classList.add('open');
+        };
         const closeAddrModal = () => addrModal?.classList.remove('open');
 
-        if (openAddrBtn) openAddrBtn.addEventListener('click', openAddrModal);
+        if (openAddAddrBtn) openAddAddrBtn.addEventListener('click', () => openAddrModal('product-location-display'));
+        if (openEditAddrBtn) openEditAddrBtn.addEventListener('click', () => openAddrModal('edit-product-location-display'));
         if (closeAddrBtn) closeAddrBtn.addEventListener('click', closeAddrModal);
         if (cancelAddrBtn) cancelAddrBtn.addEventListener('click', closeAddrModal);
         if (confirmAddrBtn) confirmAddrBtn.addEventListener('click', () => {
-            const previewEl = document.getElementById('edit-product-location-full');
-            const displayEl = document.getElementById('edit-product-location-display');
+            const previewEl = document.getElementById('product-location-full');
+            const displayEl = document.getElementById(this.currentAddressTarget || 'edit-product-location-display');
             if (displayEl && previewEl) displayEl.value = previewEl.value;
             closeAddrModal();
         });
@@ -1435,15 +1601,75 @@ class FarmerDashboard {
         }
     }
 
-    initEditProductPsgc() {
+    initProductPsgc() {
         const initPsgc = async () => {
             const psgc = await this.waitForPsgc();
-            const zoneEl = document.getElementById('edit-product-location-zone');
-            const provinceEl = document.getElementById('edit-product-location-province');
-            const cityEl = document.getElementById('edit-product-location-city');
-            const barangayEl = document.getElementById('edit-product-location-barangay');
-            const streetEl = document.getElementById('edit-product-location-street');
-            const previewEl = document.getElementById('edit-product-location-full');
+            const zoneEl = document.getElementById('product-location-zone');
+            const provinceEl = document.getElementById('product-location-province');
+            const cityEl = document.getElementById('product-location-city');
+            const barangayEl = document.getElementById('product-location-barangay');
+            const streetEl = document.getElementById('product-location-street');
+            const previewEl = document.getElementById('product-location-full');
+
+            if (!psgc) {
+                if (zoneEl) {
+                    zoneEl.innerHTML = '<option value="">Address options unavailable</option>';
+                    zoneEl.disabled = true;
+                }
+                return;
+            }
+
+            const updatePreview = () => {
+                if (!previewEl) return;
+                const prov = provinceEl?.value?.trim() || '';
+                const city = cityEl?.value?.trim() || '';
+                const bgy  = barangayEl?.value?.trim() || '';
+                const str  = streetEl?.value?.trim() || '';
+                previewEl.value = psgc.formatAddress({ street: str, barangay: bgy, city, province: prov });
+            };
+
+            if (zoneEl) {
+                psgc.loadZones(zoneEl);
+                zoneEl.addEventListener('change', async () => {
+                    await psgc.onZoneChange(zoneEl.value, { provinceEl, cityEl, barangayEl }).catch(() => {});
+                    updatePreview();
+                });
+            }
+            if (provinceEl) {
+                provinceEl.addEventListener('change', async () => {
+                    await psgc.onProvinceChange(provinceEl.value, { cityEl, barangayEl }).catch(() => {});
+                    updatePreview();
+                });
+            }
+            if (cityEl) {
+                cityEl.addEventListener('change', async () => {
+                    const city = cityEl.value;
+                    if (city) {
+                        await psgc.loadBarangays(city, barangayEl).catch(() => {});
+                        if (barangayEl) barangayEl.disabled = false;
+                    } else {
+                        psgc.setSelectOptions(barangayEl, [], 'Select Barangay');
+                        if (barangayEl) barangayEl.disabled = true;
+                    }
+                    updatePreview();
+                });
+            }
+            if (barangayEl) barangayEl.addEventListener('change', updatePreview);
+            if (streetEl) streetEl.addEventListener('input', updatePreview);
+        };
+
+        initPsgc();
+    }
+
+    initShopPsgc() {
+        const initPsgc = async () => {
+            const psgc = await this.waitForPsgc();
+            const zoneEl = document.getElementById('shop-location-zone');
+            const provinceEl = document.getElementById('shop-location-province');
+            const cityEl = document.getElementById('shop-location-city');
+            const barangayEl = document.getElementById('shop-location-barangay');
+            const streetEl = document.getElementById('shop-location-street');
+            const previewEl = document.getElementById('shop-location-full');
 
             if (!psgc) {
                 if (zoneEl) {
@@ -1683,7 +1909,7 @@ class FarmerDashboard {
         if (!nameInput || !hint) return;
 
         const name = String(nameInput.value || '').trim();
-        const categoryId = String(categoryInput?.value || '').trim();
+        const categoryId = String(categoryInput?.dataset?.value || categoryInput?.value || '').trim();
         const unit = String(unitInput?.value || '').trim();
         if (!name) {
             hint.textContent = 'Suggested lowest price: —';
@@ -1728,6 +1954,7 @@ class FarmerDashboard {
                 const section = link.getAttribute('data-section');
                 if (!section) return;
                 this.showSection(section);
+                document.body.classList.remove('toggle-sidebar');
             });
         });
 
@@ -1864,8 +2091,8 @@ class FarmerDashboard {
 
         const titles = {
             overview: 'Overview',
-            products: 'Products',
-            orders: 'Orders',
+            products: 'My Products',
+            orders: 'Order Management',
             chat: 'Chat',
             shop: 'Shop Profile',
             reviews: 'Reviews'
@@ -1879,7 +2106,7 @@ class FarmerDashboard {
             const breadcrumbLabels = {
                 overview: 'Farmer Dashboard',
                 products: 'My Products',
-                orders: 'Orders',
+                orders: 'Order Management',
                 reviews: 'Reviews',
                 shop: 'Shop Profile',
                 chat: 'Messages'
@@ -1951,11 +2178,15 @@ class FarmerDashboard {
 
                 if (productsResponse.ok) {
                     const productsData = await productsResponse.json();
+                    const availableProducts = (productsData.products || []).filter(p => {
+                        const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+                        return isAvailable && p.status === 'approved';
+                    });
                     const myProductsEl = document.getElementById('my-products');
-                    if (myProductsEl) myProductsEl.textContent = this.fmtNumber(productsData.products.length);
+                    if (myProductsEl) myProductsEl.textContent = this.fmtNumber(availableProducts.length);
                     const shopTotalProducts = document.getElementById('shop-total-products');
                     if (shopTotalProducts) {
-                        shopTotalProducts.textContent = this.fmtNumber(productsData.products.length);
+                        shopTotalProducts.textContent = this.fmtNumber(availableProducts.length);
                     }
                 }
             }
@@ -2094,16 +2325,10 @@ class FarmerDashboard {
     setShopProfileEditMode(isEditing) {
         this.isShopProfileEditing = !!isEditing;
         const editWrap = document.getElementById('shop-profile-edit');
-        const editBtn = document.getElementById('edit-shop-profile-btn');
-        const nameDisplay = document.getElementById('shop-name-display');
-        const locDisplay = document.getElementById('shop-location-display');
-        const descDisplay = document.getElementById('shop-description-display');
+        const viewWrap = document.getElementById('shop-profile-view');
 
         if (editWrap) editWrap.style.display = this.isShopProfileEditing ? 'block' : 'none';
-        if (editBtn) editBtn.style.display = this.isShopProfileEditing ? 'none' : 'inline-block';
-        if (nameDisplay) nameDisplay.style.display = this.isShopProfileEditing ? 'none' : '';
-        if (locDisplay) locDisplay.style.display = this.isShopProfileEditing ? 'none' : '';
-        if (descDisplay) descDisplay.style.display = this.isShopProfileEditing ? 'none' : '';
+        if (viewWrap) viewWrap.style.display = this.isShopProfileEditing ? 'none' : 'block';
 
         if (this.isShopProfileEditing) {
             // Re-sync inputs/placeholders every time Edit is opened
@@ -2178,17 +2403,8 @@ class FarmerDashboard {
         const middleName = middleNameInput?.value?.trim() || '';
         const lastName = lastNameInput?.value?.trim() || '';
 
-        // Compose address from PSGC fields if any are filled
-        const province = document.getElementById('shop-province-input')?.value?.trim() || '';
-        const city = document.getElementById('shop-city-input')?.value?.trim() || '';
-        const barangay = document.getElementById('shop-barangay-input')?.value?.trim() || '';
-        const street = document.getElementById('shop-street-input')?.value?.trim() || '';
-        const addressPreview = document.getElementById('shop-address-preview')?.value?.trim() || '';
-        const composedAddress = (province || city || barangay || street)
-            ? (window.PSGC
-                ? window.PSGC.formatAddress({ street, barangay, city, province })
-                : [street, barangay, city, province].filter(Boolean).join(', '))
-            : '';
+        // Get address from the PSGC display field
+        const composedAddress = document.getElementById('shop-location-input')?.value?.trim() || '';
         
         const payload = {};
 
@@ -2496,7 +2712,11 @@ class FarmerDashboard {
         if (card === 'kpi-products' && valEl) {
             // Product count is static (current total listings)
             if (this.myProductsCache) {
-                valEl.textContent = this.fmtNumber(this.myProductsCache.length);
+                const availableProducts = this.myProductsCache.filter(p => {
+                    const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+                    return isAvailable && p.status === 'approved';
+                });
+                valEl.textContent = this.fmtNumber(availableProducts.length);
             }
             return;
         }
@@ -2866,8 +3086,8 @@ class FarmerDashboard {
             const price = this.fmtCurrency(o.price || 0);
             return `
             <tr>
-                <td class="small text-center">#${o.id}</td>
                 <td class="text-center"><img src="${this.escapeHtml(productImage)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;"></td>
+                <td class="small text-center">#${o.id}</td>
                 <td class="small">${this.escapeHtml(o.product_name || '—')}</td>
                 <td class="small">${this.escapeHtml(customerName)}</td>
                 <td class="small text-center">${price}</td>
@@ -3329,7 +3549,8 @@ class FarmerDashboard {
         const stock_quantity = document.getElementById('product-stock').value;
         const unitInput = document.getElementById('product-unit');
         const unit = unitInput?.dataset.value || unitInput?.value;
-        const location = document.getElementById('product-location').value;
+        const locationDisplay = document.getElementById('product-location-display');
+        const location = locationDisplay?.value || document.getElementById('product-location').value;
         const harvestDate = document.getElementById('harvest-date').value;
         const expiryDate = document.getElementById('expiry-date').value;
 
@@ -3445,12 +3666,12 @@ class FarmerDashboard {
         formData.append('unit', editUnitInput?.dataset.value || editUnitInput?.value);
         
         // Compose address from PSGC fields
-        const zoneEl = document.getElementById('edit-product-location-zone');
-        const provinceEl = document.getElementById('edit-product-location-province');
-        const cityEl = document.getElementById('edit-product-location-city');
-        const barangayEl = document.getElementById('edit-product-location-barangay');
-        const streetEl = document.getElementById('edit-product-location-street');
-        const previewEl = document.getElementById('edit-product-location-full');
+        const zoneEl = document.getElementById('product-location-zone');
+        const provinceEl = document.getElementById('product-location-province');
+        const cityEl = document.getElementById('product-location-city');
+        const barangayEl = document.getElementById('product-location-barangay');
+        const streetEl = document.getElementById('product-location-street');
+        const previewEl = document.getElementById('product-location-full');
         
         // Read final composed address from the display field (set on confirm)
         const displayEl = document.getElementById('edit-product-location-display');
@@ -3666,12 +3887,12 @@ class FarmerDashboard {
                 const productLocation = product.location || '';
                 const shopLocation = this.currentShopProfile?.location || '';
                 const location = productLocation || shopLocation;
-                const zoneEl = document.getElementById('edit-product-location-zone');
-                const provinceEl = document.getElementById('edit-product-location-province');
-                const cityEl = document.getElementById('edit-product-location-city');
-                const barangayEl = document.getElementById('edit-product-location-barangay');
-                const streetEl = document.getElementById('edit-product-location-street');
-                const previewEl = document.getElementById('edit-product-location-full');
+                const zoneEl = document.getElementById('product-location-zone');
+                const provinceEl = document.getElementById('product-location-province');
+                const cityEl = document.getElementById('product-location-city');
+                const barangayEl = document.getElementById('product-location-barangay');
+                const streetEl = document.getElementById('product-location-street');
+                const previewEl = document.getElementById('product-location-full');
                 
                 const displayEl = document.getElementById('edit-product-location-display');
                 
@@ -4311,11 +4532,63 @@ class FarmerDashboard {
         }
 
         this.applyOrdersSearch();
-        this.renderOrdersSearchDropdown();
 
         // Load orders for this status unless we're skipping (e.g., already loaded)
         if (!skipLoad) {
             this.loadOrdersByStatus(status);
+        }
+    }
+
+    getOrderStatusBadge(status) {
+        const statusMap = {
+            pending: { class: 'pending', label: 'Pending' },
+            confirmed: { class: 'confirmed', label: 'Confirmed' },
+            preparing: { class: 'preparing', label: 'Preparing' },
+            out_for_delivery: { class: 'out_for_delivery', label: 'Out for Delivery' },
+            delivered: { class: 'delivered', label: 'Delivered' },
+            cancelled: { class: 'cancelled', label: 'Cancelled' }
+        };
+        const config = statusMap[status] || { class: 'pending', label: status };
+        return `<span class="order-card-status ${config.class}">${config.label}</span>`;
+    }
+
+    getOrderActionButtons(order) {
+        const status = order.status;
+        const orderId = order.id;
+        
+        if (status === 'pending') {
+            return `
+                <button class="btn btn-sm btn-success order-confirm-btn" data-order-id="${orderId}">
+                    <i class="bi bi-check-lg me-1"></i>Confirm
+                </button>
+                <button class="btn btn-sm btn-danger order-cancel-btn" data-order-id="${orderId}">
+                    <i class="bi bi-x-lg me-1"></i>Cancel
+                </button>
+            `;
+        } else if (status === 'confirmed') {
+            return `
+                <button class="btn btn-sm btn-primary order-prepare-btn" data-order-id="${orderId}">
+                    <i class="bi bi-box-seam me-1"></i>Start Preparing
+                </button>
+            `;
+        } else if (status === 'preparing') {
+            return `
+                <button class="btn btn-sm btn-info order-ship-btn" data-order-id="${orderId}">
+                    <i class="bi bi-truck me-1"></i>Mark as Out for Delivery
+                </button>
+            `;
+        } else if (status === 'out_for_delivery') {
+            return `
+                <button class="btn btn-sm btn-success order-deliver-btn" data-order-id="${orderId}">
+                    <i class="bi bi-check-circle me-1"></i>Mark as Delivered
+                </button>
+            `;
+        } else {
+            return `
+                <button class="btn btn-sm btn-secondary order-view-btn" data-order-id="${orderId}">
+                    <i class="bi bi-eye me-1"></i>View Details
+                </button>
+            `;
         }
     }
 
@@ -4324,12 +4597,16 @@ class FarmerDashboard {
         this.lastOrdersByStatus[status] = Array.isArray(orders) ? orders : [];
         this.lastOrdersByStatus[status].forEach(o => this.lastOrdersById.set(Number(o.id), o));
 
-        const containerId = `${status}-orders-list`;
-        const container = document.getElementById(containerId);
+        const container = document.getElementById('orders-grid');
 
         if (orders.length === 0) {
             const statusLabel = this.formatStatusLabel(status);
-            container.innerHTML = `<div class="empty-state"><p>No ${statusLabel} orders found.</p></div>`;
+            container.innerHTML = `
+                <div class="orders-empty-state">
+                    <i class="bi bi-inbox orders-empty-state-icon"></i>
+                    <p class="orders-empty-state-text">No ${statusLabel} orders found</p>
+                </div>
+            `;
             this.updateOrdersTabCounts();
             return;
         }
@@ -4368,176 +4645,42 @@ class FarmerDashboard {
             const dateLabel = orderDate && !Number.isNaN(orderDate.getTime())
                 ? orderDate.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })
                 : '—';
-            const timeLabel = orderDate && !Number.isNaN(orderDate.getTime())
-                ? orderDate.toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' })
-                : '—';
             
             return `
-            <div class="order-card" data-order-id="${orderId}" data-order-status="${this.escapeAttr(status)}" data-search-text="${this.escapeAttr(searchText)}" style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; background: #fff;">
-                <div class="order-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                    <div class="order-head-left" style="display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
-                        <span class="order-date" style="color: #64748b; font-size: 14px;">${dateLabel}</span>
-                        <span class="order-time" style="color: #64748b; font-size: 14px;">${timeLabel}</span>
-                        <span class="order-id" style="font-weight: 700; font-size: 16px;">Pre-order #${orderId}</span>
+            <div class="order-card" data-order-id="${orderId}">
+                <div class="order-card-header">
+                    <div>
+                        <div class="order-card-id">#${orderId}</div>
+                        <div class="order-card-date">${dateLabel}</div>
+                    </div>
+                    ${this.getOrderStatusBadge(currentStatus)}
+                </div>
+                <div class="order-card-product">
+                    <img src="${this.escapeAttr(productImage)}" 
+                         alt="${this.escapeHtml(productName)}" class="order-card-product-img">
+                    <div>
+                        <div class="order-card-product-name">${this.escapeHtml(productName)}</div>
+                        <div class="order-card-product-qty">Qty: ${quantity}</div>
                     </div>
                 </div>
-                
-                <div style="display: flex; gap: 16px; margin-bottom: 16px;">
-                    <img src="${this.escapeAttr(productImage)}" alt="${this.escapeHtml(productName)}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0;" onerror="this.src='/images/logo.png'">
-                    <div style="flex: 1;">
-                        <div style="font-weight: 700; margin-bottom: 8px; font-size: 16px;">${this.escapeHtml(productName)}</div>
-                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Customer:</strong> ${this.escapeHtml(customerName)}</div>
-                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Customer Rating:</strong> ${this.fmtNumber(customerRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}★ (${this.fmtNumber(customerTotalRatings)})</div>
-                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Quantity:</strong> ${this.fmtNumber(quantity)} x ${this.fmtCurrency(price)} ${item.unit || order.unit || ''}</div>
-                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Total:</strong> ${this.fmtCurrency(totalAmount)}</div>
-                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Delivery Date:</strong> ${this.escapeHtml(deliveryDate)}</div>
-                        <div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Delivery Address:</strong> ${this.escapeHtml(deliveryAddress || 'Not provided')}</div>
-                        ${specialInstructions ? `<div style="color: #64748b; font-size: 14px; margin-bottom: 4px;"><strong>Notes:</strong> ${this.escapeHtml(specialInstructions)}</div>` : ''}
-                        <div style="color: #64748b; font-size: 14px;"><strong>Status:</strong> <span style="font-weight: 600; color: ${this.getStatusColor(currentStatus)};">${this.escapeHtml(this.formatStatusLabel(currentStatus))}</span></div>
-                    </div>
+                <div class="order-card-customer">
+                    <div class="order-card-customer-name">${this.escapeHtml(customerName)}</div>
+                    <div class="order-card-customer-location">${this.escapeHtml(deliveryAddress || '—')}</div>
                 </div>
-
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-                    <div style="font-weight: 700; margin-bottom: 12px; font-size: 14px;">Update Pre-order Status</div>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        ${currentStatus === 'pending' ? `
-                            <button class="btn btn-primary btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">Confirm Pre-order</button>
-                            <button class="btn btn-danger btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">Cancel</button>
-                        ` : currentStatus === 'confirmed' ? `
-                            <button class="btn btn-primary btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="preparing">Start Preparing</button>
-                            <button class="btn btn-danger btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">Cancel</button>
-                        ` : currentStatus === 'preparing' ? `
-                            <button class="btn btn-primary btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="out_for_delivery">Out for Delivery</button>
-                            <button class="btn btn-danger btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">Cancel</button>
-                        ` : currentStatus === 'out_for_delivery' ? `
-                            <button class="btn btn-primary btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="delivered">Mark as Delivered</button>
-                        ` : currentStatus === 'delivered' ? `
-                            <span style="color: #4caf50; font-weight: 600;">✓ Order Delivered</span>
-                        ` : currentStatus === 'cancelled' ? `
-                            <span style="color: #f44336; font-weight: 600;">✗ Order Cancelled</span>
-                        ` : ''}
-                    </div>
+                <div class="order-card-pricing">
+                    <div class="order-card-unit-price">₱${this.fmtCurrency(price)} / unit</div>
+                    <div class="order-card-total">₱${this.fmtCurrency(totalAmount)}</div>
                 </div>
-
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button class="btn btn-secondary btn-sm" type="button" data-action="chat-customer" data-customer-id="${order.customer_id || ''}" data-order-id="${orderId}">Chat Customer</button>
-                    ${currentStatus === 'delivered' ? `
-                        <button class="btn btn-outline-primary btn-sm" type="button" data-action="rate-customer" data-order-id="${orderId}">Rate Customer</button>
-                    ` : ''}
+                <div class="order-card-actions">
+                    ${this.getOrderActionButtons({ id: orderId, status: currentStatus })}
                 </div>
             </div>
-        `;
+`;
         }).join('');
 
         this.applyOrdersSearch();
-        this.renderOrdersSearchDropdown();
 
         this.updateOrdersTabCounts();
-    }
-
-    renderOrdersSearchDropdown() {
-        const input = document.getElementById('orders-search-input');
-        const dropdown = document.getElementById('orders-search-dropdown');
-        if (!input || !dropdown) return;
-
-        const q = String(input.value || '').trim().toLowerCase();
-        if (!q) {
-            dropdown.classList.remove('open');
-            dropdown.innerHTML = '';
-            return;
-        }
-
-        const cards = Array.from(document.querySelectorAll('.orders-list .order-card'));
-        const matches = cards
-            .map((card) => {
-            const text = String(card.getAttribute('data-search-text') || '').toLowerCase();
-                if (!text.includes(q)) return null;
-                const orderId = String(card.getAttribute('data-order-id') || '').trim();
-                const status = String(card.getAttribute('data-order-status') || '').trim();
-                const product = String(card.querySelector('img')?.getAttribute('alt') || 'Product').trim();
-                const customerText = String(card.textContent || '');
-                const m = customerText.match(/Customer:\s*([^\n\r]+)/i);
-                const customer = m ? String(m[1] || '').trim() : '—';
-                return { orderId, status, product, customer };
-            })
-            .filter(Boolean)
-            .slice(0, 10);
-
-        if (!matches.length) {
-            dropdown.classList.remove('open');
-            dropdown.innerHTML = '';
-            return;
-        }
-
-        dropdown.innerHTML = matches.map((m) => (
-            `<button type="button" class="orders-search-option" data-order-id="${this.escapeAttr(m.orderId)}" data-status="${this.escapeAttr(m.status)}">
-                <div class="title">Pre-order #${this.escapeHtml(m.orderId)} • ${this.escapeHtml(m.product)}</div>
-                <div class="meta">Customer: ${this.escapeHtml(m.customer)} • ${this.escapeHtml(this.formatStatusLabel(m.status || 'pending'))}</div>
-            </button>`
-        )).join('');
-        dropdown.classList.add('open');
-        this.ordersSearchActiveIndex = -1;
-
-        dropdown.querySelectorAll('.orders-search-option').forEach((btn) => {
-            btn.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                this.applyOrderSearchSelection(btn);
-            });
-        });
-    }
-
-    handleOrdersSearchKeydown(e) {
-        const dropdown = document.getElementById('orders-search-dropdown');
-        if (!dropdown || !dropdown.classList.contains('open')) return;
-
-        const options = Array.from(dropdown.querySelectorAll('.orders-search-option'));
-        if (!options.length) return;
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            this.ordersSearchActiveIndex = (this.ordersSearchActiveIndex + 1) % options.length;
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            this.ordersSearchActiveIndex = (this.ordersSearchActiveIndex - 1 + options.length) % options.length;
-        } else if (e.key === 'Enter') {
-            if (this.ordersSearchActiveIndex >= 0 && this.ordersSearchActiveIndex < options.length) {
-                e.preventDefault();
-                this.applyOrderSearchSelection(options[this.ordersSearchActiveIndex]);
-            }
-            return;
-        } else if (e.key === 'Escape') {
-            dropdown.classList.remove('open');
-            return;
-        } else {
-            return;
-        }
-
-        options.forEach((opt, index) => {
-            opt.classList.toggle('active', index === this.ordersSearchActiveIndex);
-        });
-        const current = options[this.ordersSearchActiveIndex];
-        if (current) current.scrollIntoView({ block: 'nearest' });
-    }
-
-    applyOrderSearchSelection(btn) {
-        if (!btn) return;
-        const dropdown = document.getElementById('orders-search-dropdown');
-        const orderId = String(btn.getAttribute('data-order-id') || '').trim();
-        const status = String(btn.getAttribute('data-status') || '').trim();
-        if (status) {
-            this.switchOrderTab(status, true);
-        }
-        const target = document.querySelector(`.order-card[data-order-id="${orderId}"]`);
-        if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            target.style.outline = '2px solid var(--primary-color)';
-            target.style.outlineOffset = '2px';
-            setTimeout(() => {
-                target.style.outline = '';
-                target.style.outlineOffset = '';
-            }, 1200);
-        }
-        if (dropdown) dropdown.classList.remove('open');
     }
 
     openOrderDetails(orderId) {
