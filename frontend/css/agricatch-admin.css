@@ -456,6 +456,78 @@ body.sidebar-collapsed #main.main {
   color: var(--ac-primary);
 }
 
+/* Users submenu - match catalog submenu styling */
+.sidebar-nav .nav-link[data-bs-target="#nav-users"] {
+  color: var(--ac-primary);
+  padding: 8px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+}
+.sidebar-nav .nav-link[data-bs-target="#nav-users"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--ac-primary-light);
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: -1;
+}
+.sidebar-nav .nav-link[data-bs-target="#nav-users"]:hover::before {
+  opacity: 1;
+}
+.sidebar-nav .nav-link[data-bs-target="#nav-users"]:hover {
+  color: var(--ac-primary-dark);
+}
+.sidebar-nav .nav-link[data-bs-target="#nav-users"] i {
+  color: var(--ac-primary);
+}
+.sidebar-nav .nav-link[data-bs-target="#nav-users"] span {
+  flex: 1;
+}
+.sidebar-nav .nav-link[data-bs-target="#nav-users"]:not(.collapsed)::before {
+  opacity: 1;
+}
+.sidebar-nav .nav-link[data-bs-target="#nav-users"]:not(.collapsed) {
+  color: var(--ac-primary-dark);
+  font-weight: 600;
+}
+.sidebar-nav .nav-link[data-bs-target="#nav-users"]:not(.collapsed) i {
+  color: var(--ac-primary);
+}
+.sidebar-nav #nav-users {
+  padding: 4px 8px;
+}
+.sidebar-nav #nav-users li {
+  margin: 2px 0;
+}
+.sidebar-nav #nav-users .sidebar-link {
+  color: var(--ac-text-muted);
+  padding: 8px 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: .845rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background .15s, color .15s;
+}
+.sidebar-nav #nav-users .sidebar-link:hover {
+  color: var(--ac-primary);
+  background: var(--ac-primary-light);
+}
+.sidebar-nav #nav-users .sidebar-link.active {
+  color: var(--ac-primary-dark);
+  background: var(--ac-primary-light);
+  font-weight: 600;
+}
+.sidebar-nav #nav-users .sidebar-link.active i {
+  color: var(--ac-primary);
+}
+
 /* NiceAdmin collapsed class — inactive but styled correctly */
 .sidebar-nav .nav-link.collapsed { color: var(--ac-text-muted); }
 
@@ -546,7 +618,6 @@ body.sidebar-collapsed #main.main {
   position: absolute;
   right: 0;
   top: 15px;
-  z-index: 2;
 }
 .card .filter .icon {
   color: var(--ac-text-subtle);
@@ -1431,25 +1502,63 @@ body.sidebar-collapsed #main.main {
   gap: 12px;
   background: #f9fbf9;
 }
+
+/* Timestamp separator */
+.chat-timestamp-separator {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--ac-text-muted);
+  padding: 8px 0;
+  margin: 4px 0;
+}
+
+/* Date divider */
+.chat-date-divider {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ac-text-muted);
+  padding: 12px 0;
+  margin: 8px 0;
+  border-top: 1px solid var(--ac-border-light);
+  border-bottom: 1px solid var(--ac-border-light);
+  background: var(--ac-bg);
+}
+
+/* Message group */
+.chat-msg-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-msg-group.sent {
+  align-items: flex-end;
+}
+
+.chat-msg-group.received {
+  align-items: flex-start;
+}
 /* Message bubbles (chat.js injects these) */
 .chat-msg { display: flex; gap: 8px; max-width: 75%; }
 .chat-msg.sent { margin-left: auto; flex-direction: row-reverse; }
 .chat-msg-bubble {
   padding: 8px 12px;
   border-radius: 12px;
-  font-size: .83rem;
+  font-size: .95rem;
   line-height: 1.45;
   word-break: break-word;
 }
 .chat-msg.received .chat-msg-bubble {
-  background: #fff;
-  border: 1px solid var(--ac-border-light);
+  background: #e8f5e9;
+  border: 1px solid #c8e6c9;
   color: var(--ac-text);
   border-bottom-left-radius: 4px;
 }
 .chat-msg.sent .chat-msg-bubble {
-  background: var(--ac-primary);
-  color: #fff;
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+  color: var(--ac-text);
   border-bottom-right-radius: 4px;
 }
 .chat-msg-time {

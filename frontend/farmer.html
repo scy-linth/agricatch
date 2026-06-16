@@ -25,25 +25,44 @@
 
 <style>
 /* FARMER DASHBOARD — PAGE-SCOPED OVERRIDES (complement agricatch-admin.css) */
-@media (max-width: 1199px) {
-    #farmer-sidebar { transform: translateX(-260px); transition: transform .28s ease; }
-    #farmer-sidebar.open { transform: translateX(0); }
+/* Override admin.css modal header green gradient for farmer modals */
+#customer-rating-modal .modal-header,
+#product-address-modal .modal-header {
+  background: #fff !important;
+  color: var(--ac-text) !important;
+}
+#customer-rating-modal .modal-header h3,
+#product-address-modal .modal-header h3 {
+  color: var(--ac-text) !important;
+}
+/* Header account dropdown hover styles */
+#farmer-user-account-btn:hover {
+  background: rgba(255,255,255,.2);
+}
+#farmer-user-dropdown-menu .dd-item:hover {
+  background: var(--ac-bg);
+}
+#farmer-sidebar-account-btn:hover {
+  background: rgba(255,255,255,.12);
+}
+#farmer-sidebar-dropdown-menu button:hover {
+  background: var(--ac-bg);
 }
 .modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(15,23,42,.55); align-items:flex-start; justify-content:center; padding:1.5rem 1rem; overflow-y:auto; }
 .modal.open { display:flex; }
 .modal .modal-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:100%; max-width:620px; margin:auto; position:relative; overflow:hidden; display:flex; flex-direction:column; }
 .modal .modal-header { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); background:#fff; position:sticky; top:0; z-index:2; }
 .modal .modal-header h3 { margin:0; font-size:1.05rem; font-weight:700; color:var(--ac-text,#1a2e1e); }
-.modal .close-btn { background:none; border:none; font-size:1.5rem; line-height:1; cursor:pointer; color:var(--ac-text-muted,#6b7e72); padding:0 4px; transition:color .15s; }
-.modal .close-btn:hover { color:var(--ac-danger,#dc2626); }
+.modal .close-btn { background:white; border:1px solid rgba(0,0,0,0.08); color:var(--ac-text-muted,#6b7e72); cursor:pointer; font-size:.9rem; padding:4px; border-radius:50%; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); transition:all .15s; }
+.modal .close-btn:hover { background:#f8f9fa; color:var(--ac-primary,#2d7a3a); }
 .product-details-modal { display:none; position:fixed; inset:0; z-index:1070; align-items:center; justify-content:center; }
 .product-details-modal.active { display:flex; }
 .product-details-overlay { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:0; }
 .product-details-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:calc(100% - 2rem); max-width:640px; max-height:calc(100vh - 3rem); overflow-y:auto; position:relative; z-index:1; }
-.product-details-topbar { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); position:sticky; top:0; background: linear-gradient(135deg, #2d7a3a 0%, #41bf5b 100%); z-index:2; }
-.product-details-topbar h3 { margin:0; font-size:1.05rem; font-weight:700; color: #fff; }
-.product-details-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color: #fff; line-height:1; padding:0 4px; }
-.product-details-close:hover { color: #e8f5e9; }
+.product-details-topbar { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); position:sticky; top:0; background:#fff; z-index:2; }
+.product-details-topbar h3 { margin:0; font-size:1.05rem; font-weight:700; color:var(--ac-text,#1a2e1e); }
+.product-details-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--ac-text-muted,#6b7e72); line-height:1; padding:0 4px; }
+.product-details-close:hover { color:var(--ac-danger,#dc2626); }
 #farmer-verif-banner { padding:.65rem 1.15rem; border-radius:8px; margin-bottom:.75rem; font-size:.875rem; font-weight:600; }
 #my-products-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; }
 .product-tabs { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
@@ -92,32 +111,169 @@
 .custom-select-option.selected::after { content:'✓'; margin-left:auto; font-size:.8rem; font-weight:700; color:var(--ac-primary,#2d7a3a); }
 .custom-select-option.active { background:var(--ac-primary,#2d7a3a); color:#fff; }
 .custom-select-option.active::after { color:#fff; }
-.orders-search-wrap { position:relative; }
-#orders-search-dropdown { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; z-index:200; display:none; max-height:240px; overflow-y:auto; box-shadow:0 4px 16px rgba(0,0,0,.08); }
-#orders-search-dropdown.open { display:block; }
-.orders-search-option { display:flex; flex-direction:column; width:100%; padding:.6rem .85rem; border:none; border-bottom:1px solid var(--ac-border,#e2e8f0); background:none; text-align:left; font-size:.875rem; font-weight:500; color:var(--ac-text,#1a2e1e); cursor:pointer; transition:background .1s,color .1s; line-height:1.3; }
-.orders-search-option:last-child { border-bottom:none; }
-.orders-search-option:hover { background:var(--ac-bg,#f5f7f5); color:var(--ac-primary,#2d7a3a); }
-.orders-search-option .title { font-weight:600; margin-bottom:.2rem; }
-.orders-search-option .meta { font-size:.8rem; color:var(--ac-text-muted,#6b7e72); }
 .product-form .form-row { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; margin-bottom:.75rem; }
 .product-form .form-group { margin-bottom:.65rem; }
 .product-form .form-group label { display:block; font-size:.8rem; font-weight:600; margin-bottom:.25rem; color:var(--ac-text,#1a2e1e); }
 .product-form .form-actions { display:flex; justify-content:flex-end; gap:.5rem; padding:.75rem 1.25rem; border-top:1px solid var(--ac-border,#e2e8f0); background:#fff; position:sticky; bottom:0; z-index:1; }
 .image-preview img { max-width:280px; max-height:280px; border-radius:8px; margin:.5rem auto 0; display:block; border:1px solid var(--ac-border); }
 .field-hint { font-size:.77rem; color:var(--ac-text-muted,#6b7e72); margin-top:.2rem; display:block; }
-.chat-layout { display:grid; grid-template-columns:280px 1fr; height:540px; overflow:hidden; border-radius:0 0 8px 8px; }
-#conversation-list { border-right:1px solid var(--ac-border,#e2e8f0); overflow-y:auto; background:#fafafa; }
-.chat-window { display:flex; flex-direction:column; overflow:hidden; }
-#chat-messages { flex:1; overflow-y:auto; padding:1rem; }
-#chat-form { display:flex; gap:.5rem; padding:.65rem .75rem; border-top:1px solid var(--ac-border,#e2e8f0); }
-#chat-form input { flex:1; }
 .admin-detail-panel { position:fixed; top:60px; right:0; width:420px; height:calc(100vh - 60px); background:#fff; border-left:1px solid var(--ac-border,#e2e8f0); z-index:900; transform:translateX(100%); transition:transform .3s ease; overflow-y:auto; padding:1rem; box-shadow:-4px 0 20px rgba(0,0,0,.06); }
 .admin-detail-panel.open { transform:translateX(0); }
 .panel-close { background:none; border:none; font-size:1.3rem; cursor:pointer; position:absolute; top:.75rem; right:.75rem; color:var(--ac-text-muted); transition:color .15s; }
 .panel-close:hover { color:var(--ac-danger,#dc2626); }
 .panel-content { margin-top:2rem; }
 #overview-status-breakdown { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.5rem; }
+/* Order Grid */
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 1rem;
+}
+@media (min-width: 576px) {
+  .orders-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 992px) {
+  .orders-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+/* Order Card */
+.order-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
+}
+.order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+/* Order Card Header */
+.order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.order-card-id {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+.order-card-date {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+.order-card-status {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+/* Order Card Product */
+.order-card-product {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.order-card-product-img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+.order-card-product-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #1a2e1e;
+  flex: 1;
+}
+.order-card-product-qty {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+/* Order Card Customer */
+.order-card-customer {
+  margin-bottom: 0.75rem;
+}
+.order-card-customer-name {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #1a2e1e;
+}
+.order-card-customer-location {
+  font-size: 0.75rem;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Order Card Pricing */
+.order-card-pricing {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+.order-card-unit-price {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+.order-card-total {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2d7a3a;
+}
+/* Order Card Actions */
+.order-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.order-card-actions .btn {
+  flex: 1;
+  min-width: 120px;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+}
+/* Empty State */
+.orders-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem 1rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 2px dashed #e2e8f0;
+}
+.orders-empty-state-icon {
+  font-size: 3rem;
+  color: #cbd5e1;
+  margin-bottom: 1rem;
+}
+.orders-empty-state-text {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+/* Status Colors */
+.order-card-status.pending { background: #fef3c7; color: #d97706; }
+.order-card-status.confirmed { background: #dbeafe; color: #2563eb; }
+.order-card-status.preparing { background: #ede9fe; color: #7c3aed; }
+.order-card-status.out_for_delivery { background: #cffafe; color: #0891b2; }
+.order-card-status.delivered { background: #dcfce7; color: #16a34a; }
+.order-card-status.cancelled { background: #fee2e2; color: #dc2626; }
 .overview-list { display:flex; flex-direction:column; gap:.35rem; }
 .overview-list-item { padding:.45rem .65rem; border-radius:6px; background:var(--ac-bg,#f5f7f5); font-size:.83rem; }
 .order-rating-stars { display:flex; gap:.3rem; margin:.5rem 0; }
@@ -129,7 +285,7 @@
 #farmer-sidebar-account-btn { display:flex; align-items:center; gap:.55rem; width:100%; background:none; border:none; padding:.55rem .65rem; border-radius:8px; cursor:pointer; color:inherit; font-size:.875rem; font-weight:600; transition:background .15s; text-align:left; }
 #farmer-sidebar-account-btn:hover { background:rgba(255,255,255,.12); }
 .sidebar-user-initial { width:30px; height:30px; border-radius:50%; flex-shrink:0; background:rgba(255,255,255,.22); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; border:1.5px solid rgba(255,255,255,.5); }
-#farmer-sidebar-dropdown-menu { background:#fff; border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.1); overflow:hidden; margin:.2rem .5rem; }
+#farmer-sidebar-dropdown-menu { position:absolute; bottom:calc(100% + 4px); left:0; min-width:180px; background:#fff; border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.1); overflow:hidden; z-index:1000; }
 #farmer-sidebar-dropdown-menu button { display:flex; align-items:center; gap:.5rem; width:100%; text-align:left; padding:.55rem .85rem; background:none; border:none; font-size:.875rem; cursor:pointer; color:var(--ac-text,#1a2e1e); transition:background .1s; }
 #farmer-sidebar-dropdown-menu button:hover { background:var(--ac-bg,#f5f7f5); }
 #farmer-sidebar-dropdown-menu button.text-danger { color:#dc2626 !important; }
@@ -169,7 +325,7 @@
   body.toggle-sidebar #farmer-sidebar.sidebar {
     left: 0 !important;
   }
-  body.toggle-sidebar .sidebar-overlay {
+  body.toggle-sidebar #sidebar-overlay.sidebar-overlay {
     display: block;
   }
 }
@@ -183,7 +339,7 @@
   }
 }
 
-@media (max-width:768px) { .product-form .form-row{grid-template-columns:1fr} .chat-layout{grid-template-columns:1fr;height:auto;min-height:400px} .admin-detail-panel{width:100%} #my-products-grid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr))} }
+@media (max-width:768px) { .product-form .form-row{grid-template-columns:1fr} .admin-detail-panel{width:100%} #my-products-grid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr))} }
 </style>
 
 <body>
@@ -203,7 +359,7 @@
 </div>
 
 <!-- Sidebar Overlay (mobile) -->
-<div id="farmer-sidebar-overlay" class="sidebar-overlay"></div>
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
 
 <!-- HEADER -->
 <header id="header" class="header fixed-top d-flex align-items-center">
@@ -248,37 +404,37 @@
     <ul class="sidebar-nav" id="sidebar-nav">
         <li class="nav-heading">Overview</li>
         <li class="nav-item">
-            <a class="nav-link sidebar-link" href="#overview" data-section="overview">
+            <a class="nav-link collapsed sidebar-link" href="#overview" data-section="overview">
                 <i class="bi bi-speedometer2"></i><span>Dashboard</span>
             </a>
         </li>
         <li class="nav-heading">Catalog</li>
         <li class="nav-item">
-            <a class="nav-link sidebar-link" href="#products" data-section="products">
+            <a class="nav-link collapsed sidebar-link" href="#products" data-section="products">
                 <i class="bi bi-box-seam"></i><span>My Products</span>
             </a>
         </li>
         <li class="nav-heading">Commerce</li>
         <li class="nav-item">
-            <a class="nav-link sidebar-link" href="#orders" data-section="orders">
+            <a class="nav-link collapsed sidebar-link" href="#orders" data-section="orders">
                 <i class="bi bi-bag-check"></i><span>Orders</span>
             </a>
         </li>
         <li class="nav-heading">Reputation</li>
         <li class="nav-item">
-            <a class="nav-link sidebar-link" href="#reviews" data-section="reviews">
+            <a class="nav-link collapsed sidebar-link" href="#reviews" data-section="reviews">
                 <i class="bi bi-star-half"></i><span>Reviews</span>
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link sidebar-link" href="#shop" data-section="shop">
+            <a class="nav-link collapsed sidebar-link" href="#shop" data-section="shop">
                 <i class="bi bi-shop"></i><span>Shop Profile</span>
             </a>
         </li>
         <li class="nav-heading">Communication</li>
         <li class="nav-item">
-            <a class="nav-link sidebar-link" href="#chat" data-section="chat">
-                <i class="bi bi-chat-dots"></i><span>Messages</span>
+            <a class="nav-link collapsed sidebar-link" href="#chat" data-section="chat">
+                <i class="bi bi-chat-dots"></i><span>Chat & Support</span>
                 <span id="chat-unread-badge" class="badge bg-danger ms-auto" style="display:none;">0</span>
             </a>
         </li>
@@ -304,7 +460,7 @@
 <main id="main" class="main admin-main">
     <div id="farmer-verif-banner" style="display:none;"></div>
     <div class="pagetitle">
-        <h1 id="farmer-page-title">Farmer Dashboard</h1>
+        <h1 id="farmer-page-title" class="page-title">Farmer Dashboard</h1>
         <nav>
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="/">Home</a></li>
@@ -314,7 +470,7 @@
     </div>
 
     <!-- OVERVIEW SECTION -->
-    <section id="overview" class="admin-section-card">
+    <section id="overview" class="admin-section-card active">
         <div class="row g-3 mb-3">
             <!-- My Products KPI -->
             <div class="col-xxl-3 col-md-6">
@@ -344,6 +500,7 @@
                             <li><a class="dropdown-item total-orders-period-filter" href="#" data-period="week">This Week</a></li>
                             <li><a class="dropdown-item total-orders-period-filter" href="#" data-period="month">This Month</a></li>
                             <li><a class="dropdown-item total-orders-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item total-orders-period-filter" href="#" data-period="all">All Time</a></li>
                         </ul>
                     </div>
                     <div class="card-body">
@@ -354,7 +511,7 @@
                             </div>
                             <div class="ps-3">
                                 <h6 id="total-orders">--</h6>
-                                <span class="text-success small pt-1 fw-bold" id="total-orders-change">+0% <span id="total-orders-change-label">vs prev today</span></span>
+                                <span class="text-success small pt-1 fw-bold" id="total-orders-change">+0%</span> <span id="total-orders-change-label" class="text-muted small">vs prev today</span>
                             </div>
                         </div>
                     </div>
@@ -371,6 +528,7 @@
                             <li><a class="dropdown-item items-sold-period-filter" href="#" data-period="week">This Week</a></li>
                             <li><a class="dropdown-item items-sold-period-filter" href="#" data-period="month">This Month</a></li>
                             <li><a class="dropdown-item items-sold-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item items-sold-period-filter" href="#" data-period="all">All Time</a></li>
                         </ul>
                     </div>
                     <div class="card-body">
@@ -381,7 +539,7 @@
                             </div>
                             <div class="ps-3">
                                 <h6 id="total-sold">--</h6>
-                                <span class="text-success small pt-1 fw-bold" id="items-sold-change">+0% <span id="items-sold-change-label">vs prev today</span></span>
+                                <span class="text-success small pt-1 fw-bold" id="items-sold-change">+0%</span> <span id="items-sold-change-label" class="text-muted small">vs prev today</span>
                             </div>
                         </div>
                     </div>
@@ -398,6 +556,7 @@
                             <li><a class="dropdown-item total-revenue-period-filter" href="#" data-period="week">This Week</a></li>
                             <li><a class="dropdown-item total-revenue-period-filter" href="#" data-period="month">This Month</a></li>
                             <li><a class="dropdown-item total-revenue-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item total-revenue-period-filter" href="#" data-period="all">All Time</a></li>
                         </ul>
                     </div>
                     <div class="card-body">
@@ -408,7 +567,7 @@
                             </div>
                             <div class="ps-3">
                                 <h6 id="total-revenue">&#8369;0.00</h6>
-                                <span class="text-success small pt-1 fw-bold" id="total-revenue-change">+0% <span id="total-revenue-change-label">vs prev today</span></span>
+                                <span class="text-success small pt-1 fw-bold" id="total-revenue-change">+0%</span> <span id="total-revenue-change-label" class="text-muted small">vs prev today</span>
                             </div>
                         </div>
                     </div>
@@ -427,6 +586,7 @@
                             <li><a class="dropdown-item report-period-filter" href="#" data-period="week">This Week</a></li>
                             <li><a class="dropdown-item report-period-filter" href="#" data-period="month">This Month</a></li>
                             <li><a class="dropdown-item report-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="all">All Time</a></li>
                         </ul>
                     </div>
                     <div class="card-body">
@@ -445,6 +605,7 @@
                             <li><a class="dropdown-item status-period-filter" href="#" data-period="week">This Week</a></li>
                             <li><a class="dropdown-item status-period-filter" href="#" data-period="month">This Month</a></li>
                             <li><a class="dropdown-item status-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item status-period-filter" href="#" data-period="all">All Time</a></li>
                         </ul>
                     </div>
                     <div class="card-body">
@@ -473,8 +634,8 @@
                         <table id="recent-orders-table" class="table table-borderless ac-table">
                             <thead>
                                 <tr>
-                                    <th scope="col" class="text-center">#</th>
                                     <th scope="col" class="text-center">Image</th>
+                                    <th scope="col" class="text-center">#</th>
                                     <th scope="col">Product</th>
                                     <th scope="col">Customer</th>
                                     <th scope="col" class="text-center">Price</th>
@@ -661,7 +822,7 @@
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm flex-grow-1">
                                 <input type="text" id="products-search-input" class="form-control me-2" placeholder="Product name…">
-                                <button id="products-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;"><i class="bi bi-search me-1"></i>Search</button>
+                                <button id="products-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
                             </div>
                             <button id="products-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
@@ -672,7 +833,7 @@
                     <table id="products-table" class="table ac-table table-sm table-hover align-middle">
                         <thead>
                             <tr>
-                                <th style="width:56px">Img</th>
+                                <th style="width:56px">Image</th>
                                 <th>ID</th>
                                 <th>Product</th>
                                 <th>Category</th>
@@ -708,7 +869,7 @@
         <div class="ac-section-hero ac-section-hero--primary mb-4">
             <div class="ac-section-hero__icon"><i class="bi bi-bag-check"></i></div>
             <div class="ac-section-hero__body">
-                <h4 class="ac-section-hero__title">My Orders</h4>
+                <h4 class="ac-section-hero__title">Order Management</h4>
                 <p class="ac-section-hero__sub">View and manage customer orders for your products.</p>
             </div>
             <div class="ac-section-hero__actions">
@@ -720,12 +881,19 @@
         <div class="card">
             <div class="card-body">
                 <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold mb-1">Search Orders</label>
-                        <div class="orders-search-wrap">
-                            <input type="text" id="orders-search-input" class="form-control form-control-sm"
-                                   placeholder="Order ID, product name, or customer..." autocomplete="off">
-                            <div id="orders-search-dropdown" role="listbox"></div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="orders-search-input" class="form-control me-2" 
+                                       placeholder="Order ID, product name, or customer…">
+                                <button id="orders-search-btn" class="btn btn-sm btn-ac-green" type="button">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
+                            </div>
+                            <button id="orders-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh orders">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -783,44 +951,66 @@
                 <p class="ac-section-hero__sub">Manage your public farm shop information visible to customers.</p>
             </div>
         </div>
-        <div class="card">
-            <div class="card-body">
-                <div style="max-width:560px;">
-                    <div id="shop-profile-view">
-                        <div class="d-flex align-items-start justify-content-between gap-3 mb-2">
-                            <div>
-                                <h5 id="shop-name-display" class="mb-1 fw-bold">--</h5>
-                                <p class="text-muted small mb-1" id="shop-location-display">
-                                    <i class="bi bi-geo-alt me-1"></i>Farm location not set
-                                </p>
+
+        <!-- VIEW MODE -->
+        <div id="shop-profile-view">
+            <div class="row g-3">
+                <div class="col-lg-8">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h6 class="card-title mb-0"><i class="bi bi-shop me-2 text-success"></i>Shop Information</h6>
+                                <button type="button" id="edit-shop-profile-btn" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-pencil me-1"></i>Edit
+                                </button>
                             </div>
-                            <button type="button" id="edit-shop-profile-btn" class="btn btn-outline-secondary btn-sm flex-shrink-0">
-                                <i class="bi bi-pencil me-1"></i>Edit
-                            </button>
+                            <div class="row g-2 small">
+                                <div class="col-sm-4 text-muted fw-semibold">Shop / Farm Name</div>
+                                <div class="col-sm-8" id="shop-name-display">--</div>
+                                <div class="col-sm-4 text-muted fw-semibold">Location</div>
+                                <div class="col-sm-8 text-muted" id="shop-location-display"><i class="bi bi-geo-alt me-1"></i>Not set</div>
+                                <div class="col-sm-4 text-muted fw-semibold">Description</div>
+                                <div class="col-sm-8 text-muted" id="shop-description-display">No description set.</div>
+                            </div>
                         </div>
-                        <p id="shop-description-display" class="text-muted small">No description set.</p>
                     </div>
-                    <div id="shop-profile-edit" style="display:none;">
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label class="form-label small fw-semibold" for="shop-name-input">Shop / Farm Name</label>
-                                <input type="text" id="shop-name-input" class="form-control" maxlength="120" placeholder="My Farm Shop">
+                </div>
+            </div>
+        </div>
+
+        <!-- EDIT MODE -->
+        <div id="shop-profile-edit" style="display:none;">
+            <div class="row g-3">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3"><i class="bi bi-pencil me-2 text-success"></i>Edit Shop Information</h6>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold" for="shop-name-input">Shop / Farm Name</label>
+                                    <input type="text" id="shop-name-input" class="form-control form-control-sm" maxlength="120" placeholder="My Farm Shop">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold">Farm / Pick-up Location</label>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <textarea id="shop-location-input" class="form-control form-control-sm" rows="2" placeholder="No address set — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
+                                        <button type="button" id="open-shop-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
+                                            <i class="bi bi-geo-alt me-1"></i>Set Location
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold" for="shop-description-input">Description</label>
+                                    <textarea id="shop-description-input" class="form-control form-control-sm" rows="4" maxlength="500"
+                                              placeholder="Tell customers about your farm and what you grow."></textarea>
+                                </div>
                             </div>
-                            <div class="col-12">
-                                <label class="form-label small fw-semibold" for="shop-location-input">Location</label>
-                                <input type="text" id="shop-location-input" class="form-control" maxlength="255" placeholder="e.g., Laguna, Philippines">
+                            <div class="d-flex gap-2 justify-content-end mt-3">
+                                <button type="button" id="cancel-shop-profile-btn" class="btn btn-secondary btn-sm">Cancel</button>
+                                <button type="button" id="save-shop-profile-btn" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-check-lg me-1"></i>Save Changes
+                                </button>
                             </div>
-                            <div class="col-12">
-                                <label class="form-label small fw-semibold" for="shop-description-input">Description</label>
-                                <textarea id="shop-description-input" class="form-control" rows="4" maxlength="500"
-                                          placeholder="Tell customers about your farm and what you grow."></textarea>
-                            </div>
-                        </div>
-                        <div class="d-flex gap-2 justify-content-end mt-3">
-                            <button type="button" id="cancel-shop-profile-btn" class="btn btn-secondary btn-sm">Cancel</button>
-                            <button type="button" id="save-shop-profile-btn" class="btn btn-primary btn-sm">
-                                <i class="bi bi-check-lg me-1"></i>Save Changes
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -828,28 +1018,113 @@
         </div>
     </section>
 
+    <!-- MODAL: SHOP ADDRESS (PSGC) -->
+    <div id="shop-address-modal" class="modal" style="z-index:1090;">
+        <div class="modal-content" style="max-width:500px;">
+            <div class="modal-header" style="background:#fff!important;color:var(--ac-text)!important;">
+                <h3 style="color:var(--ac-text)!important;"><i class="bi bi-geo-alt me-2 text-success"></i>Farm / Pick-up Location</h3>
+                <button class="close-btn" id="close-shop-address-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(80vh - 58px);">
+                <div class="form-group">
+                    <label for="shop-location-zone">Zone <span class="text-danger">*</span></label>
+                    <select id="shop-location-zone" class="form-select form-select-sm">
+                        <option value="">Select Zone (Metro / North / South Luzon)</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="shop-location-province">Province <span class="text-danger">*</span></label>
+                        <select id="shop-location-province" class="form-select form-select-sm" disabled>
+                            <option value="">Select Province</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="shop-location-city">City / Municipality <span class="text-danger">*</span></label>
+                        <select id="shop-location-city" class="form-select form-select-sm" disabled>
+                            <option value="">Select City</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="shop-location-barangay">Barangay <span class="text-danger">*</span></label>
+                    <select id="shop-location-barangay" class="form-select form-select-sm" disabled>
+                        <option value="">Select Barangay</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="shop-location-street">Street / Building / House No.</label>
+                    <input type="text" id="shop-location-street" class="form-control form-control-sm" placeholder="Enter street, building, or house number">
+                </div>
+                <div class="form-group">
+                    <label for="shop-location-full">Address Preview</label>
+                    <textarea id="shop-location-full" class="form-control form-control-sm" rows="3" placeholder="Formatted address will appear here" readonly></textarea>
+                    <small class="field-hint">Street / Building, Barangay, City, Province</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancel-shop-address-modal" class="btn btn-sm btn-secondary">Cancel</button>
+                <button type="button" id="confirm-shop-address-modal" class="btn btn-sm btn-primary">
+                    <i class="bi bi-check-lg me-1"></i>Confirm Address
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- CHAT / MESSAGES SECTION -->
     <section id="chat" class="admin-section-card">
         <div class="ac-section-hero ac-section-hero--primary mb-4">
             <div class="ac-section-hero__icon"><i class="bi bi-chat-dots"></i></div>
             <div class="ac-section-hero__body">
-                <h4 class="ac-section-hero__title">Messages</h4>
-                <p class="ac-section-hero__sub">Chat with customers about orders and products.</p>
+                <h4 class="ac-section-hero__title">Support Chat</h4>
+                <p class="ac-section-hero__sub">Manage customer support conversations and inquiries.</p>
             </div>
         </div>
-        <div class="card">
-            <div class="card-body p-0">
-                <div class="chat-layout">
-                    <div id="conversation-list"></div>
-                    <div class="chat-window">
-                        <div id="chat-messages"></div>
-                        <form id="chat-form">
-                            <input type="text" id="chat-input" class="form-control form-control-sm"
-                                   placeholder="Type a message..." required autocomplete="off">
-                            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send"></i></button>
-                        </form>
+
+        <div id="admin-chat-drawer" class="admin-chat-drawer chat-section-mode">
+            <div class="chat-sidebar-panel">
+                <div class="chat-sidebar-header">
+                    <h3 class="chat-sidebar-title">
+                        <i class="bi bi-chat-dots"></i>
+                        Conversations
+                    </h3>
+                </div>
+                <div id="conversation-list" class="conversation-list"></div>
+                <div id="chat-empty-state" class="text-center py-5" style="display:none">
+                    <i class="bi bi-chat-dots text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">No conversations yet</p>
+                    <p class="text-muted small">Messages from customers will appear here</p>
+                </div>
+            </div>
+
+            <div class="chat-main-panel">
+                <div id="chat-header" class="chat-thread-header">
+                    <div class="chat-thread-identity">
+                        <div class="chat-thread-avatar">
+                            <i class="bi bi-person"></i>
+                        </div>
+                        <div>
+                            <div id="chat-header-title" class="chat-thread-name">
+                                Select a conversation
+                            </div>
+                            <div id="chat-header-subtitle" class="chat-thread-sub"></div>
+                        </div>
                     </div>
                 </div>
+
+                <div id="chat-messages" class="chat-messages-feed"></div>
+
+                <form id="chat-form" class="chat-compose-bar">
+                    <input id="chat-input"
+                           class="chat-compose-input"
+                           type="text"
+                           placeholder="Type a message…"
+                           autocomplete="off"
+                           required>
+                    <button type="submit" class="btn btn-primary chat-send-btn">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </form>
             </div>
         </div>
     </section>
@@ -858,7 +1133,7 @@
 
 <!-- ORDER DETAIL SIDE PANEL -->
 <aside id="farmer-detail-panel" class="admin-detail-panel" aria-label="Order details">
-    <button class="panel-close" id="close-farmer-panel" type="button" aria-label="Close panel">
+    <button class="detail-panel-close" id="close-farmer-panel" type="button" aria-label="Close panel">
         <i class="bi bi-x-lg"></i>
     </button>
     <div id="farmer-detail-content" class="panel-content">
@@ -871,7 +1146,7 @@
     <div class="modal-content" style="max-width:640px;">
         <div class="modal-header">
             <h3><i class="bi bi-plus-circle-fill me-2 text-success"></i>Add Product</h3>
-            <button class="close-btn" id="close-add-product-modal" aria-label="Close">&times;</button>
+            <button class="close-btn" id="close-add-product-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
         <form id="add-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(85vh - 58px);">
             <div class="form-row">
@@ -886,18 +1161,6 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="product-unit">Unit <span class="text-danger">*</span></label>
-                    <div class="custom-select-field">
-                        <div class="custom-select-input-wrap">
-                            <input type="text" id="product-unit" class="form-control form-control-sm" placeholder="Select unit" autocomplete="off" readonly required>
-                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
-                        </div>
-                        <div id="product-unit-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Unit options"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
                     <label for="product-name">Product Name <span class="text-danger">*</span></label>
                     <div class="product-name-field">
                         <div class="product-name-input-wrap">
@@ -906,6 +1169,18 @@
                             <i class="bi bi-chevron-down pn-chevron" aria-hidden="true"></i>
                         </div>
                         <div id="product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product suggestions"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="product-unit">Unit <span class="text-danger">*</span></label>
+                    <div class="custom-select-field">
+                        <div class="custom-select-input-wrap">
+                            <input type="text" id="product-unit" class="form-control form-control-sm" placeholder="Select unit" autocomplete="off" readonly required>
+                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
+                        </div>
+                        <div id="product-unit-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Unit options"></div>
                     </div>
                 </div>
                 <div class="form-group">
@@ -934,9 +1209,14 @@
                 </div>
             </div>
             <div class="form-group">
-                <label for="product-location">Farm / Pick-up Location</label>
-                <input type="text" id="product-location" class="form-control form-control-sm" placeholder="Auto-filled from shop address" readonly>
-                <small class="field-hint">Location is automatically set to your shop address. Contact admin to change shop location.</small>
+                <label for="product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
+                <div style="display:flex;gap:.5rem;align-items:center;">
+                    <textarea id="product-location-display" class="form-control form-control-sm" rows="2" placeholder="Auto-filled from shop address — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
+                    <button type="button" id="open-add-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
+                        <i class="bi bi-geo-alt me-1"></i>Set Location
+                    </button>
+                </div>
+                <input type="hidden" id="product-location">
             </div>
             <div class="form-group">
                 <label for="product-image">Product Image</label>
@@ -944,24 +1224,24 @@
                 <small class="field-hint">Upload a clear, well-lit photo of your product.</small>
                 <div id="product-image-preview" class="image-preview"></div>
             </div>
-            <div class="form-actions">
-                <button type="button" id="cancel-add-product-btn" class="btn btn-secondary btn-sm">Cancel</button>
-                <button type="submit" class="btn btn-primary btn-sm">
-                    <i class="bi bi-cloud-upload me-1"></i>Submit for Approval
-                </button>
-            </div>
         </form>
+        <div class="modal-footer">
+            <button type="button" id="cancel-add-product-btn" class="btn btn-sm btn-secondary">Cancel</button>
+            <button type="submit" form="add-product-form" class="btn btn-sm btn-primary">
+                <i class="bi bi-cloud-upload me-1"></i>Submit for Approval
+            </button>
+        </div>
     </div>
 </div>
 
 <!-- MODAL: EDIT PRODUCT -->
 <div id="edit-product-modal" class="modal">
-    <div class="modal-content" style="max-width:640px;">
+    <div class="modal-content" style="max-width:640px;display:flex;flex-direction:column;max-height:90vh;">
         <div class="modal-header">
             <h3><i class="bi bi-pencil-square me-2 text-primary"></i>Edit Product</h3>
-            <button class="close-btn" aria-label="Close">&times;</button>
+            <button class="close-btn" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
-        <form id="edit-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(85vh - 58px);">
+        <form id="edit-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;flex:1;">
             <input type="hidden" id="edit-product-id">
             <div class="form-row">
                 <div class="form-group">
@@ -975,18 +1255,6 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="edit-product-unit">Unit <span class="text-danger">*</span></label>
-                    <div class="custom-select-field">
-                        <div class="custom-select-input-wrap">
-                            <input type="text" id="edit-product-unit" class="form-control form-control-sm" placeholder="Select unit" autocomplete="off" readonly required>
-                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
-                        </div>
-                        <div id="edit-product-unit-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Unit options"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
                     <label for="edit-product-name">Product Name <span class="text-danger">*</span></label>
                     <div class="product-name-field">
                         <div class="product-name-input-wrap">
@@ -994,6 +1262,18 @@
                             <i class="bi bi-chevron-down pn-chevron" aria-hidden="true"></i>
                         </div>
                         <div id="edit-product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product suggestions"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="edit-product-unit">Unit <span class="text-danger">*</span></label>
+                    <div class="custom-select-field">
+                        <div class="custom-select-input-wrap">
+                            <input type="text" id="edit-product-unit" class="form-control form-control-sm" placeholder="Select unit" autocomplete="off" readonly required>
+                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
+                        </div>
+                        <div id="edit-product-unit-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Unit options"></div>
                     </div>
                 </div>
                 <div class="form-group">
@@ -1024,7 +1304,7 @@
             <div class="form-group">
                 <label for="edit-product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
                 <div style="display:flex;gap:.5rem;align-items:center;">
-                    <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set — click Set Location to change" readonly style="flex:1;"></textarea>
+                    <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
                     <button type="button" id="open-edit-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
                         <i class="bi bi-geo-alt me-1"></i>Set Location
                     </button>
@@ -1036,62 +1316,63 @@
                 <small class="field-hint">Leave empty to keep the current image.</small>
                 <div id="edit-product-image-preview" class="image-preview"></div>
             </div>
-            <div class="form-actions">
-                <button type="button" id="cancel-edit-btn" class="btn btn-secondary btn-sm">Cancel</button>
-                <button type="submit" class="btn btn-primary btn-sm">
-                    <i class="bi bi-check-lg me-1"></i>Update Product
-                </button>
-            </div>
         </form>
+        <div class="modal-footer gap-2" style="padding:.75rem 1.25rem;border-top:1px solid #e2e8f0;background:#fff;flex-shrink:0;">
+            <button type="button" id="cancel-edit-btn" class="btn btn-sm btn-secondary">Cancel</button>
+            <button type="submit" form="edit-product-form" class="btn btn-sm btn-ac-green">
+                <i class="bi bi-check-lg me-1"></i>Update Product
+            </button>
+        </div>
     </div>
 </div>
 
-<!-- MODAL: EDIT PRODUCT ADDRESS (PSGC) -->
-<div id="edit-product-address-modal" class="modal" style="z-index:1090;">
+<!-- MODAL: PRODUCT ADDRESS (PSGC) - Shared for Add and Edit -->
+<div id="product-address-modal" class="modal" style="z-index:1090;">
     <div class="modal-content" style="max-width:500px;">
         <div class="modal-header">
             <h3><i class="bi bi-geo-alt me-2 text-success"></i>Farm / Pick-up Location</h3>
-            <button class="close-btn" id="close-edit-product-address-modal" aria-label="Close">&times;</button>
+            <button class="close-btn" id="close-product-address-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
         <div style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(80vh - 58px);">
             <div class="form-group">
-                <label for="edit-product-location-zone">Zone <span class="text-danger">*</span></label>
-                <select id="edit-product-location-zone" class="form-select form-select-sm">
+                <label for="product-location-zone">Zone <span class="text-danger">*</span></label>
+                <select id="product-location-zone" class="form-select form-select-sm">
                     <option value="">Select Zone (Metro / North / South Luzon)</option>
                 </select>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="edit-product-location-province">Province <span class="text-danger">*</span></label>
-                    <select id="edit-product-location-province" class="form-select form-select-sm" disabled>
+                    <label for="product-location-province">Province <span class="text-danger">*</span></label>
+                    <select id="product-location-province" class="form-select form-select-sm" disabled>
                         <option value="">Select Province</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="edit-product-location-city">City / Municipality <span class="text-danger">*</span></label>
-                    <select id="edit-product-location-city" class="form-select form-select-sm" disabled>
+                    <label for="product-location-city">City / Municipality <span class="text-danger">*</span></label>
+                    <select id="product-location-city" class="form-select form-select-sm" disabled>
                         <option value="">Select City</option>
                     </select>
                 </div>
             </div>
             <div class="form-group">
-                <label for="edit-product-location-barangay">Barangay <span class="text-danger">*</span></label>
-                <select id="edit-product-location-barangay" class="form-select form-select-sm" disabled>
+                <label for="product-location-barangay">Barangay <span class="text-danger">*</span></label>
+                <select id="product-location-barangay" class="form-select form-select-sm" disabled>
                     <option value="">Select Barangay</option>
                 </select>
             </div>
             <div class="form-group">
-                <label for="edit-product-location-street">Street / Building / House No. <span class="text-danger">*</span></label>
-                <input type="text" id="edit-product-location-street" class="form-control form-control-sm" placeholder="Enter street, building, or house number">
+                <label for="product-location-street">Street / Building / House No. <span class="text-danger">*</span></label>
+                <input type="text" id="product-location-street" class="form-control form-control-sm" placeholder="Enter street, building, or house number">
             </div>
             <div class="form-group">
-                <label for="edit-product-location-full">Address Preview</label>
-                <textarea id="edit-product-location-full" class="form-control form-control-sm" rows="3" placeholder="Formatted address will appear here" readonly></textarea>
+                <label for="product-location-full">Address Preview</label>
+                <textarea id="product-location-full" class="form-control form-control-sm" rows="3" placeholder="Formatted address will appear here" readonly></textarea>
                 <small class="field-hint">Street / Building, Barangay, City, Province</small>
             </div>
-            <div class="form-actions">
-                <button type="button" id="cancel-edit-product-address-modal" class="btn btn-secondary btn-sm">Cancel</button>
-                <button type="button" id="confirm-edit-product-address-modal" class="btn btn-primary btn-sm">
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancel-product-address-modal" class="btn btn-sm btn-secondary">Cancel</button>
+                <button type="button" id="confirm-product-address-modal" class="btn btn-sm btn-primary">
                     <i class="bi bi-check-lg me-1"></i>Confirm Address
                 </button>
             </div>
@@ -1105,7 +1386,7 @@
     <div class="product-details-content">
         <div class="product-details-topbar">
             <h3><i class="bi bi-eye me-2"></i>Product Details</h3>
-            <button class="product-details-close" id="farmer-product-preview-close" aria-label="Close">&times;</button>
+            <button class="product-details-close" id="farmer-product-preview-close" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
         <div id="farmer-product-preview-body" style="padding:1rem 1.25rem;"></div>
     </div>
@@ -1115,9 +1396,9 @@
 <div id="request-product-modal" class="product-details-modal">
     <div class="product-details-overlay"></div>
     <div class="product-details-content" style="max-width:560px;">
-        <div class="product-details-topbar">
-            <h3><i class="bi bi-send me-2"></i>Request New Product</h3>
-            <button class="product-details-close" id="request-modal-close" aria-label="Close">&times;</button>
+        <div class="product-details-topbar" style="background:linear-gradient(135deg,var(--primary-color,#4ade80),var(--secondary-color,#0ea5e9));border-bottom:1px solid rgba(255,255,255,.2);">
+            <h3 style="color:#fff;"><i class="bi bi-send me-2"></i>Request New Product</h3>
+            <button class="product-details-close" id="request-modal-close" aria-label="Close" style="color:#fff;"><i class="bi bi-x-lg"></i></button>
         </div>
         <div style="padding:1rem 1.25rem;overflow:auto;">
             <p class="text-muted small mb-3">Cannot find a product in the catalog? Request it here and staff will review it.</p>
@@ -1132,9 +1413,10 @@
                     <textarea id="request-product-notes" class="form-control form-control-sm" rows="3" maxlength="500"
                               placeholder="e.g., local name, usual unit of sale, quality details..."></textarea>
                 </div>
-                <div class="form-actions">
-                    <button type="button" id="request-form-cancel" class="btn btn-secondary btn-sm">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="request-form-cancel" class="btn btn-sm btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary">
                         <i class="bi bi-send me-1"></i>Submit Request
                     </button>
                 </div>
@@ -1152,7 +1434,7 @@
     <div class="modal-content" style="max-width:380px;">
         <div class="modal-header">
             <h3><i class="bi bi-star-fill me-2 text-warning"></i>Rate Customer</h3>
-            <button class="close-btn" id="customer-rating-close" aria-label="Close">&times;</button>
+            <button class="close-btn" id="customer-rating-close" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
         <form id="customer-rating-form" style="padding:1rem 1.25rem;">
             <p id="customer-rating-order" class="text-muted small mb-2"></p>
@@ -1164,9 +1446,10 @@
                 <button type="button" class="order-rating-star-btn" data-rating="5" aria-label="5 stars"><i class="fas fa-star"></i></button>
             </div>
             <div id="customer-rating-value" class="order-rating-value mb-3">Select a rating</div>
-            <div class="d-flex gap-2 justify-content-end">
-                <button type="button" id="customer-rating-cancel" class="btn btn-secondary btn-sm">Cancel</button>
-                <button type="submit" id="customer-rating-submit" class="btn btn-primary btn-sm">
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="customer-rating-cancel" class="btn btn-sm btn-secondary">Cancel</button>
+                <button type="submit" id="customer-rating-submit" class="btn btn-sm btn-primary">
                     <i class="bi bi-check-lg me-1"></i>Save Rating
                 </button>
             </div>
