@@ -3667,7 +3667,9 @@ class FarmerDashboard {
                 document.getElementById('edit-product-description').value = product.description || '';
                 
                 // Parse and populate PSGC address fields
-                const location = product.location || '';
+                const productLocation = product.location || '';
+                const shopLocation = this.currentShopProfile?.location || '';
+                const location = productLocation || shopLocation;
                 const zoneEl = document.getElementById('edit-product-location-zone');
                 const provinceEl = document.getElementById('edit-product-location-province');
                 const cityEl = document.getElementById('edit-product-location-city');
