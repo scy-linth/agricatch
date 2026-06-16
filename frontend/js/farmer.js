@@ -63,6 +63,37 @@ class FarmerDashboard {
         return '/api';
     }
 
+    setupChatScrollObserver() {
+        const chatSection = document.getElementById('chat');
+        if (!chatSection) return;
+
+        // Watch for chat section becoming active
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    if (chatSection.classList.contains('active')) {
+                        // Chat section became active, use setInterval to keep scrolling for 10 seconds
+                        let elapsed = 0;
+                        const interval = 50;
+                        const maxDuration = 10000; // 10 seconds
+                        const scrollInterval = setInterval(() => {
+                            elapsed += interval;
+                            const chatMessages = document.getElementById('chat-messages');
+                            if (chatMessages && chatMessages.children.length > 0) {
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            }
+                            if (elapsed >= maxDuration) {
+                                clearInterval(scrollInterval);
+                            }
+                        }, interval);
+                    }
+                }
+            });
+        });
+
+        observer.observe(chatSection, { attributes: true });
+    }
+
     setApiBase(nextBase) {
         this.apiBase = String(nextBase || '/api').trim() || '/api';
         try {
@@ -4687,10 +4718,8 @@ class FarmerDashboard {
                 <div class="order-card-product">
                     <img src="${this.escapeAttr(productImage)}" 
                          alt="${this.escapeHtml(productName)}" class="order-card-product-img">
-                    <div>
-                        <div class="order-card-product-name">${this.escapeHtml(productName)}</div>
-                        <div class="order-card-product-qty">Qty: ${quantity}</div>
-                    </div>
+                    <div class="order-card-product-name">${this.escapeHtml(productName)}</div>
+                    <div class="order-card-product-qty">Qty: ${quantity}</div>
                 </div>
                 <div class="order-card-customer">
                     <div class="order-card-customer-name">${this.escapeHtml(customerName)}</div>
