@@ -31,7 +31,7 @@
 }
 .modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(15,23,42,.55); align-items:flex-start; justify-content:center; padding:1.5rem 1rem; overflow-y:auto; }
 .modal.open { display:flex; }
-.modal .modal-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:100%; max-width:620px; margin:auto; position:relative; overflow:hidden; }
+.modal .modal-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:100%; max-width:620px; margin:auto; position:relative; overflow:hidden; display:flex; flex-direction:column; }
 .modal .modal-header { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); background:#fff; position:sticky; top:0; z-index:2; }
 .modal .modal-header h3 { margin:0; font-size:1.05rem; font-weight:700; color:var(--ac-text,#1a2e1e); }
 .modal .close-btn { background:none; border:none; font-size:1.5rem; line-height:1; cursor:pointer; color:var(--ac-text-muted,#6b7e72); padding:0 4px; transition:color .15s; }
@@ -961,7 +961,7 @@
             <h3><i class="bi bi-pencil-square me-2 text-primary"></i>Edit Product</h3>
             <button class="close-btn" aria-label="Close">&times;</button>
         </div>
-        <form id="edit-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(85vh - 58px);">
+        <form id="edit-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;flex:1;max-height:calc(85vh - 58px);">
             <input type="hidden" id="edit-product-id">
             <div class="form-row">
                 <div class="form-group">
