@@ -40,10 +40,10 @@
 .product-details-modal.active { display:flex; }
 .product-details-overlay { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:0; }
 .product-details-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:calc(100% - 2rem); max-width:640px; max-height:calc(100vh - 3rem); overflow-y:auto; position:relative; z-index:1; }
-.product-details-topbar { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); position:sticky; top:0; background:#fff; z-index:2; }
-.product-details-topbar h3 { margin:0; font-size:1.05rem; font-weight:700; }
-.product-details-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--ac-text-muted); line-height:1; padding:0 4px; }
-.product-details-close:hover { color:var(--ac-danger,#dc2626); }
+.product-details-topbar { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); position:sticky; top:0; background: linear-gradient(135deg, #2d7a3a 0%, #41bf5b 100%); z-index:2; }
+.product-details-topbar h3 { margin:0; font-size:1.05rem; font-weight:700; color: #fff; }
+.product-details-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color: #fff; line-height:1; padding:0 4px; }
+.product-details-close:hover { color: #e8f5e9; }
 #farmer-verif-banner { padding:.65rem 1.15rem; border-radius:8px; margin-bottom:.75rem; font-size:.875rem; font-weight:600; }
 #my-products-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; }
 .product-tabs { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
@@ -95,6 +95,11 @@
 .orders-search-wrap { position:relative; }
 #orders-search-dropdown { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; z-index:200; display:none; max-height:240px; overflow-y:auto; box-shadow:0 4px 16px rgba(0,0,0,.08); }
 #orders-search-dropdown.open { display:block; }
+.orders-search-option { display:flex; flex-direction:column; width:100%; padding:.6rem .85rem; border:none; border-bottom:1px solid var(--ac-border,#e2e8f0); background:none; text-align:left; font-size:.875rem; font-weight:500; color:var(--ac-text,#1a2e1e); cursor:pointer; transition:background .1s,color .1s; line-height:1.3; }
+.orders-search-option:last-child { border-bottom:none; }
+.orders-search-option:hover { background:var(--ac-bg,#f5f7f5); color:var(--ac-primary,#2d7a3a); }
+.orders-search-option .title { font-weight:600; margin-bottom:.2rem; }
+.orders-search-option .meta { font-size:.8rem; color:var(--ac-text-muted,#6b7e72); }
 .product-form .form-row { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; margin-bottom:.75rem; }
 .product-form .form-group { margin-bottom:.65rem; }
 .product-form .form-group label { display:block; font-size:.8rem; font-weight:600; margin-bottom:.25rem; color:var(--ac-text,#1a2e1e); }
@@ -725,7 +730,8 @@
                     </div>
                 </div>
                 <div id="orders-search-empty" class="text-center py-3 text-muted small" style="display:none;">
-                    <i class="bi bi-search d-block fs-4 mb-1"></i>No matching orders found.
+                    <i class="bi bi-search d-block fs-4 mb-1"></i>
+                    <p>No matching orders found.</p>
                 </div>
                 <div class="order-tabs">
                     <button id="pending-orders-tab" class="tab-btn active" type="button">Pending <span class="tab-count" id="pending-orders-count">0</span></button>
@@ -1018,8 +1024,8 @@
             <div class="form-group">
                 <label for="edit-product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
                 <div style="display:flex;gap:.5rem;align-items:flex-start;">
-                    <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set — click to set location" readonly style="flex:1;cursor:pointer;" onclick="document.getElementById('edit-product-address-modal').classList.add('open')"></textarea>
-                    <button type="button" id="open-edit-product-address-modal" class="btn btn-outline-secondary btn-sm" style="white-space:nowrap;">
+                    <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set — click Set Location to change" readonly style="flex:1;"></textarea>
+                    <button type="button" id="open-edit-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
                         <i class="bi bi-geo-alt me-1"></i>Set Location
                     </button>
                 </div>
