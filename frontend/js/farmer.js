@@ -1372,6 +1372,12 @@ class FarmerDashboard {
                 if (!orderId) return;
                 this.rateCustomerForOrder(orderId);
             }
+
+            if (action === 'view-order') {
+                const orderId = Number(btn.getAttribute('data-order-id'));
+                if (!orderId) return;
+                this.openOrderDetails(orderId);
+            }
         });
 
         // Initialize date rules for product forms
@@ -4558,34 +4564,34 @@ class FarmerDashboard {
         
         if (status === 'pending') {
             return `
-                <button class="btn btn-sm btn-success order-confirm-btn" data-order-id="${orderId}">
+                <button class="btn btn-sm btn-success order-confirm-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">
                     <i class="bi bi-check-lg me-1"></i>Confirm
                 </button>
-                <button class="btn btn-sm btn-danger order-cancel-btn" data-order-id="${orderId}">
+                <button class="btn btn-sm btn-danger order-cancel-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">
                     <i class="bi bi-x-lg me-1"></i>Cancel
                 </button>
             `;
         } else if (status === 'confirmed') {
             return `
-                <button class="btn btn-sm btn-primary order-prepare-btn" data-order-id="${orderId}">
+                <button class="btn btn-sm btn-primary order-prepare-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="preparing">
                     <i class="bi bi-box-seam me-1"></i>Start Preparing
                 </button>
             `;
         } else if (status === 'preparing') {
             return `
-                <button class="btn btn-sm btn-info order-ship-btn" data-order-id="${orderId}">
+                <button class="btn btn-sm btn-info order-ship-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="out_for_delivery">
                     <i class="bi bi-truck me-1"></i>Mark as Out for Delivery
                 </button>
             `;
         } else if (status === 'out_for_delivery') {
             return `
-                <button class="btn btn-sm btn-success order-deliver-btn" data-order-id="${orderId}">
+                <button class="btn btn-sm btn-success order-deliver-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="delivered">
                     <i class="bi bi-check-circle me-1"></i>Mark as Delivered
                 </button>
             `;
         } else {
             return `
-                <button class="btn btn-sm btn-secondary order-view-btn" data-order-id="${orderId}">
+                <button class="btn btn-sm btn-secondary order-view-btn" data-action="view-order" data-order-id="${orderId}">
                     <i class="bi bi-eye me-1"></i>View Details
                 </button>
             `;
