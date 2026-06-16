@@ -381,7 +381,6 @@ class FarmerDashboard {
         }
         if (closeBtn) closeBtn.addEventListener('click', () => this.closeRequestModal(true));
         if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeRequestModal(true));
-        if (overlay) overlay.addEventListener('click', () => this.closeRequestModal(true));
 
         // Form handlers
         const form = document.getElementById('request-product-form-modal');
@@ -1068,13 +1067,6 @@ class FarmerDashboard {
         if (cancelAddProductBtn) {
             cancelAddProductBtn.addEventListener('click', () => this.closeAddProductModal());
         }
-        if (addProductModal) {
-            addProductModal.addEventListener('click', (e) => {
-                if (e.target === addProductModal) {
-                    this.closeAddProductModal();
-                }
-            });
-        }
 
         const customerRatingModal = document.getElementById('customer-rating-modal');
         const customerRatingClose = document.getElementById('customer-rating-close');
@@ -1167,9 +1159,7 @@ class FarmerDashboard {
 
         const previewModal = document.getElementById('farmer-product-preview-modal');
         const previewCloseBtn = document.getElementById('farmer-product-preview-close');
-        const previewOverlay = previewModal?.querySelector('.product-details-overlay');
         if (previewCloseBtn) previewCloseBtn.addEventListener('click', () => this.closeMyProductPreview());
-        if (previewOverlay) previewOverlay.addEventListener('click', () => this.closeMyProductPreview());
 
         // Product edit button (event delegation)
         document.addEventListener('click', (e) => {
@@ -3215,11 +3205,11 @@ class FarmerDashboard {
                 paginationEl.innerHTML = '';
             } else {
                 paginationEl.innerHTML = `
-                    <button type="button" class="btn btn-secondary btn-small" ${p <= 1 ? 'disabled' : ''} onclick="farmerDashboard.loadReviews(${p - 1})">
+                    <button type="button" class="btn btn-secondary btn-sm" ${p <= 1 ? 'disabled' : ''} onclick="farmerDashboard.loadReviews(${p - 1})">
                         <i class="fas fa-chevron-left"></i>
                     </button>
                     <span style="padding:0 0.75rem;font-weight:700;">${p} / ${tp}</span>
-                    <button type="button" class="btn btn-secondary btn-small" ${p >= tp ? 'disabled' : ''} onclick="farmerDashboard.loadReviews(${p + 1})">
+                    <button type="button" class="btn btn-secondary btn-sm" ${p >= tp ? 'disabled' : ''} onclick="farmerDashboard.loadReviews(${p + 1})">
                         <i class="fas fa-chevron-right"></i>
                     </button>
                 `;
@@ -3700,14 +3690,14 @@ class FarmerDashboard {
                             if (parsed.city && barangayEl) barangayEl.disabled = false;
                         }
                     } catch (e) {
-                        // If parsing fails, fall back to simple text in street field
-                        if (streetEl) streetEl.value = location;
+                        // If parsing fails, set preview to full address but leave street field empty
                         if (previewEl) previewEl.value = location;
+                        if (streetEl) streetEl.value = '';
                     }
                 } else if (location) {
-                    // Fallback if PSGC not available
-                    if (streetEl) streetEl.value = location;
+                    // Fallback if PSGC not available - set preview to full address but leave street field empty
                     if (previewEl) previewEl.value = location;
+                    if (streetEl) streetEl.value = '';
                 }
                 
                 await this.loadProductCatalogNames(product.category_id || null);
@@ -3911,7 +3901,7 @@ class FarmerDashboard {
                         <textarea id="shop-description-input" class="editable-field" rows="3" placeholder="Add a short description about your farm and products.">${this.escapeHtml(desc)}</textarea>
                     </div>
                     <div style="display:flex; gap:10px; justify-content:flex-end;">
-                        <button type="submit" class="btn btn-primary btn-small">Save Shop Profile</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Save Shop Profile</button>
                     </div>
                 </form>
             </div>
@@ -3947,7 +3937,7 @@ class FarmerDashboard {
                     </div>
                     <div id="account-password-error" class="field-error" style="display:none;margin-top:8px;margin-bottom:6px;"></div>
                     <div style="display:flex; gap:10px; justify-content:flex-end;">
-                        <button type="submit" class="btn btn-primary btn-small" id="account-password-submit">Update Password</button>
+                        <button type="submit" class="btn btn-primary btn-sm" id="account-password-submit">Update Password</button>
                     </div>
                 </form>
             </div>
@@ -4395,16 +4385,16 @@ class FarmerDashboard {
                     <div style="font-weight: 700; margin-bottom: 12px; font-size: 14px;">Update Pre-order Status</div>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         ${currentStatus === 'pending' ? `
-                            <button class="btn btn-primary btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">Confirm Pre-order</button>
-                            <button class="btn btn-danger btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">Cancel</button>
+                            <button class="btn btn-primary btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">Confirm Pre-order</button>
+                            <button class="btn btn-danger btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">Cancel</button>
                         ` : currentStatus === 'confirmed' ? `
-                            <button class="btn btn-primary btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="preparing">Start Preparing</button>
-                            <button class="btn btn-danger btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">Cancel</button>
+                            <button class="btn btn-primary btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="preparing">Start Preparing</button>
+                            <button class="btn btn-danger btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">Cancel</button>
                         ` : currentStatus === 'preparing' ? `
-                            <button class="btn btn-primary btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="out_for_delivery">Out for Delivery</button>
-                            <button class="btn btn-danger btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">Cancel</button>
+                            <button class="btn btn-primary btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="out_for_delivery">Out for Delivery</button>
+                            <button class="btn btn-danger btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">Cancel</button>
                         ` : currentStatus === 'out_for_delivery' ? `
-                            <button class="btn btn-primary btn-small" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="delivered">Mark as Delivered</button>
+                            <button class="btn btn-primary btn-sm" type="button" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="delivered">Mark as Delivered</button>
                         ` : currentStatus === 'delivered' ? `
                             <span style="color: #4caf50; font-weight: 600;">✓ Order Delivered</span>
                         ` : currentStatus === 'cancelled' ? `
@@ -4414,9 +4404,9 @@ class FarmerDashboard {
                 </div>
 
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button class="btn btn-secondary btn-small" type="button" data-action="chat-customer" data-customer-id="${order.customer_id || ''}" data-order-id="${orderId}">Chat Customer</button>
+                    <button class="btn btn-secondary btn-sm" type="button" data-action="chat-customer" data-customer-id="${order.customer_id || ''}" data-order-id="${orderId}">Chat Customer</button>
                     ${currentStatus === 'delivered' ? `
-                        <button class="btn btn-small" type="button" data-action="rate-customer" data-order-id="${orderId}">Rate Customer</button>
+                        <button class="btn btn-outline-primary btn-sm" type="button" data-action="rate-customer" data-order-id="${orderId}">Rate Customer</button>
                     ` : ''}
                 </div>
             </div>
