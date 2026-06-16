@@ -2095,6 +2095,14 @@ class FarmerDashboard {
             sec.classList.toggle('active', sec.id === safeSection);
         });
 
+        // Prevent body scroll when chat section is active
+        document.body.classList.toggle('chat-section-active', safeSection === 'chat');
+
+        // Auto-switch to pending tab when orders section is opened
+        if (safeSection === 'orders') {
+            this.switchOrderTab('pending', true);
+        }
+
         const titles = {
             overview: 'Overview',
             products: 'My Products',

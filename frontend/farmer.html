@@ -876,24 +876,11 @@
                 <button id="refresh-orders-btn" class="btn btn-outline-secondary btn-sm" type="button">
                     <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                 </button>
-                <button id="orders-export-btn" class="btn btn-outline-secondary btn-sm" type="button">
-                    <i class="bi bi-download me-1"></i>Export
-                </button>
             </div>
         </div>
         <div class="card">
             <div class="card-body">
                 <div class="row g-2 mb-3">
-                    <div class="col-md-4 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Search</label>
-                        <div class="input-group input-group-sm">
-                            <input type="text" id="orders-search-input" class="form-control" 
-                                   placeholder="Order ID, product name, or customer…">
-                            <button id="orders-search-btn" class="btn btn-ac-green" type="button">
-                                <i class="bi bi-search"></i>
-                            </button>
-                        </div>
-                    </div>
                     <div class="col-md-3 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Date Range</label>
                         <select id="orders-date-filter" class="form-select form-select-sm">
@@ -914,6 +901,19 @@
                             <option value="delivered">Delivered</option>
                             <option value="cancelled">Cancelled</option>
                         </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <input type="text" id="orders-search-input" class="form-control" 
+                                   placeholder="Order ID, product name, or customer…">
+                            <button id="orders-search-btn" class="btn btn-ac-green" type="button">
+                                <i class="bi bi-search"></i>
+                            </button>
+                            <button id="orders-refresh-btn" class="btn btn-outline-secondary" type="button">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="order-tabs">
