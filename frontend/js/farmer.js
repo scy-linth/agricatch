@@ -18,6 +18,7 @@ class FarmerDashboard {
         this.lastOrdersById = new Map();
         this.lastOrdersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
         this.ordersCountByStatus = { pending: 0, confirmed: 0, preparing: 0, out_for_delivery: 0, delivered: 0, cancelled: 0 };
+        this.activeOrderStatus = 'pending';
         this.activeSection = 'overview';
         this.currentShopProfile = null;
         this.isShopProfileEditing = false;
@@ -2098,9 +2099,28 @@ class FarmerDashboard {
         // Prevent body scroll when chat section is active
         document.body.classList.toggle('chat-section-active', safeSection === 'chat');
 
+        // Scroll chat to bottom when section becomes active
+        if (safeSection === 'chat') {
+            let attempts = 0;
+            const maxAttempts = 50;
+            const scrollChat = () => {
+                attempts++;
+                const chatMessages = document.getElementById('chat-messages');
+                if (chatMessages && chatMessages.scrollHeight > 0) {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    if (attempts < maxAttempts) {
+                        setTimeout(scrollChat, 100);
+                    }
+                } else if (attempts < maxAttempts) {
+                    setTimeout(scrollChat, 100);
+                }
+            };
+            scrollChat();
+        }
+
         // Auto-switch to pending tab when orders section is opened
         if (safeSection === 'orders') {
-            this.switchOrderTab('pending', true);
+            this.switchOrderTab('pending');
         }
 
         const titles = {
@@ -4445,13 +4465,21 @@ class FarmerDashboard {
                             const item = (order.items && order.items[0]) || order;
                             return String(item.status || order.status || '').toLowerCase() === 'cancelled';
                         });
-                        this.renderOrders(cancelledOrders, status);
+                        this.lastOrdersByStatus[status] = cancelledOrders;
+                        cancelledOrders.forEach(o => this.lastOrdersById.set(Number(o.id), o));
+                        if (this.activeOrderStatus === status) {
+                            this.renderOrders(cancelledOrders, status);
+                        }
                         this.updateOrdersTabCounts();
                         return;
                     }
                 }
 
-                this.renderOrders(orders, status);
+                this.lastOrdersByStatus[status] = orders;
+                orders.forEach(o => this.lastOrdersById.set(Number(o.id), o));
+                if (this.activeOrderStatus === status) {
+                    this.renderOrders(orders, status);
+                }
                 this.updateOrdersTabCounts();
             } else {
                 const errorData = await response.json();
@@ -4531,6 +4559,7 @@ class FarmerDashboard {
     switchOrderTab(status, skipLoad = false) {
         const ordersEl = document.getElementById('orders');
         const scope = ordersEl || document;
+        this.activeOrderStatus = status;
 
         // Hide all order tabs (scope to #orders to avoid touching product tabs)
         scope.querySelectorAll('.order-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -4550,6 +4579,8 @@ class FarmerDashboard {
         // Load orders for this status unless we're skipping (e.g., already loaded)
         if (!skipLoad) {
             this.loadOrdersByStatus(status);
+        } else {
+            this.renderOrders(this.lastOrdersByStatus[status] || [], status);
         }
     }
 
