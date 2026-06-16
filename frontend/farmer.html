@@ -1,647 +1,1192 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Farmer Dashboard - AgriCatch</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <title>Farmer Dashboard — AgriCatch</title>
+
+    <!-- Google Fonts (match admin.html exactly) -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Font Awesome (farmer.js renders fa-* icons dynamically) -->
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
-    <meta name="color-scheme" content="light">
-    <style>
-        /* Ensure order tab badges are visible and styled consistently */
-        .order-tabs .tab-count {
-            display: inline-flex !important;
-            align-items: center;
-            justify-content: center;
-            min-width: 20px;
-            padding: 2px 6px;
-            border-radius: 12px;
-            font-size: 0.85rem;
-            background: #ef4444;
-            color: #fff;
-            margin-left: 8px;
-            vertical-align: middle;
-            opacity: 0.9;
-        }
-    </style>
+
+    <!-- NiceAdmin base template CSS -->
+    <link rel="stylesheet" href="/css/nicemain.css">
+    <link rel="stylesheet" href="/vendor/simple-datatables/style.css">
+    <!-- AgriCatch SaaS overrides — loaded LAST -->
+    <link rel="stylesheet" href="/css/agricatch-admin.css?v=farmer-rebuild-20260614">
 </head>
-<body class="admin-theme farmer-theme">
-    <div class="admin-layout farmer-layout">
-        <div class="sidebar-overlay" id="farmer-sidebar-overlay"></div>
-        <button class="mobile-menu-toggle" id="farmer-mobile-menu-toggle" aria-label="Toggle menu" style="position: fixed; top: 1rem; left: 1rem; z-index: 2001; background: var(--sidebar-bg); color: white; border: none; padding: 0.75rem; border-radius: 8px;">
-            <i class="fas fa-bars"></i>
+
+<style>
+/* FARMER DASHBOARD — PAGE-SCOPED OVERRIDES (complement agricatch-admin.css) */
+@media (max-width: 1199px) {
+    #farmer-sidebar { transform: translateX(-260px); transition: transform .28s ease; }
+    #farmer-sidebar.open { transform: translateX(0); }
+}
+.modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(15,23,42,.55); align-items:flex-start; justify-content:center; padding:1.5rem 1rem; overflow-y:auto; }
+.modal.open { display:flex; }
+.modal .modal-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:100%; max-width:620px; margin:auto; position:relative; overflow:hidden; }
+.modal .modal-header { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); background:#fff; position:sticky; top:0; z-index:2; }
+.modal .modal-header h3 { margin:0; font-size:1.05rem; font-weight:700; color:var(--ac-text,#1a2e1e); }
+.modal .close-btn { background:none; border:none; font-size:1.5rem; line-height:1; cursor:pointer; color:var(--ac-text-muted,#6b7e72); padding:0 4px; transition:color .15s; }
+.modal .close-btn:hover { color:var(--ac-danger,#dc2626); }
+.product-details-modal { display:none; position:fixed; inset:0; z-index:1070; align-items:center; justify-content:center; }
+.product-details-modal.active { display:flex; }
+.product-details-overlay { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:0; }
+.product-details-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:calc(100% - 2rem); max-width:640px; max-height:calc(100vh - 3rem); overflow-y:auto; position:relative; z-index:1; }
+.product-details-topbar { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); position:sticky; top:0; background:#fff; z-index:2; }
+.product-details-topbar h3 { margin:0; font-size:1.05rem; font-weight:700; }
+.product-details-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--ac-text-muted); line-height:1; padding:0 4px; }
+.product-details-close:hover { color:var(--ac-danger,#dc2626); }
+#farmer-verif-banner { padding:.65rem 1.15rem; border-radius:8px; margin-bottom:.75rem; font-size:.875rem; font-weight:600; }
+#my-products-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; }
+.product-tabs { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
+.product-tabs .tab-btn { padding:.4rem .85rem; border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; background:#fff; font-size:.82rem; font-weight:600; cursor:pointer; color:var(--ac-text-muted,#6b7e72); transition:background .15s,color .15s,border-color .15s; }
+.product-tabs .tab-btn.active { background:var(--ac-primary,#2d7a3a); color:#fff; border-color:var(--ac-primary,#2d7a3a); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+.order-tabs { display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.75rem; }
+.order-tabs .tab-btn { padding:.35rem .7rem; border-radius:8px; border:1px solid var(--ac-border,#e2e8f0); background:#fff; font-size:.8rem; font-weight:600; cursor:pointer; color:var(--ac-text-muted,#6b7e72); transition:background .15s,color .15s; white-space:nowrap; }
+.order-tabs .tab-btn.active { background:var(--ac-primary,#2d7a3a); color:#fff; border-color:var(--ac-primary,#2d7a3a); }
+.order-tabs .tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:18px; padding:1px 5px; border-radius:10px; font-size:.72rem; background:#ef4444; color:#fff; margin-left:4px; vertical-align:middle; }
+.orders-list { display:flex; flex-direction:column; gap:.65rem; }
+#products-batch-bar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; background:var(--ac-bg,#f5f7f5); border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; padding:.5rem .75rem; margin-bottom:.75rem; }
+/* Product Name Combobox — Modern */
+.product-name-field { position:relative; }
+.product-name-input-wrap { position:relative; display:flex; align-items:center; }
+.product-name-input-wrap .form-control { padding-right:2rem; cursor:pointer; }
+.product-name-input-wrap .form-control:disabled { cursor:not-allowed; }
+.pn-chevron { position:absolute; right:.6rem; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--ac-text-muted,#6b7e72); font-size:.8rem; transition:transform .2s ease, color .2s; }
+.product-name-field:has(.product-name-dropdown.open) .pn-chevron { transform:translateY(-50%) rotate(180deg); color:var(--ac-primary,#2d7a3a); }
+.product-name-input-wrap .form-control:disabled ~ .pn-chevron { opacity:.35; }
+.product-name-dropdown { display:none; position:absolute; top:calc(100% + 5px); left:0; right:0; background:#fff; border:1px solid var(--ac-primary-light,#c8ecd0); border-radius:10px; max-height:220px; overflow-y:auto; z-index:300; box-shadow:0 8px 24px rgba(45,122,58,.12),0 2px 8px rgba(0,0,0,.06); padding:.25rem; scrollbar-width:thin; scrollbar-color:var(--ac-primary-light,#c8ecd0) transparent; }
+.product-name-dropdown::-webkit-scrollbar { width:5px; }
+.product-name-dropdown::-webkit-scrollbar-thumb { background:var(--ac-primary-light,#c8ecd0); border-radius:4px; }
+.product-name-dropdown.open { display:block; animation:pnDropIn .14s ease; }
+@keyframes pnDropIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+.product-name-option { display:flex; align-items:center; width:100%; padding:.5rem .75rem; border:none; border-radius:7px; background:none; text-align:left; font-size:.875rem; font-weight:500; color:var(--ac-text,#1a2e1e); cursor:pointer; transition:background .1s,color .1s; line-height:1.3; }
+.product-name-option:hover { background:var(--ac-bg,#f5f7f5); color:var(--ac-primary,#2d7a3a); }
+.product-name-option.selected { background:var(--ac-primary-light,#e8f5e9); color:var(--ac-primary,#2d7a3a); font-weight:600; }
+.product-name-option.selected::after { content:'✓'; margin-left:auto; font-size:.8rem; font-weight:700; color:var(--ac-primary,#2d7a3a); }
+.product-name-option.active { background:var(--ac-primary,#2d7a3a); color:#fff; }
+.product-name-option.active::after { color:#fff; }
+/* Custom Select Dropdowns (Category, Unit) — Same style as product name */
+.custom-select-field { position:relative; }
+.custom-select-input-wrap { position:relative; display:flex; align-items:center; }
+.custom-select-input-wrap .form-control { padding-right:2rem; cursor:pointer; }
+.cs-chevron { position:absolute; right:.6rem; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--ac-text-muted,#6b7e72); font-size:.8rem; transition:transform .2s ease, color .2s; }
+.custom-select-field:has(.custom-select-dropdown.open) .cs-chevron { transform:translateY(-50%) rotate(180deg); color:var(--ac-primary,#2d7a3a); }
+.custom-select-dropdown { display:none; position:absolute; top:calc(100% + 5px); left:0; right:0; background:#fff; border:1px solid var(--ac-primary-light,#c8ecd0); border-radius:10px; max-height:220px; overflow-y:auto; z-index:300; box-shadow:0 8px 24px rgba(45,122,58,.12),0 2px 8px rgba(0,0,0,.06); padding:.25rem; scrollbar-width:thin; scrollbar-color:var(--ac-primary-light,#c8ecd0) transparent; }
+.custom-select-dropdown::-webkit-scrollbar { width:5px; }
+.custom-select-dropdown::-webkit-scrollbar-thumb { background:var(--ac-primary-light,#c8ecd0); border-radius:4px; }
+.custom-select-dropdown.open { display:block; animation:pnDropIn .14s ease; }
+.custom-select-option { display:flex; align-items:center; width:100%; padding:.5rem .75rem; border:none; border-radius:7px; background:none; text-align:left; font-size:.875rem; font-weight:500; color:var(--ac-text,#1a2e1e); cursor:pointer; transition:background .1s,color .1s; line-height:1.3; }
+.custom-select-option:hover { background:var(--ac-bg,#f5f7f5); color:var(--ac-primary,#2d7a3a); }
+.custom-select-option.selected { background:var(--ac-primary-light,#e8f5e9); color:var(--ac-primary,#2d7a3a); font-weight:600; }
+.custom-select-option.selected::after { content:'✓'; margin-left:auto; font-size:.8rem; font-weight:700; color:var(--ac-primary,#2d7a3a); }
+.custom-select-option.active { background:var(--ac-primary,#2d7a3a); color:#fff; }
+.custom-select-option.active::after { color:#fff; }
+.orders-search-wrap { position:relative; }
+#orders-search-dropdown { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; z-index:200; display:none; max-height:240px; overflow-y:auto; box-shadow:0 4px 16px rgba(0,0,0,.08); }
+#orders-search-dropdown.open { display:block; }
+.product-form .form-row { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; margin-bottom:.75rem; }
+.product-form .form-group { margin-bottom:.65rem; }
+.product-form .form-group label { display:block; font-size:.8rem; font-weight:600; margin-bottom:.25rem; color:var(--ac-text,#1a2e1e); }
+.product-form .form-actions { display:flex; justify-content:flex-end; gap:.5rem; padding:.75rem 1.25rem; border-top:1px solid var(--ac-border,#e2e8f0); background:#fff; position:sticky; bottom:0; z-index:1; }
+.image-preview img { max-width:140px; max-height:140px; border-radius:8px; margin-top:.5rem; border:1px solid var(--ac-border); }
+.field-hint { font-size:.77rem; color:var(--ac-text-muted,#6b7e72); margin-top:.2rem; display:block; }
+.chat-layout { display:grid; grid-template-columns:280px 1fr; height:540px; overflow:hidden; border-radius:0 0 8px 8px; }
+#conversation-list { border-right:1px solid var(--ac-border,#e2e8f0); overflow-y:auto; background:#fafafa; }
+.chat-window { display:flex; flex-direction:column; overflow:hidden; }
+#chat-messages { flex:1; overflow-y:auto; padding:1rem; }
+#chat-form { display:flex; gap:.5rem; padding:.65rem .75rem; border-top:1px solid var(--ac-border,#e2e8f0); }
+#chat-form input { flex:1; }
+.admin-detail-panel { position:fixed; top:60px; right:0; width:420px; height:calc(100vh - 60px); background:#fff; border-left:1px solid var(--ac-border,#e2e8f0); z-index:900; transform:translateX(100%); transition:transform .3s ease; overflow-y:auto; padding:1rem; box-shadow:-4px 0 20px rgba(0,0,0,.06); }
+.admin-detail-panel.open { transform:translateX(0); }
+.panel-close { background:none; border:none; font-size:1.3rem; cursor:pointer; position:absolute; top:.75rem; right:.75rem; color:var(--ac-text-muted); transition:color .15s; }
+.panel-close:hover { color:var(--ac-danger,#dc2626); }
+.panel-content { margin-top:2rem; }
+#overview-status-breakdown { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.5rem; }
+.overview-list { display:flex; flex-direction:column; gap:.35rem; }
+.overview-list-item { padding:.45rem .65rem; border-radius:6px; background:var(--ac-bg,#f5f7f5); font-size:.83rem; }
+.order-rating-stars { display:flex; gap:.3rem; margin:.5rem 0; }
+.order-rating-star-btn { background:none; border:none; font-size:1.7rem; color:#d1d5db; cursor:pointer; padding:0; transition:color .12s; line-height:1; }
+.order-rating-star-btn.active,.order-rating-star-btn:hover { color:#f59e0b; }
+.order-rating-value { font-size:.875rem; color:var(--ac-text-muted); }
+.request-history-wrap { border-top:1px solid var(--ac-border,#e2e8f0); padding-top:.85rem; margin-top:.5rem; }
+.sidebar-user-area { margin-top:auto; padding:.85rem .75rem; border-top:1px solid rgba(255,255,255,.1); }
+#farmer-sidebar-account-btn { display:flex; align-items:center; gap:.55rem; width:100%; background:none; border:none; padding:.55rem .65rem; border-radius:8px; cursor:pointer; color:inherit; font-size:.875rem; font-weight:600; transition:background .15s; text-align:left; }
+#farmer-sidebar-account-btn:hover { background:rgba(255,255,255,.12); }
+.sidebar-user-initial { width:30px; height:30px; border-radius:50%; flex-shrink:0; background:rgba(255,255,255,.22); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; border:1.5px solid rgba(255,255,255,.5); }
+#farmer-sidebar-dropdown-menu { background:#fff; border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.1); overflow:hidden; margin:.2rem .5rem; }
+#farmer-sidebar-dropdown-menu button { display:flex; align-items:center; gap:.5rem; width:100%; text-align:left; padding:.55rem .85rem; background:none; border:none; font-size:.875rem; cursor:pointer; color:var(--ac-text,#1a2e1e); transition:background .1s; }
+#farmer-sidebar-dropdown-menu button:hover { background:var(--ac-bg,#f5f7f5); }
+#farmer-sidebar-dropdown-menu button.text-danger { color:#dc2626 !important; }
+#farmer-user-account-btn { display:flex; align-items:center; gap:.45rem; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); cursor:pointer; padding:.3rem .6rem; border-radius:8px; color:rgba(255,255,255,.95); font-size:.875rem; font-weight:600; transition:background .15s; }
+#farmer-user-account-btn:hover { background:rgba(255,255,255,.2); }
+.farmer-header-initial { width:30px; height:30px; border-radius:50%; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; border:1.5px solid rgba(255,255,255,.5); flex-shrink:0; }
+#farmer-user-dropdown-menu { position:absolute; top:calc(100% + 8px); right:0; min-width:210px; background:#fff; border:1px solid var(--ac-border,#e2e8f0); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12); z-index:1100; overflow:hidden; }
+#farmer-user-dropdown-menu .dd-header { padding:.7rem 1rem; background:var(--ac-bg,#f5f7f5); border-bottom:1px solid var(--ac-border); }
+#farmer-user-dropdown-menu .dd-header h6 { margin:0; font-weight:700; font-size:.88rem; }
+#farmer-user-dropdown-menu .dd-header small { color:var(--ac-text-muted); font-size:.77rem; }
+#farmer-user-dropdown-menu .dd-divider { height:1px; background:var(--ac-border); margin:.2rem 0; }
+#farmer-user-dropdown-menu .dd-item { display:flex; align-items:center; gap:.55rem; padding:.55rem .9rem; font-size:.875rem; cursor:pointer; color:var(--ac-text); background:none; border:none; width:100%; text-align:left; transition:background .1s; }
+#farmer-user-dropdown-menu .dd-item:hover { background:var(--ac-bg); }
+#farmer-user-dropdown-menu .dd-item.danger { color:#dc2626; }
+
+/* Sidebar toggle behavior (mirrors admin.js pattern) */
+#farmer-sidebar.sidebar {
+  background: var(--ac-sidebar-bg);
+  border-right: 1px solid var(--ac-sidebar-border);
+  width: 260px;
+  box-shadow: none;
+  transition: left 0.3s ease, width 0.3s ease;
+}
+
+@media (max-width: 1199px) {
+  #farmer-sidebar.sidebar {
+    position: fixed !important;
+    top: 60px;
+    left: -300px !important;
+    bottom: 0;
+    width: 260px;
+    z-index: 996;
+    overflow-y: auto;
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 12px rgba(0,0,0,0.18);
+  }
+  body.toggle-sidebar #farmer-sidebar.sidebar {
+    left: 0 !important;
+  }
+  body.toggle-sidebar .sidebar-overlay {
+    display: block;
+  }
+}
+
+@media (min-width: 1200px) {
+  body.toggle-sidebar #farmer-sidebar.sidebar {
+    left: -260px !important;
+  }
+  body.toggle-sidebar #main.main {
+    margin-left: 0 !important;
+  }
+}
+
+@media (max-width:768px) { .product-form .form-row{grid-template-columns:1fr} .chat-layout{grid-template-columns:1fr;height:auto;min-height:400px} .admin-detail-panel{width:100%} #my-products-grid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr))} }
+</style>
+
+<body>
+
+<!-- Loading Screen -->
+<div id="admin-loading-screen" class="loading-screen">
+    <div class="loading-content">
+        <div class="loading-logo">
+            <img src="/images/logo.png" alt="AgriCatch" class="loading-logo-img">
+            <h1 class="loading-title"><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
+        </div>
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div><div class="spinner-ring"></div><div class="spinner-ring"></div>
+        </div>
+        <p class="loading-text">Loading Farmer Dashboard...</p>
+    </div>
+</div>
+
+<!-- Sidebar Overlay (mobile) -->
+<div id="farmer-sidebar-overlay" class="sidebar-overlay"></div>
+
+<!-- HEADER -->
+<header id="header" class="header fixed-top d-flex align-items-center">
+    <div class="d-flex align-items-center justify-content-between">
+        <button id="farmer-sidebar-toggle" class="admin-sidebar-toggle-btn" type="button" aria-label="Toggle sidebar">
+            <i class="bi bi-list"></i>
         </button>
-        <aside class="admin-sidebar" id="farmer-sidebar">
-            <div class="sidebar-brand">
-                <div class="brand-logo-container">
-                    <img src="/images/logo.png" alt="AgriCatch Logo" class="sidebar-logo">
-                    <div class="brand-text">
-                        <span class="brand-title">
-                            <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
-                        </span>
-                        <span class="brand-subtitle">Farmer</span>
+        <a href="/" class="logo d-flex align-items-center">
+            <img src="/images/logo.png" alt="AgriCatch Logo">
+            <span>AgriCatch</span>
+        </a>
+    </div>
+    <nav class="header-nav ms-auto">
+        <ul class="d-flex align-items-center list-unstyled mb-0 gap-1">
+            <li class="nav-item pe-3" style="position:relative;">
+                <button id="farmer-user-account-btn" type="button" aria-haspopup="true" aria-expanded="false">
+                    <div class="farmer-header-initial" id="farmer-user-initial">F</div>
+                    <span class="d-none d-md-inline" id="farmer-user-label">Account</span>
+                    <i class="bi bi-chevron-down small ms-1 d-none d-md-inline"></i>
+                </button>
+                <div id="farmer-user-dropdown-menu" style="display:none;">
+                    <div class="dd-header">
+                        <h6 id="user-name">Farmer</h6>
+                        <small id="user-email"></small>
                     </div>
-                </div>
-            </div>
-            <nav class="sidebar-nav">
-                <a class="sidebar-link active" href="#overview" data-section="overview"><i class="fas fa-gauge-high"></i> Overview</a>
-                <a class="sidebar-link" href="#products" data-section="products"><i class="fas fa-box"></i> Products</a>
-                <a class="sidebar-link" href="#shop" data-section="shop"><i class="fas fa-store"></i> Shop Profile</a>
-                <a class="sidebar-link" href="#reviews" data-section="reviews"><i class="fas fa-star"></i> Reviews</a>
-                <a class="sidebar-link" href="#orders" data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</a>
-                <a class="sidebar-link" href="#chat" data-section="chat"><i class="fas fa-comments"></i> Chat <span id="chat-unread-badge" class="sidebar-badge" style="display:none;">0</span></a>
-                <div class="user-profile sidebar-account-wrap">
-                    <button id="farmer-sidebar-account-btn" class="user-account-btn" type="button" aria-haspopup="menu" aria-expanded="false">
-                        <span class="user-initial" id="farmer-sidebar-user-initial">F</span>
-                        <span id="farmer-sidebar-user-label">Account</span>
-                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                    <div class="dd-divider"></div>
+                    <button class="dd-item" id="farmer-my-account-btn" type="button">
+                        <i class="bi bi-person-circle me-2"></i>My Account
                     </button>
-                    <div id="farmer-sidebar-dropdown-menu" class="user-dropdown-menu" style="display:none;">
-                        <button id="farmer-sidebar-my-account-btn" class="user-dropdown-item" type="button">My Account</button>
-                        <button id="farmer-sidebar-logout-btn" class="user-dropdown-item" type="button">Logout</button>
-                    </div>
+                    <div class="dd-divider"></div>
+                    <button class="dd-item danger" id="farmer-logout-menu-btn" type="button">
+                        <i class="bi bi-box-arrow-right me-2"></i>Sign Out
+                    </button>
                 </div>
-            </nav>
-        </aside>
+            </li>
+        </ul>
+    </nav>
+</header>
 
-        <main class="admin-main">
-            <div id="farmer-verif-banner" style="display:none; padding:0.75rem 1.25rem; border-radius:8px; margin-bottom:1rem; font-size:0.95rem; font-weight:600;"></div>
-            <div class="admin-welcome-banner">
-                <div class="welcome-text">
-                    <h1 class="welcome-title">
-                        <i class="fas fa-seedling"></i>
-                        Farmer Dashboard
-                    </h1>
-                    <p class="welcome-subtitle">Manage your shop, products, and orders</p>
+<!-- SIDEBAR -->
+<aside id="farmer-sidebar" class="sidebar admin-sidebar">
+    <ul class="sidebar-nav" id="sidebar-nav">
+        <li class="nav-heading">Overview</li>
+        <li class="nav-item">
+            <a class="nav-link sidebar-link" href="#overview" data-section="overview">
+                <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+            </a>
+        </li>
+        <li class="nav-heading">Catalog</li>
+        <li class="nav-item">
+            <a class="nav-link sidebar-link" href="#products" data-section="products">
+                <i class="bi bi-box-seam"></i><span>My Products</span>
+            </a>
+        </li>
+        <li class="nav-heading">Commerce</li>
+        <li class="nav-item">
+            <a class="nav-link sidebar-link" href="#orders" data-section="orders">
+                <i class="bi bi-bag-check"></i><span>Orders</span>
+            </a>
+        </li>
+        <li class="nav-heading">Reputation</li>
+        <li class="nav-item">
+            <a class="nav-link sidebar-link" href="#reviews" data-section="reviews">
+                <i class="bi bi-star-half"></i><span>Reviews</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link sidebar-link" href="#shop" data-section="shop">
+                <i class="bi bi-shop"></i><span>Shop Profile</span>
+            </a>
+        </li>
+        <li class="nav-heading">Communication</li>
+        <li class="nav-item">
+            <a class="nav-link sidebar-link" href="#chat" data-section="chat">
+                <i class="bi bi-chat-dots"></i><span>Messages</span>
+                <span id="chat-unread-badge" class="badge bg-danger ms-auto" style="display:none;">0</span>
+            </a>
+        </li>
+    </ul>
+    <div class="sidebar-user-area">
+        <button id="farmer-sidebar-account-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+            <div class="sidebar-user-initial" id="farmer-sidebar-user-initial">F</div>
+            <span id="farmer-sidebar-user-label">Account</span>
+            <i class="bi bi-chevron-down ms-auto small"></i>
+        </button>
+        <div id="farmer-sidebar-dropdown-menu" style="display:none;">
+            <button id="farmer-sidebar-my-account-btn" type="button">
+                <i class="bi bi-person-circle"></i>My Account
+            </button>
+            <button id="farmer-sidebar-logout-btn" class="text-danger" type="button">
+                <i class="bi bi-box-arrow-right"></i>Sign Out
+            </button>
+        </div>
+    </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main id="main" class="main admin-main">
+    <div id="farmer-verif-banner" style="display:none;"></div>
+    <div class="pagetitle">
+        <h1 id="farmer-page-title">Farmer Dashboard</h1>
+        <nav>
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item active" id="breadcrumb-current">Farmer Dashboard</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <section id="overview" class="admin-section-card">
+        <div class="row g-3 mb-3">
+            <!-- My Products KPI -->
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card sales-card">
+                    <div class="card-body">
+                        <h5 class="card-title">My Products</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-box-seam" style="color:var(--ac-primary,#2d7a3a)"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="my-products">--</h6>
+                                <span class="text-success small pt-1 fw-bold">Total listings</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <section id="overview" class="admin-section-card active">
-                <div class="section-content">
-                    <div class="farmer-overview-grid">
-                        <div class="farmer-overview-left">
-                            <!-- Top row: My Products -->
-                            <div class="admin-stats farmer-overview-stats-inline farmer-overview-top-row">
-                                <div class="stat-card my-products-card">
-                                    <div class="stat-icon" style="color: #10b981;"><i class="fas fa-box"></i></div>
-                                    <div class="stat-details">
-                                        <h3>My Products</h3>
-                                        <div class="stat-number" id="my-products">0</div>
-                                    </div>
-                                </div>
+            <!-- Total Orders KPI -->
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item total-orders-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item total-orders-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item total-orders-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item total-orders-period-filter" href="#" data-period="year">This Year</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Total Orders <span id="total-orders-period-label" class="small text-muted">| Today</span></h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-bag-check" style="color:#f59e0b"></i>
                             </div>
-
-                            <!-- Visual separator between My Products and other stats -->
-                            <div class="farmer-overview-separator"></div>
-
-                            <!-- Second row: Orders / Sold / Revenue -->
-                            <div class="admin-stats farmer-overview-stats-inline farmer-overview-bottom-row">
-                                <div class="stat-card">
-                                    <div class="stat-icon" style="color: #f59e0b;"><i class="fas fa-clipboard-list"></i></div>
-                                    <div class="stat-details">
-                                        <h3>Total Orders</h3>
-                                        <div class="stat-number" id="total-orders">0</div>
-                                    </div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-icon" style="color: #22c55e;"><i class="fas fa-basket-shopping"></i></div>
-                                    <div class="stat-details">
-                                        <h3>Total Sold</h3>
-                                        <div class="stat-number" id="total-sold">0</div>
-                                    </div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-icon" style="color: #22c55e;"><i class="fas fa-peso-sign"></i></div>
-                                    <div class="stat-details">
-                                        <h3>Sales</h3>
-                                        <div class="stat-number" id="total-revenue">₱0.00</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="overview-card" style="margin-top: 1.25rem;">
-                                <div class="overview-card-title">Top Products (Items Sold, Sales, Avg Price)</div>
-                                <div class="overview-chart-wrap">
-                                    <canvas id="overview-top-products-chart" height="140"></canvas>
-                                </div>
-                                <div id="overview-top-products-list" class="overview-list" style="margin-top: 0.65rem;"></div>
-                            </div>
-                        </div>
-
-                        <div class="farmer-overview-right">
-                            <div class="overview-panel-header">
-                                <div id="overview-last-updated" class="overview-panel-subtitle">Loading report…</div>
-                                <div class="overview-panel-actions">
-                                    <div class="overview-actions-left">
-                                        <div class="overview-range-group" role="group" aria-label="Overview range">
-                                            <select id="overview-range-select" class="filter-select" style="min-width: 140px;">
-                                                <option value="7">Last 7 days</option>
-                                                <option value="30">Last 30 days</option>
-                                                <option value="90">Last 90 days</option>
-                                                <option value="all" selected>All time</option>
-                                                <option value="custom">Custom range</option>
-                                            </select>
-                                        </div>
-                                        <div id="overview-custom-panel" class="overview-custom-panel" style="display:none;">
-                                            <div class="overview-custom-title">Choose dates</div>
-                                            <div class="overview-custom-row">
-                                                <label class="overview-custom-label" for="overview-from">From</label>
-                                                <input type="date" id="overview-from" class="overview-custom-input">
-                                                <label class="overview-custom-label" for="overview-to">To</label>
-                                                <input type="date" id="overview-to" class="overview-custom-input">
-                                            </div>
-                                            <div class="overview-custom-actions">
-                                                <button type="button" class="btn btn-secondary btn-small" id="overview-custom-cancel">Cancel</button>
-                                                <button type="button" class="btn btn-primary btn-small" id="overview-custom-apply">Apply</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="overview-actions-right">
-                                        <button type="button" id="overview-export-csv-btn" class="btn btn-secondary btn-small">
-                                            <i class="fas fa-file-arrow-down"></i> Export CSV
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="overview-panel-grid">
-                                <div class="overview-card">
-                                    <div class="overview-card-title">Sales (Delivered) — Trend</div>
-                                    <div class="overview-chart-wrap">
-                                        <canvas id="overview-sales-chart" height="120"></canvas>
-                                    </div>
-                                </div>
-
-                                <div class="overview-card">
-                                    <div class="overview-card-title">Orders — Status</div>
-                                    <div class="overview-chart-wrap">
-                                        <canvas id="overview-status-chart" height="140"></canvas>
-                                    </div>
-                                    <div id="overview-status-breakdown" class="overview-status-breakdown" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem;"></div>
-                                </div>
-
-                                <div class="overview-card">
-                                    <div class="overview-card-title" style="display:flex; align-items:center; justify-content:space-between; gap: 0.75rem;">
-                                        <span>Recent Orders</span>
-                                        <div style="display:flex; align-items:center; gap: 0.4rem;">
-                                            <button type="button" id="overview-recent-prev" class="btn btn-secondary btn-small" aria-label="Previous page"><i class="fas fa-chevron-left"></i></button>
-                                            <span id="overview-recent-page" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 700;">1/1</span>
-                                            <button type="button" id="overview-recent-next" class="btn btn-secondary btn-small" aria-label="Next page"><i class="fas fa-chevron-right"></i></button>
-                                        </div>
-                                    </div>
-                                    <div id="overview-recent-orders" class="overview-list"></div>
-                                </div>
-
-                                <div class="overview-card">
-                                    <div class="overview-card-title" style="display:flex;align-items:center;justify-content:space-between;">
-                                        <span><i class="fas fa-bullhorn" style="color:#f59e0b;margin-right:6px;"></i>Platform Announcements</span>
-                                        <span id="farmer-announce-count" style="font-size:0.78rem;color:#6b7280;"></span>
-                                    </div>
-                                    <div id="farmer-announcements" class="overview-list" style="max-height:180px;overflow-y:auto;">
-                                        <div style="color:#9ca3af;font-size:0.85rem;padding:8px 0;">Loading announcements…</div>
-                                    </div>
-                                </div>
-
+                            <div class="ps-3">
+                                <h6 id="total-orders">--</h6>
+                                <span class="text-success small pt-1 fw-bold" id="total-orders-change">+0% <span id="total-orders-change-label">vs prev today</span></span>
                             </div>
                         </div>
                     </div>
                 </div>
-            </section>
-
-            <section id="products" class="admin-section-card">
-                <div class="section-content">
-                    <div class="product-tabs">
-                        <button id="list-products-tab" class="tab-btn active" type="button"><i class="fas fa-list"></i> List Products</button>
-                        <button id="add-product-tab" class="tab-btn btn btn-primary btn-elevated" type="button"><i class="fas fa-plus"></i> Add Product</button>
-                        <button id="request-product-btn" class="btn btn-secondary btn-small" type="button"><i class="fas fa-clipboard-list"></i> Request Product</button>
+            </div>
+            <!-- Items Sold KPI -->
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item items-sold-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item items-sold-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item items-sold-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item items-sold-period-filter" href="#" data-period="year">This Year</a></li>
+                        </ul>
                     </div>
-
-                    <div class="products-search-row">
-                        <input type="text" id="products-search-input" class="search-input" placeholder="Search products by name">
-                    </div>
-
-                    <div id="list-products-section" class="tab-content active" data-tab-scope="products">
-                        <div class="product-filters">
-                            <div class="status-radio-group" role="radiogroup" aria-label="Filter products by status">
-                                <label class="status-radio-item">
-                                    <input type="radio" name="product-status-filter" value="all" checked>
-                                    <span>All</span>
-                                </label>
-                                <label class="status-radio-item">
-                                    <input type="radio" name="product-status-filter" value="available">
-                                    <span>Available</span>
-                                </label>
-                                <label class="status-radio-item">
-                                    <input type="radio" name="product-status-filter" value="no_stock">
-                                    <span>No Stock</span>
-                                </label>
-                                <label class="status-radio-item">
-                                    <input type="radio" name="product-status-filter" value="disabled">
-                                    <span>Disabled</span>
-                                </label>
+                    <div class="card-body">
+                        <h5 class="card-title">Items Sold <span id="items-sold-period-label" class="small text-muted">| Today</span></h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-basket2" style="color:#22c55e"></i>
                             </div>
-                            <label class="status-radio-item" style="margin-left:0.5rem;">
-                                <input type="checkbox" id="product-low-stock-filter">
-                                <span>Low Stock Only</span>
-                            </label>
-                        <div class="product-filters-right">
-                                <select id="product-category-filter" class="filter-select" style="max-width: 240px;">
-                                    <option value="">Category: All</option>
-                                </select>
-                                <select id="product-sort-select" class="filter-select" style="max-width: 280px;">
-                                    <option value="latest">Sort: Latest Added</option>
-                                    <option value="name_asc">Name (A-Z)</option>
-                                    <option value="name_desc">Name (Z-A)</option>
-                                    <option value="category_asc">Category (A-Z)</option>
-                                    <option value="price_low_high">Price (Low to High)</option>
-                                    <option value="price_high_low">Price (High to Low)</option>
-                                    <option value="stock_high_low">Stock (High to Low)</option>
-                                    <option value="stock_low_high">Stock (Low to High)</option>
-                                    <option value="rating_high_low">Rating (High to Low)</option>
-                                    <option value="reviews_high_low">Reviews (Most First)</option>
-                                </select>
+                            <div class="ps-3">
+                                <h6 id="total-sold">--</h6>
+                                <span class="text-success small pt-1 fw-bold" id="items-sold-change">+0% <span id="items-sold-change-label">vs prev today</span></span>
                             </div>
                         </div>
-                        <div id="products-batch-bar" style="display:none; align-items:center; gap:0.6rem; flex-wrap:wrap; background:var(--card-bg,#fff); border:1px solid var(--border-color,#e2e8f0); border-radius:8px; padding:0.6rem 0.9rem; margin-bottom:0.75rem;">
-                            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
-                                <input type="checkbox" id="batch-select-all"> <span style="font-size:0.9rem;">Select All</span>
-                            </label>
-                            <span id="batch-selected-count" style="font-size:0.85rem;color:var(--text-secondary,#64748b);margin:0 0.25rem;">0 selected</span>
-                            <button type="button" class="btn btn-secondary btn-small" id="batch-mark-available-btn">Mark Available</button>
-                            <button type="button" class="btn btn-secondary btn-small" id="batch-mark-soldout-btn">Mark Sold Out</button>
-                            <button type="button" class="btn btn-danger btn-small" id="batch-delete-btn">Delete Selected</button>
-                            <button type="button" class="btn btn-secondary btn-small" id="batch-cancel-btn">Cancel</button>
-                        </div>
-                        <div id="my-products-grid" class="products-grid"></div>
-                    </div>
-
-                </div>
-            </section>
-
-            <section id="orders" class="admin-section-card">
-                <div class="section-content">
-                    <div class="orders-search-row">
-                        <input type="text" id="orders-search-input" class="search-input" placeholder="Search pre-orders by product, customer, or pre-order #">
-                        <div id="orders-search-dropdown" class="orders-search-dropdown" role="listbox" aria-label="Matching orders"></div>
-                    </div>
-                    <div id="orders-search-empty" class="empty-state" style="display:none;"><p>No orders found!:((</p></div>
-                    <div class="order-tabs">
-                        <button id="pending-orders-tab" class="tab-btn active" type="button">Pending <span class="tab-count" id="pending-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">0</span></button>
-                        <button id="confirmed-orders-tab" class="tab-btn" type="button">Confirmed <span class="tab-count" id="confirmed-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">0</span></button>
-                        <button id="preparing-orders-tab" class="tab-btn" type="button">Preparing <span class="tab-count" id="preparing-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">0</span></button>
-                        <button id="out_for_delivery-orders-tab" class="tab-btn" type="button">Out for Delivery <span class="tab-count" id="out_for_delivery-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">0</span></button>
-                        <button id="delivered-orders-tab" class="tab-btn" type="button">Delivered <span class="tab-count" id="delivered-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">0</span></button>
-                        <button id="cancelled-orders-tab" class="tab-btn" type="button">Cancelled <span class="tab-count" id="cancelled-orders-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">0</span></button>
-                    </div>
-
-                    <div id="pending-orders-section" class="tab-content active" data-tab-scope="orders">
-                        <div id="pending-orders-list" class="orders-list"></div>
-                    </div>
-
-                    <div id="confirmed-orders-section" class="tab-content" data-tab-scope="orders">
-                        <div id="confirmed-orders-list" class="orders-list"></div>
-                    </div>
-
-                    <div id="preparing-orders-section" class="tab-content" data-tab-scope="orders">
-                        <div id="preparing-orders-list" class="orders-list"></div>
-                    </div>
-
-                    <div id="out_for_delivery-orders-section" class="tab-content" data-tab-scope="orders">
-                        <div id="out_for_delivery-orders-list" class="orders-list"></div>
-                    </div>
-
-                    <div id="delivered-orders-section" class="tab-content" data-tab-scope="orders">
-                        <div id="delivered-orders-list" class="orders-list"></div>
-                    </div>
-
-                    <div id="cancelled-orders-section" class="tab-content" data-tab-scope="orders">
-                        <div id="cancelled-orders-list" class="orders-list"></div>
                     </div>
                 </div>
-            </section>
-
-            <section id="shop" class="admin-section-card">
-                <div class="section-content">
-                    <div class="admin-section-header" style="margin-bottom:1.25rem;">
-                        <h2 style="font-size:1.25rem;font-weight:700;margin:0;">Shop Profile</h2>
+            </div>
+            <!-- Total Revenue KPI -->
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card revenue-card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item total-revenue-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item total-revenue-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item total-revenue-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item total-revenue-period-filter" href="#" data-period="year">This Year</a></li>
+                        </ul>
                     </div>
-                    <div class="shop-profile-card" style="max-width:540px;">
-                        <div id="shop-profile-view">
-                            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;margin-bottom:0.5rem;">
-                                <h3 id="shop-name-display" style="margin:0;font-size:1.15rem;font-weight:700;">—</h3>
-                                <button type="button" id="edit-shop-profile-btn" class="btn btn-secondary btn-small">
-                                    <i class="fas fa-pencil"></i> Edit
-                                </button>
+                    <div class="card-body">
+                        <h5 class="card-title">Total Revenue <span id="total-revenue-period-label" class="small text-muted">| Today</span></h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-currency-exchange" style="color:#2eca6a"></i>
                             </div>
-                            <div id="shop-location-display" style="color:var(--text-secondary,#64748b);margin-bottom:0.5rem;">
-                                <i class="fas fa-location-dot"></i> <span>Farm location not set</span>
+                            <div class="ps-3">
+                                <h6 id="total-revenue">&#8369;0.00</h6>
+                                <span class="text-success small pt-1 fw-bold" id="total-revenue-change">+0% <span id="total-revenue-change-label">vs prev today</span></span>
                             </div>
-                            <p id="shop-description-display" style="color:var(--text-secondary,#64748b);margin:0;">No description yet.</p>
                         </div>
-                        <div id="shop-profile-edit" style="display:none;">
-                            <div class="form-group">
-                                <label for="shop-name-input">Shop / Farm Name</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Reports + Charts Row -->
+        <div class="row g-3 mb-3">
+            <div class="col-lg-8">
+                <div class="card h-100">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="year">This Year</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Reports <span id="reports-period-label">| Today</span></h5>
+                        <div id="reportsChart" style="min-height:350px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item status-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item status-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item status-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item status-period-filter" href="#" data-period="year">This Year</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Orders by Status <span id="status-period-label">| Today</span></h5>
+                        <div id="statusChart" style="min-height:320px;"></div>
+                        <div id="overview-status-breakdown" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Recent Orders + Announcements Row -->
+        <div class="row g-3 mb-3">
+            <div class="col-lg-8">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Recent Orders</h5>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <label class="small fw-semibold text-muted">Show</label>
+                            <select class="form-select form-select-sm" style="width:auto" data-entries-section="recent-orders">
+                                <option value="5" selected>5</option>
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                            </select>
+                            <span class="small text-muted">entries</span>
+                        </div>
+                        <table id="recent-orders-table" class="table table-borderless ac-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="text-center">#</th>
+                                    <th scope="col" class="text-center">Image</th>
+                                    <th scope="col">Product</th>
+                                    <th scope="col">Customer</th>
+                                    <th scope="col" class="text-center">Price</th>
+                                    <th scope="col" class="text-center">Total</th>
+                                    <th scope="col" class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-orders-tbody">
+                                <tr><td colspan="7" class="text-center text-muted">
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                </td></tr>
+                            </tbody>
+                        </table>
+                        <div id="recent-orders-pagination" class="pagination-container"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h5 class="card-title mb-0"><i class="bi bi-megaphone text-warning me-1"></i>Announcements</h5>
+                            <span id="farmer-announce-count" class="small text-muted"></span>
+                        </div>
+                        <div id="farmer-announcements" class="overview-list" style="max-height:220px;overflow-y:auto;">
+                            <div class="text-center py-3 text-muted small">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Top Products Row -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Top Products</h5>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <label class="small fw-semibold text-muted">Show</label>
+                            <select class="form-select form-select-sm" style="width:auto" data-entries-section="top-products">
+                                <option value="5" selected>5</option>
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                            </select>
+                            <span class="small text-muted">entries</span>
+                        </div>
+                        <table id="top-products-table" class="table table-borderless ac-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="text-center">Image</th>
+                                    <th scope="col">Product</th>
+                                    <th scope="col" class="text-center">Price</th>
+                                    <th scope="col" class="text-center">Sold</th>
+                                    <th scope="col" class="text-center">Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-products-tbody">
+                                <tr><td colspan="5" class="text-center text-muted">
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                </td></tr>
+                            </tbody>
+                        </table>
+                        <div id="top-products-pagination" class="pagination-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PRODUCTS SECTION -->
+    <section id="products" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-box-seam"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">My Products</h4>
+                <p class="ac-section-hero__sub">Manage your listings, stock, and pricing.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="add-product-tab" class="btn ac-btn-primary btn-sm" type="button">
+                    <i class="bi bi-plus-lg me-1"></i>Add Product
+                </button>
+                <button id="request-product-btn" class="btn btn-outline-secondary btn-sm" type="button">
+                    <i class="bi bi-send me-1"></i>Request
+                </button>
+            </div>
+        </div>
+
+        <!-- KPI Summary Cards -->
+        <div class="row g-3 mb-3">
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card sales-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Products</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-box-seam" style="color:var(--ac-primary,#2d7a3a)"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="kpi-total-products">--</h6>
+                                <span class="text-success small pt-1 fw-bold">All listings</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Active Products</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-check-circle" style="color:#22c55e"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="kpi-active-products">--</h6>
+                                <span class="text-success small pt-1 fw-bold">Currently for sale</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Low Stock</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-exclamation-triangle" style="color:#f59e0b"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="kpi-low-stock">--</h6>
+                                <span class="text-warning small pt-1 fw-bold">Below threshold</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xxl-3 col-md-6">
+                <div class="card info-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Pending</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-clock" style="color:#6c757d"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="kpi-pending-products">--</h6>
+                                <span class="text-muted small pt-1 fw-bold">Awaiting approval</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="products" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Category</label>
+                        <select id="product-category-filter" class="form-select form-select-sm">
+                            <option value="">All categories</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="product-status-filter" class="form-select form-select-sm">
+                            <option value="">Any status</option>
+                            <option value="available">Active</option>
+                            <option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="products-search-input" class="form-control me-2" placeholder="Product name…">
+                                <button id="products-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;"><i class="bi bi-search me-1"></i>Search</button>
+                            </div>
+                            <button id="products-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="products-table" class="table ac-table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width:56px">Img</th>
+                                <th>ID</th>
+                                <th>Product</th>
+                                <th>Category</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>Status</th>
+                                <th>Reviews</th>
+                                <th class="col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-tbody">
+                            <tr>
+                                <td colspan="9">
+                                    <div class="table-skeleton">
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                        <div class="skeleton-row"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="products-pagination" class="pagination-container"></div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- ORDERS SECTION -->
+    <section id="orders" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-bag-check"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">My Orders</h4>
+                <p class="ac-section-hero__sub">View and manage customer orders for your products.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="refresh-orders-btn" class="btn btn-outline-secondary btn-sm" type="button">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold mb-1">Search Orders</label>
+                        <div class="orders-search-wrap">
+                            <input type="text" id="orders-search-input" class="form-control form-control-sm"
+                                   placeholder="Order ID, product name, or customer..." autocomplete="off">
+                            <div id="orders-search-dropdown" role="listbox"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="orders-search-empty" class="text-center py-3 text-muted small" style="display:none;">
+                    <i class="bi bi-search d-block fs-4 mb-1"></i>No matching orders found.
+                </div>
+                <div class="order-tabs">
+                    <button id="pending-orders-tab" class="tab-btn active" type="button">Pending <span class="tab-count" id="pending-orders-count">0</span></button>
+                    <button id="confirmed-orders-tab" class="tab-btn" type="button">Confirmed <span class="tab-count" id="confirmed-orders-count">0</span></button>
+                    <button id="preparing-orders-tab" class="tab-btn" type="button">Preparing <span class="tab-count" id="preparing-orders-count">0</span></button>
+                    <button id="out_for_delivery-orders-tab" class="tab-btn" type="button">Out for Delivery <span class="tab-count" id="out_for_delivery-orders-count">0</span></button>
+                    <button id="delivered-orders-tab" class="tab-btn" type="button">Delivered <span class="tab-count" id="delivered-orders-count">0</span></button>
+                    <button id="cancelled-orders-tab" class="tab-btn" type="button">Cancelled <span class="tab-count" id="cancelled-orders-count">0</span></button>
+                </div>
+                <div id="pending-orders-section" class="tab-content active" data-tab-scope="orders"><div id="pending-orders-list" class="orders-list"></div></div>
+                <div id="confirmed-orders-section" class="tab-content" data-tab-scope="orders"><div id="confirmed-orders-list" class="orders-list"></div></div>
+                <div id="preparing-orders-section" class="tab-content" data-tab-scope="orders"><div id="preparing-orders-list" class="orders-list"></div></div>
+                <div id="out_for_delivery-orders-section" class="tab-content" data-tab-scope="orders"><div id="out_for_delivery-orders-list" class="orders-list"></div></div>
+                <div id="delivered-orders-section" class="tab-content" data-tab-scope="orders"><div id="delivered-orders-list" class="orders-list"></div></div>
+                <div id="cancelled-orders-section" class="tab-content" data-tab-scope="orders"><div id="cancelled-orders-list" class="orders-list"></div></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- REVIEWS SECTION -->
+    <section id="reviews" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-star-half"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Customer Reviews</h4>
+                <p class="ac-section-hero__sub">Read what customers say about your products.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div id="reviews-aggregate"></div>
+                <div id="reviews-list">
+                    <div class="text-center py-5 text-muted">
+                        <span class="spinner-border spinner-border-sm"></span>
+                        <p class="small mt-2">Loading reviews...</p>
+                    </div>
+                </div>
+                <div id="reviews-pagination" class="mt-3"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SHOP PROFILE SECTION -->
+    <section id="shop" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-shop"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Shop Profile</h4>
+                <p class="ac-section-hero__sub">Manage your public farm shop information visible to customers.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div style="max-width:560px;">
+                    <div id="shop-profile-view">
+                        <div class="d-flex align-items-start justify-content-between gap-3 mb-2">
+                            <div>
+                                <h5 id="shop-name-display" class="mb-1 fw-bold">--</h5>
+                                <p class="text-muted small mb-1" id="shop-location-display">
+                                    <i class="bi bi-geo-alt me-1"></i>Farm location not set
+                                </p>
+                            </div>
+                            <button type="button" id="edit-shop-profile-btn" class="btn btn-outline-secondary btn-sm flex-shrink-0">
+                                <i class="bi bi-pencil me-1"></i>Edit
+                            </button>
+                        </div>
+                        <p id="shop-description-display" class="text-muted small">No description set.</p>
+                    </div>
+                    <div id="shop-profile-edit" style="display:none;">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold" for="shop-name-input">Shop / Farm Name</label>
                                 <input type="text" id="shop-name-input" class="form-control" maxlength="120" placeholder="My Farm Shop">
                             </div>
-                            <div class="form-group">
-                                <label for="shop-location-input">Location</label>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold" for="shop-location-input">Location</label>
                                 <input type="text" id="shop-location-input" class="form-control" maxlength="255" placeholder="e.g., Laguna, Philippines">
                             </div>
-                            <div class="form-group">
-                                <label for="shop-description-input">Description</label>
-                                <textarea id="shop-description-input" class="form-control" rows="4" maxlength="500" placeholder="Add a short description about your farm and products."></textarea>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold" for="shop-description-input">Description</label>
+                                <textarea id="shop-description-input" class="form-control" rows="4" maxlength="500"
+                                          placeholder="Tell customers about your farm and what you grow."></textarea>
                             </div>
-                            <div class="form-actions">
-                                <button type="button" id="cancel-shop-profile-btn" class="btn btn-secondary">Cancel</button>
-                                <button type="button" id="save-shop-profile-btn" class="btn btn-primary">Save Changes</button>
-                            </div>
+                        </div>
+                        <div class="d-flex gap-2 justify-content-end mt-3">
+                            <button type="button" id="cancel-shop-profile-btn" class="btn btn-secondary btn-sm">Cancel</button>
+                            <button type="button" id="save-shop-profile-btn" class="btn btn-primary btn-sm">
+                                <i class="bi bi-check-lg me-1"></i>Save Changes
+                            </button>
                         </div>
                     </div>
                 </div>
-            </section>
-
-            <section id="reviews" class="admin-section-card">
-                <div class="section-content">
-                    <div class="admin-section-header" style="margin-bottom:1rem;">
-                        <h2 style="font-size:1.25rem;font-weight:700;margin:0;">Reviews</h2>
-                    </div>
-                    <div id="reviews-aggregate" style="margin-bottom:1rem;"></div>
-                    <div id="reviews-list"><div class="empty-state"><p>Select this section to load reviews.</p></div></div>
-                    <div id="reviews-pagination" class="pagination" style="margin-top:1rem;"></div>
-                </div>
-            </section>
-
-            <section id="chat" class="admin-section-card">
-                <div class="section-content">
-                    <div class="chat-layout">
-                        <div id="conversation-list" class="conversation-list"></div>
-                        <div class="chat-window">
-                            <div id="chat-messages" class="chat-messages"></div>
-                            <form id="chat-form" class="chat-form">
-                                <input type="text" id="chat-input" placeholder="Type a message..." required>
-                                <button type="submit" class="btn btn-primary btn-small">Send</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </main>
-
-        <aside id="farmer-detail-panel" class="admin-detail-panel">
-            <button class="panel-close" id="close-farmer-panel" aria-label="Close details" type="button">&times;</button>
-            <div id="farmer-detail-content" class="panel-content">
-                <div class="panel-placeholder">Select an order to view details</div>
             </div>
-        </aside>
+        </div>
+    </section>
+
+    <!-- CHAT / MESSAGES SECTION -->
+    <section id="chat" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-chat-dots"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Messages</h4>
+                <p class="ac-section-hero__sub">Chat with customers about orders and products.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="chat-layout">
+                    <div id="conversation-list"></div>
+                    <div class="chat-window">
+                        <div id="chat-messages"></div>
+                        <form id="chat-form">
+                            <input type="text" id="chat-input" class="form-control form-control-sm"
+                                   placeholder="Type a message..." required autocomplete="off">
+                            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send"></i></button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<!-- ORDER DETAIL SIDE PANEL -->
+<aside id="farmer-detail-panel" class="admin-detail-panel" aria-label="Order details">
+    <button class="panel-close" id="close-farmer-panel" type="button" aria-label="Close panel">
+        <i class="bi bi-x-lg"></i>
+    </button>
+    <div id="farmer-detail-content" class="panel-content">
+        <p class="text-muted small">Select an order to view details.</p>
     </div>
+</aside>
 
-    <div id="add-product-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Add Product</h3>
-                <button class="close-btn" id="close-add-product-modal" aria-label="Close">&times;</button>
+<!-- MODAL: ADD PRODUCT -->
+<div id="add-product-modal" class="modal">
+    <div class="modal-content" style="max-width:640px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-plus-circle-fill me-2 text-success"></i>Add Product</h3>
+            <button class="close-btn" id="close-add-product-modal" aria-label="Close">&times;</button>
+        </div>
+        <form id="add-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(85vh - 58px);">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="product-category">Category <span class="text-danger">*</span></label>
+                    <div class="custom-select-field">
+                        <div class="custom-select-input-wrap">
+                            <input type="text" id="product-category" class="form-control form-control-sm" placeholder="Select category" autocomplete="off" readonly required>
+                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
+                        </div>
+                        <div id="product-category-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Category options"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="product-unit">Unit <span class="text-danger">*</span></label>
+                    <div class="custom-select-field">
+                        <div class="custom-select-input-wrap">
+                            <input type="text" id="product-unit" class="form-control form-control-sm" placeholder="Select unit" autocomplete="off" readonly required>
+                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
+                        </div>
+                        <div id="product-unit-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Unit options"></div>
+                    </div>
+                </div>
             </div>
-            <form id="add-product-form" class="product-form">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="product-category">Category *</label>
-                                    <select id="product-category" required>
-                                        <option value="">Select category</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="product-unit">Unit *</label>
-                                    <select id="product-unit" required>
-                                        <option value="kg">Kilogram (kg)</option>
-                                        <option value="pieces">Pieces</option>
-                                        <option value="boxes">Boxes</option>
-                                    </select>
-                                </div>
-                            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="product-name">Product Name <span class="text-danger">*</span></label>
+                    <div class="product-name-field">
+                        <div class="product-name-input-wrap">
+                            <input type="text" id="product-name" class="form-control form-control-sm"
+                                   placeholder="Choose a category first" autocomplete="off" disabled required>
+                            <i class="bi bi-chevron-down pn-chevron" aria-hidden="true"></i>
+                        </div>
+                        <div id="product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product suggestions"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="product-price">Price (&#8369;) <span class="text-danger">*</span></label>
+                    <input type="number" id="product-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
+                    <small id="product-price-suggestion" class="field-hint">Suggested price: --</small>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="product-stock">Stock Quantity <span class="text-danger">*</span></label>
+                <input type="number" id="product-stock" class="form-control form-control-sm" min="0" step="1" inputmode="numeric" required>
+            </div>
+            <div class="form-group">
+                <label for="product-description">Description</label>
+                <textarea id="product-description" class="form-control form-control-sm" rows="3" maxlength="500"
+                          placeholder="Describe your fresh product..."></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="harvest-date">Expected Harvest Date</label>
+                    <input type="date" id="harvest-date" class="form-control form-control-sm" name="harvest_date">
+                </div>
+                <div class="form-group">
+                    <label for="expiry-date">Best Before / Expiry</label>
+                    <input type="date" id="expiry-date" class="form-control form-control-sm" name="expiry_date">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="product-location">Farm / Pick-up Location</label>
+                <input type="text" id="product-location" class="form-control form-control-sm" placeholder="Auto-filled from shop address" readonly>
+                <small class="field-hint">Location is automatically set to your shop address. Contact admin to change shop location.</small>
+            </div>
+            <div class="form-group">
+                <label for="product-image">Product Image</label>
+                <input type="file" id="product-image" class="form-control form-control-sm" name="image" accept="image/*">
+                <small class="field-hint">Upload a clear, well-lit photo of your product.</small>
+                <div id="product-image-preview" class="image-preview"></div>
+            </div>
+            <div class="form-actions">
+                <button type="button" id="cancel-add-product-btn" class="btn btn-secondary btn-sm">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-cloud-upload me-1"></i>Submit for Approval
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="product-name">Product Name *</label>
-                                    <div class="product-name-field">
-                                        <input type="text" id="product-name" placeholder="Choose category first" autocomplete="off" disabled required>
-                                        <div id="product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product name suggestions"></div>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="product-price">Price (₱) *</label>
-                                    <input type="number" id="product-price" step="0.01" min="0" inputmode="decimal" required>
-                                    <small id="product-price-suggestion" class="field-hint">Suggested lowest price: —</small>
-                                </div>
-                            </div>
+<!-- MODAL: EDIT PRODUCT -->
+<div id="edit-product-modal" class="modal">
+    <div class="modal-content" style="max-width:640px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-pencil-square me-2 text-primary"></i>Edit Product</h3>
+            <button class="close-btn" aria-label="Close">&times;</button>
+        </div>
+        <form id="edit-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(85vh - 58px);">
+            <input type="hidden" id="edit-product-id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="edit-product-category">Category <span class="text-danger">*</span></label>
+                    <div class="custom-select-field">
+                        <div class="custom-select-input-wrap">
+                            <input type="text" id="edit-product-category" class="form-control form-control-sm" placeholder="Select category" autocomplete="off" readonly required>
+                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
+                        </div>
+                        <div id="edit-product-category-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Category options"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="edit-product-unit">Unit <span class="text-danger">*</span></label>
+                    <div class="custom-select-field">
+                        <div class="custom-select-input-wrap">
+                            <input type="text" id="edit-product-unit" class="form-control form-control-sm" placeholder="Select unit" autocomplete="off" readonly required>
+                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
+                        </div>
+                        <div id="edit-product-unit-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Unit options"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="edit-product-name">Product Name <span class="text-danger">*</span></label>
+                    <div class="product-name-field">
+                        <div class="product-name-input-wrap">
+                            <input type="text" id="edit-product-name" class="form-control form-control-sm" placeholder="Choose category first" autocomplete="off" disabled required>
+                            <i class="bi bi-chevron-down pn-chevron" aria-hidden="true"></i>
+                        </div>
+                        <div id="edit-product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product suggestions"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="edit-product-price">Price (&#8369;) <span class="text-danger">*</span></label>
+                    <input type="number" id="edit-product-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
+                    <small id="edit-product-price-suggestion" class="field-hint">Suggested lowest price: —</small>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="edit-product-stock">Stock Quantity <span class="text-danger">*</span></label>
+                <input type="number" id="edit-product-stock" class="form-control form-control-sm" min="0" step="1" inputmode="numeric" required>
+            </div>
+            <div class="form-group">
+                <label for="edit-product-description">Description</label>
+                <textarea id="edit-product-description" class="form-control form-control-sm" rows="3" maxlength="500"
+                          placeholder="Describe your fresh product..."></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="edit-harvest-date">Expected Harvest Date</label>
+                    <input type="date" id="edit-harvest-date" class="form-control form-control-sm" name="harvest_date">
+                </div>
+                <div class="form-group">
+                    <label for="edit-expiry-date">Best Before / Expiry</label>
+                    <input type="date" id="edit-expiry-date" class="form-control form-control-sm" name="expiry_date">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="edit-product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
+                <div style="display:flex;gap:.5rem;align-items:flex-start;">
+                    <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set — click to set location" readonly style="flex:1;cursor:pointer;" onclick="document.getElementById('edit-product-address-modal').classList.add('open')"></textarea>
+                    <button type="button" id="open-edit-product-address-modal" class="btn btn-outline-secondary btn-sm" style="white-space:nowrap;">
+                        <i class="bi bi-geo-alt me-1"></i>Set Location
+                    </button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="edit-product-image">Product Image</label>
+                <input type="file" id="edit-product-image" class="form-control form-control-sm" name="image" accept="image/*">
+                <small class="field-hint">Leave empty to keep the current image.</small>
+                <div id="edit-product-image-preview" class="image-preview"></div>
+            </div>
+            <div class="form-actions">
+                <button type="button" id="cancel-edit-btn" class="btn btn-secondary btn-sm">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-check-lg me-1"></i>Update Product
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
-                            <div class="form-group">
-                                <label for="product-stock">Stock Quantity *</label>
-                                <input type="number" id="product-stock" min="0" step="1" inputmode="numeric" required>
-                            </div>
+<!-- MODAL: EDIT PRODUCT ADDRESS (PSGC) -->
+<div id="edit-product-address-modal" class="modal" style="z-index:1090;">
+    <div class="modal-content" style="max-width:500px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-geo-alt me-2 text-success"></i>Farm / Pick-up Location</h3>
+            <button class="close-btn" id="close-edit-product-address-modal" aria-label="Close">&times;</button>
+        </div>
+        <div style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(80vh - 58px);">
+            <div class="form-group">
+                <label for="edit-product-location-zone">Zone <span class="text-danger">*</span></label>
+                <select id="edit-product-location-zone" class="form-select form-select-sm">
+                    <option value="">Select Zone (Metro / North / South Luzon)</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="edit-product-location-province">Province <span class="text-danger">*</span></label>
+                    <select id="edit-product-location-province" class="form-select form-select-sm" disabled>
+                        <option value="">Select Province</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-product-location-city">City / Municipality <span class="text-danger">*</span></label>
+                    <select id="edit-product-location-city" class="form-select form-select-sm" disabled>
+                        <option value="">Select City</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="edit-product-location-barangay">Barangay <span class="text-danger">*</span></label>
+                <select id="edit-product-location-barangay" class="form-select form-select-sm" disabled>
+                    <option value="">Select Barangay</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit-product-location-street">Street / Building / House No. <span class="text-danger">*</span></label>
+                <input type="text" id="edit-product-location-street" class="form-control form-control-sm" placeholder="Enter street, building, or house number">
+            </div>
+            <div class="form-group">
+                <label for="edit-product-location-full">Address Preview</label>
+                <textarea id="edit-product-location-full" class="form-control form-control-sm" rows="3" placeholder="Formatted address will appear here" readonly></textarea>
+                <small class="field-hint">Street / Building, Barangay, City, Province</small>
+            </div>
+            <div class="form-actions">
+                <button type="button" id="cancel-edit-product-address-modal" class="btn btn-secondary btn-sm">Cancel</button>
+                <button type="button" id="confirm-edit-product-address-modal" class="btn btn-primary btn-sm">
+                    <i class="bi bi-check-lg me-1"></i>Confirm Address
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
-                            <div class="form-group">
-                                <label for="product-description">Description</label>
-                                <textarea id="product-description" rows="3" maxlength="500" placeholder="Describe your fresh product..."></textarea>
-                            </div>
+<!-- MODAL: PRODUCT PREVIEW -->
+<div id="farmer-product-preview-modal" class="product-details-modal">
+    <div class="product-details-overlay"></div>
+    <div class="product-details-content">
+        <div class="product-details-topbar">
+            <h3><i class="bi bi-eye me-2"></i>Product Details</h3>
+            <button class="product-details-close" id="farmer-product-preview-close" aria-label="Close">&times;</button>
+        </div>
+        <div id="farmer-product-preview-body" style="padding:1rem 1.25rem;"></div>
+    </div>
+</div>
 
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="harvest-date">Expected Harvest Date</label>
-                                        <input type="date" id="harvest-date" name="harvest_date">
-                                </div>
-                                <div class="form-group">
-                                    <label for="expiry-date">Best Before</label>
-                                        <input type="date" id="expiry-date" name="expiry_date">
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="product-location">Farm Location</label>
-                                <input type="text" id="product-location" placeholder="e.g., Laguna, Philippines">
-                                <small class="field-hint">Shipping fee is set by delivery distance and is paid by the customer during checkout.</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="product-image">Product Image</label>
-                                <input type="file" id="product-image" name="image" accept="image/*">
-                                <small>Upload a clear image of your fresh product</small>
-                                <div id="product-image-preview" class="image-preview"></div>
-                            </div>
-
+<!-- MODAL: REQUEST PRODUCT -->
+<div id="request-product-modal" class="product-details-modal">
+    <div class="product-details-overlay"></div>
+    <div class="product-details-content" style="max-width:560px;">
+        <div class="product-details-topbar">
+            <h3><i class="bi bi-send me-2"></i>Request New Product</h3>
+            <button class="product-details-close" id="request-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div style="padding:1rem 1.25rem;overflow:auto;">
+            <p class="text-muted small mb-3">Cannot find a product in the catalog? Request it here and staff will review it.</p>
+            <form id="request-product-form-modal" class="product-form">
+                <div class="form-group">
+                    <label for="request-product-name">Product Name <span class="text-danger">*</span></label>
+                    <input type="text" id="request-product-name" class="form-control form-control-sm"
+                           placeholder="Enter the product name you want to request" required>
+                </div>
+                <div class="form-group">
+                    <label for="request-product-notes">Notes for Staff <span class="text-muted">(optional)</span></label>
+                    <textarea id="request-product-notes" class="form-control form-control-sm" rows="3" maxlength="500"
+                              placeholder="e.g., local name, usual unit of sale, quality details..."></textarea>
+                </div>
                 <div class="form-actions">
-                    <button type="button" id="cancel-add-product-btn" class="btn btn-secondary">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Product</button>
+                    <button type="button" id="request-form-cancel" class="btn btn-secondary btn-sm">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-send me-1"></i>Submit Request
+                    </button>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <div id="farmer-product-preview-modal" class="product-details-modal">
-        <div class="product-details-overlay"></div>
-        <div class="product-details-content">
-            <div class="product-details-topbar" style="display:flex;align-items:center;justify-content:space-between;">
-                <h3>Product Details</h3>
-                <button class="product-details-close" id="farmer-product-preview-close" aria-label="Close">&times;</button>
-            </div>
-            <div id="farmer-product-preview-body" style="padding:1rem 1.25rem;"></div>
-        </div>
-    </div>
-
-    <!-- Edit Product Modal -->
-    <div id="edit-product-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Edit Product</h3>
-                <button class="close-btn">&times;</button>
-            </div>
-            <form id="edit-product-form" class="product-form">
-                <input type="hidden" id="edit-product-id">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="edit-product-name">Product Name *</label>
-                        <div class="product-name-field">
-                            <input type="text" id="edit-product-name" autocomplete="off" required>
-                            <div id="edit-product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Edit product name suggestions"></div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-product-price">Price (₱) *</label>
-                        <input type="number" id="edit-product-price" step="0.01" min="0" inputmode="decimal" required>
-                        <small id="edit-product-price-suggestion" class="field-hint">Suggested lowest price: —</small>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="edit-product-category">Category *</label>
-                        <select id="edit-product-category" required>
-                            <option value="">Select category</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-product-unit">Unit *</label>
-                        <select id="edit-product-unit" required>
-                            <option value="kg">Kilogram (kg)</option>
-                            <option value="pieces">Pieces</option>
-                            <option value="boxes">Boxes</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="edit-product-stock">Stock Quantity *</label>
-                    <input type="number" id="edit-product-stock" min="0" step="1" inputmode="numeric" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="edit-product-description">Description</label>
-                    <textarea id="edit-product-description" rows="3" maxlength="500" placeholder="Describe your fresh product..."></textarea>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="edit-harvest-date">Expected Harvest Date</label>
-                        <input type="date" id="edit-harvest-date" name="harvest_date">
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-expiry-date">Best Before</label>
-                        <input type="date" id="edit-expiry-date" name="expiry_date">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="edit-product-location">Farm Location</label>
-                    <input type="text" id="edit-product-location" placeholder="e.g., Laguna, Philippines">
-                </div>
-
-                <div class="form-group">
-                    <label for="edit-product-image">Product Image</label>
-                    <input type="file" id="edit-product-image" name="image" accept="image/*">
-                    <small>Upload a new image or leave empty to keep current image</small>
-                    <div id="edit-product-image-preview" class="image-preview"></div>
-                </div>
-
-                <div class="form-actions">
-                    <button type="button" id="cancel-edit-btn" class="btn btn-secondary">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Update Product</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="request-product-modal" class="product-details-modal">
-        <div class="product-details-overlay"></div>
-        <div class="product-details-content">
-            <div class="product-details-topbar" style="display:flex;align-items:center;justify-content:space-between;">
-                <h3>Request Product</h3>
-                <button class="product-details-close" id="request-modal-close" aria-label="Close">&times;</button>
-            </div>
-            <div class="request-product-body" style="padding:1rem 1.25rem; overflow:auto;">
-                <form id="request-product-form-modal" class="product-form">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="request-product-category">Product Category *</label>
-                            <select id="request-product-category">
-                                <option value="">Select category</option>
-                            </select>
-                            <div class="request-category-toggle" style="margin-top:0.5rem; display:flex; align-items:center;">
-                                <button type="button" id="request-new-category-toggle" class="btn btn-secondary btn-small request-new-category-btn" aria-pressed="false">Request New Category</button>
-                            </div>
-                            <input type="text" id="request-new-category-name" class="search-input request-new-category-input" style="margin-top:0.5rem; display:none;" placeholder="Enter new category name">
-                        </div>
-                        <div class="form-group">
-                            <label for="request-product-name">Product Name *</label>
-                            <input type="text" id="request-product-name" placeholder="Choose category first" disabled required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="request-product-notes">Details for staff (optional)</label>
-                        <textarea id="request-product-notes" rows="4" maxlength="500" placeholder="e.g., local/common name, quality details, suggested unit, etc."></textarea>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Submit Request</button>
-                        <button type="button" class="btn btn-secondary" id="request-form-cancel">Cancel</button>
-                    </div>
-                </form>
-
-                <div class="request-history-wrap" style="margin-top:1.25rem;">
-                    <h4 class="request-history-title" style="text-align:center;">My Requests</h4>
-                    <div id="request-product-history" class="overview-list" style="margin-top:0.5rem; max-height: 260px; overflow:auto;">
-                        <!-- history rows inserted here -->
-                    </div>
-                </div>
+            <div class="request-history-wrap">
+                <h6 class="fw-bold text-center mb-2 small text-muted text-uppercase">My Requests</h6>
+                <div id="request-product-history" class="overview-list" style="max-height:240px;overflow-y:auto;"></div>
             </div>
         </div>
     </div>
+</div>
 
-    <div id="customer-rating-modal" class="modal">
-        <div class="modal-content order-rating-modal-content">
-            <div class="modal-header">
-                <h3>Rate Customer</h3>
-                <button class="close-btn" id="customer-rating-close" aria-label="Close">&times;</button>
-            </div>
-            <form id="customer-rating-form" class="product-form">
-                <p id="customer-rating-order" style="margin:0 0 0.5rem 0; color: var(--text-secondary);"></p>
-                <div class="order-rating-stars" style="display:flex; gap:0.4rem; margin: 0.75rem 0;">
-                    <button type="button" class="order-rating-star-btn" data-rating="1" aria-label="1 star"><i class="fas fa-star"></i></button>
-                    <button type="button" class="order-rating-star-btn" data-rating="2" aria-label="2 stars"><i class="fas fa-star"></i></button>
-                    <button type="button" class="order-rating-star-btn" data-rating="3" aria-label="3 stars"><i class="fas fa-star"></i></button>
-                    <button type="button" class="order-rating-star-btn" data-rating="4" aria-label="4 stars"><i class="fas fa-star"></i></button>
-                    <button type="button" class="order-rating-star-btn" data-rating="5" aria-label="5 stars"><i class="fas fa-star"></i></button>
-                </div>
-                <div id="customer-rating-value" class="order-rating-value">Select a rating</div>
-                <div class="form-actions" style="margin-top: 1rem;">
-                    <button type="button" class="btn btn-secondary" id="customer-rating-cancel">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="customer-rating-submit">Save Rating</button>
-                </div>
-            </form>
+<!-- MODAL: CUSTOMER RATING -->
+<div id="customer-rating-modal" class="modal">
+    <div class="modal-content" style="max-width:380px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-star-fill me-2 text-warning"></i>Rate Customer</h3>
+            <button class="close-btn" id="customer-rating-close" aria-label="Close">&times;</button>
         </div>
+        <form id="customer-rating-form" style="padding:1rem 1.25rem;">
+            <p id="customer-rating-order" class="text-muted small mb-2"></p>
+            <div class="order-rating-stars">
+                <button type="button" class="order-rating-star-btn" data-rating="1" aria-label="1 star"><i class="fas fa-star"></i></button>
+                <button type="button" class="order-rating-star-btn" data-rating="2" aria-label="2 stars"><i class="fas fa-star"></i></button>
+                <button type="button" class="order-rating-star-btn" data-rating="3" aria-label="3 stars"><i class="fas fa-star"></i></button>
+                <button type="button" class="order-rating-star-btn" data-rating="4" aria-label="4 stars"><i class="fas fa-star"></i></button>
+                <button type="button" class="order-rating-star-btn" data-rating="5" aria-label="5 stars"><i class="fas fa-star"></i></button>
+            </div>
+            <div id="customer-rating-value" class="order-rating-value mb-3">Select a rating</div>
+            <div class="d-flex gap-2 justify-content-end">
+                <button type="button" id="customer-rating-cancel" class="btn btn-secondary btn-sm">Cancel</button>
+                <button type="submit" id="customer-rating-submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-check-lg me-1"></i>Save Rating
+                </button>
+            </div>
+        </form>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="/js/format.js"></script>
-        <script src="/js/psgc.js"></script>
-    <script src="/js/farmer.js"></script>
-    <script src="/js/chat.js"></script>
+<!-- SCRIPTS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+<script src="/vendor/simple-datatables/simple-datatables.js"></script>
+<script src="/js/nicemain.js"></script>
+<script src="/js/format.js"></script>
+<script src="/js/psgc.js"></script>
+<script src="/js/farmer.js"></script>
+<script src="/js/chat.js"></script>
+
+<script>
+window.addEventListener('load', function () {
+    setTimeout(function () {
+        var ls = document.getElementById('admin-loading-screen');
+        if (ls) ls.classList.add('hidden');
+    }, 500);
+});
+</script>
+
 </body>
 </html>
