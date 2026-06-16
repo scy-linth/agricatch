@@ -27,6 +27,7 @@ class FarmerDashboard {
         this.hasLoadedOrders = false;
         this.isSubmittingAddProduct = false;
         this.isSubmittingEditProduct = false;
+        this.isSubmittingRequestProduct = false;
         this.overviewRecentOrdersCache = [];
         this.overviewTopProductsCache = [];
         this.overviewLastFetchAt = 0;
@@ -362,6 +363,7 @@ class FarmerDashboard {
         this.setupDetailPanel();
         this.setupRealtime();
         this.initChat();
+        this.initUnitDropdowns();
     }
 
     setupRequestModal() {
@@ -377,9 +379,9 @@ class FarmerDashboard {
                 this.openRequestModal();
             });
         }
-        if (closeBtn) closeBtn.addEventListener('click', () => this.closeRequestModal());
-        if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeRequestModal());
-        if (overlay) overlay.addEventListener('click', () => this.closeRequestModal());
+        if (closeBtn) closeBtn.addEventListener('click', () => this.closeRequestModal(true));
+        if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeRequestModal(true));
+        if (overlay) overlay.addEventListener('click', () => this.closeRequestModal(true));
 
         // Form handlers
         const form = document.getElementById('request-product-form-modal');
@@ -415,6 +417,14 @@ class FarmerDashboard {
         modal.classList.add('open');
         document.documentElement.classList.add('modal-open');
         document.body.classList.add('modal-open');
+        
+        // Auto-fill location from shop address
+        const shopLocation = this.currentShopProfile?.location || '';
+        const locationInput = document.getElementById('product-location');
+        if (locationInput) {
+            locationInput.value = shopLocation;
+        }
+        
         await this.loadCategories();
         await this.loadProductCatalogNames();
     }
@@ -462,12 +472,21 @@ class FarmerDashboard {
     async handleSubmitRequestForm(e) {
         try {
             e.preventDefault();
+            if (this.isSubmittingRequestProduct) return;
             const nameEl = document.getElementById('request-product-name');
             const notesEl = document.getElementById('request-product-notes');
             if (!nameEl) return;
             const name = String(nameEl.value || '').trim();
             const notes = String(notesEl?.value || '').trim();
             if (!name) return this.showMessage('Please enter the product name.', 'error');
+
+            this.isSubmittingRequestProduct = true;
+            const submitBtn = document.querySelector('#request-product-form-modal button[type="submit"]');
+            const originalText = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
+            }
 
             const res = await fetch(`${this.apiBase}/products/category-requests`, {
                 method: 'POST',
@@ -478,14 +497,24 @@ class FarmerDashboard {
                 })
             });
             const data = await res.json().catch(() => ({}));
-            if (!res.ok) return this.showMessage(data.message || 'Unable to submit request', 'error');
-            this.showMessage('Request submitted for staff approval.', 'success');
-            // reset
-            (document.getElementById('request-product-form-modal') || {}).reset?.();
-            await this.loadRequestHistory();
+            if (!res.ok) {
+                this.showMessage(data.message || 'Unable to submit request', 'error');
+            } else {
+                this.showMessage('Request submitted for staff approval.', 'success');
+                // reset
+                (document.getElementById('request-product-form-modal') || {}).reset?.();
+                await this.loadRequestHistory();
+            }
         } catch (err) {
             console.error('Submit request error:', err);
             this.showMessage('Unable to submit request right now.', 'error');
+        } finally {
+            this.isSubmittingRequestProduct = false;
+            const submitBtn = document.querySelector('#request-product-form-modal button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-send me-1"></i>Submit Request';
+            }
         }
     }
 
@@ -1097,11 +1126,11 @@ class FarmerDashboard {
         
         const cancelEditBtn = document.getElementById('cancel-edit-btn');
         if (cancelEditBtn) {
-            cancelEditBtn.addEventListener('click', () => this.closeEditModal());
+            cancelEditBtn.addEventListener('click', () => this.closeEditModal(true));
         }
         const closeEditModalBtn = document.querySelector('#edit-product-modal .close-btn');
         if (closeEditModalBtn) {
-            closeEditModalBtn.addEventListener('click', () => this.closeEditModal());
+            closeEditModalBtn.addEventListener('click', () => this.closeEditModal(true));
         }
 
         const addImageInput = document.getElementById('product-image');
@@ -1112,6 +1141,29 @@ class FarmerDashboard {
         if (editImageInput) {
             editImageInput.addEventListener('change', () => this.previewImage(editImageInput, 'edit-product-image-preview'));
         }
+
+        // Initialize PSGC for edit product location
+        this.initEditProductPsgc();
+
+        // Edit product address modal controls
+        const openAddrBtn = document.getElementById('open-edit-product-address-modal');
+        const closeAddrBtn = document.getElementById('close-edit-product-address-modal');
+        const cancelAddrBtn = document.getElementById('cancel-edit-product-address-modal');
+        const confirmAddrBtn = document.getElementById('confirm-edit-product-address-modal');
+        const addrModal = document.getElementById('edit-product-address-modal');
+
+        const openAddrModal = () => addrModal?.classList.add('open');
+        const closeAddrModal = () => addrModal?.classList.remove('open');
+
+        if (openAddrBtn) openAddrBtn.addEventListener('click', openAddrModal);
+        if (closeAddrBtn) closeAddrBtn.addEventListener('click', closeAddrModal);
+        if (cancelAddrBtn) cancelAddrBtn.addEventListener('click', closeAddrModal);
+        if (confirmAddrBtn) confirmAddrBtn.addEventListener('click', () => {
+            const previewEl = document.getElementById('edit-product-location-full');
+            const displayEl = document.getElementById('edit-product-location-display');
+            if (displayEl && previewEl) displayEl.value = previewEl.value;
+            closeAddrModal();
+        });
 
         const previewModal = document.getElementById('farmer-product-preview-modal');
         const previewCloseBtn = document.getElementById('farmer-product-preview-close');
@@ -1315,6 +1367,138 @@ class FarmerDashboard {
         if (current) current.scrollIntoView({ block: 'nearest' });
     }
 
+    setupCustomSelectDropdown(fieldId) {
+        const input = document.getElementById(fieldId);
+        const dropdown = document.getElementById(`${fieldId}-dropdown`);
+        if (!input || !dropdown) return;
+
+        const toggleDropdown = () => {
+            dropdown.classList.toggle('open');
+        };
+
+        const selectOption = (btn) => {
+            const value = btn.getAttribute('data-value');
+            const label = btn.getAttribute('data-label');
+            input.value = label;
+            input.dataset.value = value;
+            dropdown.classList.remove('open');
+            dropdown.querySelectorAll('.custom-select-option').forEach(opt => opt.classList.remove('selected'));
+            btn.classList.add('selected');
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+
+        input.addEventListener('click', toggleDropdown);
+        input.addEventListener('focus', () => {
+            if (!dropdown.classList.contains('open')) toggleDropdown();
+        });
+
+        dropdown.querySelectorAll('.custom-select-option').forEach(btn => {
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                selectOption(btn);
+            });
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.remove('open');
+            }
+        });
+    }
+
+    initUnitDropdowns() {
+        const units = [
+            { value: 'kg', label: 'Kilogram (kg)' },
+            { value: 'pieces', label: 'Pieces' },
+            { value: 'boxes', label: 'Boxes' },
+            { value: 'bundle', label: 'Bundle' },
+            { value: 'sack', label: 'Sack' },
+            { value: 'tray', label: 'Tray' },
+            { value: 'liter', label: 'Liter (L)' }
+        ];
+
+        const renderUnitOptions = (selected = '') => {
+            return units.map(unit => {
+                const isSelected = String(selected) === unit.value ? 'selected' : '';
+                return `<button type="button" class="custom-select-option${isSelected ? ' selected' : ''}" data-value="${this.escapeAttr(unit.value)}" data-label="${this.escapeAttr(unit.label)}">${this.escapeHtml(unit.label)}</button>`;
+            }).join('');
+        };
+
+        const addInput = document.getElementById('product-unit');
+        const addDropdown = document.getElementById('product-unit-dropdown');
+        const editInput = document.getElementById('edit-product-unit');
+        const editDropdown = document.getElementById('edit-product-unit-dropdown');
+
+        if (addDropdown) {
+            addDropdown.innerHTML = renderUnitOptions(addInput?.value || '');
+            this.setupCustomSelectDropdown('product-unit');
+        }
+        if (editDropdown) {
+            editDropdown.innerHTML = renderUnitOptions(editInput?.value || '');
+            this.setupCustomSelectDropdown('edit-product-unit');
+        }
+    }
+
+    initEditProductPsgc() {
+        const initPsgc = async () => {
+            const psgc = await this.waitForPsgc();
+            const zoneEl = document.getElementById('edit-product-location-zone');
+            const provinceEl = document.getElementById('edit-product-location-province');
+            const cityEl = document.getElementById('edit-product-location-city');
+            const barangayEl = document.getElementById('edit-product-location-barangay');
+            const streetEl = document.getElementById('edit-product-location-street');
+            const previewEl = document.getElementById('edit-product-location-full');
+
+            if (!psgc) {
+                if (zoneEl) {
+                    zoneEl.innerHTML = '<option value="">Address options unavailable</option>';
+                    zoneEl.disabled = true;
+                }
+                return;
+            }
+
+            const updatePreview = () => {
+                if (!previewEl) return;
+                const prov = provinceEl?.value?.trim() || '';
+                const city = cityEl?.value?.trim() || '';
+                const bgy  = barangayEl?.value?.trim() || '';
+                const str  = streetEl?.value?.trim() || '';
+                previewEl.value = psgc.formatAddress({ street: str, barangay: bgy, city, province: prov });
+            };
+
+            if (zoneEl) {
+                psgc.loadZones(zoneEl);
+                zoneEl.addEventListener('change', async () => {
+                    await psgc.onZoneChange(zoneEl.value, { provinceEl, cityEl, barangayEl }).catch(() => {});
+                    updatePreview();
+                });
+            }
+            if (provinceEl) {
+                provinceEl.addEventListener('change', async () => {
+                    await psgc.onProvinceChange(provinceEl.value, { cityEl, barangayEl }).catch(() => {});
+                    updatePreview();
+                });
+            }
+            if (cityEl) {
+                cityEl.addEventListener('change', async () => {
+                    const city = cityEl.value;
+                    if (city) {
+                        await psgc.loadBarangays(city, barangayEl).catch(() => {});
+                        if (barangayEl) barangayEl.disabled = false;
+                    } else {
+                        psgc.setSelectOptions(barangayEl, [], 'Select Barangay');
+                        if (barangayEl) barangayEl.disabled = true;
+                    }
+                    updatePreview();
+                });
+            }
+            if (barangayEl) barangayEl.addEventListener('change', updatePreview);
+            if (streetEl) streetEl.addEventListener('input', updatePreview);
+        };
+
+        initPsgc();
+    }
+
     async loadCategories() {
         try {
             const response = await fetch(`${this.apiBase}/products/categories`, {
@@ -1331,22 +1515,29 @@ class FarmerDashboard {
             const data = await response.json();
             const categories = Array.isArray(data.categories) ? data.categories : [];
 
-            const renderOptions = (selected = '') => {
-                return ['<option value="">Select category</option>']
-                    .concat(categories.map((category) => {
-                        const value = String(category.id);
-                        const isSelected = String(selected) === value ? 'selected' : '';
-                        return `<option value="${this.escapeAttr(value)}" ${isSelected}>${this.escapeHtml(category.name || 'Category')}</option>`;
-                    }))
-                    .join('');
+            const renderCustomOptions = (selectedId = '') => {
+                return categories.map((category) => {
+                    const value = String(category.id);
+                    const isSelected = String(selectedId) === value ? 'selected' : '';
+                    return `<button type="button" class="custom-select-option${isSelected ? ' selected' : ''}" data-value="${this.escapeAttr(value)}" data-label="${this.escapeAttr(category.name || 'Category')}">${this.escapeHtml(category.name || 'Category')}</button>`;
+                }).join('');
             };
 
-            const addSelect = document.getElementById('product-category');
-            const editSelect = document.getElementById('edit-product-category');
+            const addInput = document.getElementById('product-category');
+            const addDropdown = document.getElementById('product-category-dropdown');
+            const editInput = document.getElementById('edit-product-category');
+            const editDropdown = document.getElementById('edit-product-category-dropdown');
 
-            if (addSelect) addSelect.innerHTML = renderOptions(addSelect.value || '');
-            if (editSelect) editSelect.innerHTML = renderOptions(editSelect.value || '');
-            await this.loadProductCatalogNames(addSelect?.value || null);
+            if (addDropdown) {
+                addDropdown.innerHTML = renderCustomOptions(addInput?.value || '');
+                this.setupCustomSelectDropdown('product-category');
+            }
+            if (editDropdown) {
+                editDropdown.innerHTML = renderCustomOptions(editInput?.value || '');
+                this.setupCustomSelectDropdown('edit-product-category');
+            }
+
+            await this.loadProductCatalogNames(addInput?.value || null);
             this.syncProductNameAvailability('add');
             this.syncProductNameAvailability('edit');
         } catch (error) {
@@ -1361,7 +1552,8 @@ class FarmerDashboard {
         const hint = document.getElementById(isEdit ? 'edit-product-price-suggestion' : 'product-price-suggestion');
         if (!nameInput) return;
 
-        const hasCategory = !!String(categoryInput?.value || '').trim();
+        const categoryId = String(categoryInput?.dataset.value || categoryInput?.value || '').trim();
+        const hasCategory = !!categoryId;
         nameInput.disabled = !hasCategory;
         nameInput.readOnly = true;
         if (!hasCategory) {
@@ -1414,14 +1606,14 @@ class FarmerDashboard {
         }
         if (addCategory) addCategory.addEventListener('change', async () => {
             this.syncProductNameAvailability('add');
-            await this.loadProductCatalogNames(addCategory.value || null);
+            await this.loadProductCatalogNames(addCategory.dataset.value || addCategory.value || null);
             this.updatePriceSuggestion('add');
         });
         if (editCategory) editCategory.addEventListener('change', async () => {
             const editNameEl = document.getElementById('edit-product-name');
             if (editNameEl) editNameEl.value = '';
             this.syncProductNameAvailability('edit');
-            await this.loadProductCatalogNames(editCategory.value || null);
+            await this.loadProductCatalogNames(editCategory.dataset.value || editCategory.value || null);
             this.updatePriceSuggestion('edit');
         });
 
@@ -1443,7 +1635,8 @@ class FarmerDashboard {
     }
 
     async submitCustomProductRequest() {
-        const categoryId = String(document.getElementById('product-category')?.value || '').trim();
+        const categoryInput = document.getElementById('product-category');
+        const categoryId = String(categoryInput?.dataset.value || categoryInput?.value || '').trim();
         const name = String(document.getElementById('custom-product-name-request')?.value || '').trim();
         const notes = String(document.getElementById('custom-product-request-notes')?.value || '').trim();
 
@@ -3135,9 +3328,11 @@ class FarmerDashboard {
         const name = document.getElementById('product-name').value;
         const description = document.getElementById('product-description').value;
         const price = document.getElementById('product-price').value;
-        const category_id = document.getElementById('product-category').value;
+        const categoryInput = document.getElementById('product-category');
+        const category_id = categoryInput?.dataset.value || categoryInput?.value;
         const stock_quantity = document.getElementById('product-stock').value;
-        const unit = document.getElementById('product-unit').value;
+        const unitInput = document.getElementById('product-unit');
+        const unit = unitInput?.dataset.value || unitInput?.value;
         const location = document.getElementById('product-location').value;
         const harvestDate = document.getElementById('harvest-date').value;
         const expiryDate = document.getElementById('expiry-date').value;
@@ -3247,10 +3442,31 @@ class FarmerDashboard {
         formData.append('name', document.getElementById('edit-product-name').value);
         formData.append('description', document.getElementById('edit-product-description').value);
         formData.append('price', document.getElementById('edit-product-price').value);
-        formData.append('category_id', document.getElementById('edit-product-category').value);
+        const editCategoryInput = document.getElementById('edit-product-category');
+        const editUnitInput = document.getElementById('edit-product-unit');
+        formData.append('category_id', editCategoryInput?.dataset.value || editCategoryInput?.value);
         formData.append('stock_quantity', document.getElementById('edit-product-stock').value);
-        formData.append('unit', document.getElementById('edit-product-unit').value);
-        formData.append('location', document.getElementById('edit-product-location').value);
+        formData.append('unit', editUnitInput?.dataset.value || editUnitInput?.value);
+        
+        // Compose address from PSGC fields
+        const zoneEl = document.getElementById('edit-product-location-zone');
+        const provinceEl = document.getElementById('edit-product-location-province');
+        const cityEl = document.getElementById('edit-product-location-city');
+        const barangayEl = document.getElementById('edit-product-location-barangay');
+        const streetEl = document.getElementById('edit-product-location-street');
+        const previewEl = document.getElementById('edit-product-location-full');
+        
+        // Read final composed address from the display field (set on confirm)
+        const displayEl = document.getElementById('edit-product-location-display');
+        let location = '';
+        if (displayEl?.value) {
+            location = displayEl.value;
+        } else if (window.PSGC && previewEl?.value) {
+            location = previewEl.value;
+        } else if (streetEl?.value) {
+            location = streetEl.value;
+        }
+        formData.append('location', location);
 
         const harvestDate = document.getElementById('edit-harvest-date').value;
         const expiryDate = document.getElementById('edit-expiry-date').value;
@@ -3276,7 +3492,8 @@ class FarmerDashboard {
         if (imageFile) {
             try {
                 const editName = document.getElementById('edit-product-name').value;
-                const editCategoryId = document.getElementById('edit-product-category').value;
+                const editCategoryInput = document.getElementById('edit-product-category');
+                const editCategoryId = editCategoryInput?.dataset.value || editCategoryInput?.value;
                 const editCategorySelect = document.getElementById('edit-product-category');
                 const uploaded = await this.uploadProductImage(imageFile, {
                     name: editName,
@@ -3419,11 +3636,78 @@ class FarmerDashboard {
                 document.getElementById('edit-product-id').value = product.id;
                 document.getElementById('edit-product-name').value = product.name;
                 document.getElementById('edit-product-price').value = product.price;
-                document.getElementById('edit-product-category').value = product.category_id;
-                document.getElementById('edit-product-unit').value = product.unit;
+                const editCategoryInput = document.getElementById('edit-product-category');
+                const editCategoryDropdown = document.getElementById('edit-product-category-dropdown');
+                const editUnitInput = document.getElementById('edit-product-unit');
+                const editUnitDropdown = document.getElementById('edit-product-unit-dropdown');
+                
+                // Set category value and label
+                if (editCategoryInput && editCategoryDropdown) {
+                    const categoryOption = editCategoryDropdown.querySelector(`[data-value="${product.category_id}"]`);
+                    if (categoryOption) {
+                        editCategoryInput.value = categoryOption.getAttribute('data-label');
+                        editCategoryInput.dataset.value = product.category_id;
+                        editCategoryDropdown.querySelectorAll('.custom-select-option').forEach(opt => opt.classList.remove('selected'));
+                        categoryOption.classList.add('selected');
+                    }
+                }
+                
+                // Set unit value and label
+                if (editUnitInput && editUnitDropdown) {
+                    const unitOption = editUnitDropdown.querySelector(`[data-value="${product.unit}"]`);
+                    if (unitOption) {
+                        editUnitInput.value = unitOption.getAttribute('data-label');
+                        editUnitInput.dataset.value = product.unit;
+                        editUnitDropdown.querySelectorAll('.custom-select-option').forEach(opt => opt.classList.remove('selected'));
+                        unitOption.classList.add('selected');
+                    }
+                }
+                
                 document.getElementById('edit-product-stock').value = product.stock_quantity;
                 document.getElementById('edit-product-description').value = product.description || '';
-                document.getElementById('edit-product-location').value = product.location || '';
+                
+                // Parse and populate PSGC address fields
+                const location = product.location || '';
+                const zoneEl = document.getElementById('edit-product-location-zone');
+                const provinceEl = document.getElementById('edit-product-location-province');
+                const cityEl = document.getElementById('edit-product-location-city');
+                const barangayEl = document.getElementById('edit-product-location-barangay');
+                const streetEl = document.getElementById('edit-product-location-street');
+                const previewEl = document.getElementById('edit-product-location-full');
+                
+                const displayEl = document.getElementById('edit-product-location-display');
+                
+                if (location) {
+                    if (displayEl) displayEl.value = location;
+                }
+                
+                if (location && window.PSGC) {
+                    try {
+                        const parsed = window.PSGC.parseAddress(location);
+                        if (parsed) {
+                            if (zoneEl) zoneEl.value = parsed.zone || '';
+                            if (provinceEl) provinceEl.value = parsed.province || '';
+                            if (cityEl) cityEl.value = parsed.city || '';
+                            if (barangayEl) barangayEl.value = parsed.barangay || '';
+                            if (streetEl) streetEl.value = parsed.street || '';
+                            if (previewEl) previewEl.value = location;
+                            
+                            // Enable cascading selects based on parsed values
+                            if (parsed.zone && provinceEl) provinceEl.disabled = false;
+                            if (parsed.province && cityEl) cityEl.disabled = false;
+                            if (parsed.city && barangayEl) barangayEl.disabled = false;
+                        }
+                    } catch (e) {
+                        // If parsing fails, fall back to simple text in street field
+                        if (streetEl) streetEl.value = location;
+                        if (previewEl) previewEl.value = location;
+                    }
+                } else if (location) {
+                    // Fallback if PSGC not available
+                    if (streetEl) streetEl.value = location;
+                    if (previewEl) previewEl.value = location;
+                }
+                
                 await this.loadProductCatalogNames(product.category_id || null);
                 this.syncProductNameAvailability('edit');
                 this.updatePriceSuggestion('edit');
