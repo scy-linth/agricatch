@@ -2099,25 +2099,6 @@ class FarmerDashboard {
         // Prevent body scroll when chat section is active
         document.body.classList.toggle('chat-section-active', safeSection === 'chat');
 
-        // Scroll chat to bottom when section becomes active
-        if (safeSection === 'chat') {
-            let attempts = 0;
-            const maxAttempts = 50;
-            const scrollChat = () => {
-                attempts++;
-                const chatMessages = document.getElementById('chat-messages');
-                if (chatMessages && chatMessages.scrollHeight > 0) {
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                    if (attempts < maxAttempts) {
-                        setTimeout(scrollChat, 100);
-                    }
-                } else if (attempts < maxAttempts) {
-                    setTimeout(scrollChat, 100);
-                }
-            };
-            scrollChat();
-        }
-
         // Auto-switch to pending tab when orders section is opened
         if (safeSection === 'orders') {
             this.switchOrderTab('pending');
@@ -4713,8 +4694,8 @@ class FarmerDashboard {
                     <div class="order-card-customer-location">${this.escapeHtml(deliveryAddress || '—')}</div>
                 </div>
                 <div class="order-card-pricing">
-                    <div class="order-card-unit-price">₱${this.fmtCurrency(price)} / unit</div>
-                    <div class="order-card-total">₱${this.fmtCurrency(totalAmount)}</div>
+                    <div class="order-card-unit-price">${this.fmtCurrency(price)} / unit</div>
+                    <div class="order-card-total">${this.fmtCurrency(totalAmount)}</div>
                 </div>
                 <div class="order-card-actions">
                     ${this.getOrderActionButtons({ id: orderId, status: currentStatus })}
