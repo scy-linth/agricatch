@@ -1027,11 +1027,6 @@ class AdminDashboard {
                 const requestId = e.target.dataset.requestId;
                 this.openReviewModal(requestId, 'reject');
             }
-            // Unverify button
-            if (e.target.classList.contains('unverify-verification-btn')) {
-                const requestId = e.target.dataset.requestId;
-                this.openUnverifyModal(requestId);
-            }
         });
 
         // Sidebar toggle button
@@ -6688,7 +6683,7 @@ class AdminDashboard {
                     <td>${rating}</td>
                     <td style="text-align:center">
                         <div class="d-flex flex-column gap-1 align-items-center">
-                            ${isDisabled ? '<i class="bi bi-x-circle-fill text-danger me-1"></i><span class="badge bg-danger">Disabled</span>' : '<i class="bi bi-check-circle-fill text-success me-1"></i><span class="badge bg-success">Active</span>'}
+                            ${this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active')}
                             ${isVerified ? '<i class="bi bi-check-circle-fill text-primary me-1"></i><span class="badge bg-success">Verified</span>' : '<i class="bi bi-x-circle-fill text-danger me-1"></i><span class="badge bg-secondary">Unverified</span>'}
                         </div>
                     </td>
