@@ -241,6 +241,13 @@
                 <span id="product-approvals-badge" class="sidebar-badge" style="display:none">0</span>
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#verification-requests" data-section="verification-requests">
+                <i class="bi bi-shield-check"></i>
+                <span>Verification Requests</span>
+                <span id="verification-requests-badge" class="sidebar-badge" style="display:none">0</span>
+            </a>
+        </li>
 
         <!-- ── People (collapsible submenu) ─────────────────── -->
         <li class="nav-heading">People</li>
@@ -2350,6 +2357,86 @@
             </div>
         </div>
     </section><!-- /product-approvals -->
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 12 — VERIFICATION REQUESTS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="verification-requests" class="admin-section-card">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-shield-check"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Verification Requests</h4>
+                <p class="ac-section-hero__sub">Review and approve farmer verification requests.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="card bg-warning text-dark">
+                            <div class="card-body">
+                                <h5>Pending</h5>
+                                <h3 id="verification-pending-count">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-success text-white">
+                            <div class="card-body">
+                                <h5>Approved Today</h5>
+                                <h3 id="verification-approved-today">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-danger text-white">
+                            <div class="card-body">
+                                <h5>Rejected Today</h5>
+                                <h3 id="verification-rejected-today">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Bar -->
+                <div class="verification-tabs mb-3">
+                    <button class="tab-btn active" data-status="all">All</button>
+                    <button class="tab-btn" data-status="pending">Pending</button>
+                    <button class="tab-btn" data-status="approved">Approved</button>
+                    <button class="tab-btn" data-status="rejected">Rejected</button>
+                </div>
+
+                <!-- Requests Table -->
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Farmer</th>
+                                <th>Shop</th>
+                                <th>Products</th>
+                                <th>Orders</th>
+                                <th>Document</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="verification-requests-table">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <nav id="verification-pagination"></nav>
+            </div>
+        </div>
+    </section><!-- /verification-requests -->
 
     <!-- ════════════════════════════════════════════════════════════════
          § 12 — PROFILE SECTION
