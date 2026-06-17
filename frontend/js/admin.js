@@ -685,7 +685,7 @@ class AdminDashboard {
         }
 
         // Add active state to parent collapse menu for catalog sections
-        const catalogSections = ['catalog-products', 'categories', 'category-requests'];
+        const catalogSections = ['catalog-products', 'categories'];
         const catalogParent = document.getElementById('nav-catalog');
         const catalogLink = document.querySelector('[data-bs-target="#nav-catalog"]');
         
@@ -5413,8 +5413,8 @@ class AdminDashboard {
             <div class="panel-section">
                 <h4>Actions</h4>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-ac-green product-approve-btn" data-product-id="${product.id}">Approve</button>
                     <button class="btn btn-sm btn-ac-red product-reject-btn" data-product-id="${product.id}">Reject</button>
+                    <button class="btn btn-sm btn-ac-green product-approve-btn" data-product-id="${product.id}">Approve</button>
                 </div>
             </div>
         `;
@@ -7165,8 +7165,8 @@ class AdminDashboard {
                     <div class="d-flex gap-1">
                         <button class="btn btn-sm btn-ac-green view-verification-details-btn" data-request-id="${request.id}" data-farmer-id="${request.farmer_id}">View</button>
                         ${request.status === 'pending' ? `
-                            <button class="btn btn-sm btn-success approve-verification-btn" data-request-id="${request.id}">Approve</button>
-                            <button class="btn btn-sm btn-danger reject-verification-btn" data-request-id="${request.id}">Reject</button>
+                            <button class="btn btn-sm btn-ac-green approve-verification-btn" data-request-id="${request.id}">Approve</button>
+                            <button class="btn btn-sm btn-ac-red reject-verification-btn" data-request-id="${request.id}">Reject</button>
                         ` : ''}
                         ${request.status === 'approved' ? `
                             <button class="btn btn-sm btn-warning unverify-verification-btn" data-request-id="${request.id}">Unverify</button>
@@ -7270,11 +7270,11 @@ class AdminDashboard {
 
         title.textContent = `Verification Document - ${farmerName}`;
         img.src = docUrl;
-        modal.style.display = 'block';
+        modal.classList.add('open');
     }
 
     closeVerificationDocModal() {
-        document.getElementById('verification-doc-modal').style.display = 'none';
+        document.getElementById('verification-doc-modal').classList.remove('open');
     }
 
     async openVerificationDetailsModal(requestId, farmerId) {
@@ -7284,7 +7284,7 @@ class AdminDashboard {
 
         title.textContent = 'Verification Details';
         content.innerHTML = '<div class="text-center py-5"><span class="spinner-border"></span></div>';
-        modal.style.display = 'block';
+        modal.classList.add('open');
 
         try {
             // Fetch verification request details
@@ -7321,7 +7321,7 @@ class AdminDashboard {
                                 </table>
                                 ${request.document_url ? `
                                     <h5 class="mt-3">Document</h5>
-                                    <img src="${this.escapeHtml(request.document_url)}" style="max-width:100%; max-height:300px; border-radius:8px; cursor:pointer;" onclick="adminDashboard.openVerificationDocModal('${this.escapeHtml(request.document_url)}', '${this.escapeHtml(request.full_name || request.username)}')" />
+                                    <img src="${this.escapeHtml(request.document_url)}" style="max-width:100%; max-height:300px; border-radius:8px; cursor:pointer; position:relative; z-index:9999;" onclick="adminDashboard.openVerificationDocModal('${this.escapeHtml(request.document_url)}', '${this.escapeHtml(request.full_name || request.username)}')" />
                                 ` : '<p class="text-muted mt-3">No document uploaded</p>'}
                             </div>
                         </div>
@@ -7339,7 +7339,7 @@ class AdminDashboard {
     }
 
     closeVerificationDetailsModal() {
-        document.getElementById('verification-details-modal').style.display = 'none';
+        document.getElementById('verification-details-modal').classList.remove('open');
     }
 
     async handleUnverifyAction(requestId) {
@@ -7419,7 +7419,7 @@ document.addEventListener('DOMContentLoaded', () => {
     adminDashboard = new AdminDashboard();
 });
 
-// Global functions for onclick handlers
+// Global functions for onclick handlers (kept for backward compatibility)
 function openReviewModal(requestId, action) {
     if (adminDashboard) {
         adminDashboard.openReviewModal(requestId, action);

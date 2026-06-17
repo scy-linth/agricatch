@@ -223,11 +223,6 @@
                         <i class="bi bi-circle"></i><span>Categories</span>
                     </a>
                 </li>
-                <li>
-                    <a href="#category-requests" class="sidebar-link" data-section="category-requests">
-                        <i class="bi bi-circle"></i><span>Catalog Requests</span>
-                    </a>
-                </li>
             </ul>
         </li>
 
@@ -246,6 +241,13 @@
                 <i class="bi bi-shield-check"></i>
                 <span>Verification Requests</span>
                 <span id="verification-requests-badge" class="sidebar-badge" style="display:none">0</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#category-requests" data-section="category-requests">
+                <i class="bi bi-box-seam"></i>
+                <span>Catalog Requests</span>
+                <span id="category-requests-badge" class="sidebar-badge" style="display:none">0</span>
             </a>
         </li>
 
@@ -267,11 +269,6 @@
                 <li>
                     <a href="#farmers" class="sidebar-link" data-section="farmers">
                         <i class="bi bi-circle"></i><span>Farmers</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#verification-requests" class="sidebar-link" data-section="verification-requests">
-                        <i class="bi bi-circle"></i><span>Verification Requests</span>
                     </a>
                 </li>
                 <li data-roles="super_admin">
@@ -2585,52 +2582,14 @@
         </div>
     </section><!-- /profile -->
 
-    <!-- Verification Requests Section -->
-    <section id="verification-requests" class="admin-section-card">
-        <div class="card-header">
-            <h3>Verification Requests</h3>
-        </div>
-        <div class="card-body">
-            <!-- Status Filter Tabs -->
-            <div class="verification-tabs mb-3">
-                <button class="tab-btn active" data-status="all">All</button>
-                <button class="tab-btn" data-status="pending">Pending</button>
-                <button class="tab-btn" data-status="approved">Approved</button>
-                <button class="tab-btn" data-status="rejected">Rejected</button>
-            </div>
-
-            <!-- Requests Table -->
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Farmer</th>
-                            <th>Shop</th>
-                            <th>Products</th>
-                            <th>Orders</th>
-                            <th>Document</th>
-                            <th>Date</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="verification-requests-table">
-                        <!-- Dynamic content -->
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination -->
-            <nav id="verification-pagination"></nav>
-        </div>
-    </section>
-
     <!-- Admin Review Modal -->
-    <div class="modal" id="admin-review-modal">
-        <div class="modal-content">
+    <div id="admin-review-modal" class="admin-modal-backdrop">
+        <div class="admin-modal modal-lg">
             <div class="modal-header">
-                <h3 id="review-modal-title">Review Verification Request</h3>
-                <button class="close-btn" onclick="closeReviewModal()">✕</button>
+                <h5 class="modal-title" id="review-modal-title">Review Verification Request</h5>
+                <button class="modal-close-btn" data-close-modal="admin-review-modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
             </div>
             <div class="modal-body">
                 <div id="review-farmer-details"></div>
@@ -2649,19 +2608,21 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeReviewModal()">Cancel</button>
-                <button class="btn btn-success" id="approve-btn">Approve</button>
-                <button class="btn btn-danger" id="reject-btn">Reject</button>
+                <button class="btn btn-secondary" data-close-modal="admin-review-modal">Cancel</button>
+                <button class="btn btn-ac-green" id="approve-btn">Approve</button>
+                <button class="btn btn-ac-red" id="reject-btn">Reject</button>
             </div>
         </div>
     </div>
 
     <!-- Verification Document View Modal -->
-    <div class="modal" id="verification-doc-modal" style="display:none;">
-        <div class="modal-content" style="max-width:800px;">
+    <div id="verification-doc-modal" class="admin-modal-backdrop">
+        <div class="admin-modal modal-lg">
             <div class="modal-header">
-                <h3 id="verification-doc-modal-title">Verification Document</h3>
-                <button class="close-btn" onclick="closeVerificationDocModal()">✕</button>
+                <h5 class="modal-title" id="verification-doc-modal-title">Verification Document</h5>
+                <button class="modal-close-btn" data-close-modal="verification-doc-modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
             </div>
             <div class="modal-body">
                 <div id="verification-doc-content" class="text-center">
@@ -2669,17 +2630,19 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeVerificationDocModal()">Close</button>
+                <button class="btn btn-secondary" data-close-modal="verification-doc-modal">Close</button>
             </div>
         </div>
     </div>
 
     <!-- Verification Details Modal -->
-    <div class="modal" id="verification-details-modal" style="display:none;">
-        <div class="modal-content" style="max-width:900px;">
+    <div id="verification-details-modal" class="admin-modal-backdrop">
+        <div class="admin-modal modal-lg">
             <div class="modal-header">
-                <h3 id="verification-details-modal-title">Verification Details</h3>
-                <button class="close-btn" onclick="closeVerificationDetailsModal()">✕</button>
+                <h5 class="modal-title" id="verification-details-modal-title">Verification Details</h5>
+                <button class="modal-close-btn" data-close-modal="verification-details-modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
             </div>
             <div class="modal-body">
                 <div id="verification-details-content">
@@ -2687,7 +2650,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeVerificationDetailsModal()">Close</button>
+                <button class="btn btn-secondary" data-close-modal="verification-details-modal">Close</button>
             </div>
         </div>
     </div>
