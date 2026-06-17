@@ -58,6 +58,12 @@ const publicIdForUserPhoto = (userId, kind = 'avatar') => {
   return `agricatch/users/${String(userId || 'unknown').trim()}/${safeKind}-${manilaTimestamp()}`;
 };
 
+const publicIdForVerificationDocument = (userId) => {
+  const userPart = String(userId || 'unknown').trim();
+  // Use consistent public_id per farmer for overwrite (no timestamp)
+  return `agricatch/verification/${userPart}/document`;
+};
+
 // uploadFile(localPath, options)
 // Supported options mirror Cloudinary uploader options. Most common keys:
 // - folder: target folder path in Cloudinary
@@ -89,6 +95,7 @@ cloudinary.manilaTimestamp = manilaTimestamp;
 cloudinary.publicIdForCategorizedProduct = publicIdForCategorizedProduct;
 cloudinary.publicIdForProduct = publicIdForProduct;
 cloudinary.publicIdForUserPhoto = publicIdForUserPhoto;
+cloudinary.publicIdForVerificationDocument = publicIdForVerificationDocument;
 cloudinary.uploadFile = uploadFile;
 cloudinary.getMissingCloudinaryEnv = getMissingCloudinaryEnv;
 cloudinary.assertConfigured = assertConfigured;
