@@ -994,6 +994,23 @@ class AdminDashboard {
         document.getElementById('approve-btn')?.addEventListener('click', () => this.handleReviewAction('approved'));
         document.getElementById('reject-btn')?.addEventListener('click', () => this.handleReviewAction('rejected'));
 
+        // Verification document view buttons (event delegation)
+        document.getElementById('verification-requests-table')?.addEventListener('click', (e) => {
+            if (e.target.classList.contains('view-verification-doc-btn')) {
+                const docUrl = e.target.dataset.docUrl;
+                const farmerName = e.target.dataset.farmerName;
+                this.openVerificationDocModal(docUrl, farmerName);
+            }
+            if (e.target.classList.contains('approve-verification-btn')) {
+                const requestId = e.target.dataset.requestId;
+                this.openReviewModal(requestId, 'approve');
+            }
+            if (e.target.classList.contains('reject-verification-btn')) {
+                const requestId = e.target.dataset.requestId;
+                this.openReviewModal(requestId, 'reject');
+            }
+        });
+
         // Sidebar toggle button
         const toggleBtn = document.getElementById('admin-sidebar-toggle');
         if (toggleBtn) {
@@ -7131,10 +7148,15 @@ class AdminDashboard {
                 <td>${new Date(request.created_at).toLocaleDateString()}</td>
                 <td>${statusBadge}</td>
                 <td>
-                    ${request.status === 'pending' ? `
-                        <button class="btn btn-sm btn-success" onclick="openReviewModal(${request.id}, 'approve')">Approve</button>
-                        <button class="btn btn-sm btn-danger" onclick="openReviewModal(${request.id}, 'reject')">Reject</button>
-                    ` : ''}
+                    <div class="d-flex gap-1">
+                        ${request.document_url ? `
+                            <button class="btn btn-sm btn-info view-verification-doc-btn" data-doc-url="${this.escapeHtml(request.document_url)}" data-farmer-name="${this.escapeHtml(request.full_name || request.username)}">View Doc</button>
+                        ` : ''}
+                        ${request.status === 'pending' ? `
+                            <button class="btn btn-sm btn-success approve-verification-btn" data-request-id="${request.id}">Approve</button>
+                            <button class="btn btn-sm btn-danger reject-verification-btn" data-request-id="${request.id}">Reject</button>
+                        ` : ''}
+                    </div>
                 </td>
             `;
 
@@ -7226,6 +7248,20 @@ class AdminDashboard {
         document.getElementById('rejection-reason-input').value = '';
     }
 
+    openVerificationDocModal(docUrl, farmerName) {
+        const modal = document.getElementById('verification-doc-modal');
+        const title = document.getElementById('verification-doc-modal-title');
+        const img = document.getElementById('verification-doc-img');
+
+        title.textContent = `Verification Document - ${farmerName}`;
+        img.src = docUrl;
+        modal.style.display = 'block';
+    }
+
+    closeVerificationDocModal() {
+        document.getElementById('verification-doc-modal').style.display = 'none';
+    }
+
     async handleReviewAction(action) {
         if (!this.currentReviewRequestId) return;
 
@@ -7282,6 +7318,12 @@ function openReviewModal(requestId, action) {
 function closeReviewModal() {
     if (adminDashboard) {
         adminDashboard.closeReviewModal();
+    }
+}
+
+function closeVerificationDocModal() {
+    if (adminDashboard) {
+        adminDashboard.closeVerificationDocModal();
     }
 }
 
