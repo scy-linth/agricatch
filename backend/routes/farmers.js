@@ -868,7 +868,7 @@ router.post('/me/verification-request', async (req, res) => {
     const user = await requireFarmer(req, res);
     if (!user) return;
 
-    const { documents, notes } = req.body;
+    const { document_url, notes } = req.body;
 
     // Check if farmer is already verified
     const userResult = await pool.query('SELECT is_verified FROM users WHERE id = $1', [user.id]);
@@ -877,21 +877,21 @@ router.post('/me/verification-request', async (req, res) => {
     }
 
     // Check if there's already a pending verification request
-    const existingRequest = await pool.query(
-      'SELECT id FROM verification_requests WHERE farmer_id = $1 AND status = $2',
-      [user.id, 'pending']
-    );
-    if (existingRequest.rows.length > 0) {
-      return res.status(400).json({ message: 'You already have a pending verification request' });
-    }
+    // REMOVED: Allow new requests even if pending exists for unverified workflow
+    // const existingRequest = await pool.query(
+    //   'SELECT id FROM verification_requests WHERE farmer_id = $1 AND status = $2',
+    //   [user.id, 'pending']
+    // );
+    // if (existingRequest.rows.length > 0) {
+    //   return res.status(400).json({ message: 'You already have a pending verification request' });
+    // }
 
     // Create verification request
-    const documentsJson = documents ? JSON.stringify(documents) : null;
     const result = await pool.query(
-      `INSERT INTO verification_requests (farmer_id, documents, notes, status)
+      `INSERT INTO verification_requests (farmer_id, document_url, notes, status)
        VALUES ($1, $2, $3, 'pending')
        RETURNING id, created_at`,
-      [user.id, documentsJson, notes || null]
+      [user.id, document_url || null, notes || null]
     );
 
     // Notify all admins about new verification request
@@ -905,7 +905,7 @@ router.post('/me/verification-request', async (req, res) => {
           `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
            VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
           [admin.id, 'verification_request', 'New Verification Request', 
-           'A farmer has requested account verification. Review the request in the admin panel.']
+           `Farmer ${user.username} has requested account verification.`]
         );
         broadcastEvent('notification.created', { user_id: admin.id });
       }
@@ -913,7 +913,7 @@ router.post('/me/verification-request', async (req, res) => {
       console.error('Failed to send admin notifications:', notifErr);
     }
 
-    res.json({ 
+    res.status(201).json({ 
       message: 'Verification request submitted successfully',
       request_id: result.rows[0].id,
       created_at: result.rows[0].created_at
