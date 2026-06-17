@@ -6686,7 +6686,7 @@ class AdminDashboard {
                     <td style="text-align:center">
                         <div class="d-flex flex-column gap-1 align-items-center">
                             ${this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active')}
-                            ${isVerified ? '<span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Verified</span>' : '<span class="badge" style="background-color:transparent; border:none; color:black;"><i class="bi bi-x-circle-fill text-danger me-1"></i>Unverified</span>'}
+                            ${isVerified ? '<span class="badge bg-success">Verified</span><i class="bi bi-check-circle-fill text-primary ms-1"></i>' : '<span class="badge bg-secondary">Unverified</span><i class="bi bi-x-circle-fill text-danger ms-1"></i>'}
                         </div>
                     </td>
                     <td class="text-muted">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
@@ -7188,10 +7188,6 @@ class AdminDashboard {
                 <td>
                     <div class="d-flex gap-1">
                         <button class="btn btn-sm btn-ac-green view-verification-details-btn" data-request-id="${request.id}" data-farmer-id="${request.farmer_id}">View</button>
-                        ${request.status === 'pending' ? `
-                            <button class="btn btn-sm btn-ac-green approve-verification-btn" data-request-id="${request.id}">Approve</button>
-                            <button class="btn btn-sm btn-ac-red reject-verification-btn" data-request-id="${request.id}">Reject</button>
-                        ` : ''}
                     </div>
                 </td>
             `;
@@ -7303,11 +7299,15 @@ class AdminDashboard {
         const title = document.getElementById('verification-details-modal-title');
         const content = document.getElementById('verification-details-content');
         const unverifyBtn = document.getElementById('unverify-from-details-btn');
+        const approveBtn = document.getElementById('approve-from-details-btn');
+        const rejectBtn = document.getElementById('reject-from-details-btn');
 
         title.textContent = 'Verification Details';
         content.innerHTML = '<div class="text-center py-5"><span class="spinner-border"></span></div>';
         modal.classList.add('open');
         unverifyBtn.style.display = 'none';
+        approveBtn.style.display = 'none';
+        rejectBtn.style.display = 'none';
 
         try {
             // Fetch verification request details
@@ -7323,6 +7323,13 @@ class AdminDashboard {
                     if (request.status === 'approved') {
                         unverifyBtn.style.display = 'inline-block';
                         unverifyBtn.dataset.requestId = request.id;
+                    }
+                    // Show approve/reject buttons if status is pending
+                    if (request.status === 'pending') {
+                        approveBtn.style.display = 'inline-block';
+                        approveBtn.dataset.requestId = request.id;
+                        rejectBtn.style.display = 'inline-block';
+                        rejectBtn.dataset.requestId = request.id;
                     }
 
                     content.innerHTML = `
