@@ -27,6 +27,10 @@ class AdminDashboard {
         this.previousModalId = null;
         this.modalZIndex = 1080;
         this.selectedNotifId = null;
+        this.verificationRequests = [];
+        this.verificationCurrentPage = 1;
+        this.verificationCurrentStatus = 'all';
+        this.currentReviewRequestId = null;
 
         if (!this.token) {
             window.location.href = '/?login=1';
@@ -676,6 +680,10 @@ class AdminDashboard {
             }, 500);
         }
 
+        if (sectionId === 'verification-requests') {
+            this.loadVerificationRequests();
+        }
+
         // Add active state to parent collapse menu for catalog sections
         const catalogSections = ['catalog-products', 'categories', 'category-requests'];
         const catalogParent = document.getElementById('nav-catalog');
@@ -866,6 +874,13 @@ class AdminDashboard {
                 }
             });
 
+            // Handle invalid token (signature mismatch)
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                window.location.href = '/?login=1&reason=invalid_token';
+                return;
+            }
+
             if (response.ok) {
                 const data = await response.json();
                 if (!['staff', 'super_admin'].includes(data.user.role)) {
@@ -965,6 +980,19 @@ class AdminDashboard {
             e.preventDefault();
             this.navigateTo('chat');
         });
+
+        // Verification request status filter tabs
+        document.querySelectorAll('.verification-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.verification-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.loadVerificationRequests(1, e.target.dataset.status);
+            });
+        });
+
+        // Review modal buttons
+        document.getElementById('approve-btn')?.addEventListener('click', () => this.handleReviewAction('approved'));
+        document.getElementById('reject-btn')?.addEventListener('click', () => this.handleReviewAction('rejected'));
 
         // Sidebar toggle button
         const toggleBtn = document.getElementById('admin-sidebar-toggle');
@@ -5006,20 +5034,33 @@ class AdminDashboard {
 
     async toggleFarmerVerification(userId, isVerified) {
         try {
+            const body = { is_verified: isVerified };
+            
+            // Require reason when unverifying
+            if (!isVerified) {
+                const reason = prompt('Please provide a reason for unverifying this farmer:');
+                if (!reason) {
+                    this.showMessage('Reason is required to unverify', 'error');
+                    return;
+                }
+                body.reason = reason;
+            }
+            
             const response = await fetch(`${this.apiBase}/admin/users/${userId}/verify`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify({ is_verified: isVerified })
+                body: JSON.stringify(body)
             });
 
             if (response.ok) {
                 this.showMessage('Farmer verification updated!', 'success');
                 await this.loadFarmers();
             } else {
-                this.showMessage('Failed to update verification', 'error');
+                const data = await response.json();
+                this.showMessage(data.message || 'Failed to update verification', 'error');
             }
         } catch (error) {
             console.error('Error updating verification:', error);
@@ -7023,6 +7064,206 @@ class AdminDashboard {
         }
     }
 
+    // Verification requests functions
+    async loadVerificationRequests(page = 1, status = 'all') {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/verification-requests?page=${page}&status=${status}`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                this.verificationRequests = data.requests || [];
+                this.verificationCurrentPage = page;
+                this.verificationCurrentStatus = status;
+                this.renderVerificationRequestsTable();
+                this.renderVerificationPagination(data.total, data.limit);
+                this.updateVerificationStats(this.verificationRequests);
+            } else {
+                this.showToast('Failed to load verification requests', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to load verification requests:', error);
+            this.showToast('Failed to load verification requests', 'error');
+        }
+    }
+
+    updateVerificationStats(requests) {
+        const pending = requests.filter(r => r.status === 'pending').length;
+        const today = new Date().toDateString();
+        const approvedToday = requests.filter(r => r.status === 'approved' && new Date(r.updated_at).toDateString() === today).length;
+        const rejectedToday = requests.filter(r => r.status === 'rejected' && new Date(r.updated_at).toDateString() === today).length;
+
+        document.getElementById('verification-pending-count').textContent = pending;
+        document.getElementById('verification-approved-today').textContent = approvedToday;
+        document.getElementById('verification-rejected-today').textContent = rejectedToday;
+    }
+
+    renderVerificationRequestsTable() {
+        const tbody = document.getElementById('verification-requests-table');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!this.verificationRequests || this.verificationRequests.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No verification requests found</td></tr>';
+            return;
+        }
+
+        this.verificationRequests.forEach(request => {
+            const row = document.createElement('tr');
+
+            const statusBadge = {
+                'pending': '<span class="badge bg-warning">Pending</span>',
+                'approved': '<span class="badge bg-success">Approved</span>',
+                'rejected': '<span class="badge bg-danger">Rejected</span>'
+            }[request.status] || request.status;
+
+            const docIndicator = request.document_url
+                ? '<i class="bi bi-file-earmark-image text-success"></i>'
+                : '<i class="bi bi-dash text-muted"></i>';
+
+            row.innerHTML = `
+                <td>${this.escapeHtml(request.full_name || request.username)}</td>
+                <td>${this.escapeHtml(request.shop_name || '—')}</td>
+                <td>${request.product_count || 0}</td>
+                <td>${request.delivered_orders || 0}</td>
+                <td>${docIndicator}</td>
+                <td>${new Date(request.created_at).toLocaleDateString()}</td>
+                <td>${statusBadge}</td>
+                <td>
+                    ${request.status === 'pending' ? `
+                        <button class="btn btn-sm btn-success" onclick="openReviewModal(${request.id}, 'approve')">Approve</button>
+                        <button class="btn btn-sm btn-danger" onclick="openReviewModal(${request.id}, 'reject')">Reject</button>
+                    ` : ''}
+                </td>
+            `;
+
+            tbody.appendChild(row);
+        });
+    }
+
+    renderVerificationPagination(total, limit) {
+        const nav = document.getElementById('verification-pagination');
+        if (!nav) return;
+        const totalPages = Math.ceil(total / limit);
+
+        if (totalPages <= 1) {
+            nav.innerHTML = '';
+            return;
+        }
+
+        let html = '<ul class="pagination">';
+
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<li class="page-item ${i === this.verificationCurrentPage ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="loadVerificationRequests(${i}, '${this.verificationCurrentStatus}'); return false;">${i}</a>
+            </li>`;
+        }
+
+        html += '</ul>';
+        nav.innerHTML = html;
+    }
+
+    openReviewModal(requestId, action) {
+        this.currentReviewRequestId = requestId;
+        const request = this.verificationRequests.find(r => r.id === requestId);
+
+        if (!request) return;
+
+        document.getElementById('review-modal-title').textContent =
+            action === 'approve' ? 'Approve Verification Request' : 'Reject Verification Request';
+
+        document.getElementById('review-farmer-details').innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Farmer:</strong> ${this.escapeHtml(request.full_name || request.username)}</p>
+                    <p><strong>Email:</strong> ${this.escapeHtml(request.email)}</p>
+                    <p><strong>Phone:</strong> ${request.phone ? '+63' + request.phone : '—'}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Shop:</strong> ${this.escapeHtml(request.shop_name || '—')}</p>
+                    <p><strong>Products:</strong> ${request.product_count || 0}</p>
+                    <p><strong>Delivered Orders:</strong> ${request.delivered_orders || 0}</p>
+                </div>
+            </div>
+            ${request.notes ? `<p><strong>Notes:</strong> ${this.escapeHtml(request.notes)}</p>` : ''}
+        `;
+
+        const docSection = document.getElementById('review-document-section');
+        const docImg = document.getElementById('review-document-img');
+
+        if (request.document_url) {
+            docSection.style.display = 'block';
+            docImg.src = request.document_url;
+        } else {
+            docSection.style.display = 'none';
+        }
+
+        const rejectionSection = document.getElementById('rejection-reason-section');
+        const approveBtn = document.getElementById('approve-btn');
+        const rejectBtn = document.getElementById('reject-btn');
+
+        if (action === 'reject') {
+            rejectionSection.style.display = 'block';
+            approveBtn.style.display = 'none';
+            rejectBtn.style.display = 'inline-block';
+        } else {
+            rejectionSection.style.display = 'none';
+            approveBtn.style.display = 'inline-block';
+            rejectBtn.style.display = 'none';
+        }
+
+        document.getElementById('view-chat-btn').onclick = () => {
+            window.location.href = `/admin.html#chat?user_id=${request.farmer_id}`;
+        };
+
+        document.getElementById('admin-review-modal').classList.add('open');
+    }
+
+    closeReviewModal() {
+        document.getElementById('admin-review-modal').classList.remove('open');
+        this.currentReviewRequestId = null;
+        document.getElementById('rejection-reason-input').value = '';
+    }
+
+    async handleReviewAction(action) {
+        if (!this.currentReviewRequestId) return;
+
+        const rejectionReason = document.getElementById('rejection-reason-input').value;
+
+        if (action === 'reject' && !rejectionReason.trim()) {
+            this.showToast('Rejection reason is required', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/verification-requests/${this.currentReviewRequestId}/review`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({
+                    status: action,
+                    rejection_reason: action === 'reject' ? rejectionReason : null
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.closeReviewModal();
+                this.showToast(`Verification request ${action}ed successfully`, 'success');
+                this.loadVerificationRequests(this.verificationCurrentPage, this.verificationCurrentStatus);
+            } else {
+                this.showToast(data.message || `Failed to ${action} request`, 'error');
+            }
+        } catch (error) {
+            console.error('Review action error:', error);
+            this.showToast(`Failed to ${action} request`, 'error');
+        }
+    }
+
 }
 
 // Initialize admin dashboard when DOM is loaded
@@ -7030,6 +7271,25 @@ let adminDashboard;
 document.addEventListener('DOMContentLoaded', () => {
     adminDashboard = new AdminDashboard();
 });
+
+// Global functions for onclick handlers
+function openReviewModal(requestId, action) {
+    if (adminDashboard) {
+        adminDashboard.openReviewModal(requestId, action);
+    }
+}
+
+function closeReviewModal() {
+    if (adminDashboard) {
+        adminDashboard.closeReviewModal();
+    }
+}
+
+function loadVerificationRequests(page, status) {
+    if (adminDashboard) {
+        adminDashboard.loadVerificationRequests(page, status);
+    }
+}
 
 
 
