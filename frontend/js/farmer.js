@@ -2652,6 +2652,30 @@ class FarmerDashboard {
         const targetSelector = targetMap[String(tab || 'overview').trim()] || targetMap.overview;
         const tabs = document.querySelectorAll('#profileTabs .nav-link');
         const panes = document.querySelectorAll('#profile .tab-pane');
+        const verificationSubsection = document.getElementById('profile-verification');
+
+        // Handle verification subsection separately
+        if (tab === 'verification') {
+            // Hide all tab panes
+            panes.forEach((pane) => {
+                pane.classList.remove('show', 'active');
+            });
+            // Deactivate all tab buttons
+            tabs.forEach((btn) => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-selected', 'false');
+            });
+            // Show verification subsection
+            if (verificationSubsection) {
+                verificationSubsection.style.display = 'block';
+            }
+            return;
+        }
+
+        // Hide verification subsection for other tabs
+        if (verificationSubsection) {
+            verificationSubsection.style.display = 'none';
+        }
 
         tabs.forEach((btn) => {
             const isActive = btn.getAttribute('data-bs-target') === targetSelector;
