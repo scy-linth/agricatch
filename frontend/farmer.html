@@ -451,6 +451,13 @@
                             <i class="bi bi-person"></i><span>My Profile</span>
                         </a>
                     </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center" href="#"
+                           id="verification-request-btn"
+                           onclick="farmerDashboard&&farmerDashboard.openVerificationSection();return false;">
+                            <i class="bi bi-shield-check"></i><span id="verification-menu-text">Request Verification</span>
+                        </a>
+                    </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
                         <a class="dropdown-item d-flex align-items-center" href="#"
@@ -547,6 +554,14 @@
 
     <!-- OVERVIEW SECTION -->
     <section id="overview" class="admin-section-card active">
+        <!-- Verification Banner -->
+        <div id="verification-banner" class="alert alert-warning alert-dismissible" style="display:none;">
+            <i class="bi bi-info-circle"></i>
+            <span id="verification-banner-message"></span>
+            <button type="button" class="btn btn-sm btn-primary ms-2" id="open-chat-btn">Open Chat</button>
+            <button type="button" class="btn-close" onclick="dismissVerificationBanner()"></button>
+        </div>
+
         <div class="row g-3 mb-3">
             <!-- My Products KPI -->
             <div class="col-xxl-3 col-md-6">
@@ -1384,7 +1399,7 @@
                                     <div class="col-lg-9 col-md-8" id="po-shop-name">—</div>
                                 </div>
                                 <div class="row mb-2">
-                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Owner Name</div>
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Full Name</div>
                                     <div class="col-lg-9 col-md-8" id="po-owner-name">—</div>
                                 </div>
                                 <div class="row mb-2">
@@ -1945,6 +1960,49 @@ window.addEventListener('load', function () {
     }, 500);
 });
 </script>
+
+<!-- Verification Request Modal -->
+<div class="modal" id="verification-request-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Request Account Verification</h3>
+      <button class="close-btn" onclick="farmerDashboard&&farmerDashboard.closeVerificationRequestModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="verification-request-form">
+        <div class="mb-3">
+          <label class="form-label">Upload ID/Document (optional but recommended)</label>
+          <input type="file" class="form-control" id="verification-document" accept="image/jpeg,image/png" />
+          <small class="text-muted">JPG/PNG, max 5MB</small>
+        </div>
+        <div id="document-preview" class="mb-3" style="display:none;">
+          <label class="form-label">Preview:</label>
+          <img id="document-preview-img" style="max-width:100%; max-height:200px; border-radius:8px;" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Additional Notes (optional)</label>
+          <textarea class="form-control" id="verification-notes" rows="3" placeholder="Any additional information..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Submit Request</button>
+        <button type="button" class="btn btn-secondary" onclick="farmerDashboard&&farmerDashboard.closeVerificationRequestModal()">Cancel</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Verification Rejection Modal -->
+<div class="modal" id="verification-rejection-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Verification Request Rejected</h3>
+      <button class="close-btn" onclick="closeRejectionModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="rejection-reason-text"></p>
+      <button class="btn btn-primary" id="resubmit-verification-btn">Submit New Request</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
