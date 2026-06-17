@@ -800,7 +800,7 @@ body.sidebar-collapsed #main.main {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .06em;
-  padding: 10px 24px;
+  padding: 10px 32px;
   border-bottom: 1px solid var(--ac-border);
   white-space: nowrap;
   border-top: none;
