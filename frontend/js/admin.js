@@ -1010,7 +1010,9 @@ class AdminDashboard {
             console.log('[DEBUG] Approve button clicked', e.target);
             const requestId = e.target.dataset.requestId;
             console.log('[DEBUG] Request ID from dataset:', requestId);
+            console.log('[DEBUG] Calling closeVerificationDetailsModal...');
             this.closeVerificationDetailsModal();
+            console.log('[DEBUG] Calling openReviewModal with approve...');
             this.openReviewModal(requestId, 'approve');
         });
 
@@ -1019,7 +1021,9 @@ class AdminDashboard {
             console.log('[DEBUG] Reject button clicked', e.target);
             const requestId = e.target.dataset.requestId;
             console.log('[DEBUG] Request ID from dataset:', requestId);
+            console.log('[DEBUG] Calling closeVerificationDetailsModal...');
             this.closeVerificationDetailsModal();
+            console.log('[DEBUG] Calling openReviewModal with reject...');
             this.openReviewModal(requestId, 'reject');
         });
 
@@ -2236,8 +2240,8 @@ class AdminDashboard {
         const tbody = document.getElementById('users-tbody');
         if (!tbody) return;
         if (!users.length) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No users found</td></tr>`;
-            this.refreshSortableTable('users-table', { columns: [{ select: 7, sortable: false }] });
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No users found</td></tr>`;
+            this.refreshSortableTable('users-table', { columns: [{ select: 6, sortable: false }] });
             return;
         }
         tbody.innerHTML = users.map(user => {
@@ -2253,7 +2257,6 @@ class AdminDashboard {
                 this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
 
             const fullName = user.full_name || '—';
-            const rating = user.rating ? `<span class="star-rating">★</span> ${Number(user.rating).toFixed(1)}` : '—';
 
             return `
                 <tr>
@@ -2265,7 +2268,6 @@ class AdminDashboard {
                     </td>
                     <td style="color:#777171f0">${this.escapeHtml(user.username || '—')}</td>
                     <td>${this.escapeHtml(user.email)}</td>
-                    <td>${rating}</td>
                     <td class="text-center">
                         <div class="d-flex flex-column gap-1 align-items-center">
                             ${statusBadge}
@@ -3097,6 +3099,7 @@ class AdminDashboard {
                         ['Email', safeUser.email || '—'], ['Phone', safeUser.phone || '—'],
                         ['Address', safeUser.address || '—'],
                         ['Status', safeUser.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
+                        ['Rating', user.rating ? `<span class="star-rating">★</span> ${Number(user.rating).toFixed(1)}` : '—'],
                         ['Joined', safeUser.created_at ? new Date(safeUser.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
                         ['Total Orders', total_orders], ['Total Spent', this.fmtCurrency(total_spent)],
                     ].map(([k,v]) => `<div class="col-6"><div class="text-muted small">${k}</div><div class="fw-semibold small">${v}</div></div>`).join('')}
@@ -7515,20 +7518,4 @@ function loadVerificationRequests(page, status) {
         adminDashboard.loadVerificationRequests(page, status);
     }
 }
-
-
-
-
-
-}
-
-function loadVerificationRequests(page, status) {
-    if (adminDashboard) {
-        adminDashboard.loadVerificationRequests(page, status);
-    }
-}
-
-
-
-
 
