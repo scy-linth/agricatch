@@ -1266,7 +1266,6 @@
                                     <th>FULL NAME</th>
                                     <th>Username</th>
                                     <th>Email</th>
-                                    <th>Rating</th>
                                     <th>Status</th>
                                     <th>Verification</th>
                                     <th>Joined</th>
@@ -1274,7 +1273,7 @@
                                 </tr>
                             </thead>
                             <tbody id="farmers-all-tbody">
-                                <tr><td colspan="10" class="text-center text-muted py-4">
+                                <tr><td colspan="9" class="text-center text-muted py-4">
                                     <span class="spinner-border spinner-border-sm"></span>
                                 </td></tr>
                             </tbody>
@@ -2652,10 +2651,9 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-ac-red me-auto" id="unverify-from-details-btn" style="display:none;">Unverify</button>
+                <button class="btn btn-ac-red me-auto" id="reject-from-details-btn" style="display:none;">Reject</button>
+                <button class="btn btn-ac-red" id="unverify-from-details-btn" style="display:none;">Unverify</button>
                 <button class="btn btn-ac-green" id="approve-from-details-btn" style="display:none;">Approve</button>
-                <button class="btn btn-ac-red" id="reject-from-details-btn" style="display:none;">Reject</button>
-                <button class="btn btn-secondary" data-close-modal="verification-details-modal">Close</button>
             </div>
         </div>
     </div>

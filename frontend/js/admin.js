@@ -1007,13 +1007,19 @@ class AdminDashboard {
 
         // Approve button in details modal
         document.getElementById('approve-from-details-btn')?.addEventListener('click', (e) => {
+            console.log('[DEBUG] Approve button clicked', e.target);
             const requestId = e.target.dataset.requestId;
+            console.log('[DEBUG] Request ID from dataset:', requestId);
+            this.closeVerificationDetailsModal();
             this.openReviewModal(requestId, 'approve');
         });
 
         // Reject button in details modal
         document.getElementById('reject-from-details-btn')?.addEventListener('click', (e) => {
+            console.log('[DEBUG] Reject button clicked', e.target);
             const requestId = e.target.dataset.requestId;
+            console.log('[DEBUG] Request ID from dataset:', requestId);
+            this.closeVerificationDetailsModal();
             this.openReviewModal(requestId, 'reject');
         });
 
@@ -6684,7 +6690,6 @@ class AdminDashboard {
         const buildRow = (f) => {
             const isDisabled = !!f.is_disabled;
             const isVerified = !!f.is_verified;
-            const rating = f.rating ? `<span class="star-rating">★</span> ${Number(f.rating).toFixed(1)}` : '—';
             const shopName = f.shop_name || '—';
             const ownerName = `${f.first_name || ''} ${f.last_name || ''}`.trim() || f.full_name || '—';
             return `
@@ -6694,7 +6699,6 @@ class AdminDashboard {
                     <td class="text-muted">${this.escapeHtml(ownerName)}</td>
                     <td style="color:#777171f0">${this.escapeHtml(f.username || '—')}</td>
                     <td>${this.escapeHtml(f.email)}</td>
-                    <td>${rating}</td>
                     <td style="text-align:center">${this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active')}</td>
                     <td style="text-align:center">${isVerified ? '<span class="badge bg-success">Verified<i class="bi bi-check-circle-fill ms-1"></i></span>' : '<span class="badge bg-secondary">Unverified<i class="bi bi-x-circle-fill ms-1"></i></span>'}</td>
                     <td class="text-muted">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
@@ -6709,10 +6713,10 @@ class AdminDashboard {
         if (allTbody) {
             allTbody.innerHTML = pagedFarmers.length
                 ? pagedFarmers.map(f => buildRow(f)).join('')
-                : `<tr><td colspan="10" class="text-center text-muted py-4">No farmers found</td></tr>`;
+                : `<tr><td colspan="9" class="text-center text-muted py-4">No farmers found</td></tr>`;
         }
 
-        this.refreshSortableTable('farmers-all-table', { columns: [{ select: 9, sortable: false }], defaultSort: [8, 'desc'] });
+        this.refreshSortableTable('farmers-all-table', { columns: [{ select: 8, sortable: false }], defaultSort: [7, 'desc'] });
 
         this.renderPagination('farmers-pagination', pageState, (page) => {
             this.loadFarmers('all', page);
