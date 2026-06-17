@@ -7118,13 +7118,31 @@ class AdminDashboard {
                 this.verificationCurrentStatus = status;
                 this.renderVerificationRequestsTable();
                 this.renderVerificationPagination(data.total, data.limit);
-                this.updateVerificationStats(this.verificationRequests);
+                
+                // Load all requests for stats (to show total counts regardless of current tab)
+                await this.loadVerificationStats();
             } else {
                 this.showToast('Failed to load verification requests', 'error');
             }
         } catch (error) {
             console.error('Failed to load verification requests:', error);
             this.showToast('Failed to load verification requests', 'error');
+        }
+    }
+
+    async loadVerificationStats() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/verification-requests?status=all&page=1&limit=10000`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                const allRequests = data.requests || [];
+                this.updateVerificationStats(allRequests);
+            }
+        } catch (error) {
+            console.error('Failed to load verification stats:', error);
         }
     }
 
@@ -7154,7 +7172,8 @@ class AdminDashboard {
             const statusBadge = {
                 'pending': '<span class="badge bg-warning">Pending</span>',
                 'approved': '<span class="badge bg-success">Approved</span>',
-                'rejected': '<span class="badge bg-danger">Rejected</span>'
+                'rejected': '<span class="badge bg-danger">Rejected</span>',
+                'unverified': '<span class="badge bg-secondary">Unverified</span>'
             }[request.status] || request.status;
 
             const docIndicator = request.document_url
