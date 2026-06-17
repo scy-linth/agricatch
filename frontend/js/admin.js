@@ -1005,6 +1005,18 @@ class AdminDashboard {
             this.openUnverifyModal(requestId);
         });
 
+        // Approve button in details modal
+        document.getElementById('approve-from-details-btn')?.addEventListener('click', (e) => {
+            const requestId = e.target.dataset.requestId;
+            this.openReviewModal(requestId, 'approve');
+        });
+
+        // Reject button in details modal
+        document.getElementById('reject-from-details-btn')?.addEventListener('click', (e) => {
+            const requestId = e.target.dataset.requestId;
+            this.openReviewModal(requestId, 'reject');
+        });
+
         // Verification document view buttons (event delegation)
         document.getElementById('verification-requests-table')?.addEventListener('click', (e) => {
             // Image thumbnail click
@@ -6686,7 +6698,9 @@ class AdminDashboard {
                     <td style="text-align:center">
                         <div class="d-flex flex-column gap-1 align-items-center">
                             ${this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active')}
-                            ${isVerified ? '<span class="badge bg-success">Verified</span><i class="bi bi-check-circle-fill text-primary ms-1"></i>' : '<span class="badge bg-secondary">Unverified</span><i class="bi bi-x-circle-fill text-danger ms-1"></i>'}
+                            <div class="d-flex align-items-center gap-1">
+                                ${isVerified ? '<span class="badge bg-success">Verified</span><i class="bi bi-check-circle-fill text-primary ms-1"></i>' : '<span class="badge bg-secondary">Unverified</span><i class="bi bi-x-circle-fill text-danger ms-1"></i>'}
+                            </div>
                         </div>
                     </td>
                     <td class="text-muted">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
