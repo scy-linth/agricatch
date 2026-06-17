@@ -2768,7 +2768,7 @@ class FarmerDashboard {
                 const profile = data.profile || {};
                 this.currentShopProfile = profile;
 
-                const displayName = profile.shop_name || getName(profile) || getName(fallbackUser) || '—';
+                const displayName = profile.shop_name || '—';
                 const displayLocation = getLocation(profile) || getLocation(fallbackUser) || 'Farm location not set';
                 const displayDesc = getDesc(profile) || getDesc(fallbackUser) || 'No description yet.';
 
@@ -2792,9 +2792,9 @@ class FarmerDashboard {
                 const shopDescriptionInput = document.getElementById('shop-description-input');
 
                 if (shopNameInput) {
-                    const v = profile.shop_name || getName(profile) || getName(fallbackUser) || '';
+                    const v = profile.shop_name || '';
                     shopNameInput.value = v;
-                    shopNameInput.placeholder = v || displayName;
+                    shopNameInput.placeholder = displayName || 'My Farm Shop';
                 }
                 if (shopLocationInput) {
                     const v = getLocation(profile) || getLocation(fallbackUser) || '';
@@ -3351,7 +3351,7 @@ class FarmerDashboard {
             try {
                 const profile = this.currentShopProfile || {};
                 const fallbackUser = this.authProfile || {};
-                const name = String((profile.full_name || fallbackUser.full_name || profile.username || fallbackUser.username || '')).trim();
+                const name = String((profile.shop_name || '')).trim();
                 const loc = String((profile.location || fallbackUser.address || '')).trim();
                 const desc = String((profile.shop_description || fallbackUser.shop_description || '')).trim();
 
@@ -3387,7 +3387,7 @@ class FarmerDashboard {
             const shopDescriptionInput = document.getElementById('shop-description-input');
 
             if (shopNameInput) {
-                const v = profile.full_name || fallbackUser.full_name || profile.username || fallbackUser.username || '';
+                const v = profile.shop_name || '';
                 shopNameInput.value = v;
                 shopNameInput.placeholder = v || 'My Farm Shop';
             }
@@ -6414,6 +6414,325 @@ class FarmerDashboard {
             toast.remove();
         }, 3000);
     }
+
+    // Verification request functions
+    async uploadToCloudinary(file) {
+        const formData = new FormData();
+        formData.append('document', file);
+
+        try {
+            const response = await fetch('/api/upload/verification-document', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('Upload failed');
+            }
+
+            const data = await response.json();
+            return data.imageUrl;
+        } catch (error) {
+            console.error('Cloudinary upload error:', error);
+            throw error;
+        }
+    }
+
+    openVerificationSection() {
+        this.showSection('profile', 'verification');
+        this.loadVerificationStatus();
+    }
+
+    openVerificationRequestModal() {
+        document.getElementById('verification-request-modal').classList.add('open');
+        document.getElementById('verification-request-form').reset();
+        document.getElementById('document-preview').style.display = 'none';
+    }
+
+    closeVerificationRequestModal() {
+        document.getElementById('verification-request-modal').classList.remove('open');
+    }
+
+    previewDocumentImage(event) {
+        const file = event.target.files[0];
+        if (file) {
+            // Validate file size (5MB limit)
+            const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+            if (file.size > maxSize) {
+                this.showMessage('File size exceeds 5MB limit. Please choose a smaller file.', 'error');
+                event.target.value = ''; // Clear the input
+                document.getElementById('document-preview').style.display = 'none';
+                return;
+            }
+
+            // Validate file type
+            const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+            if (!validTypes.includes(file.type)) {
+                this.showMessage('Only JPG and PNG files are allowed.', 'error');
+                event.target.value = ''; // Clear the input
+                document.getElementById('document-preview').style.display = 'none';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const preview = document.getElementById('document-preview');
+                const img = document.getElementById('document-preview-img');
+                img.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    async handleVerificationRequest(event) {
+        event.preventDefault();
+
+        const fileInput = document.getElementById('verification-document');
+        const notes = document.getElementById('verification-notes').value;
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        try {
+            let document_url = null;
+
+            if (fileInput.files[0]) {
+                document_url = await this.uploadToCloudinary(fileInput.files[0]);
+            }
+
+            const response = await fetch('/api/farmers/me/verification-request', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ document_url, notes })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.renderVerificationSubsection();
+                this.showMessage('Verification request submitted successfully', 'success');
+                await this.loadVerificationStatus();
+                // Navigate to chat section
+                this.showSection('chat');
+            } else {
+                this.showMessage(data.message || 'Failed to submit request', 'error');
+            }
+        } catch (error) {
+            console.error('Verification request error:', error);
+            this.showMessage('Failed to submit request. Please try again.', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Request';
+        }
+    }
+
+    async loadVerificationStatus() {
+        try {
+            const response = await fetch('/api/farmers/me/verification-request', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            const data = await response.json();
+
+            if (response.ok && data.request) {
+                this.currentVerificationRequest = data.request;
+            } else {
+                this.currentVerificationRequest = null;
+            }
+            this.updateVerificationUI();
+            this.renderVerificationSubsection();
+        } catch (error) {
+            console.error('Failed to load verification status:', error);
+        }
+    }
+
+    updateVerificationUI() {
+        const btn = document.getElementById('verification-request-btn');
+        const menuText = document.getElementById('verification-menu-text');
+        const icon = btn?.querySelector('i');
+
+        if (!this.currentVerificationRequest) {
+            // No request - show button
+            if (btn) btn.style.display = '';
+            if (menuText) menuText.textContent = 'Request Verification';
+            if (icon) {
+                icon.className = 'bi bi-shield-check';
+            }
+        } else {
+            const status = this.currentVerificationRequest.status;
+            if (status === 'pending') {
+                if (menuText) menuText.textContent = 'Verification: Pending';
+                if (icon) {
+                    icon.className = 'bi bi-clock text-warning';
+                }
+            } else if (status === 'rejected') {
+                if (menuText) menuText.textContent = 'Verification: Rejected';
+                if (icon) {
+                    icon.className = 'bi bi-exclamation-triangle text-danger';
+                }
+            } else if (status === 'approved') {
+                // Verified - hide button
+                if (btn) btn.style.display = 'none';
+            }
+        }
+    }
+
+    renderVerificationSubsection() {
+        const headerSection = document.getElementById('verification-header-section');
+        const benefitsSection = document.getElementById('verification-benefits-section');
+        const formSection = document.getElementById('verification-request-form-section');
+        const statusSection = document.getElementById('verification-status-display-section');
+        const historySection = document.getElementById('verification-history-section');
+
+        const statusBadge = document.getElementById('verification-status-badge');
+        const statusText = document.getElementById('verification-status-text');
+        const statusDesc = document.getElementById('verification-status-description');
+
+        if (!this.currentVerificationRequest) {
+            // Unverified, no request
+            statusBadge.className = 'alert alert-warning';
+            statusText.textContent = 'Unverified';
+            statusDesc.textContent = 'Submit a verification request to unlock all benefits.';
+            benefitsSection.style.display = 'block';
+            formSection.style.display = 'block';
+            statusSection.style.display = 'none';
+            historySection.style.display = 'none';
+        } else {
+            const status = this.currentVerificationRequest.status;
+            if (status === 'pending') {
+                statusBadge.className = 'alert alert-warning';
+                statusText.textContent = 'Pending Review';
+                statusDesc.textContent = 'Your verification request is being reviewed by our team.';
+                benefitsSection.style.display = 'none';
+                formSection.style.display = 'none';
+                statusSection.style.display = 'block';
+                this.renderStatusDisplay();
+            } else if (status === 'rejected') {
+                statusBadge.className = 'alert alert-danger';
+                statusText.textContent = 'Verification Rejected';
+                statusDesc.textContent = this.currentVerificationRequest.admin_notes || 'Please resubmit with additional information.';
+                benefitsSection.style.display = 'block';
+                formSection.style.display = 'block';
+                statusSection.style.display = 'none';
+            } else if (status === 'approved') {
+                statusBadge.className = 'alert alert-success';
+                statusText.textContent = 'Verified';
+                statusDesc.textContent = 'Your account is verified. Enjoy all benefits!';
+                benefitsSection.style.display = 'none';
+                formSection.style.display = 'none';
+                statusSection.style.display = 'block';
+                this.renderStatusDisplay();
+            }
+            historySection.style.display = 'block';
+            this.renderHistoryTimeline();
+        }
+    }
+
+    renderStatusDisplay() {
+        if (!this.currentVerificationRequest) return;
+
+        document.getElementById('display-status').textContent = this.currentVerificationRequest.status;
+        document.getElementById('display-submitted-date').textContent = new Date(this.currentVerificationRequest.created_at).toLocaleDateString();
+        document.getElementById('display-estimated-time').textContent = '1-2 business days';
+
+        if (this.currentVerificationRequest.admin_notes) {
+            document.getElementById('display-admin-notes').style.display = 'block';
+            document.getElementById('display-notes').textContent = this.currentVerificationRequest.admin_notes;
+        }
+
+        if (this.currentVerificationRequest.document_url) {
+            document.getElementById('display-document-preview').style.display = 'block';
+            document.getElementById('display-document-img').src = this.currentVerificationRequest.document_url;
+        }
+    }
+
+    renderHistoryTimeline() {
+        const timeline = document.getElementById('verification-history-timeline');
+        if (!this.currentVerificationRequest) {
+            timeline.innerHTML = '<p class="text-muted">No verification history.</p>';
+            return;
+        }
+
+        const request = this.currentVerificationRequest;
+        timeline.innerHTML = `
+            <div class="timeline-item">
+                <div class="timeline-marker bg-${request.status === 'approved' ? 'success' : request.status === 'rejected' ? 'danger' : 'warning'}"></div>
+                <div class="timeline-content">
+                    <strong>${new Date(request.created_at).toLocaleString()}</strong>
+                    <p>Status: ${request.status}</p>
+                    ${request.admin_notes ? `<p class="text-muted">${request.admin_notes}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    showVerificationBanner() {
+        const banner = document.getElementById('verification-banner');
+        const message = document.getElementById('verification-banner-message');
+        const openChatBtn = document.getElementById('open-chat-btn');
+
+        if (!this.currentVerificationRequest) {
+            banner.style.display = 'none';
+            return;
+        }
+
+        const dismissed = localStorage.getItem('verificationBannerDismissed');
+        const requestKey = `${this.currentVerificationRequest.id}-${this.currentVerificationRequest.status}`;
+
+        if (dismissed === requestKey) {
+            banner.style.display = 'none';
+            return;
+        }
+
+        banner.style.display = 'block';
+        banner.className = 'alert alert-dismissible';
+
+        if (this.currentVerificationRequest.status === 'pending') {
+            banner.classList.add('alert-warning');
+            message.textContent = 'Verification Request Pending - Chat with admin to coordinate payment';
+            openChatBtn.style.display = 'inline-block';
+            openChatBtn.onclick = () => this.showSection('chat');
+        } else if (this.currentVerificationRequest.status === 'approved') {
+            banner.classList.add('alert-success');
+            message.textContent = 'Account Verified! You now have unlimited products and advanced analytics';
+            openChatBtn.style.display = 'none';
+        } else if (this.currentVerificationRequest.status === 'rejected') {
+            banner.classList.add('alert-danger');
+            message.textContent = `Request rejected: ${this.currentVerificationRequest.rejection_reason || 'No reason provided'}. Submit new request after addressing feedback.`;
+            openChatBtn.style.display = 'none';
+        }
+    }
+
+    dismissVerificationBanner() {
+        if (this.currentVerificationRequest) {
+            const requestKey = `${this.currentVerificationRequest.id}-${this.currentVerificationRequest.status}`;
+            localStorage.setItem('verificationBannerDismissed', requestKey);
+        }
+        document.getElementById('verification-banner').style.display = 'none';
+    }
+
+    showRejectionModal(reason) {
+        document.getElementById('rejection-reason-text').textContent = reason || 'No reason provided';
+        document.getElementById('verification-rejection-modal').classList.add('open');
+    }
+
+    closeRejectionModal() {
+        document.getElementById('verification-rejection-modal').classList.remove('open');
+    }
+
+    handleResubmitRequest() {
+        this.closeRejectionModal();
+        this.openVerificationRequestModal();
+    }
 }
 
 // Initialize farmer dashboard when DOM is loaded
@@ -6422,4 +6741,23 @@ document.addEventListener('DOMContentLoaded', () => {
     farmerDashboard = new FarmerDashboard();
     // Make it globally accessible for inline onclick handlers
     window.farmerDashboard = farmerDashboard;
+
+    // Initialize verification request event listeners
+    const documentInput = document.getElementById('verification-document');
+    if (documentInput) {
+        documentInput.addEventListener('change', (e) => farmerDashboard.previewDocumentImage(e));
+    }
+
+    const verificationForm = document.getElementById('verification-request-form');
+    if (verificationForm) {
+        verificationForm.addEventListener('submit', (e) => farmerDashboard.handleVerificationRequest(e));
+    }
+
+    const resubmitBtn = document.getElementById('resubmit-verification-btn');
+    if (resubmitBtn) {
+        resubmitBtn.addEventListener('click', () => farmerDashboard.handleResubmitRequest());
+    }
+
+    // Load verification status on page load
+    farmerDashboard.loadVerificationStatus();
 });
