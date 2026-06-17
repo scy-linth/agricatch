@@ -231,8 +231,8 @@
             </ul>
         </li>
 
-        <!-- ── Product Approvals ───────────────────────────────── -->
-        <li class="nav-heading">Product Approvals</li>
+        <!-- ── Requests ───────────────────────────────── -->
+        <li class="nav-heading">Requests</li>
 
         <li class="nav-item">
             <a class="nav-link collapsed sidebar-link" href="#product-approvals" data-section="product-approvals">
@@ -260,6 +260,11 @@
                 <li>
                     <a href="#farmers" class="sidebar-link" data-section="farmers">
                         <i class="bi bi-circle"></i><span>Farmers</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#verification-requests" class="sidebar-link" data-section="verification-requests">
+                        <i class="bi bi-circle"></i><span>Verification Requests</span>
                     </a>
                 </li>
                 <li data-roles="super_admin">
@@ -2492,6 +2497,77 @@
 
         </div>
     </section><!-- /profile -->
+
+    <!-- Verification Requests Section -->
+    <section id="verification-requests" class="admin-section-card">
+        <div class="card-header">
+            <h3>Verification Requests</h3>
+        </div>
+        <div class="card-body">
+            <!-- Status Filter Tabs -->
+            <div class="verification-tabs mb-3">
+                <button class="tab-btn active" data-status="all">All</button>
+                <button class="tab-btn" data-status="pending">Pending</button>
+                <button class="tab-btn" data-status="approved">Approved</button>
+                <button class="tab-btn" data-status="rejected">Rejected</button>
+            </div>
+
+            <!-- Requests Table -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Farmer</th>
+                            <th>Shop</th>
+                            <th>Products</th>
+                            <th>Orders</th>
+                            <th>Document</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="verification-requests-table">
+                        <!-- Dynamic content -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <nav id="verification-pagination"></nav>
+        </div>
+    </section>
+
+    <!-- Admin Review Modal -->
+    <div class="modal" id="admin-review-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="review-modal-title">Review Verification Request</h3>
+                <button class="close-btn" onclick="closeReviewModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="review-farmer-details"></div>
+                <div id="review-document-section" class="mt-3" style="display:none;">
+                    <h5>Uploaded Document</h5>
+                    <img id="review-document-img" style="max-width:100%; max-height:300px; border-radius:8px;" />
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-info" id="view-chat-btn">
+                        <i class="bi bi-chat"></i> View Chat
+                    </button>
+                </div>
+                <div id="rejection-reason-section" class="mt-3" style="display:none;">
+                    <label class="form-label">Rejection Reason (required):</label>
+                    <textarea class="form-control" id="rejection-reason-input" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeReviewModal()">Cancel</button>
+                <button class="btn btn-success" id="approve-btn">Approve</button>
+                <button class="btn btn-danger" id="reject-btn">Reject</button>
+            </div>
+        </div>
+    </div>
 
 </main><!-- /main -->
 
