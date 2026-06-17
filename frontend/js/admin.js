@@ -996,18 +996,32 @@ class AdminDashboard {
 
         // Verification document view buttons (event delegation)
         document.getElementById('verification-requests-table')?.addEventListener('click', (e) => {
-            if (e.target.classList.contains('view-verification-doc-btn')) {
+            // Image thumbnail click
+            if (e.target.classList.contains('verification-doc-thumb')) {
                 const docUrl = e.target.dataset.docUrl;
                 const farmerName = e.target.dataset.farmerName;
                 this.openVerificationDocModal(docUrl, farmerName);
             }
+            // View details button
+            if (e.target.classList.contains('view-verification-details-btn')) {
+                const requestId = e.target.dataset.requestId;
+                const farmerId = e.target.dataset.farmerId;
+                this.openVerificationDetailsModal(requestId, farmerId);
+            }
+            // Approve button
             if (e.target.classList.contains('approve-verification-btn')) {
                 const requestId = e.target.dataset.requestId;
                 this.openReviewModal(requestId, 'approve');
             }
+            // Reject button
             if (e.target.classList.contains('reject-verification-btn')) {
                 const requestId = e.target.dataset.requestId;
                 this.openReviewModal(requestId, 'reject');
+            }
+            // Unverify button
+            if (e.target.classList.contains('unverify-verification-btn')) {
+                const requestId = e.target.dataset.requestId;
+                this.handleUnverifyAction(requestId);
             }
         });
 
@@ -7136,7 +7150,7 @@ class AdminDashboard {
             }[request.status] || request.status;
 
             const docIndicator = request.document_url
-                ? '<i class="bi bi-file-earmark-image text-success"></i>'
+                ? `<img src="${this.escapeHtml(request.document_url)}" style="width:50px; height:50px; object-fit:cover; border-radius:4px; cursor:pointer;" class="verification-doc-thumb" data-doc-url="${this.escapeHtml(request.document_url)}" data-farmer-name="${this.escapeHtml(request.full_name || request.username)}" />`
                 : '<i class="bi bi-dash text-muted"></i>';
 
             row.innerHTML = `
@@ -7149,12 +7163,13 @@ class AdminDashboard {
                 <td>${statusBadge}</td>
                 <td>
                     <div class="d-flex gap-1">
-                        ${request.document_url ? `
-                            <button class="btn btn-sm btn-info view-verification-doc-btn" data-doc-url="${this.escapeHtml(request.document_url)}" data-farmer-name="${this.escapeHtml(request.full_name || request.username)}">View Doc</button>
-                        ` : ''}
+                        <button class="btn btn-sm btn-ac-green view-verification-details-btn" data-request-id="${request.id}" data-farmer-id="${request.farmer_id}">View</button>
                         ${request.status === 'pending' ? `
                             <button class="btn btn-sm btn-success approve-verification-btn" data-request-id="${request.id}">Approve</button>
                             <button class="btn btn-sm btn-danger reject-verification-btn" data-request-id="${request.id}">Reject</button>
+                        ` : ''}
+                        ${request.status === 'approved' ? `
+                            <button class="btn btn-sm btn-warning unverify-verification-btn" data-request-id="${request.id}">Unverify</button>
                         ` : ''}
                     </div>
                 </td>
@@ -7262,6 +7277,102 @@ class AdminDashboard {
         document.getElementById('verification-doc-modal').style.display = 'none';
     }
 
+    async openVerificationDetailsModal(requestId, farmerId) {
+        const modal = document.getElementById('verification-details-modal');
+        const title = document.getElementById('verification-details-modal-title');
+        const content = document.getElementById('verification-details-content');
+
+        title.textContent = 'Verification Details';
+        content.innerHTML = '<div class="text-center py-5"><span class="spinner-border"></span></div>';
+        modal.style.display = 'block';
+
+        try {
+            // Fetch verification request details
+            const response = await fetch(`${this.apiBase}/admin/verification-requests`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                const request = data.requests.find(r => r.id === parseInt(requestId));
+                if (request) {
+                    content.innerHTML = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Farmer Information</h5>
+                                <table class="table table-sm">
+                                    <tr><td><strong>Name:</strong></td><td>${this.escapeHtml(request.full_name || request.username)}</td></tr>
+                                    <tr><td><strong>Email:</strong></td><td>${this.escapeHtml(request.email)}</td></tr>
+                                    <tr><td><strong>Phone:</strong></td><td>${this.escapeHtml(request.phone || '—')}</td></tr>
+                                    <tr><td><strong>Shop Name:</strong></td><td>${this.escapeHtml(request.shop_name || '—')}</td></tr>
+                                    <tr><td><strong>Address:</strong></td><td>${this.escapeHtml(request.address || '—')}</td></tr>
+                                    <tr><td><strong>Products:</strong></td><td>${request.product_count || 0}</td></tr>
+                                    <tr><td><strong>Delivered Orders:</strong></td><td>${request.delivered_orders || 0}</td></tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Verification Information</h5>
+                                <table class="table table-sm">
+                                    <tr><td><strong>Status:</strong></td><td>${request.status}</td></tr>
+                                    <tr><td><strong>Submitted:</strong></td><td>${new Date(request.created_at).toLocaleString()}</td></tr>
+                                    <tr><td><strong>Reviewed:</strong></td><td>${request.reviewed_at ? new Date(request.reviewed_at).toLocaleString() : '—'}</td></tr>
+                                    <tr><td><strong>Notes:</strong></td><td>${this.escapeHtml(request.notes || '—')}</td></tr>
+                                    <tr><td><strong>Rejection Reason:</strong></td><td>${this.escapeHtml(request.rejection_reason || '—')}</td></tr>
+                                </table>
+                                ${request.document_url ? `
+                                    <h5 class="mt-3">Document</h5>
+                                    <img src="${this.escapeHtml(request.document_url)}" style="max-width:100%; max-height:300px; border-radius:8px; cursor:pointer;" onclick="adminDashboard.openVerificationDocModal('${this.escapeHtml(request.document_url)}', '${this.escapeHtml(request.full_name || request.username)}')" />
+                                ` : '<p class="text-muted mt-3">No document uploaded</p>'}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    content.innerHTML = '<p class="text-danger">Verification request not found</p>';
+                }
+            } else {
+                content.innerHTML = '<p class="text-danger">Failed to load verification details</p>';
+            }
+        } catch (error) {
+            console.error('Failed to load verification details:', error);
+            content.innerHTML = '<p class="text-danger">Failed to load verification details</p>';
+        }
+    }
+
+    closeVerificationDetailsModal() {
+        document.getElementById('verification-details-modal').style.display = 'none';
+    }
+
+    async handleUnverifyAction(requestId) {
+        if (!confirm('Are you sure you want to unverify this farmer? This will change their status back to pending.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/admin/verification-requests/${requestId}/review`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    status: 'pending',
+                    rejection_reason: null
+                })
+            });
+
+            if (response.ok) {
+                this.showToast('Verification request unverifed successfully', 'success');
+                this.loadVerificationRequests(this.verificationCurrentPage, this.verificationCurrentStatus);
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showToast(data.message || 'Failed to unverify request', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to unverify request:', error);
+            this.showToast('Failed to unverify request', 'error');
+        }
+    }
+
     async handleReviewAction(action) {
         if (!this.currentReviewRequestId) return;
 
@@ -7324,6 +7435,12 @@ function closeReviewModal() {
 function closeVerificationDocModal() {
     if (adminDashboard) {
         adminDashboard.closeVerificationDocModal();
+    }
+}
+
+function closeVerificationDetailsModal() {
+    if (adminDashboard) {
+        adminDashboard.closeVerificationDetailsModal();
     }
 }
 
