@@ -2501,6 +2501,16 @@ body.sidebar-collapsed #main.main {
 .admin-sortable-wrapper th button.datatable-sorter {
   width: 100%;
   text-align: center;
+  padding-right: 40px;
+  position: relative;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.admin-sortable-wrapper th button.datatable-sorter::after {
+  margin-left: 18px;
+  margin-right: -15px;
+  font-size: 0.8em;
 }
 
 /* Order detail panel rebuit status area */
