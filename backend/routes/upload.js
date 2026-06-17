@@ -92,7 +92,7 @@ router.post('/product-image', ensureAuth, productUpload.single('image'), async (
         'role:primary'
       ],
       transformation: [
-        { width: 1200, crop: 'limit', quality: 'auto' },
+        { width: 1200, crop: 'limit', quality: 'auto:good' },
         { fetch_format: 'auto' }
       ]
     });
@@ -121,7 +121,7 @@ router.post('/shop-banner', ensureAuth, bannerUpload.single('image'), async (req
       resource_type: 'image',
       tags: ['app:agricatch', 'entity:shop', 'role:banner'],
       transformation: [
-        { width: 1600, crop: 'limit', quality: 'auto' },
+        { width: 1600, crop: 'limit', quality: 'auto:good' },
         { fetch_format: 'auto' }
       ]
     });
@@ -151,7 +151,7 @@ router.post('/shop-avatar', ensureAuth, avatarUpload.single('image'), async (req
       resource_type: 'image',
       tags: ['app:agricatch', 'entity:shop', `entity_id:${req.user?.id || 'unknown'}`, 'role:avatar'],
       transformation: [
-        { width: 400, height: 400, crop: 'limit', quality: 'auto' },
+        { width: 400, height: 400, crop: 'limit', quality: 'auto:good' },
         { fetch_format: 'auto' }
       ]
     });

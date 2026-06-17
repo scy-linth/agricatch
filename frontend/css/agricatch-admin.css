@@ -199,6 +199,45 @@ a:hover { color: var(--ac-primary-dark); }
   justify-content: center;
   border: 2px solid rgba(255,255,255,.5);
 }
+.profile-initial {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  color: #0284c7;
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e2e8f0;
+}
+.profile-avatar-fallback-lg {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--ac-primary);
+  color: white;
+  font-size: 2rem;
+  font-weight: 700;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255,255,255,.5);
+}
+.profile-initial-lg {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  color: #0284c7;
+  font-size: 2rem;
+  font-weight: 700;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e2e8f0;
+}
 .nav-profile:hover .profile-avatar-ring img {
   border-color: rgba(255,255,255,.9);
 }
@@ -926,6 +965,8 @@ body.sidebar-collapsed #main.main {
 .status-pill.refunded   { background: var(--s-refunded-bg);  color: var(--s-refunded);  }
 .status-pill.active     { background: var(--s-completed-bg); color: var(--s-completed); }
 .status-pill.disabled   { background: var(--s-cancelled-bg); color: var(--s-cancelled); }
+.status-pill.admin_disabled { background: var(--s-cancelled-bg); color: var(--s-cancelled); }
+.status-pill.farmer_disabled { background: #fef3c7; color: #92400e; }
 .status-pill.approved   { background: var(--s-completed-bg); color: var(--s-completed); }
 .status-pill.rejected   { background: var(--s-cancelled-bg); color: var(--s-cancelled); }
 .status-pill.verified   { background: var(--s-completed-bg); color: var(--s-completed); }
@@ -1354,6 +1395,25 @@ body.sidebar-collapsed #main.main {
 #chat.admin-section-card.active .admin-chat-drawer {
   transform: none;
   display: flex;
+}
+
+/* Prevent body scroll when chat section is active */
+#chat.admin-section-card.active {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 100px);
+  overflow: hidden;
+}
+
+#chat.admin-section-card.active .ac-section-hero {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+#chat.admin-section-card.active .admin-chat-drawer {
+  flex: 1;
+  height: auto !important;
+  min-height: 0;
 }
 
 /* Conversation sidebar panel */
@@ -2088,7 +2148,8 @@ body.sidebar-collapsed #main.main {
   .admin-detail-panel { width: 100%; }
 
   /* Chat section full height */
-  .chat-section-mode { height: calc(100vh - 160px) !important; }
+  .chat-section-mode { height: calc(100vh - 140px) !important; }
+  #chat.admin-section-card.active { height: calc(100vh - 80px) !important; }
 
   /* Chat sidebar slides on mobile */
   .chat-sidebar-panel { display: none; }

@@ -35,13 +35,7 @@
 #product-address-modal .modal-header h3 {
   color: var(--ac-text) !important;
 }
-/* Header account dropdown hover styles */
-#farmer-user-account-btn:hover {
-  background: rgba(255,255,255,.2);
-}
-#farmer-user-dropdown-menu .dd-item:hover {
-  background: var(--ac-bg);
-}
+/* Sidebar account dropdown hover styles */
 #farmer-sidebar-account-btn:hover {
   background: rgba(255,255,255,.12);
 }
@@ -68,8 +62,8 @@
 .product-tabs { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
 .product-tabs .tab-btn { padding:.4rem .85rem; border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; background:#fff; font-size:.82rem; font-weight:600; cursor:pointer; color:var(--ac-text-muted,#6b7e72); transition:background .15s,color .15s,border-color .15s; }
 .product-tabs .tab-btn.active { background:var(--ac-primary,#2d7a3a); color:#fff; border-color:var(--ac-primary,#2d7a3a); }
-.tab-content { display:none; }
-.tab-content.active { display:block; }
+.product-tabs + .tab-content { display:none; }
+.product-tabs + .tab-content.active { display:block; }
 .order-tabs { display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.75rem; }
 .order-tabs .tab-btn { padding:.35rem .7rem; border-radius:8px; border:1px solid var(--ac-border,#e2e8f0); background:#fff; font-size:.8rem; font-weight:600; cursor:pointer; color:var(--ac-text-muted,#6b7e72); transition:background .15s,color .15s; white-space:nowrap; }
 .order-tabs .tab-btn.active { background:var(--ac-primary,#2d7a3a); color:#fff; border-color:var(--ac-primary,#2d7a3a); }
@@ -287,17 +281,6 @@
 #farmer-sidebar-dropdown-menu button { display:flex; align-items:center; gap:.5rem; width:100%; text-align:left; padding:.55rem .85rem; background:none; border:none; font-size:.875rem; cursor:pointer; color:var(--ac-text,#1a2e1e); transition:background .1s; }
 #farmer-sidebar-dropdown-menu button:hover { background:var(--ac-bg,#f5f7f5); }
 #farmer-sidebar-dropdown-menu button.text-danger { color:#dc2626 !important; }
-#farmer-user-account-btn { display:flex; align-items:center; gap:.45rem; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); cursor:pointer; padding:.3rem .6rem; border-radius:8px; color:rgba(255,255,255,.95); font-size:.875rem; font-weight:600; transition:background .15s; }
-#farmer-user-account-btn:hover { background:rgba(255,255,255,.2); }
-.farmer-header-initial { width:30px; height:30px; border-radius:50%; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; border:1.5px solid rgba(255,255,255,.5); flex-shrink:0; }
-#farmer-user-dropdown-menu { position:absolute; top:calc(100% + 8px); right:0; min-width:210px; background:#fff; border:1px solid var(--ac-border,#e2e8f0); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12); z-index:1100; overflow:hidden; }
-#farmer-user-dropdown-menu .dd-header { padding:.7rem 1rem; background:var(--ac-bg,#f5f7f5); border-bottom:1px solid var(--ac-border); }
-#farmer-user-dropdown-menu .dd-header h6 { margin:0; font-weight:700; font-size:.88rem; }
-#farmer-user-dropdown-menu .dd-header small { color:var(--ac-text-muted); font-size:.77rem; }
-#farmer-user-dropdown-menu .dd-divider { height:1px; background:var(--ac-border); margin:.2rem 0; }
-#farmer-user-dropdown-menu .dd-item { display:flex; align-items:center; gap:.55rem; padding:.55rem .9rem; font-size:.875rem; cursor:pointer; color:var(--ac-text); background:none; border:none; width:100%; text-align:left; transition:background .1s; }
-#farmer-user-dropdown-menu .dd-item:hover { background:var(--ac-bg); }
-#farmer-user-dropdown-menu .dd-item.danger { color:#dc2626; }
 
 /* Sidebar toggle behavior (mirrors admin.js pattern) */
 #farmer-sidebar.sidebar {
@@ -338,6 +321,36 @@
 }
 
 @media (max-width:768px) { .product-form .form-row{grid-template-columns:1fr} .admin-detail-panel{width:100%} #my-products-grid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr))} }
+
+/* Profile Card */
+.profile-card {
+    background: #fff;
+    color: var(--ac-text, #1a2e1e);
+}
+.profile-avatar-lg img {
+    border: 3px solid rgba(255,255,255,0.3);
+}
+
+/* Chat character counter */
+.char-counter {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    color: #9ca3af;
+    pointer-events: none;
+    user-select: none;
+}
+.char-counter-warning {
+    color: #dc2626;
+    font-weight: 600;
+}
+.chat-input-wrap .chat-compose-input {
+    padding-right: 40px;
+    width: 100%;
+    box-sizing: border-box;
+}
 </style>
 
 <body>
@@ -365,34 +378,103 @@
         <button id="farmer-sidebar-toggle" class="admin-sidebar-toggle-btn" type="button" aria-label="Toggle sidebar">
             <i class="bi bi-list"></i>
         </button>
-        <a href="/" class="logo d-flex align-items-center">
-            <img src="/images/logo.png" alt="AgriCatch Logo">
+        <a href="/" class="logo d-flex align-items-center" style="gap:4px;">
+            <img src="/images/logo.png" alt="AgriCatch">
             <span>AgriCatch</span>
         </a>
     </div>
     <nav class="header-nav ms-auto">
         <ul class="d-flex align-items-center list-unstyled mb-0 gap-1">
-            <li class="nav-item pe-3" style="position:relative;">
-                <button id="farmer-user-account-btn" type="button" aria-haspopup="true" aria-expanded="false">
-                    <div class="farmer-header-initial" id="farmer-user-initial">F</div>
-                    <span class="d-none d-md-inline" id="farmer-user-label">Account</span>
-                    <i class="bi bi-chevron-down small ms-1 d-none d-md-inline"></i>
-                </button>
-                <div id="farmer-user-dropdown-menu" style="display:none;">
-                    <div class="dd-header">
-                        <h6 id="user-name">Farmer</h6>
-                        <small id="user-email"></small>
+
+            <!-- Messages dropdown -->
+            <li class="nav-item dropdown">
+                <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" aria-expanded="false" id="farmer-float-chat-btn">
+                    <i class="bi bi-chat-left-text"></i>
+                    <span id="farmer-chat-unread" class="badge bg-success badge-number" style="display:none">0</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow messages" style="min-width:360px;">
+                    <li class="dropdown-header d-flex align-items-center justify-content-between">
+                        <span>You have <span id="messages-count">0</span> new messages</span>
+                        <a href="#" id="view-all-messages-badge">
+                            <span class="badge rounded-pill bg-primary p-2 ms-2">View all</span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <div id="messages-list"><!-- populated by farmer.js --></div>
+                    <li><hr class="dropdown-divider"></li>
+                    <li class="dropdown-footer">
+                        <a href="#" id="show-all-messages-link">Show all messages</a>
+                    </li>
+                </ul>
+            </li><!-- End Messages Nav -->
+
+            <!-- Notifications dropdown -->
+            <li class="nav-item dropdown">
+                <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-bell"></i>
+                    <span id="notif-badge" class="badge bg-danger badge-number" style="display:none">0</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications" style="min-width:360px;">
+                    <li class="dropdown-header">
+                        You have <span id="notif-count">0</span> new notifications
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <div id="notif-list"><!-- populated by farmer.js --></div>
+                    <li><hr class="dropdown-divider"></li>
+                    <li class="dropdown-footer">
+                        <a href="#" id="show-all-notifications-link">Show all notifications</a>
+                    </li>
+                </ul>
+            </li><!-- End Notifications Nav -->
+
+            <!-- Profile dropdown -->
+            <li class="nav-item dropdown pe-3">
+                <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#"
+                   data-bs-toggle="dropdown" aria-expanded="false">
+                    <div class="profile-avatar-ring">
+                        <span class="profile-initial" id="header-profile-initial">F</span>
                     </div>
-                    <div class="dd-divider"></div>
-                    <button class="dd-item" id="farmer-my-account-btn" type="button">
-                        <i class="bi bi-person-circle me-2"></i>My Account
-                    </button>
-                    <div class="dd-divider"></div>
-                    <button class="dd-item danger" id="farmer-logout-menu-btn" type="button">
-                        <i class="bi bi-box-arrow-right me-2"></i>Sign Out
-                    </button>
-                </div>
-            </li>
+                    <span class="d-none d-md-block dropdown-toggle ps-2 fw-semibold" id="user-name">Farmer</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
+                    <li class="dropdown-header">
+                        <h6 class="mb-0 fw-semibold" id="user-name-dd"></h6>
+                        <span id="user-email" class="small text-muted"></span>
+                        <div class="mt-1">
+                            <span id="header-role-badge" class="badge bg-primary" style="display:none"></span>
+                        </div>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center" href="#"
+                           onclick="farmerDashboard&&farmerDashboard.showSection('profile','overview');return false;">
+                            <i class="bi bi-person"></i><span>My Profile</span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center" href="#"
+                           onclick="farmerDashboard&&farmerDashboard.showSection('profile','edit');return false;">
+                            <i class="bi bi-gear"></i><span>Edit Profile</span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center" href="#"
+                           onclick="farmerDashboard&&farmerDashboard.showSection('profile','password');return false;">
+                            <i class="bi bi-shield-lock"></i><span>Change Password</span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a id="logout-btn" class="dropdown-item d-flex align-items-center text-danger" href="#"
+                           onclick="farmerDashboard&&farmerDashboard.logout();return false;">
+                            <i class="bi bi-box-arrow-right"></i><span>Sign Out</span>
+                        </a>
+                    </li>
+                </ul>
+            </li><!-- End Profile Nav -->
+
         </ul>
     </nav>
 </header>
@@ -406,16 +488,15 @@
                 <i class="bi bi-speedometer2"></i><span>Dashboard</span>
             </a>
         </li>
-        <li class="nav-heading">Catalog</li>
-        <li class="nav-item">
-            <a class="nav-link collapsed sidebar-link" href="#products" data-section="products">
-                <i class="bi bi-box-seam"></i><span>My Products</span>
-            </a>
-        </li>
         <li class="nav-heading">Commerce</li>
         <li class="nav-item">
             <a class="nav-link collapsed sidebar-link" href="#orders" data-section="orders">
                 <i class="bi bi-bag-check"></i><span>Orders</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#products" data-section="products">
+                <i class="bi bi-box-seam"></i><span>My Products</span>
             </a>
         </li>
         <li class="nav-heading">Reputation</li>
@@ -424,34 +505,31 @@
                 <i class="bi bi-star-half"></i><span>Reviews</span>
             </a>
         </li>
+        <li class="nav-heading">Communication</li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#chat" data-section="chat">
+                <i class="bi bi-chat-dots"></i><span>Messages</span>
+                <span id="chat-unread-badge" class="badge bg-danger ms-auto" style="display:none;">0</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#notifications" data-section="notifications">
+                <i class="bi bi-bell"></i><span>Notifications</span>
+                <span id="notif-sidebar-badge" class="badge bg-danger ms-auto" style="display:none;">0</span>
+            </a>
+        </li>
+        <li class="nav-heading">Account</li>
         <li class="nav-item">
             <a class="nav-link collapsed sidebar-link" href="#shop" data-section="shop">
                 <i class="bi bi-shop"></i><span>Shop Profile</span>
             </a>
         </li>
-        <li class="nav-heading">Communication</li>
         <li class="nav-item">
-            <a class="nav-link collapsed sidebar-link" href="#chat" data-section="chat">
-                <i class="bi bi-chat-dots"></i><span>Chat & Support</span>
-                <span id="chat-unread-badge" class="badge bg-danger ms-auto" style="display:none;">0</span>
+            <a class="nav-link collapsed sidebar-link" href="#profile" data-section="profile">
+                <i class="bi bi-person"></i><span>My Profile</span>
             </a>
         </li>
     </ul>
-    <div class="sidebar-user-area">
-        <button id="farmer-sidebar-account-btn" type="button" aria-haspopup="menu" aria-expanded="false">
-            <div class="sidebar-user-initial" id="farmer-sidebar-user-initial">F</div>
-            <span id="farmer-sidebar-user-label">Account</span>
-            <i class="bi bi-chevron-down ms-auto small"></i>
-        </button>
-        <div id="farmer-sidebar-dropdown-menu" style="display:none;">
-            <button id="farmer-sidebar-my-account-btn" type="button">
-                <i class="bi bi-person-circle"></i>My Account
-            </button>
-            <button id="farmer-sidebar-logout-btn" class="text-danger" type="button">
-                <i class="bi bi-box-arrow-right"></i>Sign Out
-            </button>
-        </div>
-    </div>
 </aside>
 
 <!-- MAIN CONTENT -->
@@ -481,7 +559,7 @@
                             </div>
                             <div class="ps-3">
                                 <h6 id="my-products">--</h6>
-                                <span class="text-success small pt-1 fw-bold">Total listings</span>
+                                <span class="text-success small pt-1 fw-bold">Active Listings</span>
                             </div>
                         </div>
                     </div>
@@ -618,8 +696,19 @@
         <div class="row g-3 mb-3">
             <div class="col-lg-8">
                 <div class="card h-100">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item recent-orders-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item recent-orders-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item recent-orders-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item recent-orders-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item recent-orders-period-filter" href="#" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Recent Orders</h5>
+                        <h5 class="card-title">Recent Orders <span id="recent-orders-period-label">| Today</span></h5>
                         <div class="d-flex align-items-center gap-2 mb-2">
                             <label class="small fw-semibold text-muted">Show</label>
                             <select class="form-select form-select-sm" style="width:auto" data-entries-section="recent-orders">
@@ -634,15 +723,16 @@
                                 <tr>
                                     <th scope="col" class="text-center">Image</th>
                                     <th scope="col" class="text-center">#</th>
-                                    <th scope="col">Product</th>
                                     <th scope="col">Customer</th>
+                                    <th scope="col">Product</th>
                                     <th scope="col" class="text-center">Price</th>
-                                    <th scope="col" class="text-center">Total</th>
+                                    <th scope="col" class="text-center">Sold</th>
+                                    <th scope="col" class="text-center">Revenue</th>
                                     <th scope="col" class="text-center">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="recent-orders-tbody">
-                                <tr><td colspan="7" class="text-center text-muted">
+                                <tr><td colspan="8" class="text-center text-muted">
                                     <span class="spinner-border spinner-border-sm"></span>
                                 </td></tr>
                             </tbody>
@@ -669,8 +759,19 @@
         <div class="row g-3">
             <div class="col-12">
                 <div class="card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item top-products-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item top-products-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item top-products-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item top-products-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item top-products-period-filter" href="#" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Top Products</h5>
+                        <h5 class="card-title">Top Selling Products <span id="top-products-period-label">| Today</span></h5>
                         <div class="d-flex align-items-center gap-2 mb-2">
                             <label class="small fw-semibold text-muted">Show</label>
                             <select class="form-select form-select-sm" style="width:auto" data-entries-section="top-products">
@@ -684,6 +785,7 @@
                             <thead>
                                 <tr>
                                     <th scope="col" class="text-center">Image</th>
+                                    <th scope="col" class="text-center">#</th>
                                     <th scope="col">Product</th>
                                     <th scope="col" class="text-center">Price</th>
                                     <th scope="col" class="text-center">Sold</th>
@@ -691,7 +793,7 @@
                                 </tr>
                             </thead>
                             <tbody id="top-products-tbody">
-                                <tr><td colspan="5" class="text-center text-muted">
+                                <tr><td colspan="6" class="text-center text-muted">
                                     <span class="spinner-border spinner-border-sm"></span>
                                 </td></tr>
                             </tbody>
@@ -723,8 +825,8 @@
 
         <!-- KPI Summary Cards -->
         <div class="row g-3 mb-3">
-            <div class="col-xxl-3 col-md-6">
-                <div class="card info-card sales-card">
+            <div class="col">
+                <div class="card info-card sales-card h-100">
                     <div class="card-body">
                         <h5 class="card-title">Total Products</h5>
                         <div class="d-flex align-items-center">
@@ -739,8 +841,8 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xxl-3 col-md-6">
-                <div class="card info-card">
+            <div class="col">
+                <div class="card info-card h-100">
                     <div class="card-body">
                         <h5 class="card-title">Active Products</h5>
                         <div class="d-flex align-items-center">
@@ -755,10 +857,21 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xxl-3 col-md-6">
-                <div class="card info-card">
+            <div class="col">
+                <div class="card info-card h-100">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Low Stock Threshold</h6></li>
+                            <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="3">3 items</a></li>
+                            <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="5">5 items</a></li>
+                            <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="10">10 items</a></li>
+                            <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="15">15 items</a></li>
+                            <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="20">20 items</a></li>
+                        </ul>
+                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Low Stock</h5>
+                        <h5 class="card-title">Low Stock <span id="low-stock-threshold-label" class="small text-muted">| ≤15</span></h5>
                         <div class="d-flex align-items-center">
                             <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                                 <i class="bi bi-exclamation-triangle" style="color:#f59e0b"></i>
@@ -771,8 +884,24 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xxl-3 col-md-6">
-                <div class="card info-card">
+            <div class="col">
+                <div class="card info-card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">No Stock</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-x-circle" style="color:#dc2626"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="kpi-no-stock">--</h6>
+                                <span class="text-danger small pt-1 fw-bold">Out of stock</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card info-card h-100">
                     <div class="card-body">
                         <h5 class="card-title">Pending</h5>
                         <div class="d-flex align-items-center">
@@ -789,75 +918,148 @@
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-body">
-                <div class="section-filter-bar row g-2 mb-3 align-items-end">
-                    <div class="col-md-1 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Show</label>
-                        <select class="form-select form-select-sm" data-entries-section="products" style="min-width: 60px;">
-                            <option value="10">10</option>
-                            <option value="25">25</option>
-                            <option value="50" selected>50</option>
-                            <option value="100">100</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Category</label>
-                        <select id="product-category-filter" class="form-select form-select-sm">
-                            <option value="">All categories</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="product-status-filter" class="form-select form-select-sm">
-                            <option value="">Any status</option>
-                            <option value="available">Active</option>
-                            <option value="disabled">Disabled</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4 col-sm-6 ms-md-auto">
-                        <label class="form-label small fw-semibold mb-1">Search</label>
-                        <div class="d-flex gap-2">
-                            <div class="input-group input-group-sm flex-grow-1">
-                                <input type="text" id="products-search-input" class="form-control me-2" placeholder="Product name…">
-                                <button id="products-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+        <!-- Products Tabs -->
+        <ul class="nav nav-tabs nav-tabs-bordered mb-3" id="products-tabs">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#products-list-tab">My Products</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#products-requests-tab">Approval</button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <!-- My Products Tab -->
+            <div class="tab-pane fade show active" id="products-list-tab">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                            <div class="col-md-1 col-sm-6">
+                                <label class="form-label small fw-semibold mb-1">Show</label>
+                                <select class="form-select form-select-sm" data-entries-section="products" style="min-width: 60px;">
+                                    <option value="10">10</option>
+                                    <option value="25">25</option>
+                                    <option value="50" selected>50</option>
+                                    <option value="100">100</option>
+                                </select>
                             </div>
-                            <button id="products-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
+                            <div class="col-md-2 col-sm-6">
+                                <label class="form-label small fw-semibold mb-1">Category</label>
+                                <select id="product-category-filter" class="form-select form-select-sm">
+                                    <option value="">All categories</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 col-sm-6">
+                                <label class="form-label small fw-semibold mb-1">Status</label>
+                                <select id="product-status-filter" class="form-select form-select-sm">
+                                    <option value="" selected>Any status</option>
+                                    <option value="available">Active</option>
+                                    <option value="disabled">Disabled</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 col-sm-6 ms-md-auto">
+                                <label class="form-label small fw-semibold mb-1">Search</label>
+                                <div class="d-flex gap-2">
+                                    <div class="input-group input-group-sm flex-grow-1">
+                                        <input type="text" id="products-search-input" class="form-control me-2" placeholder="Product name…">
+                                        <button id="products-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                                    </div>
+                                    <button id="products-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
+                                </div>
+                            </div>
                         </div>
+
+                        <div class="table-responsive">
+                            <table id="products-table" class="table ac-table table-sm table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th style="width:56px">Image</th>
+                                        <th>ID</th>
+                                        <th>Product</th>
+                                        <th>Category</th>
+                                        <th>Price</th>
+                                        <th>Stock</th>
+                                        <th>Status</th>
+                                        <th>Reviews</th>
+                                        <th class="col-actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="products-tbody">
+                                    <tr>
+                                        <td colspan="9">
+                                            <div class="table-skeleton">
+                                                <div class="skeleton-row"></div>
+                                                <div class="skeleton-row"></div>
+                                                <div class="skeleton-row"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div id="products-pagination" class="pagination-container"></div>
+
                     </div>
                 </div>
+            </div>
 
-                <div class="table-responsive">
-                    <table id="products-table" class="table ac-table table-sm table-hover align-middle">
-                        <thead>
-                            <tr>
-                                <th style="width:56px">Image</th>
-                                <th>ID</th>
-                                <th>Product</th>
-                                <th>Category</th>
-                                <th>Price</th>
-                                <th>Stock</th>
-                                <th>Status</th>
-                                <th>Reviews</th>
-                                <th class="col-actions">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="products-tbody">
-                            <tr>
-                                <td colspan="9">
-                                    <div class="table-skeleton">
-                                        <div class="skeleton-row"></div>
-                                        <div class="skeleton-row"></div>
-                                        <div class="skeleton-row"></div>
+            <!-- My Requests Tab -->
+            <div class="tab-pane fade" id="products-requests-tab">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                            <div class="col-md-2 col-sm-6">
+                                <label class="form-label small fw-semibold mb-1">Status</label>
+                                <select id="request-status-filter" class="form-select form-select-sm">
+                                    <option value="" selected>All statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 col-sm-6 ms-md-auto">
+                                <label class="form-label small fw-semibold mb-1">Search</label>
+                                <div class="d-flex gap-2">
+                                    <div class="input-group input-group-sm flex-grow-1">
+                                        <input type="text" id="requests-search-input" class="form-control me-2" placeholder="Product name…">
+                                        <button id="requests-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
                                     </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                    <button id="requests-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh requests"><i class="bi bi-arrow-clockwise"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table id="requests-table" class="table ac-table table-sm table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Product Name</th>
+                                        <th>Category</th>
+                                        <th>Requested Date</th>
+                                        <th>Status</th>
+                                        <th class="col-actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="requests-tbody">
+                                    <tr>
+                                        <td colspan="6">
+                                            <div class="table-skeleton">
+                                                <div class="skeleton-row"></div>
+                                                <div class="skeleton-row"></div>
+                                                <div class="skeleton-row"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div id="requests-pagination" class="pagination-container"></div>
+
+                    </div>
                 </div>
-
-                <div id="products-pagination" class="pagination-container"></div>
-
             </div>
         </div>
     </section>
@@ -1034,6 +1236,257 @@
         </div>
     </section>
 
+    <!-- CHAT / MESSAGES SECTION -->
+    <section id="chat" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-chat-dots"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Messages</h4>
+                <p class="ac-section-hero__sub">Manage customer support conversations and inquiries.</p>
+            </div>
+        </div>
+
+        <div id="admin-chat-drawer" class="admin-chat-drawer chat-section-mode">
+            <div class="chat-sidebar-panel">
+                <div class="chat-sidebar-header">
+                    <h3 class="chat-sidebar-title">
+                        <i class="bi bi-chat-dots"></i>
+                        Conversations
+                    </h3>
+                </div>
+                <div id="conversation-list" class="conversation-list"></div>
+                <div id="chat-empty-state" class="text-center py-5" style="display:none">
+                    <i class="bi bi-chat-dots text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">No conversations yet</p>
+                    <p class="text-muted small">Messages from customers will appear here</p>
+                </div>
+            </div>
+
+            <div class="chat-main-panel">
+                <div id="chat-header" class="chat-thread-header">
+                    <div class="chat-thread-identity">
+                        <div class="chat-thread-avatar">
+                            <i class="bi bi-person"></i>
+                        </div>
+                        <div>
+                            <div id="chat-header-title" class="chat-thread-name">
+                                Select a conversation
+                            </div>
+                            <div id="chat-header-subtitle" class="chat-thread-sub"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="chat-messages" class="chat-messages-feed"></div>
+
+                <form id="chat-form" class="chat-compose-bar">
+                    <div class="chat-input-wrap" style="flex:1;position:relative;">
+                        <input id="chat-input"
+                               class="chat-compose-input"
+                               type="text"
+                               placeholder="Type a message…"
+                               autocomplete="off"
+                               maxlength="500"
+                               required>
+                        <span id="chat-char-counter" class="char-counter">500</span>
+                    </div>
+                    <button type="submit" class="btn btn-primary chat-send-btn">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- NOTIFICATIONS SECTION -->
+    <section id="notifications" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-bell"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Notifications</h4>
+                <p class="ac-section-hero__sub">System alerts and account activity notifications.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button class="btn btn-sm ac-btn-outline-muted" id="notif-mark-all-btn">
+                    <i class="bi bi-check2-all me-1"></i>Mark All Read
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div id="notifications-list">
+                    <div class="text-center py-4">
+                        <span class="spinner-border spinner-border-sm text-success"></span>
+                    </div>
+                </div>
+                <div id="notifications-empty-state" class="text-center py-5" style="display:none">
+                    <i class="bi bi-bell-slash text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">No notifications yet</p>
+                    <p class="text-muted small">You'll see system alerts and account activity here</p>
+                </div>
+                <div id="notifications-pagination" class="pagination-container"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PROFILE SECTION -->
+    <section id="profile" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-person-circle"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">My Profile</h4>
+                <p class="ac-section-hero__sub">View and edit your personal account details and preferences.</p>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <!-- Profile card (left col) -->
+            <div class="col-xl-4">
+                <div class="card">
+                    <div class="card-body profile-card pt-4 d-flex flex-column align-items-center">
+                        <div class="profile-avatar-lg mb-3">
+                            <img src="/images/resendlogo.png" alt="Profile" class="rounded-circle" id="profile-avatar-img" style="width:80px;height:80px;object-fit:cover">
+                            <span class="profile-initial-lg" id="profile-avatar-initial" style="display:none"></span>
+                        </div>
+                        <h2 class="fw-semibold" id="profile-shop-name">—</h2>
+                        <h3 class="text-muted small" id="profile-owner-name">—</h3>
+                        <span class="badge bg-primary mt-2" id="profile-role">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile tabs (right col) -->
+            <div class="col-xl-8">
+                <div class="card">
+                    <div class="card-body pt-3">
+                        <ul class="nav nav-tabs nav-tabs-bordered" id="profileTabs">
+                            <li class="nav-item">
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#profile-overview">Overview</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#profile-edit">Edit Profile</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#profile-change-password">Change Password</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content pt-2">
+                            <!-- Overview Tab -->
+                            <div class="tab-pane fade show active profile-overview" id="profile-overview">
+                                <h5 class="card-title">Profile Details</h5>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Shop Name</div>
+                                    <div class="col-lg-9 col-md-8" id="po-shop-name">—</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Owner Name</div>
+                                    <div class="col-lg-9 col-md-8" id="po-owner-name">—</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Email</div>
+                                    <div class="col-lg-9 col-md-8" id="po-email">—</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Phone</div>
+                                    <div class="col-lg-9 col-md-8" id="po-phone">—</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Role</div>
+                                    <div class="col-lg-9 col-md-8" id="po-role">—</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Joined</div>
+                                    <div class="col-lg-9 col-md-8" id="po-joined">—</div>
+                                </div>
+                            </div>
+
+                            <!-- Edit Profile Tab -->
+                            <div class="tab-pane fade profile-edit" id="profile-edit">
+                                <h5 class="card-title">Edit Profile</h5>
+                                <form id="profile-edit-form">
+                                    <div class="row mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">First Name</label>
+                                            <input type="text" id="pe-firstname" class="form-control form-control-sm">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Middle Name (Optional)</label>
+                                            <input type="text" id="pe-middlename" class="form-control form-control-sm" placeholder="Optional">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Last Name</label>
+                                            <input type="text" id="pe-lastname" class="form-control form-control-sm">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Phone</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">+63</span>
+                                            <input type="text" id="pe-phone" class="form-control" placeholder="9XX XXX XXXX" maxlength="12" pattern="9[0-9]{2} [0-9]{3} [0-9]{4}">
+                                        </div>
+                                        <div class="form-text text-muted small">Enter 10 digits starting with 9 (e.g. 912 345 6789). Letters are not allowed.</div>
+                                    </div>
+                                    <div class="text-end">
+                                        <button type="submit" class="btn btn-primary btn-sm" id="profile-save-btn">
+                                            <span class="btn-text">Save Changes</span>
+                                            <span class="spinner-border spinner-border-sm d-none ms-1" id="profile-save-spinner"></span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Change Password Tab -->
+                            <div class="tab-pane fade" id="profile-change-password">
+                                <h5 class="card-title">Change Password</h5>
+                                <form id="profile-password-form">
+                                    <div class="mb-3">
+                                        <label class="form-label">Current Password</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="password" id="pp-current" class="form-control">
+                                            <button type="button" class="btn btn-outline-secondary" onclick="farmerDashboard&&farmerDashboard.togglePassword('pp-current', this)">
+                                                <i class="bi bi-eye-slash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">New Password</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="password" id="pp-new" class="form-control">
+                                            <button type="button" class="btn btn-outline-secondary" onclick="farmerDashboard&&farmerDashboard.togglePassword('pp-new', this)">
+                                                <i class="bi bi-eye-slash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Confirm New Password</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="password" id="pp-confirm" class="form-control">
+                                            <button type="button" class="btn btn-outline-secondary" onclick="farmerDashboard&&farmerDashboard.togglePassword('pp-confirm', this)">
+                                                <i class="bi bi-eye-slash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="pp-error" class="alert alert-danger d-none small"></div>
+                                    <div class="text-end">
+                                        <button type="submit" class="btn btn-primary btn-sm" id="pp-submit-btn">
+                                            <span class="btn-text">Change Password</span>
+                                            <span class="spinner-border spinner-border-sm d-none ms-1" id="pp-spinner"></span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- MODAL: SHOP ADDRESS (PSGC) -->
     <div id="shop-address-modal" class="modal" style="z-index:1090;">
         <div class="modal-content" style="max-width:500px;">
@@ -1086,64 +1539,6 @@
             </div>
         </div>
     </div>
-
-    <!-- CHAT / MESSAGES SECTION -->
-    <section id="chat" class="admin-section-card">
-        <div class="ac-section-hero ac-section-hero--primary mb-4">
-            <div class="ac-section-hero__icon"><i class="bi bi-chat-dots"></i></div>
-            <div class="ac-section-hero__body">
-                <h4 class="ac-section-hero__title">Support Chat</h4>
-                <p class="ac-section-hero__sub">Manage customer support conversations and inquiries.</p>
-            </div>
-        </div>
-
-        <div id="admin-chat-drawer" class="admin-chat-drawer chat-section-mode">
-            <div class="chat-sidebar-panel">
-                <div class="chat-sidebar-header">
-                    <h3 class="chat-sidebar-title">
-                        <i class="bi bi-chat-dots"></i>
-                        Conversations
-                    </h3>
-                </div>
-                <div id="conversation-list" class="conversation-list"></div>
-                <div id="chat-empty-state" class="text-center py-5" style="display:none">
-                    <i class="bi bi-chat-dots text-muted" style="font-size: 3rem;"></i>
-                    <p class="text-muted mt-3">No conversations yet</p>
-                    <p class="text-muted small">Messages from customers will appear here</p>
-                </div>
-            </div>
-
-            <div class="chat-main-panel">
-                <div id="chat-header" class="chat-thread-header">
-                    <div class="chat-thread-identity">
-                        <div class="chat-thread-avatar">
-                            <i class="bi bi-person"></i>
-                        </div>
-                        <div>
-                            <div id="chat-header-title" class="chat-thread-name">
-                                Select a conversation
-                            </div>
-                            <div id="chat-header-subtitle" class="chat-thread-sub"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="chat-messages" class="chat-messages-feed"></div>
-
-                <form id="chat-form" class="chat-compose-bar">
-                    <input id="chat-input"
-                           class="chat-compose-input"
-                           type="text"
-                           placeholder="Type a message…"
-                           autocomplete="off"
-                           required>
-                    <button type="submit" class="btn btn-primary chat-send-btn">
-                        <i class="bi bi-send-fill"></i>
-                    </button>
-                </form>
-            </div>
-        </div>
-    </section>
 
 </main>
 
@@ -1254,7 +1649,7 @@
 <div id="edit-product-modal" class="modal">
     <div class="modal-content" style="max-width:640px;display:flex;flex-direction:column;max-height:90vh;">
         <div class="modal-header">
-            <h3><i class="bi bi-pencil-square me-2 text-primary"></i>Edit Product</h3>
+            <h3 id="edit-product-modal-title"><i class="bi bi-pencil-square me-2 text-primary"></i>Edit Product</h3>
             <button class="close-btn" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
         <form id="edit-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;flex:1;">
@@ -1408,6 +1803,19 @@
     </div>
 </div>
 
+<!-- MODAL: ORDER DETAILS -->
+<div id="order-details-modal" class="modal">
+    <div class="modal-content" style="max-width:600px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-bag-check me-2 text-success"></i>Order Details</h3>
+            <button class="close-btn" id="close-order-details-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div id="order-details-body" style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(85vh - 58px);">
+            <!-- Order details will be populated here -->
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: REQUEST PRODUCT -->
 <div id="request-product-modal" class="product-details-modal">
     <div class="product-details-overlay"></div>
@@ -1437,10 +1845,35 @@
                     </button>
                 </div>
             </form>
-            <div class="request-history-wrap">
+            <div class="request-history-wrap" style="margin-top:1rem;">
                 <h6 class="fw-bold text-center mb-2 small text-muted text-uppercase">My Requests</h6>
-                <div id="request-product-history" class="overview-list" style="max-height:240px;overflow-y:auto;"></div>
+                <div id="request-product-history" class="overview-list" style="max-height:200px;overflow-y:auto;padding:0.5rem;background:#f8f9fa;border-radius:6px;"></div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: PRODUCT REQUEST DETAILS -->
+<div id="product-request-details-modal" class="modal">
+    <div class="modal-content" style="max-width:500px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-info-circle me-2 text-primary"></i>Product Request Details</h3>
+            <button class="close-btn" id="close-request-details-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div style="padding:1rem 1.25rem;">
+            <div id="request-details-content">
+                <div class="table-skeleton">
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" id="resubmit-product-request-btn" class="btn btn-sm btn-primary" style="display:none;">
+                <i class="bi bi-arrow-repeat me-1"></i>Resubmit
+            </button>
+            <button type="button" id="close-request-details-btn" class="btn btn-sm btn-secondary">Close</button>
         </div>
     </div>
 </div>
@@ -1470,6 +1903,26 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- MODAL: REJECTION REASON -->
+<div id="rejection-reason-modal" class="modal">
+    <div class="modal-content" style="max-width:500px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-exclamation-circle me-2 text-danger"></i>Product Rejected</h3>
+            <button class="close-btn" id="rejection-reason-close" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div style="padding:1rem 1.25rem;">
+            <p class="text-muted small mb-3">Your product was rejected for the following reason:</p>
+            <div id="rejection-reason-content" style="background:#fef2f2;border-left:3px solid #dc2626;padding:12px;margin-bottom:16px;">
+                <p id="rejection-reason-text" style="margin:0;color:#7f1d1d;"></p>
+            </div>
+            <p class="text-muted small">Please address the issue and resubmit your product for approval.</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" id="rejection-reason-close-btn" class="btn btn-sm btn-primary">Close</button>
+        </div>
     </div>
 </div>
 

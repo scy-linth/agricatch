@@ -13,6 +13,7 @@ class ChatUI {
         this.conversationMeta = new Map();
         this.currentUserId = this.getUserId();
         this._lastMarkReadAt = 0;
+        this.MAX_MESSAGE_LENGTH = 500;
         window.chatUI = this;
         
         if (!this.token || !this.currentUserId) {
@@ -61,6 +62,21 @@ class ChatUI {
         if (form) {
             form.addEventListener('submit', (e) => this.sendMessage(e));
         }
+        const input = document.getElementById('chat-input');
+        if (input) {
+            input.addEventListener('input', () => this.updateCharCounter());
+            input.setAttribute('maxlength', String(this.MAX_MESSAGE_LENGTH));
+            this.updateCharCounter();
+        }
+    }
+
+    updateCharCounter() {
+        const input = document.getElementById('chat-input');
+        const counter = document.getElementById('chat-char-counter');
+        if (!input || !counter) return;
+        const remaining = this.MAX_MESSAGE_LENGTH - input.value.length;
+        counter.textContent = `${remaining}`;
+        counter.className = remaining < 50 ? 'char-counter char-counter-warning' : 'char-counter';
     }
 
     async loadConversations() {
@@ -259,22 +275,23 @@ class ChatUI {
                 // First message - start new group
                 currentGroup = {
                     senderId: msg.sender_id,
-                    startTime: msgDate,
+                    lastMessageTime: msgDate,
                     messages: [msg]
                 };
             } else {
-                const timeDiff = (msgDate - currentGroup.startTime) / 60000; // minutes
+                const timeDiff = (msgDate - currentGroup.lastMessageTime) / 60000; // minutes
                 const sameSender = msg.sender_id === currentGroup.senderId;
 
                 if (sameSender && timeDiff < 5) {
                     // Same group
                     currentGroup.messages.push(msg);
+                    currentGroup.lastMessageTime = msgDate;
                 } else {
                     // New group
                     groups.push(currentGroup);
                     currentGroup = {
                         senderId: msg.sender_id,
-                        startTime: msgDate,
+                        lastMessageTime: msgDate,
                         messages: [msg]
                     };
                 }
@@ -351,7 +368,6 @@ class ChatUI {
                 html += `
                     <div class="chat-msg ${msgIsSent ? 'sent' : 'received'}" title="${exactTime}">
                         <div class="chat-msg-bubble">
-                            ${isLastInGroup ? `<span class="chat-msg-sender">${senderName}</span>` : ''}
                             <p class="chat-msg-text">${this.escapeHtml(msg.message).replace(/\n/g, '<br>')}</p>
                         </div>
                     </div>
@@ -362,17 +378,11 @@ class ChatUI {
         });
 
         container.innerHTML = html;
-
-        // Smart auto-scroll: scroll to bottom if user is near bottom (within 100px)
-        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-        if (isNearBottom) {
-            container.scrollTop = container.scrollHeight;
-        }
     }
 
     async sendMessage(e) {
         e.preventDefault();
-        
+
         if (!this.currentConversation) {
             this.showError('Please select a conversation first.');
             return;
@@ -382,7 +392,15 @@ class ChatUI {
         if (!input || !input.value.trim()) return;
 
         const messageText = input.value.trim();
+
+        // Frontend validation
+        if (messageText.length > this.MAX_MESSAGE_LENGTH) {
+            this.showError(`Message too long. Maximum ${this.MAX_MESSAGE_LENGTH} characters.`);
+            return;
+        }
+
         input.value = '';
+        this.updateCharCounter();
 
         // Get receiver ID from conversation metadata
         const meta = this.conversationMeta.get(String(this.currentConversation));
@@ -599,6 +617,13 @@ class ChatUI {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    scrollToBottom() {
+        const container = document.getElementById('chat-messages');
+        if (container) {
+            container.scrollTop = container.scrollHeight;
+        }
     }
 
 

@@ -43,8 +43,9 @@
                         </div>
                     </div>
                     <div id="chat-messages" class="chat-messages"></div>
-                    <form id="chat-form" class="chat-form">
-                        <input type="text" id="chat-input" placeholder="Type a message..." required>
+                    <form id="chat-form" class="chat-form" style="position:relative;">
+                        <input type="text" id="chat-input" placeholder="Type a message..." maxlength="500" required style="padding-right:40px;flex:1;">
+                        <span id="chat-char-counter" style="position:absolute;right:80px;top:50%;transform:translateY(-50%);font-size:0.7rem;color:#9ca3af;pointer-events:none;">500</span>
                         <button type="submit" class="btn btn-primary btn-small">Send</button>
                     </form>
                 </div>

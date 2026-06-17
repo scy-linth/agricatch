@@ -65,7 +65,7 @@ class FarmersPage {
                         <i class="fas fa-user"></i>
                     </div>
                     <div class="farmer-info">
-                        <h3>${farmer.full_name || farmer.username}</h3>
+                        <h3>${farmer.full_name || farmer.username}${farmer.is_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : ''}</h3>
                         <p class="farmer-location"><i class="fas fa-location-dot"></i> ${farmer.location || 'Unknown location'}</p>
                     </div>
                 </div>

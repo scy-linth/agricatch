@@ -270,10 +270,18 @@ router.post('/category-requests', async (req, res) => {
     const decoded = getUserFromToken(req);
     if (!decoded?.id) return res.status(401).json({ message: 'Invalid or expired token' });
 
-    const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
+    const roleResult = await pool.query('SELECT role, is_verified FROM users WHERE id = $1', [decoded.id]);
     const role = roleResult.rows[0]?.role;
+    const isVerified = roleResult.rows[0]?.is_verified;
+    
     if (role !== 'farmer') {
       return res.status(403).json({ message: 'Only farmers can request custom product names' });
+    }
+
+    if (!isVerified) {
+      return res.status(403).json({ 
+        message: 'Custom product name requests are available for verified farmers only. Please contact support to verify your account.' 
+      });
     }
 
     const name = String(req.body?.name || '').trim();
@@ -358,7 +366,8 @@ const getMyCategoryRequestsHandler = async (req, res) => {
     if (!decoded?.id) return res.status(401).json({ message: 'Invalid or expired token' });
     const userId = decoded.id;
 
-    const result = await pool.query(
+    // Get catalog requests (product name requests) - for modal display
+    const catalogRequestsResult = await pool.query(
       `SELECT r.id, r.category_id, r.requested_category_name, c.name as category_name, r.name, r.notes, r.status, r.review_notes, r.reviewed_at, r.created_at
        FROM product_name_requests r
        LEFT JOIN categories c ON r.category_id = c.id
@@ -367,16 +376,51 @@ const getMyCategoryRequestsHandler = async (req, res) => {
       [userId]
     );
 
-    return res.json({ requests: result.rows });
+    return res.json({ requests: catalogRequestsResult.rows });
   } catch (error) {
     console.error('Get my category requests error:', error.message);
     return res.status(500).json({ message: 'Server error fetching requests' });
   }
 };
 
-// Get current farmer's product name requests (history)
+// Get pending/rejected products for Approval tab
+const getMyProductRequestsHandler = async (req, res) => {
+  try {
+    const decoded = getUserFromToken(req);
+    if (!decoded?.id) return res.status(401).json({ message: 'Invalid or expired token' });
+    const userId = decoded.id;
+
+    // Get farmer_id from users table
+    const userResult = await pool.query('SELECT id, role FROM users WHERE id = $1', [userId]);
+    if (!userResult.rows.length) return res.status(404).json({ message: 'User not found' });
+    
+    const farmerId = userResult.rows[0].id;
+
+    // Get pending/rejected products (farmer's own products awaiting approval)
+    const pendingProductsResult = await pool.query(
+      `SELECT p.id, p.category_id, c.name as category_name, p.name, p.description as notes, p.status, p.rejection_reason as review_notes, p.updated_at as reviewed_at, p.created_at,
+       'product_request' as request_type
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       WHERE p.farmer_id = $1
+        AND p.status IN ('pending', 'rejected')
+      ORDER BY p.created_at DESC`,
+      [farmerId]
+    );
+
+    return res.json({ requests: pendingProductsResult.rows });
+  } catch (error) {
+    console.error('Get my product requests error:', error.message);
+    return res.status(500).json({ message: 'Server error fetching product requests' });
+  }
+};
+
+// Get current farmer's product name requests (history) - for modal
 router.get('/category-requests/mine', getMyCategoryRequestsHandler);
 router.get('/requests/mine', getMyCategoryRequestsHandler);
+
+// Get pending/rejected products for Approval tab
+router.get('/product-requests/mine', getMyProductRequestsHandler);
 
 // Get all products with pagination and filtering
 router.get('/', async (req, res) => {
@@ -390,14 +434,14 @@ router.get('/', async (req, res) => {
 
     const normalizedSort = String(sort || 'latest').trim().toLowerCase();
     const orderByMap = {
-      latest: 'p.created_at DESC',
-      harvest_date: 'p.harvest_date DESC NULLS LAST, p.created_at DESC',
-      expiry_date: 'p.expiry_date ASC NULLS LAST, p.created_at DESC',
-      expiration_date: 'p.expiry_date ASC NULLS LAST, p.created_at DESC',
-      ratings: 'average_rating DESC, total_reviews DESC, p.created_at DESC',
-      top_sales: 'p.sales_count DESC, p.created_at DESC',
-      price_low_high: 'p.price ASC, p.created_at DESC',
-      price_high_low: 'p.price DESC, p.created_at DESC'
+      latest: 'COALESCE(u.is_verified, false) DESC, p.created_at DESC',
+      harvest_date: 'COALESCE(u.is_verified, false) DESC, p.harvest_date DESC NULLS LAST, p.created_at DESC',
+      expiry_date: 'COALESCE(u.is_verified, false) DESC, p.expiry_date ASC NULLS LAST, p.created_at DESC',
+      expiration_date: 'COALESCE(u.is_verified, false) DESC, p.expiry_date ASC NULLS LAST, p.created_at DESC',
+      ratings: 'COALESCE(u.is_verified, false) DESC, average_rating DESC, total_reviews DESC, p.created_at DESC',
+      top_sales: 'COALESCE(u.is_verified, false) DESC, p.sales_count DESC, p.created_at DESC',
+      price_low_high: 'COALESCE(u.is_verified, false) DESC, p.price ASC, p.created_at DESC',
+      price_high_low: 'COALESCE(u.is_verified, false) DESC, p.price DESC, p.created_at DESC'
     };
     const orderByClause = orderByMap[normalizedSort] || orderByMap.latest;
 
@@ -436,7 +480,7 @@ router.get('/', async (req, res) => {
     }
 
     let selectClause = `
-      SELECT p.*, c.name as category_name, u.full_name as farmer_name, p.location as farm_location,
+      SELECT p.*, c.name as category_name, COALESCE(u.shop_name, u.full_name) as farmer_name, p.location as farm_location,
              COALESCE(u.is_verified, false) as farmer_verified,
               COALESCE(u.average_rating, 0) as farmer_average_rating,
               COALESCE(u.total_reviews, 0) as farmer_total_reviews,
@@ -631,6 +675,7 @@ router.get('/pricing/suggestion', async (req, res) => {
 });
 
 // Best-selling low-price products for landing section
+// Now uses featured_products table for admin-curated featured products
 router.get('/featured', async (req, res) => {
   try {
     await ensureProductCatalogSchema();
@@ -644,14 +689,60 @@ router.get('/featured', async (req, res) => {
       categoryFilterSql = ` AND c.name = $${params.length}`;
     }
 
-    const result = await pool.query(
+    // First try to get admin-curated featured products
+    const featuredResult = await pool.query(
+      `SELECT p.*, COALESCE(u.shop_name, u.full_name) AS farmer_name,
+              COALESCE(u.is_verified, false) as farmer_verified,
+              COALESCE(u.average_rating, 0) as farmer_average_rating,
+              COALESCE(u.total_reviews, 0) as farmer_total_reviews,
+              (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) AS average_rating,
+              (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) AS total_reviews,
+              fp.position
+       FROM featured_products fp
+       JOIN products p ON fp.product_id = p.id
+       JOIN users u ON u.id = p.farmer_id
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE fp.is_active = true
+         AND (fp.expires_at IS NULL OR fp.expires_at > CURRENT_TIMESTAMP)
+         AND p.is_available = true
+         AND COALESCE(p.is_admin_disabled, false) = false
+         AND COALESCE(u.is_disabled, false) = false
+         AND p.stock_quantity > 0
+         AND ${NON_EXPIRED_PRODUCT_SQL}
+         AND (
+           c.id IS NULL
+           OR (COALESCE(c.is_disabled, false) = false
+               AND COALESCE(LOWER(c.type), 'agricultural') <> 'fishery'
+               AND c.name NOT ILIKE '%fish%'
+               AND c.name NOT ILIKE '%seafood%')
+         )
+         AND (
+           p.name !~* '${FISHERY_KEYWORDS_PATTERN}'
+           AND (p.description IS NULL OR p.description !~* '${FISHERY_KEYWORDS_PATTERN}')
+         )
+         ${categoryFilterSql}
+       ORDER BY fp.position ASC, fp.featured_at DESC
+       LIMIT $1`,
+      params
+    );
+
+    // If we have enough featured products, return them
+    if (featuredResult.rows.length >= limit) {
+      return res.json({ products: featuredResult.rows });
+    }
+
+    // Otherwise, fallback to best-selling low-price products to fill the remaining slots
+    const remainingLimit = limit - featuredResult.rows.length;
+    const fallbackResult = await pool.query(
       `
-        SELECT p.*, u.full_name AS farmer_name,
+        SELECT p.*, COALESCE(u.shop_name, u.full_name) AS farmer_name,
+               COALESCE(u.is_verified, false) as farmer_verified,
                COALESCE(s.sold_qty, 0)::int AS sold_qty,
                COALESCE(u.average_rating, 0) as farmer_average_rating,
                COALESCE(u.total_reviews, 0) as farmer_total_reviews,
                (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) AS average_rating,
-               (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) AS total_reviews
+               (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) AS total_reviews,
+               NULL as position
         FROM products p
         LEFT JOIN users u ON u.id = p.farmer_id
         LEFT JOIN categories c ON c.id = p.category_id
@@ -679,14 +770,18 @@ router.get('/featured', async (req, res) => {
             AND (p.description IS NULL OR p.description !~* '${FISHERY_KEYWORDS_PATTERN}')
           )
           ${categoryFilterSql}
+          AND p.id NOT IN (SELECT product_id FROM featured_products WHERE is_active = true)
         ORDER BY p.price ASC, COALESCE(s.sold_qty, 0) DESC, p.created_at DESC
         LIMIT $1
       `,
-      params
+      [remainingLimit]
     );
 
-    if (result.rows.length > 0) {
-      return res.json({ products: result.rows });
+    // Combine featured and fallback products
+    const combinedProducts = [...featuredResult.rows, ...fallbackResult.rows];
+    
+    if (combinedProducts.length > 0) {
+      return res.json({ products: combinedProducts });
     }
 
     return res.json({ products: [] });
@@ -722,6 +817,7 @@ router.get('/:id', async (req, res) => {
       if (role === 'staff' || role === 'super_admin') {
         // Staff can view all products
       } else if (role === 'farmer') {
+        // Farmers can view their own products (including rejected) and available products from others
         whereClause += ` AND (p.farmer_id = $2 OR (${availabilityFilter}))`;
         params.push(userId);
       } else {
@@ -732,7 +828,7 @@ router.get('/:id', async (req, res) => {
     }
 
     const result = await pool.query(`
-      SELECT p.*, c.name as category_name, u.full_name as farmer_name,
+      SELECT p.*, c.name as category_name, COALESCE(u.shop_name, u.full_name) as farmer_name,
              COALESCE(p.location, u.address) as farm_location,
              COALESCE(u.is_verified, false) as farmer_verified,
              COALESCE(u.average_rating, 0) as farmer_average_rating,
@@ -829,7 +925,45 @@ router.get('/:id/similar-sellers', async (req, res) => {
   }
 });
 
+// Resubmit a rejected product for approval
+router.post('/:id/resubmit', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const decoded = getUserFromToken(req);
+    if (!decoded?.id) return res.status(401).json({ message: 'Invalid or expired token' });
+
+    // Get the product
+    const productResult = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    if (!productResult.rows.length) return res.status(404).json({ message: 'Product not found' });
+
+    const product = productResult.rows[0];
+
+    // Check if user owns this product
+    if (product.farmer_id !== decoded.id) {
+      return res.status(403).json({ message: 'You can only resubmit your own products' });
+    }
+
+    // Check if product is rejected
+    if (product.status !== 'rejected') {
+      return res.status(400).json({ message: 'Only rejected products can be resubmitted' });
+    }
+
+    // Reset status to pending and clear rejection reason
+    await pool.query(
+      'UPDATE products SET status = $1, rejection_reason = NULL, updated_at = NOW() WHERE id = $2',
+      ['pending', id]
+    );
+
+    res.json({ message: 'Product resubmitted for approval' });
+
+  } catch (error) {
+    console.error('Resubmit product error:', error);
+    res.status(500).json({ message: 'Server error resubmitting product' });
+  }
+});
+
 // Get products by farmer (for farmer dashboard)
+// Only returns approved products (available or disabled) - pending/rejected are shown in My Requests tab
 router.get('/farmer/:farmerId', async (req, res) => {
   try {
     const { farmerId } = req.params;
@@ -839,6 +973,7 @@ router.get('/farmer/:farmerId', async (req, res) => {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.farmer_id = $1
+        AND p.status IN ('approved', 'available')
       ORDER BY p.created_at DESC
     `, [farmerId]);
 
@@ -864,10 +999,45 @@ router.post('/', productUpload.single('image'), async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if user is a farmer
-    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
+    // Check if user is a farmer and get verification status
+    const userResult = await pool.query('SELECT role, is_verified FROM users WHERE id = $1', [decoded.id]);
     if (userResult.rows[0].role !== 'farmer') {
       return res.status(403).json({ message: 'Only farmers can add products' });
+    }
+
+    const isVerified = userResult.rows[0].is_verified;
+
+    // Product limit check for unverified farmers (max 10 products)
+    if (!isVerified) {
+      const productCountResult = await pool.query(
+        `SELECT COUNT(*) as count FROM products 
+         WHERE farmer_id = $1 
+         AND status IN ('pending', 'approved') 
+         AND is_disabled = false`,
+        [decoded.id]
+      );
+      const productCount = parseInt(productCountResult.rows[0].count, 10);
+      
+      if (productCount >= 10) {
+        // Send notification about product limit reached
+        try {
+          await pool.query(
+            `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+             VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+            [decoded.id, 'product_limit_reached', 'Product Limit Reached', 
+             'You have reached the maximum of 10 products. Upgrade to a verified account to add unlimited products.']
+          );
+          broadcastEvent('notification.created', { user_id: decoded.id });
+        } catch (notifErr) {
+          console.error('Failed to send product limit notification:', notifErr);
+        }
+        
+        return res.status(403).json({ 
+          message: 'Product limit reached. Unverified farmers can only have up to 10 active products. Please contact support to verify your account.',
+          current_count: productCount,
+          limit: 10
+        });
+      }
     }
 
     const {
@@ -916,7 +1086,7 @@ router.post('/', productUpload.single('image'), async (req, res) => {
           folder: 'agricatch/products/tmp',
           resource_type: 'image',
           transformation: [
-            { width: 1200, crop: 'limit', quality: 'auto' },
+            { width: 1200, crop: 'limit', quality: 'auto:good' },
             { fetch_format: 'auto' }
           ]
         });
@@ -981,6 +1151,23 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       product_id: Number(createdProduct.id),
       farmer_id: Number(decoded.id)
     });
+
+    // Send notification to admin about new product submission
+    try {
+      const adminResult = await pool.query(
+        "SELECT id FROM users WHERE role IN ('staff', 'super_admin') LIMIT 1"
+      );
+      if (adminResult.rows.length > 0) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+           VALUES ($1, $2, $3, $4, $5, false, CURRENT_TIMESTAMP)`,
+          [adminResult.rows[0].id, 'new_product_submitted', 'New Product Submitted', `A new product "${name}" has been submitted for approval.`, createdProduct.id]
+        );
+        broadcastEvent('notification.created', { user_id: adminResult.rows[0].id });
+      }
+    } catch (adminErr) {
+      console.error('Failed to send new product notification to admin:', adminErr);
+    }
 
     res.status(201).json({
       message: 'Product added successfully',
@@ -1130,7 +1317,7 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
           ],
           resource_type: 'image',
           transformation: [
-            { width: 1200, crop: 'limit', quality: 'auto' },
+            { width: 1200, crop: 'limit', quality: 'auto:good' },
             { fetch_format: 'auto' }
           ]
         });
@@ -1160,16 +1347,66 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
       }
     }
 
+    // If product was rejected, reset status to pending for resubmission
+    // Note: is_available is already set in the main query, so we don't include it here
+    const statusReset = current.status === 'rejected' ? ', status = \'pending\', is_admin_disabled = false, rejection_reason = NULL' : '';
+
     await pool.query(`
       UPDATE products SET
         name = $1, description = $2, price = $3, category_id = $4,
         stock_quantity = $5, unit = $6, image_url = $7, location = $8,
         harvest_date = $9, expiry_date = $10, is_available = $11,
-        cloudinary_public_id = $12,
+        cloudinary_public_id = $12${statusReset},
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $13
     `, [nextName, nextDescription, nextPrice, nextCategoryId, nextStockQuantity, nextUnit,
          imageUrl, nextLocation, nextHarvestDate, nextExpiryDate, nextIsAvailable, imagePublicId, id]);
+
+    // Check if product went from out of stock to in stock and notify wishlist customers
+    const wasOutOfStock = Number(current.stock_quantity || 0) === 0;
+    const isNowInStock = Number(nextStockQuantity) > 0;
+    if (wasOutOfStock && isNowInStock) {
+      try {
+        const wishlistResult = await pool.query(
+          'SELECT user_id FROM wishlist WHERE product_id = $1',
+          [id]
+        );
+        for (const row of wishlistResult.rows) {
+          await pool.query(
+            `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+             VALUES ($1, $2, $3, $4, $5, false, CURRENT_TIMESTAMP)`,
+            [row.user_id, 'product_back_in_stock', 'Product Back in Stock', `"${nextName}" is back in stock!`, id]
+          );
+          broadcastEvent('notification.created', { user_id: row.user_id });
+        }
+      } catch (wishlistErr) {
+        console.error('Failed to send back in stock notifications:', wishlistErr);
+      }
+    }
+
+    // Check if price changed and notify wishlist customers
+    const oldPrice = Number(current.price || 0);
+    const newPrice = Number(nextPrice || 0);
+    if (oldPrice !== newPrice && oldPrice > 0) {
+      try {
+        const wishlistResult = await pool.query(
+          'SELECT user_id FROM wishlist WHERE product_id = $1',
+          [id]
+        );
+        const priceChange = newPrice > oldPrice ? 'increased' : 'decreased';
+        const priceDiff = Math.abs(newPrice - oldPrice).toFixed(2);
+        for (const row of wishlistResult.rows) {
+          await pool.query(
+            `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+             VALUES ($1, $2, $3, $4, $5, false, CURRENT_TIMESTAMP)`,
+            [row.user_id, 'price_changed', 'Price Changed', `"${nextName}" price ${priceChange} by ₱${priceDiff}. New price: ₱${newPrice.toFixed(2)}`, id]
+          );
+          broadcastEvent('notification.created', { user_id: row.user_id });
+        }
+      } catch (priceErr) {
+        console.error('Failed to send price change notifications:', priceErr);
+      }
+    }
 
     broadcastEvent('product.updated', {
       action: 'product.update',
@@ -1207,6 +1444,15 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ message: 'You can only delete your own products' });
     }
 
+    // Get wishlist customers before deleting (to notify them after)
+    let wishlistCustomers = [];
+    try {
+      const wishlistResult = await pool.query('SELECT user_id FROM wishlist WHERE product_id = $1', [id]);
+      wishlistCustomers = wishlistResult.rows;
+    } catch (e) {
+      console.warn('Could not get wishlist customers:', e.message);
+    }
+
     // Delete related records first to avoid foreign key constraint errors
     try {
       // Delete from cart
@@ -1231,6 +1477,20 @@ router.delete('/:id', async (req, res) => {
         });
       }
       throw deleteError;
+    }
+
+    // Notify wishlist customers that product is no longer available
+    for (const row of wishlistCustomers) {
+      try {
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+           VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+          [row.user_id, 'product_removed', 'Product Removed', 'A product in your wishlist has been removed by the farmer and is no longer available.']
+        );
+        broadcastEvent('notification.created', { user_id: row.user_id });
+      } catch (notifErr) {
+        console.error('Failed to send wishlist removal notification:', notifErr);
+      }
     }
 
     const imageUrl = productResult.rows[0].image_url;

@@ -217,6 +217,7 @@ const normalizeManagedUserPayload = (body = {}) => {
   const role = String(body.role || '').trim().toLowerCase();
   const phone = String(body.phone || '').trim();
   const address = String(body.address || '').trim();
+  const shopName = String(body.shop_name || '').trim();
   const displayName = buildDisplayName({
     firstName,
     middleName,
@@ -236,7 +237,8 @@ const normalizeManagedUserPayload = (body = {}) => {
     password,
     role,
     phone,
-    address
+    address,
+    shopName
   };
 };
 
@@ -366,6 +368,13 @@ const disableUserHandler = async (req, res, reasonOverride = null) => {
           [userId]
         );
         cancelledOrders = await cancelOrdersForFarmer(client, userId, reason);
+        
+        // Send notification about bulk product disable
+        await client.query(
+          `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+           VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+          [userId, 'products_disabled', 'Products Disabled', 'All your products have been disabled by admin. Reason: ' + reason]
+        );
       } else if (targetUser.role === 'customer') {
         cancelledOrders = await cancelOrdersForCustomer(client, userId, reason);
       }
@@ -433,6 +442,13 @@ const enableUserHandler = async (req, res) => {
       await pool.query(
         'UPDATE products SET is_admin_disabled = false, admin_disabled_at = NULL WHERE farmer_id = $1',
         [userId]
+      );
+      
+      // Send notification about bulk product enable
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+        [userId, 'products_enabled', 'Products Enabled', 'All your products have been re-enabled by admin.']
       );
     }
 
@@ -537,7 +553,8 @@ router.get('/users', requireAdmin, async (req, res) => {
       'is_disabled',
       'disabled_at',
       'disabled_reason',
-      'disable_type'
+      'disable_type',
+      'shop_name'
     ].filter(hasUserColumn);
 
     // Superadmin can request password field
@@ -593,8 +610,8 @@ router.post('/users', requireAdmin, async (req, res) => {
     const passwordHash = await bcrypt.hash(normalized.password, parseInt(process.env.BCRYPT_ROUNDS || '10', 10));
     const isVerified = normalized.role === 'farmer' ? false : true;
     const inserted = await pool.query(
-      `INSERT INTO users (username, email, password, full_name, first_name, middle_name, last_name, phone, address, role, is_verified, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
+      `INSERT INTO users (username, email, password, full_name, first_name, middle_name, last_name, phone, address, role, is_verified, shop_name, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
        RETURNING id, username, email, full_name, first_name, middle_name, last_name, phone, address, role, is_verified, is_disabled, disabled_at, disabled_reason, created_at`,
       [
         normalized.username,
@@ -607,7 +624,8 @@ router.post('/users', requireAdmin, async (req, res) => {
         normalized.phone || null,
         normalized.address || null,
         normalized.role,
-        isVerified
+        isVerified,
+        normalized.shopName || null
       ]
     );
 
@@ -732,7 +750,7 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const targetUserId = parseInt(id, 10);
-    const { full_name, first_name, middle_name, last_name, username, email, password, phone, address } = req.body || {};
+    const { full_name, first_name, middle_name, last_name, shop_name, username, email, password, phone, address } = req.body || {};
 
     if (!targetUserId || targetUserId < 0) {
       return res.status(400).json({ message: 'Invalid user id' });
@@ -779,6 +797,12 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
     if (last_name !== undefined) {
       updates.push(`last_name = $${paramIndex}`);
       values.push(String(last_name).trim() || null);
+      paramIndex++;
+    }
+
+    if (shop_name !== undefined) {
+      updates.push(`shop_name = $${paramIndex}`);
+      values.push(String(shop_name).trim() || null);
       paramIndex++;
     }
 
@@ -868,10 +892,15 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
 router.put('/users/:id/verify', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { is_verified } = req.body;
+    const { is_verified, reason } = req.body;
 
     if (typeof is_verified !== 'boolean') {
       return res.status(400).json({ message: 'is_verified must be a boolean' });
+    }
+
+    // Require reason when unverifying
+    if (!is_verified && !reason) {
+      return res.status(400).json({ message: 'Reason is required when unverifying a farmer' });
     }
 
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
@@ -884,6 +913,7 @@ router.put('/users/:id/verify', requireAdmin, async (req, res) => {
     }
 
     const beforeRes = await pool.query('SELECT id, role, is_verified FROM users WHERE id = $1', [id]);
+    const beforeVerified = beforeRes.rows[0].is_verified;
     await pool.query('UPDATE users SET is_verified = $1 WHERE id = $2', [is_verified, id]);
     const afterRes = await pool.query('SELECT id, role, is_verified FROM users WHERE id = $1', [id]);
 
@@ -899,9 +929,185 @@ router.put('/users/:id/verify', requireAdmin, async (req, res) => {
     });
     broadcastEvent('admin.audit', { action, entity: 'users', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
 
+    // Send notification to farmer about verification status change
+    const message = is_verified 
+      ? 'Your farmer account has been verified. You now have access to all features including unlimited products, priority approval, custom product name requests, and advanced analytics.'
+      : `Your farmer account verification has been revoked. Reason: ${reason}. Some features may be restricted.`;
+    
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+       VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+      [id, is_verified ? 'account_verified' : 'account_unverified', 
+       is_verified ? 'Account Verified' : 'Account Unverified',
+       message]
+    );
+    broadcastEvent('notification.created', { user_id: parseInt(id, 10) });
+
+    // If verifying, also send analytics upgrade notification
+    if (is_verified && !beforeVerified) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+        [id, 'analytics_upgrade', 'Analytics Access Upgraded',
+         'Your account is now verified! You have access to advanced analytics including charts, trends, and insights. Check your dashboard to view detailed performance metrics.']
+      );
+      broadcastEvent('notification.created', { user_id: parseInt(id, 10) });
+    }
+
+    // Log to verification history
+    await pool.query(
+      `INSERT INTO verification_history (farmer_id, action, actor_admin_id, reason)
+       VALUES ($1, $2, $3, $4)`,
+      [id, is_verified ? 'verified' : 'unverified', req.user.id, reason || null]
+    );
+
     res.json({ message: 'Farmer verification updated' });
   } catch (error) {
     console.error('Verify farmer error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get verification requests
+router.get('/verification-requests', requireAdmin, async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+    const offset = (page - 1) * limit;
+    const status = req.query.status ? String(req.query.status).trim() : null;
+
+    let whereSql = '';
+    const params = [];
+    let paramIndex = 1;
+
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+      whereSql = `WHERE vr.status = $${paramIndex}`;
+      params.push(status);
+      paramIndex++;
+    }
+
+    const totalRes = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM verification_requests vr ${whereSql}`,
+      params
+    );
+
+    const result = await pool.query(
+      `SELECT vr.*, 
+              u.username, u.full_name, u.email, u.phone, u.address,
+              u.shop_name, u.shop_description, u.shop_avatar_url,
+              (SELECT COUNT(*) FROM products WHERE farmer_id = u.id) as product_count,
+              (SELECT COUNT(*) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.farmer_id = u.id AND o.status = 'delivered') as delivered_orders
+       FROM verification_requests vr
+       JOIN users u ON vr.farmer_id = u.id
+       ${whereSql}
+       ORDER BY vr.created_at DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
+    );
+
+    res.json({ 
+      requests: result.rows, 
+      total: totalRes.rows[0]?.count || 0, 
+      page, 
+      limit 
+    });
+  } catch (error) {
+    console.error('Get verification requests error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Review verification request
+router.put('/verification-requests/:id/review', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejection_reason } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be approved or rejected' });
+    }
+
+    if (status === 'rejected' && !rejection_reason) {
+      return res.status(400).json({ message: 'Rejection reason is required' });
+    }
+
+    const requestRes = await pool.query(
+      'SELECT * FROM verification_requests WHERE id = $1',
+      [id]
+    );
+
+    if (requestRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Verification request not found' });
+    }
+
+    if (requestRes.rows[0].status !== 'pending') {
+      return res.status(400).json({ message: 'Request has already been reviewed' });
+    }
+
+    const farmerId = requestRes.rows[0].farmer_id;
+
+    // Update request status
+    await pool.query(
+      `UPDATE verification_requests 
+       SET status = $1, rejection_reason = $2, reviewed_by = $3, reviewed_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
+      [status, rejection_reason || null, req.user.id, id]
+    );
+
+    // If approved, verify the farmer
+    if (status === 'approved') {
+      await pool.query('UPDATE users SET is_verified = true WHERE id = $1', [farmerId]);
+      
+      // Send verification notification
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+        [farmerId, 'account_verified', 'Account Verified',
+         'Your farmer account has been verified! You now have access to all features including unlimited products, priority approval, custom product name requests, and advanced analytics.']
+      );
+      broadcastEvent('notification.created', { user_id: farmerId });
+
+      // Send analytics upgrade notification
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+        [farmerId, 'analytics_upgrade', 'Analytics Access Upgraded',
+         'Your account is now verified! You have access to advanced analytics including charts, trends, and insights. Check your dashboard to view detailed performance metrics.']
+      );
+      broadcastEvent('notification.created', { user_id: farmerId });
+    } else {
+      // Send rejection notification
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+        [farmerId, 'verification_rejected', 'Verification Request Rejected',
+         `Your verification request has been rejected. Reason: ${rejection_reason}. You may submit a new request after addressing the feedback.`]
+      );
+      broadcastEvent('notification.created', { user_id: farmerId });
+    }
+
+    // Audit log
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'verification_request.review',
+      entity: 'verification_requests',
+      entity_id: parseInt(id, 10),
+      before: requestRes.rows[0],
+      after: { status, rejection_reason },
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'verification_request.review', entity: 'verification_requests', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
+
+    // Log to verification history
+    await pool.query(
+      `INSERT INTO verification_history (farmer_id, action, actor_admin_id, reason)
+       VALUES ($1, $2, $3, $4)`,
+      [farmerId, status === 'approved' ? 'request_approved' : 'request_rejected', req.user.id, rejection_reason || null]
+    );
+
+    res.json({ message: `Verification request ${status}` });
+  } catch (error) {
+    console.error('Review verification request error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -1135,14 +1341,15 @@ router.get('/products', requireAdmin, async (req, res) => {
           ${whereSql}
         `, whereValues);
         const result = await pool.query(`
-          SELECT p.*, u.full_name as farmer_name, u.username as farmer_username, u.email as farmer_email,
+          SELECT p.*, u.full_name as farmer_name, u.username as farmer_username, u.email as farmer_email, u.shop_name as farmer_shop_name, u.address as farmer_address,
             cat.name AS category_name,
-               COALESCE(u.is_disabled, false) as farmer_is_disabled
+               COALESCE(u.is_disabled, false) as farmer_is_disabled,
+               COALESCE(u.is_verified, false) as farmer_is_verified
           FROM products p
           LEFT JOIN users u ON p.farmer_id = u.id
           LEFT JOIN categories cat ON p.category_id = cat.id
           ${whereSql}
-          ORDER BY p.created_at DESC
+          ORDER BY COALESCE(u.is_verified, false) DESC, p.created_at ASC
           LIMIT $${idx} OFFSET $${idx + 1}
         `, [...whereValues, limit, offset]);
         res.json({ products: result.rows, total: totalRes.rows[0]?.count || 0, page, limit });
@@ -1201,7 +1408,7 @@ router.post('/products/:id/approve', requireAdmin, async (req, res) => {
     const productId = parseInt(id, 10);
     if (!productId) return res.status(400).json({ message: 'Invalid product id' });
 
-    const productRes = await pool.query('SELECT id, is_available, is_admin_disabled FROM products WHERE id = $1', [productId]);
+    const productRes = await pool.query('SELECT id, is_available, is_admin_disabled, farmer_id, name FROM products WHERE id = $1', [productId]);
     if (!productRes.rows.length) return res.status(404).json({ message: 'Product not found' });
 
     const before = productRes.rows[0];
@@ -1219,6 +1426,13 @@ router.post('/products/:id/approve', requireAdmin, async (req, res) => {
     });
     broadcastEvent('admin.audit', { action: 'product.approve', entity: 'products', entity_id: productId, actor_admin_id: req.user.id });
 
+    // Send notification to farmer
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+       VALUES ($1, $2, $3, $4, $5, false, CURRENT_TIMESTAMP)`,
+      [before.farmer_id, 'product_approved', 'Product Approved', `Your product "${before.name}" has been approved and is now live on the marketplace.`, productId]
+    );
+
     res.json({ message: 'Product approved successfully' });
   } catch (error) {
     console.error('Approve product error:', error);
@@ -1230,14 +1444,30 @@ router.post('/products/:id/approve', requireAdmin, async (req, res) => {
 router.post('/products/:id/reject', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const { rejection_reason } = req.body;
     const productId = parseInt(id, 10);
     if (!productId) return res.status(400).json({ message: 'Invalid product id' });
+    if (!rejection_reason || rejection_reason.trim().length === 0) {
+      return res.status(400).json({ message: 'Rejection reason is required' });
+    }
 
-    const productRes = await pool.query('SELECT id, is_available, is_admin_disabled FROM products WHERE id = $1', [productId]);
+    const productRes = await pool.query('SELECT id, is_available, is_admin_disabled, farmer_id, name FROM products WHERE id = $1', [productId]);
     if (!productRes.rows.length) return res.status(404).json({ message: 'Product not found' });
 
     const before = productRes.rows[0];
-    await pool.query('UPDATE products SET is_available = false, is_admin_disabled = true, status = $2 WHERE id = $1', [productId, 'rejected']);
+    
+    // Try to update with rejection_reason, fall back if column doesn't exist
+    try {
+      await pool.query('UPDATE products SET is_available = false, is_admin_disabled = true, status = $2, rejection_reason = $3 WHERE id = $1', [productId, 'rejected', rejection_reason.trim()]);
+    } catch (updateError) {
+      // If column doesn't exist, update without it
+      if (updateError.message && updateError.message.includes('column') && updateError.message.includes('rejection_reason')) {
+        await pool.query('UPDATE products SET is_available = false, is_admin_disabled = true, status = $2 WHERE id = $1', [productId, 'rejected']);
+      } else {
+        throw updateError;
+      }
+    }
+    
     const afterRes = await pool.query('SELECT id, is_available, is_admin_disabled, status FROM products WHERE id = $1', [productId]);
 
     await writeAdminAuditLog(pool, {
@@ -1250,6 +1480,13 @@ router.post('/products/:id/reject', requireAdmin, async (req, res) => {
       req
     });
     broadcastEvent('admin.audit', { action: 'product.reject', entity: 'products', entity_id: productId, actor_admin_id: req.user.id });
+
+    // Send notification to farmer
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+       VALUES ($1, $2, $3, $4, $5, false, CURRENT_TIMESTAMP)`,
+      [before.farmer_id, 'product_rejected', 'Product Rejected', `Your product "${before.name}" was rejected. Reason: ${rejection_reason.trim()}`, productId]
+    );
 
     res.json({ message: 'Product rejected successfully' });
   } catch (error) {
@@ -1315,7 +1552,7 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
             'role:primary'
           ],
           transformation: [
-            { width: 1200, crop: 'limit', quality: 'auto' },
+            { width: 1200, crop: 'limit', quality: 'auto:good' },
             { fetch_format: 'auto' }
           ]
         });
@@ -1494,7 +1731,7 @@ router.get('/orders', requireAdmin, async (req, res) => {
 
         const totalRes = await pool.query(`SELECT COUNT(*)::int AS count FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereSql}`, whereValues);
         const result = await pool.query(`
-            SELECT o.*, u.username, u.email, u.full_name, p.name AS product_name
+            SELECT o.*, u.username, u.email, u.full_name, p.name AS product_name, p.image_url AS product_image
             FROM orders o
             LEFT JOIN users u ON o.user_id = u.id
             LEFT JOIN products p ON o.product_id = p.id
@@ -1539,6 +1776,7 @@ router.put('/users/:id/role', requireAdmin, async (req, res) => {
     }
 
     const beforeRes = await pool.query('SELECT id, role FROM users WHERE id = $1', [targetUserId]);
+    const beforeRole = beforeRes.rows[0].role;
     await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, targetUserId]);
     const afterRes = await pool.query('SELECT id, role FROM users WHERE id = $1', [targetUserId]);
 
@@ -1552,6 +1790,13 @@ router.put('/users/:id/role', requireAdmin, async (req, res) => {
       req
     });
     broadcastEvent('admin.audit', { action: 'user.role.update', entity: 'users', entity_id: targetUserId, actor_admin_id: req.user.id });
+
+    // Send notification to user about role change
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+       VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+      [targetUserId, 'role_changed', 'Role Changed', `Your account role has been changed from "${beforeRole}" to "${role}".`]
+    );
 
     res.json({ message: 'User role updated successfully' });
   } catch (error) {
@@ -1788,6 +2033,13 @@ router.delete('/products/:id', requireAdmin, async (req, res) => {
       throw deleteError;
     }
 
+    // Send notification to farmer after product is deleted
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+       VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+      [product.farmer_id, 'product_deleted', 'Product Deleted', `Your product has been deleted by admin.`]
+    );
+
     // Delete image from Cloudinary if it exists
     const imageUrl = product.image_url;
     const cloudPublicId = product.cloudinary_public_id;
@@ -1940,7 +2192,7 @@ router.get('/categories/:id/products', requireAdmin, async (req, res) => {
     const result = await pool.query(
       `SELECT p.id, p.name, p.description, p.price, p.stock_quantity, p.unit, p.status,
               p.is_available, COALESCE(p.is_admin_disabled, false) AS is_admin_disabled,
-              p.farmer_id, u.full_name AS farmer_name, u.username AS farmer_username, u.email AS farmer_email,
+              p.farmer_id, u.full_name AS farmer_name, u.username AS farmer_username, u.email AS farmer_email, u.address AS farmer_address,
               COALESCE(u.is_disabled, false) AS farmer_is_disabled
        FROM products p
        LEFT JOIN users u ON u.id = p.farmer_id
@@ -2430,7 +2682,7 @@ router.get('/category-requests', requireAdmin, async (req, res) => {
           `SELECT r.id, r.name, r.notes, r.status, r.review_notes, r.created_at, r.reviewed_at,
             r.requested_category_name,
               r.category_id, c.name AS category_name,
-              r.requested_by, u.username AS requested_by_username, u.full_name AS requested_by_full_name, u.email AS requested_by_email,
+              r.requested_by, u.username AS requested_by_username, u.full_name AS requested_by_full_name, u.email AS requested_by_email, u.shop_name AS requested_by_shop_name, u.address AS requested_by_address,
               r.reviewed_by, rv.username AS reviewed_by_username
        FROM product_name_requests r
        LEFT JOIN categories c ON c.id = r.category_id
@@ -2546,6 +2798,22 @@ router.put('/category-requests/:id/review', requireAdmin, async (req, res) => {
     });
     broadcastEvent('admin.audit', { action: 'category.request.review', entity: 'category_requests', entity_id: id, actor_admin_id: req.user.id });
 
+    // Send notification to farmer about request approval/rejection
+    if (nextStatus !== 'pending' && requestRow.requested_by) {
+      const notificationType = nextStatus === 'approved' ? 'category_request_approved' : 'category_request_rejected';
+      const notificationTitle = nextStatus === 'approved' ? 'Product Name Request Approved' : 'Product Name Request Rejected';
+      const notificationMessage = nextStatus === 'approved' 
+        ? `Your custom product name request "${nextName}" has been approved and added to the catalog.`
+        : `Your custom product name request "${nextName}" has been rejected. ${reviewNotes ? `Reason: ${reviewNotes}` : ''}`;
+      
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+        [requestRow.requested_by, notificationType, notificationTitle, notificationMessage]
+      );
+      broadcastEvent('notification.created', { user_id: requestRow.requested_by });
+    }
+
     const actionLabel = nextStatus === 'pending' ? 'saved' : nextStatus;
     return res.json({ message: `Request ${actionLabel}`, request: updated.rows[0] });
   } catch (error) {
@@ -2567,7 +2835,10 @@ router.get('/orders/:id', requireAdmin, async (req, res) => {
              p.unit,
              p.image_url,
              f.full_name as farmer_name,
-             f.email as farmer_email
+             f.username as farmer_username,
+             f.email as farmer_email,
+             f.shop_name as farmer_shop_name,
+             f.address as farmer_address
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       JOIN products p ON o.product_id = p.id
@@ -2837,6 +3108,7 @@ router.get('/dashboard/top-farmers', requireAdmin, async (req, res) => {
     const sql = `
       SELECT
         u.id, u.full_name, u.username, u.email,
+        u.shop_name,
         u.shop_avatar_url,
         u.average_rating,
         COUNT(DISTINCT p.id) AS product_count,
@@ -2846,7 +3118,7 @@ router.get('/dashboard/top-farmers', requireAdmin, async (req, res) => {
       JOIN products p ON p.farmer_id = u.id
       JOIN orders o ON o.product_id = p.id
       WHERE u.role = 'farmer' AND ${filterExpr}
-      GROUP BY u.id, u.full_name, u.username, u.email, u.shop_avatar_url, u.average_rating
+      GROUP BY u.id, u.full_name, u.username, u.email, u.shop_name, u.shop_avatar_url, u.average_rating
       ORDER BY revenue DESC
       LIMIT $1 OFFSET $2
     `;
@@ -2990,9 +3262,11 @@ router.get('/customers/:id/summary', requireAdmin, async (req, res) => {
     const [userRes, ordersRes, addressesRes, ratingRes] = await Promise.all([
       pool.query(`SELECT ${customerFields.join(', ')} FROM users WHERE id = $1`, [customerId]),
       pool.query(`SELECT o.id, o.status, o.total_amount, o.created_at, o.is_disabled,
-                         p.name AS product_name, p.image_url AS product_image
+                         p.name AS product_name, p.image_url AS product_image,
+                         u.full_name AS farmer_name, u.shop_name AS farmer_shop_name, u.username AS farmer_username, u.address AS farmer_address
                   FROM orders o
                   LEFT JOIN products p ON o.product_id = p.id
+                  LEFT JOIN users u ON p.farmer_id = u.id
                   WHERE o.user_id = $1
                   ORDER BY o.created_at DESC LIMIT 50`, [customerId]),
       pool.query(`SELECT * FROM user_addresses WHERE user_id = $1 ORDER BY is_default DESC`, [customerId]).catch(() => ({ rows: [] })),
@@ -3038,6 +3312,7 @@ router.get('/farmers/:id/summary', requireAdmin, async (req, res) => {
       'disabled_reason',
       'average_rating',
       'total_reviews',
+      'shop_name',
       'shop_description',
       'shop_avatar_url',
       'shop_banner_url',
@@ -3359,6 +3634,216 @@ router.get('/flagged-users', requireAdmin, async (req, res) => {
 router.put('/users/:id/ban', requireAdmin, async (req, res) => {
   req.body = { ...req.body, disable_type: 'banned' };
   return disableUserHandler(req, res);
+});
+
+// Featured products management
+router.get('/featured-products', requireAdmin, async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+    const offset = (page - 1) * limit;
+    const status = req.query.status ? String(req.query.status).trim() : null;
+
+    let whereSql = 'WHERE fp.is_active = true';
+    const params = [];
+    let paramIndex = 1;
+
+    if (status === 'expired') {
+      whereSql = 'WHERE fp.expires_at < CURRENT_TIMESTAMP';
+    } else if (status === 'inactive') {
+      whereSql = 'WHERE fp.is_active = false';
+    }
+
+    const totalRes = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM featured_products fp ${whereSql}`,
+      params
+    );
+
+    const result = await pool.query(
+      `SELECT fp.*, 
+              p.name as product_name, p.image_url as product_image, p.price,
+              u.username as farmer_username, u.full_name as farmer_name, u.shop_name,
+              COALESCE(u.is_verified, false) as farmer_verified
+       FROM featured_products fp
+       JOIN products p ON fp.product_id = p.id
+       JOIN users u ON fp.farmer_id = u.id
+       ${whereSql}
+       ORDER BY fp.position ASC, fp.featured_at DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
+    );
+
+    res.json({ 
+      featured_products: result.rows, 
+      total: totalRes.rows[0]?.count || 0, 
+      page, 
+      limit 
+    });
+  } catch (error) {
+    console.error('Get featured products error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Add product to featured
+router.post('/featured-products', requireAdmin, async (req, res) => {
+  try {
+    const { product_id, farmer_id, expires_at, position } = req.body;
+
+    if (!product_id || !farmer_id) {
+      return res.status(400).json({ message: 'product_id and farmer_id are required' });
+    }
+
+    // Verify farmer is verified
+    const farmerResult = await pool.query(
+      'SELECT role, is_verified FROM users WHERE id = $1',
+      [farmer_id]
+    );
+    if (farmerResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Farmer not found' });
+    }
+    if (farmerResult.rows[0].role !== 'farmer') {
+      return res.status(400).json({ message: 'User is not a farmer' });
+    }
+    if (!farmerResult.rows[0].is_verified) {
+      return res.status(400).json({ message: 'Only verified farmers can have featured products' });
+    }
+
+    // Verify product exists and belongs to farmer
+    const productResult = await pool.query(
+      'SELECT id FROM products WHERE id = $1 AND farmer_id = $2',
+      [product_id, farmer_id]
+    );
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Product not found or does not belong to farmer' });
+    }
+
+    // Check if already featured
+    const existing = await pool.query(
+      'SELECT id FROM featured_products WHERE product_id = $1 AND is_active = true',
+      [product_id]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ message: 'Product is already featured' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO featured_products (product_id, farmer_id, expires_at, position)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [product_id, farmer_id, expires_at || null, position || 0]
+    );
+
+    // Audit log
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'featured_product.add',
+      entity: 'featured_products',
+      entity_id: result.rows[0].id,
+      before: null,
+      after: result.rows[0],
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'featured_product.add', entity: 'featured_products', entity_id: result.rows[0].id, actor_admin_id: req.user.id });
+
+    res.json({ message: 'Product featured successfully', featured_product: result.rows[0] });
+  } catch (error) {
+    console.error('Add featured product error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Remove product from featured
+router.delete('/featured-products/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const beforeRes = await pool.query('SELECT * FROM featured_products WHERE id = $1', [id]);
+    if (beforeRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Featured product not found' });
+    }
+
+    await pool.query('DELETE FROM featured_products WHERE id = $1', [id]);
+
+    // Audit log
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'featured_product.remove',
+      entity: 'featured_products',
+      entity_id: parseInt(id, 10),
+      before: beforeRes.rows[0],
+      after: null,
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'featured_product.remove', entity: 'featured_products', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
+
+    res.json({ message: 'Featured product removed successfully' });
+  } catch (error) {
+    console.error('Remove featured product error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update featured product
+router.put('/featured-products/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { expires_at, position, is_active } = req.body;
+
+    const beforeRes = await pool.query('SELECT * FROM featured_products WHERE id = $1', [id]);
+    if (beforeRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Featured product not found' });
+    }
+
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (expires_at !== undefined) {
+      updates.push(`expires_at = $${paramIndex}`);
+      values.push(expires_at);
+      paramIndex++;
+    }
+    if (position !== undefined) {
+      updates.push(`position = $${paramIndex}`);
+      values.push(position);
+      paramIndex++;
+    }
+    if (is_active !== undefined) {
+      updates.push(`is_active = $${paramIndex}`);
+      values.push(is_active);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ message: 'No fields to update' });
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
+    const result = await pool.query(
+      `UPDATE featured_products SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      values
+    );
+
+    // Audit log
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'featured_product.update',
+      entity: 'featured_products',
+      entity_id: parseInt(id, 10),
+      before: beforeRes.rows[0],
+      after: result.rows[0],
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'featured_product.update', entity: 'featured_products', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
+
+    res.json({ message: 'Featured product updated successfully', featured_product: result.rows[0] });
+  } catch (error) {
+    console.error('Update featured product error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 module.exports = router;

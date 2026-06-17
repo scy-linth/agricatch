@@ -77,6 +77,7 @@ class ProductPage {
         document.querySelector('meta[name="description"]')?.setAttribute('content', product.description || 'Fresh farm products available for pre-order on AgriCatch.');
 
         const safeFarmer = this.escapeHtml(product.farmer_name || 'Local Farmer');
+        const verifiedBadge = product.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : '';
         const safeUnit = this.escapeHtml(product.unit || 'unit');
         const safeLocation = this.escapeHtml(product.farm_location || product.location || 'Unknown location');
         const productRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -87,6 +88,7 @@ class ProductPage {
                      alt="${safeName}" class="product-image">
                 <div class="product-info">
                     <h2 class="product-name">${safeName}</h2>
+                    <div class="product-farmer">${safeFarmer}${verifiedBadge}</div>
                     <div class="product-price">${this.fmtCurrency(product.price)} per ${safeUnit}</div>
                     <p>${safeDesc}</p>
                     <div class="product-meta">

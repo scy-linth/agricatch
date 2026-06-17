@@ -464,7 +464,7 @@ class OrdersPage {
                     <div class="order-item-info">
                         <div class="order-item-name">${item.product_name || 'Product'}</div>
                         <div class="order-item-meta">${this.fmtNumber(quantity)} x ${this.fmtCurrency(item.price || order.price || 0)} ${item.unit || ''}</div>
-                        <div class="order-item-meta"><strong>From:</strong> ${item.farmer_name || 'Local Farmer'}</div>
+                        <div class="order-item-meta"><strong>From:</strong> ${item.farmer_name || 'Local Farmer'}${item.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : ''}</div>
                         ${(currentStatus === 'cancelled') ? `
                             <div class="order-item-meta">
                                 <button class="btn btn-small btn-secondary" onclick="ordersPage.openReasonViewer('${encodedReason}')">

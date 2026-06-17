@@ -119,6 +119,7 @@
                    data-bs-toggle="dropdown" aria-expanded="false">
                     <div class="profile-avatar-ring">
                         <img src="/images/resendlogo.png" alt="Profile" class="rounded-circle" id="header-profile-img">
+                        <span class="profile-initial" id="header-profile-initial" style="display:none"></span>
                     </div>
                     <span class="d-none d-md-block dropdown-toggle ps-2 fw-semibold" id="user-name">Admin</span>
                 </a>
@@ -126,7 +127,9 @@
                     <li class="dropdown-header">
                         <h6 class="mb-0 fw-semibold" id="user-name-dd"></h6>
                         <span id="user-email" class="small text-muted"></span>
-                        <span id="header-role-badge" class="badge bg-primary ms-2" style="display:none"></span>
+                        <div class="mt-1">
+                            <span id="header-role-badge" class="badge bg-primary" style="display:none"></span>
+                        </div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
@@ -239,27 +242,32 @@
             </a>
         </li>
 
-        <!-- ── People ─────────────────────────────────────────── -->
+        <!-- ── People (collapsible submenu) ─────────────────── -->
         <li class="nav-heading">People</li>
 
         <li class="nav-item">
-            <a id="users-link" class="nav-link collapsed sidebar-link"
-               href="#users" data-section="users">
+            <a class="nav-link collapsed" data-bs-target="#nav-users" data-bs-toggle="collapse" href="#">
                 <i class="bi bi-people"></i>
-                <span>Customers</span>
+                <span>Users</span>
+                <i class="bi bi-chevron-down ms-auto"></i>
             </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link collapsed sidebar-link" href="#farmers" data-section="farmers">
-                <i class="bi bi-person-badge"></i>
-                <span>Farmers</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link collapsed sidebar-link" href="#staff" data-section="staff">
-                <i class="fas fa-user-tie"></i>
-                <span>Staff</span>
-            </a>
+            <ul id="nav-users" class="nav-content collapse" data-bs-parent="#sidebar-nav">
+                <li>
+                    <a id="users-link" href="#users" class="sidebar-link" data-section="users">
+                        <i class="bi bi-circle"></i><span>Customers</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#farmers" class="sidebar-link" data-section="farmers">
+                        <i class="bi bi-circle"></i><span>Farmers</span>
+                    </a>
+                </li>
+                <li data-roles="super_admin">
+                    <a href="#staff" class="sidebar-link" data-section="staff">
+                        <i class="bi bi-circle"></i><span>Staff</span>
+                    </a>
+                </li>
+            </ul>
         </li>
         <li class="nav-item" data-roles="super_admin">
             <a class="nav-link collapsed sidebar-link" href="#all-users" data-section="all-users">
@@ -285,7 +293,7 @@
         </li>
 
         <!-- ── System ─────────────────────────────────────────── -->
-        <li class="nav-heading">Security</li>
+        <li class="nav-heading" data-roles="super_admin">Security</li>
 
         <li class="nav-item" data-roles="super_admin">
             <a class="nav-link collapsed sidebar-link" href="#suspicious-patterns" data-section="suspicious-patterns">
@@ -607,15 +615,18 @@
                         <table id="recent-sales-table" class="table table-borderless ac-table">
                             <thead>
                                 <tr>
+                                    <th scope="col" class="text-center">IMAGE</th>
                                     <th scope="col">#</th>
                                     <th scope="col">Customer</th>
                                     <th scope="col">Product</th>
                                     <th scope="col">Price</th>
+                                    <th scope="col">Sold</th>
+                                    <th scope="col">Revenue</th>
                                     <th scope="col">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="recent-sales-tbody">
-                                <tr><td colspan="5" class="text-center text-muted">
+                                <tr><td colspan="8" class="text-center text-muted">
                                     <span class="spinner-border spinner-border-sm"></span>
                                 </td></tr>
                             </tbody>
@@ -703,7 +714,7 @@
                         <table id="top-products-table" class="table table-borderless ac-table">
                             <thead>
                                 <tr>
-                                    <th scope="col" class="text-center">IMG</th>
+                                    <th scope="col" class="text-center">IMAGE</th>
                                     <th scope="col">Product</th>
                                     <th scope="col">Price</th>
                                     <th scope="col">Sold</th>
@@ -802,6 +813,7 @@
                     <table id="orders-table" class="table ac-table table-sm table-hover align-middle">
                         <thead>
                             <tr>
+                                <th class="text-center">IMG</th>
                                 <th class="col-order">ORDER</th>
                                 <th>CUSTOMER</th>
                                 <th>TOTAL</th>
@@ -812,7 +824,7 @@
                         </thead>
                         <tbody id="orders-tbody">
                             <tr>
-                                <td colspan="6">
+                                <td colspan="7">
                                     <div class="table-skeleton">
                                         <div class="skeleton-row"></div>
                                         <div class="skeleton-row"></div>
@@ -956,8 +968,8 @@
                     <div class="col-md-2 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Status</label>
                         <select id="products-status-filter" class="form-select form-select-sm">
-                            <option value="">Any status</option>
                             <option value="available">Active</option>
+                            <option value="">Any status</option>
                             <option value="disabled">Disabled</option>
                         </select>
                     </div>
@@ -1241,7 +1253,8 @@
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Full Name</th>
+                                    <th>Shop Name</th>
+                                    <th>FULL NAME</th>
                                     <th>Username</th>
                                     <th>Email</th>
                                     <th>Rating</th>
@@ -1251,7 +1264,7 @@
                                 </tr>
                             </thead>
                             <tbody id="farmers-all-tbody">
-                                <tr><td colspan="8" class="text-center text-muted py-4">
+                                <tr><td colspan="9" class="text-center text-muted py-4">
                                     <span class="spinner-border spinner-border-sm"></span>
                                 </td></tr>
                             </tbody>
@@ -2152,12 +2165,6 @@
                             <div id="chat-header-subtitle" class="chat-thread-sub"></div>
                         </div>
                     </div>
-                    <!-- Close chat = navigate back to previous section -->
-                    <button id="close-chat-drawer"
-                            class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
-                        <i class="bi bi-arrow-left"></i>
-                        <span>Back</span>
-                    </button>
                 </div>
 
                 <!-- #chat-messages → chat.js populates messages -->
@@ -2362,6 +2369,7 @@
                     <div class="card-body profile-card pt-4 d-flex flex-column align-items-center">
                         <div class="profile-avatar-lg mb-3">
                             <img src="/images/resendlogo.png" alt="Profile" class="rounded-circle" id="profile-avatar-img" style="width:80px;height:80px;object-fit:cover">
+                            <span class="profile-initial-lg" id="profile-avatar-initial" style="display:none"></span>
                         </div>
                         <h2 class="fw-semibold" id="profile-full-name">—</h2>
                         <h3 class="text-muted small" id="profile-role-label"></h3>
@@ -2439,9 +2447,9 @@
                                         <label class="form-label">Phone</label>
                                         <div class="input-group input-group-sm">
                                             <span class="input-group-text">+63</span>
-                                            <input type="text" id="pe-phone" class="form-control" placeholder="9XXXXXXXXX" maxlength="10" pattern="9[0-9]{9}">
+                                            <input type="text" id="pe-phone" class="form-control" placeholder="9XX XXX XXXX" maxlength="12" pattern="9[0-9]{2} [0-9]{3} [0-9]{4}">
                                         </div>
-                                        <div class="form-text text-muted small">Enter 10 digits starting with 9 (e.g. 9123456789). Letters are not allowed.</div>
+                                        <div class="form-text text-muted small">Enter 10 digits starting with 9 (e.g. 912 345 6789). Letters are not allowed.</div>
                                     </div>
                                     <div class="text-end">
                                         <button type="submit" class="btn btn-primary btn-sm" id="profile-save-btn">
@@ -2506,6 +2514,24 @@
         <div class="panel-empty-state">
             <i class="bi bi-bag"></i>
             <p>Select an order to view details</p>
+        </div>
+    </div>
+</aside>
+
+<!-- Product Approval Panel -->
+<aside id="product-approval-panel" class="admin-detail-panel">
+    <div class="detail-panel-header">
+        <h3 class="detail-panel-title">Product Approval</h3>
+        <button id="close-product-approval-panel"
+                class="detail-panel-close"
+                aria-label="Close product approval details">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    <div id="product-approval-content" class="detail-panel-body">
+        <div class="panel-empty-state">
+            <i class="bi bi-box-seam"></i>
+            <p>Select a product to review</p>
         </div>
     </div>
 </aside>
@@ -2595,6 +2621,12 @@
                     <label class="form-label" for="edit-user-fullname">Full Name</label>
                     <input type="text" id="edit-user-fullname"
                            class="form-control" placeholder="Full name">
+                </div>
+
+                <div class="form-group mb-3" id="edit-user-shop-name-group" style="display:none;">
+                    <label class="form-label" for="edit-user-shopname">Shop Name</label>
+                    <input type="text" id="edit-user-shopname"
+                           class="form-control" placeholder="Shop name (for farmers)">
                 </div>
 
                 <div class="form-row-2 mb-3">
@@ -2746,6 +2778,12 @@
                                    class="form-control" placeholder="9XXXXXXXXX" maxlength="10" pattern="9[0-9]{9}">
                         </div>
                     </div>
+                </div>
+
+                <div class="form-group mb-3" id="create-user-shop-name-group" style="display:none;">
+                    <label class="form-label" for="create-user-shopname">Shop Name</label>
+                    <input type="text" id="create-user-shopname"
+                           class="form-control" placeholder="Shop name (for farmers)">
                 </div>
 
                 <div class="form-group mb-2">
@@ -2975,6 +3013,29 @@
     </div>
 </div>
 
+<!-- ── Rejection Reason Modal ─────────────────────────────────────────── -->
+<div id="reject-product-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-sm">
+        <div class="modal-header">
+            <h5 class="modal-title">Reject Product</h5>
+            <button class="modal-close-btn" id="reject-product-modal-close" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="mb-3">
+                <label for="rejection-reason" class="form-label small fw-semibold">Rejection Reason <span class="text-danger">*</span></label>
+                <textarea id="rejection-reason" class="form-control" rows="4" placeholder="Please explain why this product is being rejected..." required></textarea>
+                <div class="form-text text-muted small">This reason will be visible to the farmer.</div>
+            </div>
+        </div>
+        <div class="modal-footer gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="reject-product-cancel">Cancel</button>
+            <button type="button" class="btn btn-danger btn-sm" id="reject-product-confirm">Reject Product</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── Customer Detail Modal ─────────────────────────────────────────── -->
 <div id="customer-detail-modal" class="admin-modal-backdrop">
     <div class="admin-modal modal-lg">
@@ -3001,11 +3062,11 @@
                         <table class="table table-hover align-middle small">
                             <thead>
                                 <tr>
-                                    <th>#</th><th>Product</th><th>Status</th><th>Total</th><th>Date</th>
+                                    <th>#</th><th>Product</th><th>Farmer</th><th>Status</th><th>Total</th><th>Date</th>
                                 </tr>
                             </thead>
                             <tbody id="cdt-orders-tbody">
-                                <tr><td colspan="5" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>
+                                <tr><td colspan="6" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>
                             </tbody>
                         </table>
                     </div>

@@ -137,6 +137,47 @@
     return [street, barangay, city, province].filter(Boolean).join(', ');
   };
 
+  // Parse an address string into components
+  // Expected format: "street, barangay, city, province" or "barangay, city, province"
+  const parseAddress = (addressStr) => {
+    if (!addressStr || typeof addressStr !== 'string') return null;
+
+    const parts = addressStr.split(',').map(p => p.trim()).filter(Boolean);
+    const result = { street: '', barangay: '', city: '', province: '', zone: '' };
+
+    if (parts.length === 0) return null;
+    if (parts.length === 1) {
+      // Only one part - could be city or province
+      result.city = parts[0];
+    } else if (parts.length === 2) {
+      // "city, province"
+      result.city = parts[0];
+      result.province = parts[1];
+    } else if (parts.length === 3) {
+      // "barangay, city, province"
+      result.barangay = parts[0];
+      result.city = parts[1];
+      result.province = parts[2];
+    } else if (parts.length >= 4) {
+      // "street, barangay, city, province"
+      result.street = parts[0];
+      result.barangay = parts[1];
+      result.city = parts[2];
+      result.province = parts[3];
+    }
+
+    // Determine zone from province
+    if (result.province === 'Metro Manila' || result.province === 'metro') {
+      result.zone = 'metro';
+    } else if (result.province) {
+      // Try to determine zone from province (this is a simplified check)
+      // In a real implementation, you'd need a province-to-zone mapping
+      // For now, we'll just leave zone empty and let the user select it
+    }
+
+    return result;
+  };
+
   global.PSGC = {
     ZONES,
     loadZones,
@@ -146,6 +187,7 @@
     onZoneChange,
     onProvinceChange,
     formatAddress,
+    parseAddress,
     setSelectOptions
   };
 })(window);

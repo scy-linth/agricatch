@@ -4,6 +4,9 @@ const { pool } = require('../utils/db');
 
 const router = express.Router();
 
+const MAX_MESSAGE_LENGTH = 500;
+const MESSAGES_PAGE_SIZE = 50;
+
 const getUserFromToken = (req) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return null;
@@ -13,6 +16,7 @@ const getUserFromToken = (req) => {
     return null;
   }
 };
+
 
 // Get conversations for user
 // Note: For farmers, full_name represents the shop/farm name (editable via shop overview)
@@ -71,14 +75,32 @@ router.get('/conversation/:conversationId', async (req, res) => {
       return res.status(403).json({ message: 'Access denied to this conversation' });
     }
 
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const offset = (page - 1) * MESSAGES_PAGE_SIZE;
+
+    const countResult = await pool.query(
+      'SELECT COUNT(*)::int as total FROM messages WHERE conversation_id = $1',
+      [conversationId]
+    );
+    const totalMessages = countResult.rows[0]?.total || 0;
+
     const result = await pool.query(`
       SELECT m.*
       FROM messages m
       WHERE m.conversation_id = $1
       ORDER BY m.created_at ASC
-    `, [conversationId]);
+      LIMIT $2 OFFSET $3
+    `, [conversationId, MESSAGES_PAGE_SIZE, offset]);
 
-    res.json({ messages: result.rows });
+    res.json({
+      messages: result.rows,
+      pagination: {
+        page,
+        pageSize: MESSAGES_PAGE_SIZE,
+        totalMessages,
+        totalPages: Math.ceil(totalMessages / MESSAGES_PAGE_SIZE)
+      }
+    });
   } catch (error) {
     console.error('Get messages error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -116,6 +138,16 @@ router.post('/send', async (req, res) => {
     const { receiver_id, message, product_id } = req.body;
     if (!receiver_id || !message) {
       return res.status(400).json({ message: 'receiver_id and message are required' });
+    }
+
+    const trimmedMessage = String(message).trim();
+    if (trimmedMessage.length === 0) {
+      return res.status(400).json({ message: 'Message cannot be empty' });
+    }
+    if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+      return res.status(400).json({
+        message: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters`
+      });
     }
 
     const senderRole = await pool.query('SELECT role FROM users WHERE id = $1', [user.id]);
@@ -174,7 +206,7 @@ router.post('/send', async (req, res) => {
     await pool.query(`
       INSERT INTO messages (conversation_id, sender_id, receiver_id, message, product_id)
       VALUES ($1, $2, $3, $4, $5)
-    `, [conversationId, user.id, receiver_id, message, product_id || null]);
+    `, [conversationId, user.id, receiver_id, trimmedMessage, product_id || null]);
 
     res.status(201).json({ message: 'Message sent' });
   } catch (error) {

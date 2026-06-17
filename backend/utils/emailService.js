@@ -1,5 +1,30 @@
 const nodemailer = require("nodemailer");
+const path = require("path");
+const fs = require("fs");
 require("dotenv").config();
+
+// Inline logo attachment for email clients (fixes broken image in Gmail)
+const logoPath = path.join(__dirname, "..", "..", "frontend", "images", "resendlogo.png");
+let logoBase64 = "";
+let logoAttachmentNodemailer = null;
+let logoAttachmentResend = null;
+try {
+  const logoBuffer = fs.readFileSync(logoPath);
+  logoBase64 = logoBuffer.toString("base64");
+  logoAttachmentNodemailer = {
+    filename: "resendlogo.png",
+    path: logoPath,
+    cid: "logo@agricatch",
+  };
+  logoAttachmentResend = {
+    filename: "resendlogo.png",
+    content: logoBase64,
+    content_id: "logo@agricatch",
+    content_type: "image/png",
+  };
+} catch (err) {
+  console.warn("⚠️ Email logo not found at", logoPath, "— emails will not include logo");
+}
 
 // Check if Resend API key is available (preferred for cloud deployments)
 // Use Resend by default if API key is available, only use SMTP as fallback
@@ -97,7 +122,7 @@ async function sendOtpEmail(to, otp, purpose = "login") {
     <body>
       <div class="container">
         <div class="header">
-          <img src="https://res.cloudinary.com/dwv7lhgvm/image/upload/v1769510815/resendlogo_jlo0c7.png" alt="Resend Logo" class="logo-img" />
+          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
           <h1>AgriCatch</h1>
           <p>${purposeText} Verification</p>
         </div>
@@ -149,6 +174,7 @@ async function sendOtpEmail(to, otp, purpose = "login") {
         subject: `Your ${purposeText} OTP Code`,
         html: htmlContent,
         text: textContent,
+        attachments: logoAttachmentResend ? [logoAttachmentResend] : undefined,
       });
 
       if (error) {
@@ -177,6 +203,7 @@ async function sendOtpEmail(to, otp, purpose = "login") {
     subject: `Your ${purposeText} OTP Code`,
     html: htmlContent,
     text: textContent,
+    attachments: logoAttachmentNodemailer ? [logoAttachmentNodemailer] : undefined,
   };
 
   try {

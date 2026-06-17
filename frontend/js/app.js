@@ -829,6 +829,30 @@ class AgricultureMarket {
             });
         }
 
+        const toggleMyAddressSectionBtn = document.getElementById('toggle-my-address-section');
+        if (toggleMyAddressSectionBtn) {
+            toggleMyAddressSectionBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleMyAccountAddressSection(true);
+            });
+        }
+
+        const myAccountAddressBackBtn = document.getElementById('my-account-address-back');
+        if (myAccountAddressBackBtn) {
+            myAccountAddressBackBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleMyAccountAddressSection(false);
+            });
+        }
+
+        const changeMyAddressBtn = document.getElementById('change-my-address-btn');
+        if (changeMyAddressBtn) {
+            changeMyAddressBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.changeMyAccountAddress();
+            });
+        }
+
         this.bindPasswordToggle('toggle-my-account-current-password', 'my-account-current-password');
         this.bindPasswordToggle('toggle-my-account-new-password', 'my-account-new-password');
         this.bindPasswordToggle('toggle-my-account-confirm-password', 'my-account-confirm-password');
@@ -849,6 +873,14 @@ class AgricultureMarket {
         if (myAccountCity) myAccountCity.addEventListener('change', () => this.handleMyAccountCityChange());
         if (myAccountBarangay) myAccountBarangay.addEventListener('change', () => this.updateMyAccountAddressPreview());
         if (myAccountStreet) myAccountStreet.addEventListener('input', () => this.updateMyAccountAddressPreview());
+
+        // My Account phone number input formatting
+        const myAccountPhone = document.getElementById('my-account-phone');
+        if (myAccountPhone) {
+            myAccountPhone.addEventListener('input', (e) => {
+                e.target.value = this.formatPhoneInputValue(e.target.value);
+            });
+        }
 
         const myAccountModal = document.getElementById('my-account-modal');
         if (myAccountModal) {
@@ -1056,10 +1088,16 @@ class AgricultureMarket {
         if (toggleConfirmPassword) {
             toggleConfirmPassword.addEventListener('click', () => {
                 const input = passwordConfirm;
-                const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
-                input.setAttribute('type', type);
-                toggleConfirmPassword.querySelector('i').classList.toggle('fa-eye');
-                toggleConfirmPassword.querySelector('i').classList.toggle('fa-eye-slash');
+                const icon = toggleConfirmPassword.querySelector('i');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                } else {
+                    input.type = 'password';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                }
             });
         }
 
@@ -1071,12 +1109,12 @@ class AgricultureMarket {
                 const icon = toggleLoginPassword.querySelector('i');
                 if (loginPasswordInput.type === 'password') {
                     loginPasswordInput.type = 'text';
-                    icon.classList.remove('fa-eye');
-                    icon.classList.add('fa-eye-slash');
-                } else {
-                    loginPasswordInput.type = 'password';
                     icon.classList.remove('fa-eye-slash');
                     icon.classList.add('fa-eye');
+                } else {
+                    loginPasswordInput.type = 'password';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
                 }
             });
         }
@@ -1119,12 +1157,12 @@ class AgricultureMarket {
                 const icon = toggleRegisterPassword.querySelector('i');
                 if (passwordInput.type === 'password') {
                     passwordInput.type = 'text';
-                    icon.classList.remove('fa-eye');
-                    icon.classList.add('fa-eye-slash');
-                } else {
-                    passwordInput.type = 'password';
                     icon.classList.remove('fa-eye-slash');
                     icon.classList.add('fa-eye');
+                } else {
+                    passwordInput.type = 'password';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
                 }
             });
         }
@@ -1255,12 +1293,12 @@ class AgricultureMarket {
                 const icon = toggleForgotPassword.querySelector('i');
                 if (forgotPass.type === 'password') {
                     forgotPass.type = 'text';
-                    icon.classList.remove('fa-eye');
-                    icon.classList.add('fa-eye-slash');
-                } else {
-                    forgotPass.type = 'password';
                     icon.classList.remove('fa-eye-slash');
                     icon.classList.add('fa-eye');
+                } else {
+                    forgotPass.type = 'password';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
                 }
             });
         }
@@ -1270,12 +1308,12 @@ class AgricultureMarket {
                 const icon = toggleForgotConfirmPassword.querySelector('i');
                 if (forgotPassConfirm.type === 'password') {
                     forgotPassConfirm.type = 'text';
-                    icon.classList.remove('fa-eye');
-                    icon.classList.add('fa-eye-slash');
-                } else {
-                    forgotPassConfirm.type = 'password';
                     icon.classList.remove('fa-eye-slash');
                     icon.classList.add('fa-eye');
+                } else {
+                    forgotPassConfirm.type = 'password';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
                 }
             });
         }
@@ -2255,6 +2293,7 @@ class AgricultureMarket {
         const barangayEl = document.getElementById('my-account-barangay');
         const streetEl = document.getElementById('my-account-street');
         const addressPreviewEl = document.getElementById('my-account-address');
+        const addressDisplayEl = document.getElementById('my-account-address-display');
         const nameParts = this.deriveNameParts(profile);
 
         if (usernameEl) usernameEl.value = profile.username || '';
@@ -2276,6 +2315,8 @@ class AgricultureMarket {
         if (streetEl) streetEl.value = '';
         // Show existing address as preview until user re-selects
         if (addressPreviewEl) addressPreviewEl.value = profile.address || '';
+        // Show existing address in display field
+        if (addressDisplayEl) addressDisplayEl.value = profile.address || '';
 
         this.clearMyAccountPasswordFields();
         modal.classList.add('open');
@@ -2355,13 +2396,45 @@ class AgricultureMarket {
         if (modal) {
             modal.classList.remove('open');
             this.clearMyAccountPasswordFields();
+            this.clearMyAccountAddressFields();
         }
+    }
+
+    clearMyAccountAddressFields() {
+        const zoneEl = document.getElementById('my-account-zone');
+        const provinceEl = document.getElementById('my-account-province');
+        const cityEl = document.getElementById('my-account-city');
+        const barangayEl = document.getElementById('my-account-barangay');
+        const streetEl = document.getElementById('my-account-street');
+        const addressPreviewEl = document.getElementById('my-account-address');
+
+        if (zoneEl) { zoneEl.value = ''; zoneEl.disabled = true; }
+        if (provinceEl) { provinceEl.value = ''; provinceEl.disabled = true; }
+        if (cityEl) { cityEl.value = ''; cityEl.disabled = true; }
+        if (barangayEl) { barangayEl.value = ''; barangayEl.disabled = true; }
+        if (streetEl) streetEl.value = '';
+        if (addressPreviewEl) addressPreviewEl.value = '';
     }
 
     toggleMyAccountPasswordSection(forceOpen = null) {
         const fields = document.getElementById('my-account-password-fields');
         const mainFields = document.getElementById('my-account-main-fields');
         const toggleBtn = document.getElementById('toggle-my-password-section');
+        if (!fields) return;
+        const willOpen = forceOpen === null ? !!fields.hidden : !!forceOpen;
+        fields.hidden = !willOpen;
+        if (mainFields) {
+            mainFields.hidden = willOpen;
+        }
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        }
+    }
+
+    toggleMyAccountAddressSection(forceOpen = null) {
+        const fields = document.getElementById('my-account-address-fields');
+        const mainFields = document.getElementById('my-account-main-fields');
+        const toggleBtn = document.getElementById('toggle-my-address-section');
         if (!fields) return;
         const willOpen = forceOpen === null ? !!fields.hidden : !!forceOpen;
         fields.hidden = !willOpen;
@@ -2382,14 +2455,14 @@ class AgricultureMarket {
             if (input.type === 'password') {
                 input.type = 'text';
                 if (icon) {
-                    icon.classList.remove('fa-eye');
-                    icon.classList.add('fa-eye-slash');
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
                 }
             } else {
                 input.type = 'password';
                 if (icon) {
-                    icon.classList.remove('fa-eye-slash');
-                    icon.classList.add('fa-eye');
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
                 }
             }
         });
@@ -2448,8 +2521,14 @@ class AgricultureMarket {
                 : [street, barangay, city, province].filter(Boolean).join(', ');
         }
 
-        if (!first_name || !last_name || phoneDigits.length !== 10) {
-            this.showMessage('Please complete first name, last name, and a 10-digit phone number.', 'error');
+        // Validate phone number: must be 10 digits and start with 9
+        if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+            this.showMessage('Please enter a valid contact number (10 digits starting with 9).', 'error');
+            return;
+        }
+
+        if (!first_name || !last_name) {
+            this.showMessage('Please complete first name and last name.', 'error');
             return;
         }
 
@@ -2536,6 +2615,46 @@ class AgricultureMarket {
         } catch (error) {
             console.error('Change my account password error:', error);
             this.showMessage('Failed to change password.', 'error');
+        }
+    }
+
+    async changeMyAccountAddress() {
+        const province = document.getElementById('my-account-province')?.value?.trim() || '';
+        const city = document.getElementById('my-account-city')?.value?.trim() || '';
+        const barangay = document.getElementById('my-account-barangay')?.value?.trim() || '';
+        const street = document.getElementById('my-account-street')?.value?.trim() || '';
+
+        if (!province || !city || !barangay || !street) {
+            this.showMessage('Please complete all address fields: province, city, barangay, and street.', 'error');
+            return;
+        }
+
+        const address = window.PSGC
+            ? window.PSGC.formatAddress({ street, barangay, city, province })
+            : [street, barangay, city, province].filter(Boolean).join(', ');
+
+        try {
+            const response = await fetch(`${this.apiBase}/auth/profile`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ address })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || 'Failed to change address.', 'error');
+                return;
+            }
+
+            this.showMessage(data.message || 'Address changed successfully.', 'success');
+            await this.loadUserProfile();
+            this.toggleMyAccountAddressSection(false);
+        } catch (error) {
+            console.error('Change my account address error:', error);
+            this.showMessage('Failed to change address.', 'error');
         }
     }
 
@@ -4386,7 +4505,8 @@ class AgricultureMarket {
             if (descriptionEl) descriptionEl.textContent = product.description || 'No description available.';
             if (farmerEl) {
                 const farmerName = product.farmer_name || product.full_name || 'Local Farmer';
-                farmerEl.textContent = farmerName;
+                const verifiedBadge = product.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : '';
+                farmerEl.innerHTML = `${farmerName}${verifiedBadge}`;
             }
             if (farmerActionsEl) {
                 const farmerId = Number(product.farmer_id || 0);

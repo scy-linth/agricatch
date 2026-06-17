@@ -8,21 +8,21 @@ ADD COLUMN IF NOT EXISTS last_name VARCHAR(50);
 -- Migrate existing data: split full_name into first_name, middle_name, last_name
 -- For farmers: set shop_name = full_name (as default)
 UPDATE users
-SET 
-    first_name = CASE 
+SET
+    first_name = CASE
         WHEN position(' ' IN full_name) > 0 THEN substring(full_name from 1 for position(' ' IN full_name) - 1)
         ELSE full_name
     END,
-    last_name = CASE 
+    last_name = CASE
         WHEN position(' ' IN full_name) > 0 THEN substring(full_name from (length(full_name) - position(' ' IN reverse(full_name)) + 2))
         ELSE full_name
     END,
-    middle_name = CASE 
-        WHEN array_length(regexp_split_to_array(full_name, '\s+'), 1) > 2 THEN
-            array_to_string(regexp_split_to_array(full_name, '\s+')[2:array_length(regexp_split_to_array(full_name, '\s+'), 1)-1], ' ')
+    middle_name = CASE
+        WHEN (length(full_name) - length(replace(full_name, ' ', ''))) >= 2 THEN
+            substring(full_name from position(' ' IN full_name) + 1 for length(full_name) - position(' ' IN full_name) - position(' ' IN reverse(full_name)) - 1)
         ELSE NULL
     END,
-    shop_name = CASE 
+    shop_name = CASE
         WHEN role = 'farmer' THEN full_name
         ELSE NULL
     END

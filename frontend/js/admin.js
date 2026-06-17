@@ -35,6 +35,9 @@ class AdminDashboard {
 
         this.init();
 
+        // Setup chat scroll observer after initialization
+        setTimeout(() => this.setupChatScrollObserver(), 500);
+
         // Centralized event delegation for all table action buttons
         // (capture phase so it fires before simple-datatables stopPropagation)
         document.addEventListener('click', (e) => {
@@ -67,6 +70,8 @@ class AdminDashboard {
                 this.toggleModalPasswordVisibility();
             } else if (btn.matches('.category-requests-view-btn')) {
                 this.showSection('category-requests');
+            } else if (btn.matches('.product-view-btn')) {
+                this.openProductApprovalDetail(Number(btn.dataset.productId));
             } else if (btn.matches('.product-approve-btn')) {
                 this.approveProduct(Number(btn.dataset.productId));
             } else if (btn.matches('.product-reject-btn')) {
@@ -351,6 +356,8 @@ class AdminDashboard {
         this.setupEventListeners();
         this.setupRealtime();
         this.startUnreadPolling();
+        this.loadProductApprovalsBadge();
+        this.initChat();
         // Description char counter for product edit
         const desc = document.getElementById('edit-product-description');
         const count = document.getElementById('edit-product-description-count');
@@ -393,7 +400,32 @@ class AdminDashboard {
                     link.classList.add('active');
                 }
                 this._kpiPeriods[card] = period;
-                this.loadKpiCard(card, period);
+                // Sync all KPI periods to match
+                for (const key of Object.keys(this._kpiPeriods)) {
+                    this._kpiPeriods[key] = period;
+                }
+                // Sync reports period as well
+                this._reportPeriod = period;
+                const reportLbl = document.getElementById('reports-period-label');
+                if (reportLbl) reportLbl.textContent = `| ${this._periodLabel(period)}`;
+                // Reload reports chart with new period
+                this.loadReportsChart(period);
+                // Reload all KPI cards with new period
+                for (const key of Object.keys(this._kpiPeriods)) {
+                    this.loadKpiCard(key, period);
+                }
+                // Update all comparison labels
+                const comparisonText = this._comparisonLabel(period);
+                const labels = [
+                    'kpi-sales-change-label',
+                    'kpi-revenue-change-label',
+                    'kpi-customers-change-label',
+                    'kpi-farmers-change-label'
+                ];
+                labels.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = comparisonText;
+                });
                 this._savePeriods();
             }
         });
@@ -407,6 +439,26 @@ class AdminDashboard {
             this._reportPeriod = period;
             const lbl = document.getElementById('reports-period-label');
             if (lbl) lbl.textContent = `| ${this._periodLabel(period)}`;
+            // Sync all KPI periods to match
+            for (const key of Object.keys(this._kpiPeriods)) {
+                this._kpiPeriods[key] = period;
+            }
+            // Reload all KPI cards with new period
+            for (const key of Object.keys(this._kpiPeriods)) {
+                this.loadKpiCard(key, period);
+            }
+            // Update all comparison labels
+            const comparisonText = this._comparisonLabel(period);
+            const labels = [
+                'kpi-sales-change-label',
+                'kpi-revenue-change-label',
+                'kpi-customers-change-label',
+                'kpi-farmers-change-label'
+            ];
+            labels.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = comparisonText;
+            });
             this.loadReportsChart(period);
             this._savePeriods();
         });
@@ -485,7 +537,12 @@ class AdminDashboard {
                 }
             });
 
-            es.addEventListener('admin.audit', () => {
+            es.addEventListener('admin.audit', (evt) => {
+                const data = JSON.parse(evt.data);
+                // Refresh product approvals badge on product approve/reject
+                if (data.action === 'product.approve' || data.action === 'product.reject') {
+                    this.loadProductApprovalsBadge();
+                }
                 // If logs tab is open, refresh it
                 const logsSection = document.getElementById('logs');
                 if (logsSection && logsSection.classList.contains('active')) {
@@ -562,6 +619,32 @@ class AdminDashboard {
         }
     }
 
+    setupChatScrollObserver() {
+        const chatSection = document.getElementById('chat');
+        if (!chatSection) return;
+
+        // Watch for chat section becoming active
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    if (chatSection.classList.contains('active')) {
+                        // Chat section became active, scroll browser to bottom
+                        window.scrollTo(0, document.body.scrollHeight);
+                    }
+                }
+            });
+        });
+
+        observer.observe(chatSection, { attributes: true });
+
+        // Also scroll to bottom on initial load if chat section is already active
+        if (chatSection.classList.contains('active')) {
+            setTimeout(() => {
+                window.scrollTo(0, document.body.scrollHeight);
+            }, 500);
+        }
+    }
+
     showSection(sectionId) {
         // Block staff from accessing super_admin-only sections
         const sectionEl = document.getElementById(sectionId);
@@ -585,6 +668,13 @@ class AdminDashboard {
             link.classList.toggle('active', isActive);
             link.classList.toggle('collapsed', !isActive);
         });
+
+        // Scroll browser to bottom when chat section becomes active
+        if (sectionId === 'chat') {
+            setTimeout(() => {
+                window.scrollTo(0, document.body.scrollHeight);
+            }, 500);
+        }
 
         // Add active state to parent collapse menu for catalog sections
         const catalogSections = ['catalog-products', 'categories', 'category-requests'];
@@ -799,28 +889,29 @@ class AdminDashboard {
                 const userNameDdEl = document.getElementById('user-name-dd');
                 const userEmailEl  = document.getElementById('user-email');
                 const profileImgEl  = document.getElementById('header-profile-img');
+                const roleBadgeEl  = document.getElementById('header-role-badge');
                 if (userNameEl)   userNameEl.textContent   = formattedFirstName;
                 if (userNameDdEl) userNameDdEl.textContent = formattedFirstName;
                 if (userEmailEl)  userEmailEl.textContent  = data.user.email || '';
+                if (roleBadgeEl) {
+                    roleBadgeEl.textContent = data.user.role || 'admin';
+                    roleBadgeEl.style.display = 'inline-block';
+                }
                 // Set avatar to first letter of first name if no image
                 if (profileImgEl && !data.user.profile_image) {
                     const firstLetter = firstName.charAt(0).toUpperCase();
                     profileImgEl.style.display = 'none';
-                    // Create or update avatar fallback
-                    let avatarFallback = document.getElementById('header-avatar-fallback');
-                    if (!avatarFallback) {
-                        avatarFallback = document.createElement('div');
-                        avatarFallback.id = 'header-avatar-fallback';
-                        avatarFallback.className = 'profile-avatar-fallback';
-                        profileImgEl.parentNode.insertBefore(avatarFallback, profileImgEl);
+                    // Use profile-initial element
+                    const profileInitial = document.getElementById('header-profile-initial');
+                    if (profileInitial) {
+                        profileInitial.textContent = firstLetter;
+                        profileInitial.style.display = 'flex';
                     }
-                    avatarFallback.textContent = firstLetter;
-                    avatarFallback.style.display = 'flex';
                 } else if (profileImgEl && data.user.profile_image) {
                     profileImgEl.src = data.user.profile_image;
                     profileImgEl.style.display = 'block';
-                    const avatarFallback = document.getElementById('header-avatar-fallback');
-                    if (avatarFallback) avatarFallback.style.display = 'none';
+                    const profileInitial = document.getElementById('header-profile-initial');
+                    if (profileInitial) profileInitial.style.display = 'none';
                 }
                 // Apply role-based UI
                 const visitSiteBtn = document.getElementById('visit-site-btn');
@@ -861,6 +952,10 @@ class AdminDashboard {
         document.getElementById('show-all-notifications-link')?.addEventListener('click', (e) => {
             e.preventDefault();
             this.navigateTo('notifications');
+        });
+        document.getElementById('notif-mark-all-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.markAllNotifsRead();
         });
         document.getElementById('show-all-messages-link')?.addEventListener('click', (e) => {
             e.preventDefault();
@@ -904,19 +999,13 @@ class AdminDashboard {
         const closeCategoryPanel = document.getElementById('close-category-panel');
         const closeCustomerPanel = document.getElementById('close-customer-panel');
         const closeFarmerPanel = document.getElementById('close-farmer-panel');
-        const chatClose    = document.getElementById('close-chat-drawer');
+        const closeProductApprovalPanel = document.getElementById('close-product-approval-panel');
 
         if (closePanel) closePanel.addEventListener('click', () => this.closeOrderDetails());
         if (closeCategoryPanel) closeCategoryPanel.addEventListener('click', () => this.closeCategoryDetails());
         if (closeCustomerPanel) closeCustomerPanel.addEventListener('click', () => this.closeCustomerDetails());
         if (closeFarmerPanel) closeFarmerPanel.addEventListener('click', () => this.closeFarmerDetails());
-        if (chatClose) chatClose.addEventListener('click', () => {
-            // If prevSection is not set or is the same as current, default to overview
-            const targetSection = (this.prevSection && this.prevSection !== this.activeSection) 
-                ? this.prevSection 
-                : 'overview';
-            this.showSection(targetSection);
-        });
+        if (closeProductApprovalPanel) closeProductApprovalPanel.addEventListener('click', () => this.closeProductApprovalDetails());
 
         // Users in-section filter - use API search across all pages
         const usersSearchBtn = document.getElementById('users-search-btn');
@@ -971,10 +1060,12 @@ class AdminDashboard {
         });
 
         document.getElementById('products-refresh-btn')?.addEventListener('click', () => {
-            ['products-search-input','products-category-filter','products-status-filter'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
-            });
+            const searchInput = document.getElementById('products-search-input');
+            const categoryFilter = document.getElementById('products-category-filter');
+            const statusFilter = document.getElementById('products-status-filter');
+            if (searchInput) searchInput.value = '';
+            if (categoryFilter) categoryFilter.value = '';
+            if (statusFilter) statusFilter.value = 'available';
             this.loadProducts();
             this.showToast('Listings refreshed', 'success');
         });
@@ -1075,16 +1166,24 @@ class AdminDashboard {
             });
         });
 
-        // Prevent letters in phone fields
+        // Format phone input with spaces (9XX XXX XXXX)
         ['pe-phone', 'edit-user-phone', 'create-user-phone'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
                 el.addEventListener('input', () => {
-                    el.value = el.value.replace(/\D/g, '');
-                });
-                el.addEventListener('keydown', (e) => {
-                    if (e.key.length === 1 && !/\d/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                        e.preventDefault();
+                    // Remove non-digits
+                    let digits = el.value.replace(/\D/g, '');
+                    // Limit to 10 digits
+                    if (digits.length > 10) digits = digits.slice(0, 10);
+                    // Format as 9XX XXX XXXX
+                    if (digits.length > 0) {
+                        let formatted = digits[0];
+                        if (digits.length > 1) formatted += digits.slice(1, 3);
+                        if (digits.length > 3) formatted += ' ' + digits.slice(3, 6);
+                        if (digits.length > 6) formatted += ' ' + digits.slice(6, 10);
+                        el.value = formatted;
+                    } else {
+                        el.value = '';
                     }
                 });
             }
@@ -1119,6 +1218,17 @@ class AdminDashboard {
                 if (icon) icon.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
             });
         }
+
+        // Rejection modal event listeners
+        document.getElementById('reject-product-modal-close')?.addEventListener('click', () => {
+            const modal = document.getElementById('reject-product-modal');
+            if (modal) modal.classList.remove('open');
+        });
+        document.getElementById('reject-product-cancel')?.addEventListener('click', () => {
+            const modal = document.getElementById('reject-product-modal');
+            if (modal) modal.classList.remove('open');
+        });
+        document.getElementById('reject-product-confirm')?.addEventListener('click', () => this.confirmRejectProduct());
 
         const editProductForm = document.getElementById('edit-product-form');
         if (editProductForm) editProductForm.addEventListener('submit', (e) => this.submitProductEdit(e));
@@ -1607,6 +1717,11 @@ class AdminDashboard {
         return map[period] || period;
     }
 
+    _comparisonLabel(period) {
+        const map = { today: 'vs prev today', week: 'vs prev week', month: 'vs prev month', year: 'vs prev year', all: '' };
+        return map[period] || 'vs prev today';
+    }
+
     _restorePeriods() {
         try {
             const saved = localStorage.getItem('adminDashboardPeriods');
@@ -1731,7 +1846,21 @@ class AdminDashboard {
             if (!res.ok) return;
             const { data } = await res.json();
 
+            const el = document.getElementById('reportsChart');
+            if (!el) return;
+
+            if (this._reportsChart) {
+                this._reportsChart.destroy();
+                this._reportsChart = null;
+            }
+            el.innerHTML = '';
+
             if (typeof ApexCharts === 'undefined') return;
+
+            if (!data || data.length === 0) {
+                el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:350px;color:#9ca3af;font-size:14px;">No data available</div>';
+                return;
+            }
 
             const labels = data.map(d => {
                 const dt = new Date(d.label);
@@ -1740,52 +1869,47 @@ class AdminDashboard {
                 return dt.toLocaleDateString('default', { month: 'short', day: 'numeric' });
             });
 
-            const revenues = data.map(d => d.revenue);
-            const sales = data.map(d => d.sales);
-            const customers = data.map(d => d.customers);
-            const farmers = data.map(d => d.farmers || 0);
-
-            const options = {
+            this._reportsChart = new ApexCharts(el, {
                 series: [
-                    { name: 'Revenue (₱)', data: revenues, yaxisIndex: 0 },
-                    { name: 'Sales', data: sales, yaxisIndex: 1 },
-                    { name: 'Customers', data: customers, yaxisIndex: 1 },
-                    { name: 'Farmers', data: farmers, yaxisIndex: 1 },
+                    { name: 'Revenue (₱)', data: data.map(d => parseFloat(d.revenue) || 0) },
+                    { name: 'Sales', data: data.map(d => parseInt(d.sales) || 0) },
+                    { name: 'Customers', data: data.map(d => parseInt(d.customers) || 0) },
+                    { name: 'Farmers', data: data.map(d => parseInt(d.farmers) || 0) },
                 ],
-                chart: { type: 'area', height: 350, toolbar: { show: false }, zoom: { enabled: false } },
-                colors: ['#2d7a3a', '#4154f1', '#ff771d', '#9b59b6'],
+                chart: {
+                    height: 350,
+                    type: 'area',
+                    toolbar: { show: false },
+                },
+                markers: { size: 4 },
+                colors: ['#4154f1', '#2eca6a', '#ff771d', '#9b59b6'],
+                fill: {
+                    type: 'gradient',
+                    gradient: {
+                        shadeIntensity: 1,
+                        opacityFrom: 0.3,
+                        opacityTo: 0.4,
+                        stops: [0, 90, 100]
+                    }
+                },
                 dataLabels: { enabled: false },
                 stroke: { curve: 'smooth', width: 2 },
-                fill: { type: 'gradient', gradient: { opacityFrom: .6, opacityTo: .1 } },
-                markers: {
-                    size: 4,
-                    colors: ['#2d7a3a', '#4154f1', '#ff771d', '#9b59b6'],
-                    strokeColors: '#fff',
-                    strokeWidth: 2,
-                    hover: { size: 6 }
-                },
-                xaxis: { 
-                    categories: labels, 
+                xaxis: {
+                    categories: labels,
                     tickAmount: Math.min(labels.length, 7),
-                    labels: { 
-                        style: { colors: '#6c757d', fontSize: '12px' },
-                        rotate: -45,
-                        rotateAlways: true
-                    }
                 },
                 yaxis: [
                     { labels: { formatter: v => '₱' + this.fmtNumber(v) } },
-                    { opposite: true, labels: { formatter: v => this.fmtNumber(v) } }
+                    { opposite: true, labels: { formatter: v => String(Math.round(v)) } },
                 ],
-                tooltip: { shared: true, intersect: false, y: { formatter: (v, { seriesIndex }) => seriesIndex === 0 ? '₱' + v.toLocaleString() : v } },
-                legend: { position: 'top' },
-                grid: { borderColor: '#f0f0f0' },
-            };
-
-            const el = document.getElementById('reportsChart');
-            if (!el) return;
-            if (this._reportsChart) { this._reportsChart.destroy(); }
-            this._reportsChart = new ApexCharts(el, options);
+                tooltip: {
+                    shared: true,
+                    intersect: false,
+                    y: {
+                        formatter: (v, { seriesIndex }) => seriesIndex === 0 ? '₱' + Number(v).toLocaleString() : String(Math.round(v))
+                    }
+                },
+            });
             this._reportsChart.render();
         } catch (err) {
             console.warn('Reports chart error:', err);
@@ -2769,7 +2893,13 @@ class AdminDashboard {
             pg.page = page;
             const search = (document.getElementById('products-search-input')?.value || '').trim();
             const category = (document.getElementById('products-category-filter')?.value || '').trim();
-            const status = (document.getElementById('products-status-filter')?.value || '').trim();
+            const statusFilter = document.getElementById('products-status-filter');
+            let status = (statusFilter?.value || '').trim();
+            // Set default to 'available' if filter is empty on initial load
+            if (!status && page === 1) {
+                status = 'available';
+                if (statusFilter) statusFilter.value = 'available';
+            }
             const params = new URLSearchParams({
                 page: String(page),
                 limit: String(pg.limit)
@@ -2836,14 +2966,14 @@ class AdminDashboard {
                 <td>${this.fmtCurrency(product.price)}</td>
                 <td>${this.fmtNumber(product.stock_quantity ?? 0)}</td>
                 <td>
-                    <div class="fw-semibold">${this.escapeHtml(product.farmer_name || 'Unassigned')}${product.farmer_username ? ` <span style="color:#777171f0;font-size:.75rem">(${this.escapeHtml(product.farmer_username)})</span>` : ''}</div>
-                    ${product.farmer_email ? `<div class="text-muted">${this.escapeHtml(product.farmer_email)}</div>` : ''}
+                    <div class="fw-semibold">${this.escapeHtml(product.farmer_shop_name || product.farmer_name || 'Unassigned')}</div>
+                    ${product.farmer_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(product.farmer_name)}${product.farmer_username ? ` (${this.escapeHtml(product.farmer_username)})` : ''}</div>` : ''}
+                    ${product.farmer_email ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(product.farmer_email)}</div>` : ''}
                 </td>
                 <td>${this.renderStatus(statusLabel, statusKey)}</td>
                 <td class="text-muted" data-order="${createdOrder}">${createdLabel}</td>
                 <td>
                     <button class="btn btn-sm py-0 px-2 btn-ac-green product-edit-btn" data-product-id="${product.id}">Edit</button>
-                    <button class="btn btn-sm py-0 px-2 btn-ac-red product-delete-btn" data-product-id="${product.id}">Delete</button>
                 </td>
             </tr>
         `;
@@ -2882,6 +3012,7 @@ class AdminDashboard {
                     ${[
                         ['Full Name', safeUser.full_name || '—'], ['Username', safeUser.username || '—'],
                         ['Email', safeUser.email || '—'], ['Phone', safeUser.phone || '—'],
+                        ['Address', safeUser.address || '—'],
                         ['Status', safeUser.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
                         ['Joined', safeUser.created_at ? new Date(safeUser.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
                         ['Total Orders', total_orders], ['Total Spent', this.fmtCurrency(total_spent)],
@@ -2893,12 +3024,17 @@ class AdminDashboard {
             const otbody = document.getElementById('cdt-orders-tbody');
             if (otbody) {
                 if (!orders.length) {
-                    otbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3 small">No orders</td></tr>`;
+                    otbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3 small">No orders</td></tr>`;
                 } else {
                     otbody.innerHTML = orders.map(o => `
                         <tr>
                             <td class="small">#${o.id}</td>
                             <td class="small">${this.escapeHtml(o.product_name || (o.items && o.items[0] && o.items[0].product_name) || '—')}</td>
+                            <td class="small">
+                                <div class="fw-semibold">${this.escapeHtml(o.farmer_shop_name || o.farmer_name || '—')}</div>
+                                ${o.farmer_name && o.farmer_shop_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(o.farmer_name)}</div>` : ''}
+                                ${o.farmer_address ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(o.farmer_address)}</div>` : ''}
+                            </td>
                             <td>${this.renderStatus(this.formatStatus(o.status), o.status)}</td>
                             <td class="small">${this.fmtCurrency(o.total_amount)}</td>
                             <td class="small text-muted">${o.created_at ? new Date(o.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
@@ -3022,8 +3158,10 @@ class AdminDashboard {
             if (infoEl) infoEl.innerHTML = `
                 <div class="row g-2">
                     ${[
-                        ['Full Name', farmer.full_name || '—'], ['Username', farmer.username || '—'],
+                        ['Shop Name', farmer.shop_name || '—'], ['Full Name', farmer.full_name || '—'],
+                        ['Username', farmer.username || '—'],
                         ['Email', farmer.email || '—'], ['Phone', farmer.phone || '—'],
+                        ['Address', farmer.address || '—'],
                         ['Verified', farmer.is_verified ? this.renderStatus('Yes', 'verified') : this.renderStatus('No', 'unverified')],
                         ['Status', farmer.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
                         ['Joined', farmer.created_at ? new Date(farmer.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
@@ -3199,6 +3337,7 @@ class AdminDashboard {
                     ${[
                         ['Full Name', user.full_name || '—'], ['Username', user.username || '—'],
                         ['Email', user.email || '—'], ['Phone', user.phone || '—'],
+                        ['Address', user.address || '—'],
                         ['Role', this.formatRole(user.role)],
                         ['Status', user.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
                         ['Joined', user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
@@ -3292,6 +3431,7 @@ class AdminDashboard {
             const overviewFields = [
                 ['Full Name', user.full_name || '—'], ['Username', user.username || '—'],
                 ['Email', user.email || '—'], ['Phone', user.phone || '—'],
+                ['Address', user.address || '—'],
                 ['Role', this.formatRole(user.role)],
                 ['Status', user.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
                 ['Joined', user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
@@ -3416,9 +3556,25 @@ class AdminDashboard {
 
             // Profile card
             const avatarEl = document.getElementById('profile-avatar-img');
+            const avatarInitialEl = document.getElementById('profile-avatar-initial');
             const nameEl   = document.getElementById('profile-full-name');
             const roleEl   = document.getElementById('profile-role-label');
-            if (avatarEl && user.avatar_url) { avatarEl.src = user.avatar_url; }
+            
+            // Set avatar to first letter of first name if no image
+            if (avatarEl && !user.avatar_url) {
+                const firstName = user.first_name || user.username || 'U';
+                const firstLetter = firstName.charAt(0).toUpperCase();
+                avatarEl.style.display = 'none';
+                if (avatarInitialEl) {
+                    avatarInitialEl.textContent = firstLetter;
+                    avatarInitialEl.style.display = 'flex';
+                }
+            } else if (avatarEl && user.avatar_url) {
+                avatarEl.src = user.avatar_url;
+                avatarEl.style.display = 'block';
+                if (avatarInitialEl) avatarInitialEl.style.display = 'none';
+            }
+            
             if (nameEl)   nameEl.textContent  = fullName;
             if (roleEl)   roleEl.textContent  = roleName;
 
@@ -3442,7 +3598,17 @@ class AdminDashboard {
             setValue('pe-firstname', user.first_name || '');
             setValue('pe-middlename', user.middle_name || '');
             setValue('pe-lastname', user.last_name || '');
-            setValue('pe-phone', (user.phone || '').replace(/^\+63/, ''));
+            // Format phone with spaces (9XX XXX XXXX)
+            const phoneDigits = String(user.phone || '').replace(/\D/g, '');
+            if (phoneDigits.length > 0) {
+                let formatted = phoneDigits[0];
+                if (phoneDigits.length > 1) formatted += phoneDigits.slice(1, 3);
+                if (phoneDigits.length > 3) formatted += ' ' + phoneDigits.slice(3, 6);
+                if (phoneDigits.length > 6) formatted += ' ' + phoneDigits.slice(6, 10);
+                setValue('pe-phone', formatted);
+            } else {
+                setValue('pe-phone', '');
+            }
 
         } catch (err) {
             console.error('Profile section error:', err);
@@ -3465,13 +3631,15 @@ class AdminDashboard {
         const effectiveLastName = last_name || profileUser.last_name || '';
         const effectiveFullName = full_name || profileUser.full_name || `${effectiveFirstName} ${effectiveMiddleName} ${effectiveLastName}`.trim();
         const effectiveRawPhone = rawPhone || fallbackPhone;
+        // Remove spaces for validation and API
+        const phoneDigits = effectiveRawPhone.replace(/\s/g, '');
         // Validate phone format: must be 10 digits starting with 9
-        if (effectiveRawPhone && !/^9[0-9]{9}$/.test(effectiveRawPhone)) {
-            this.showToast('Phone must be 10 digits starting with 9 (e.g. 9123456789)', 'error');
+        if (phoneDigits && !/^9[0-9]{9}$/.test(phoneDigits)) {
+            this.showToast('Phone must be 10 digits starting with 9 (e.g. 912 345 6789)', 'error');
             return;
         }
         // Prepend +63 if a value is entered; leave blank if empty
-        const phone = effectiveRawPhone ? ('+63' + effectiveRawPhone.replace(/^\+63/, '')) : '';
+        const phone = phoneDigits ? ('+63' + phoneDigits) : '';
 
         if (btn) btn.disabled = true;
         if (spinner) spinner.classList.remove('d-none');
@@ -3562,10 +3730,38 @@ class AdminDashboard {
                 badge.style.display = unread ? '' : 'none';
             }
             if (count) count.textContent = unread > 99 ? '99+' : String(unread);
+
+            // Play notification sound if unread count increased
+            if (this.previousUnreadCount !== undefined && unread > this.previousUnreadCount) {
+                this.playNotificationSound();
+            }
+            this.previousUnreadCount = unread;
         } catch (err) {
             const l = document.getElementById('notifications-list');
             if (l) l.innerHTML = `<div class="text-center py-4 text-muted small">Failed to load notifications.</div>`;
             this._updateNotifHeaderDropdown([], true);
+        }
+    }
+
+    playNotificationSound() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        } catch (err) {
+            console.log('Audio play failed:', err);
         }
     }
 
@@ -3637,6 +3833,29 @@ class AdminDashboard {
         const iconMap = {
             order: 'bi-bag-check text-success',
             product: 'bi-box-seam text-primary',
+            product_approved: 'bi-check-circle text-success',
+            product_rejected: 'bi-x-circle text-danger',
+            product_deleted: 'bi-trash text-danger',
+            products_disabled: 'bi-toggle-off text-warning',
+            products_enabled: 'bi-toggle-on text-success',
+            account_disabled: 'bi-person-x text-danger',
+            account_enabled: 'bi-person-check text-success',
+            account_verified: 'bi-shield-check text-success',
+            account_unverified: 'bi-shield-x text-warning',
+            role_changed: 'bi-person-gear text-info',
+            new_review: 'bi-star-fill text-warning',
+            review_updated: 'bi-star-half text-warning',
+            order_cancelled_by_customer: 'bi-x-circle-fill text-danger',
+            low_stock_alert: 'bi-exclamation-triangle-fill text-warning',
+            product_back_in_stock: 'bi-arrow-up-circle-fill text-success',
+            price_changed: 'bi-currency-peso text-info',
+            new_product_submitted: 'bi-plus-circle text-primary',
+            order_status: 'bi-truck text-info',
+            order_placed: 'bi-bag-plus text-success',
+            order_update: 'bi-arrow-repeat text-primary',
+            product_removed: 'bi-bag-x-fill text-danger',
+            announcement: 'bi-megaphone-fill text-primary',
+            fraud_alert: 'bi-exclamation-diamond-fill text-danger',
             user: 'bi-person text-info',
             system: 'bi-gear text-secondary',
             payment: 'bi-credit-card text-warning',
@@ -4367,7 +4586,7 @@ class AdminDashboard {
         const pg = this.pagination['product-approvals'] || { page: 1, total: 0, limit: 50 };
 
         if (!filtered.length) {
-            tbody.innerHTML = `<tr><td colspan="8" class="table-placeholder">No products found</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="table-placeholder">No products found</td></tr>`;
             this.renderPagination('product-approvals-pagination', pg, (p) => this.loadProductApprovals(undefined, undefined, p));
             return;
         }
@@ -4377,13 +4596,16 @@ class AdminDashboard {
                 <td class="small text-muted">${p.id}</td>
                 <td class="small fw-semibold">${this.escapeHtml(p.name || '')}</td>
                 <td class="small">${this.escapeHtml(p.category_name || '—')}</td>
-                <td class="small">${this.escapeHtml(p.farmer_name || '—')}</td>
+                <td class="small">
+                    <div class="fw-semibold">${this.escapeHtml(p.farmer_shop_name || p.farmer_name || '—')}</div>
+                    ${p.farmer_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(p.farmer_name)}</div>` : ''}
+                </td>
                 <td class="small">${this.fmtCurrency(p.price)}</td>
                 <td class="small">${p.stock || 0}</td>
+                <td class="small text-muted">${this.renderStatus(this.formatStatus(p.status), p.status)}</td>
                 <td class="small text-muted">${p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}</td>
-                <td class="text-center">
-                    <button class="btn btn-sm btn-ac-green product-approve-btn" data-product-id="${p.id}">Approve</button>
-                    <button class="btn btn-sm btn-ac-red product-reject-btn" data-product-id="${p.id}">Reject</button>
+                <td>
+                    <button class="btn btn-sm py-0 px-2 btn-ac-green product-view-btn" data-product-id="${p.id}" type="button">View</button>
                 </td>
             </tr>
         `).join('');
@@ -4404,6 +4626,24 @@ class AdminDashboard {
         }
     }
 
+    async loadProductApprovalsBadge() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/products?status=pending&limit=1`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            const pendingCount = data.total || 0;
+            const badge = document.getElementById('product-approvals-badge');
+            if (badge) {
+                badge.textContent = pendingCount;
+                badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+            }
+        } catch (error) {
+            console.error('Error loading product approvals badge:', error);
+        }
+    }
+
     async approveProduct(productId) {
         if (!await this.adminConfirm('Are you sure you want to approve this product?', { title: 'Approve Product', danger: false })) return;
         try {
@@ -4413,6 +4653,7 @@ class AdminDashboard {
             });
             if (!response.ok) throw new Error('Failed to approve product');
             this.showToast('Product approved successfully', 'success');
+            this.closeProductApprovalDetails();
             this.loadProductApprovals();
         } catch (error) {
             console.error('Error approving product:', error);
@@ -4421,18 +4662,54 @@ class AdminDashboard {
     }
 
     async rejectProduct(productId) {
-        if (!await this.adminConfirm('Are you sure you want to reject this product?', { title: 'Reject Product', danger: true })) return;
+        this.currentRejectProductId = productId;
+        const modal = document.getElementById('reject-product-modal');
+        const textarea = document.getElementById('rejection-reason');
+        if (textarea) textarea.value = '';
+        if (modal) modal.classList.add('open');
+    }
+
+    async confirmRejectProduct() {
+        const textarea = document.getElementById('rejection-reason');
+        const reason = textarea?.value?.trim();
+        
+        if (!reason || reason.length === 0) {
+            this.showToast('Please provide a rejection reason', 'error');
+            return;
+        }
+
+        if (!this.currentRejectProductId) {
+            this.showToast('No product selected for rejection', 'error');
+            return;
+        }
+
         try {
-            const response = await fetch(`${this.apiBase}/admin/products/${productId}/reject`, {
+            const response = await fetch(`${this.apiBase}/admin/products/${this.currentRejectProductId}/reject`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${this.token}` }
+                headers: { 
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ rejection_reason: reason })
             });
-            if (!response.ok) throw new Error('Failed to reject product');
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to reject product');
+            }
+            
             this.showToast('Product rejected successfully', 'success');
+            
+            // Close modal
+            const modal = document.getElementById('reject-product-modal');
+            if (modal) modal.classList.remove('open');
+            
+            // Close panel and refresh
+            this.closeProductApprovalDetails();
             this.loadProductApprovals();
         } catch (error) {
             console.error('Error rejecting product:', error);
-            this.showToast('Failed to reject product', 'error');
+            this.showToast(error.message || 'Failed to reject product', 'error');
         }
     }
 
@@ -4448,7 +4725,10 @@ class AdminDashboard {
                 <td class="small text-muted">${r.id}</td>
                 <td class="small fw-semibold">${this.escapeHtml(r.name || '')}</td>
                 <td class="small">${this.escapeHtml(r.category_name || r.requested_category_name || '—')}</td>
-                <td class="small">${this.escapeHtml(r.requested_by_username || 'Farmer')}</td>
+                <td class="small">
+                    <div class="fw-semibold">${this.escapeHtml(r.requested_by_shop_name || r.requested_by_full_name || r.requested_by_username || 'Farmer')}</div>
+                    ${r.requested_by_username ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(r.requested_by_username)}</div>` : ''}
+                </td>
                 <td>
                     <button class="btn btn-sm py-0 px-2 btn-ac-green category-requests-view-btn"
                         data-section="category-requests">View</button>
@@ -4479,15 +4759,16 @@ class AdminDashboard {
         tbody.innerHTML = filtered.map((request) => {
             const date   = request.created_at ? new Date(request.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';
             const status = request.status || 'pending';
-            const requesterName = this.escapeHtml(request.requested_by_full_name || request.requested_by_username || 'Farmer');
+            const requesterName = this.escapeHtml(request.requested_by_shop_name || request.requested_by_full_name || request.requested_by_username || 'Farmer');
+            const requesterSub = request.requested_by_full_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(request.requested_by_full_name)}</div>` : '';
             const requesterUser = request.requested_by_username ? ` <span style="color:#777171f0;font-size:.75rem">(${this.escapeHtml(request.requested_by_username)})</span>` : '';
-            const requesterEmail = request.requested_by_email ? `<div class="text-muted">${this.escapeHtml(request.requested_by_email)}</div>` : '';
+            const requesterEmail = request.requested_by_email ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(request.requested_by_email)}</div>` : '';
             return `
             <tr>
                 <td class="text-muted">${request.id}</td>
                 <td class="fw-semibold">${this.escapeHtml(request.name || '')}</td>
                 <td>${this.escapeHtml(request.category_name || request.requested_category_name || '—')}</td>
-                <td><div class="fw-semibold">${requesterName}${requesterUser}</div>${requesterEmail}</td>
+                <td><div class="fw-semibold">${requesterName}${requesterUser}</div>${requesterSub}${requesterEmail}</td>
                 <td class="text-muted">${date}</td>
                 <td>${this.renderStatus(this.formatStatus(status), status)}</td>
                 <td>
@@ -4520,9 +4801,11 @@ class AdminDashboard {
         })).join('');
 
         const requesterInfo = [
-            request.requested_by_full_name ? `<span class="fw-semibold">${this.escapeHtml(request.requested_by_full_name)}</span>` : '',
-            request.requested_by_username ? `<span style="color:#777171f0">${this.escapeHtml(request.requested_by_username)}</span>` : '',
-            request.requested_by_email ? `<span class="text-muted">${this.escapeHtml(request.requested_by_email)}</span>` : ''
+            request.requested_by_shop_name ? `<span class="fw-semibold">${this.escapeHtml(request.requested_by_shop_name)}</span>` : '',
+            request.requested_by_full_name ? `<span class="text-muted" style="font-size:.85rem">${this.escapeHtml(request.requested_by_full_name)}</span>` : '',
+            request.requested_by_username ? `<span style="color:#777171f0;font-size:.85rem">${this.escapeHtml(request.requested_by_username)}</span>` : '',
+            request.requested_by_email ? `<span class="text-muted" style="font-size:.85rem">${this.escapeHtml(request.requested_by_email)}</span>` : '',
+            request.requested_by_address ? `<span class="text-muted" style="font-size:.85rem">${this.escapeHtml(request.requested_by_address)}</span>` : ''
         ].filter(Boolean).join(' &nbsp;&bull;&nbsp; ');
 
         const categoryOptionsWithNew = categoryOptions.replace('</select>', '') + `<option value="__new__">+ Add New Category</option></select>`;
@@ -4546,6 +4829,9 @@ class AdminDashboard {
                 </div>
             </div>
         `;
+
+        // Remove any existing footer to prevent button duplication
+        panel.querySelectorAll('.detail-panel-footer').forEach((f) => f.remove());
 
         // Add footer with approve/decline buttons
         const footer = document.createElement('div');
@@ -4902,6 +5188,15 @@ class AdminDashboard {
         this._refreshUnread = load;
     }
 
+    initChat() {
+        // Initialize chat UI for admin dashboard if chat section exists
+        if (document.getElementById('chat-messages') && typeof ChatUI !== 'undefined') {
+            if (!window.chatUI) {
+                window.chatUI = new ChatUI();
+            }
+        }
+    }
+
     getStatusClass(status) {
         if (['pending'].includes(status)) return 'pending';
         if (['confirmed'].includes(status)) return 'confirmed';
@@ -4954,7 +5249,7 @@ class AdminDashboard {
     renderStatus(text, statusKey) {
         const key = (statusKey || '').toString().toLowerCase();
         const cls = this.getStatusClass(key);
-        const direct = ['active','disabled','approved','rejected','verified','unverified','available','unavailable'];
+        const direct = ['active','disabled','admin_disabled','farmer_disabled','approved','rejected','verified','unverified','available','unavailable','pending'];
         const pillClass = direct.includes(key) ? key : cls;
         return `<span class="status-pill ${pillClass}">${text}</span>`;
     }
@@ -4977,6 +5272,82 @@ class AdminDashboard {
         this.syncPanelAccessibility();
     }
 
+    closeProductApprovalDetails() {
+        const panel = document.getElementById('product-approval-panel');
+        if (panel) {
+            panel.classList.remove('active');
+            panel.setAttribute('inert', '');
+        }
+        this.syncPanelAccessibility();
+    }
+
+    openProductApprovalDetail(productId) {
+        const product = this.lastProductApprovals?.find(p => p.id === productId);
+        if (!product) return;
+
+        const panel = document.getElementById('product-approval-panel');
+        const content = document.getElementById('product-approval-content');
+        if (!panel || !content) return;
+
+        panel.removeAttribute('inert');
+        panel.classList.add('active');
+        this.syncPanelAccessibility();
+
+        content.innerHTML = `
+            <div class="panel-header">
+                <h3>Product #${product.id}</h3>
+                ${this.renderStatus(this.formatStatus(product.status), product.status)}
+            </div>
+            <div class="panel-section">
+                <h4>Product Information</h4>
+                <table class="w-100" style="font-size:0.875rem;border-collapse:collapse;">
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Name:</td>
+                        <td class="fw-semibold pb-1">${this.escapeHtml(product.name || '—')}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Category:</td>
+                        <td class="pb-1">${this.escapeHtml(product.category_name || '—')}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Farmer:</td>
+                        <td class="pb-1">
+                            <div class="fw-semibold">${this.escapeHtml(product.farmer_shop_name || product.farmer_name || '—')}</div>
+                            ${product.farmer_name ? `<div class="text-muted small">${this.escapeHtml(product.farmer_name)}</div>` : ''}
+                            ${product.farmer_username ? `<div class="text-muted small">@${this.escapeHtml(product.farmer_username)}</div>` : ''}
+                            ${product.farmer_address ? `<div class="text-muted small">${this.escapeHtml(product.farmer_address)}</div>` : ''}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Price:</td>
+                        <td class="pb-1">${this.fmtCurrency(product.price)}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Stock:</td>
+                        <td class="pb-1">${product.stock || 0}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2" style="white-space:nowrap">Description:</td>
+                        <td>${this.escapeHtml(product.description || '—')}</td>
+                    </tr>
+                </table>
+            </div>
+            ${product.status === 'rejected' && product.rejection_reason ? `
+            <div class="panel-section" style="background:#fef2f2;border-left:3px solid #dc2626;padding:12px;margin-bottom:16px;">
+                <h4 style="color:#dc2626;margin:0 0 8px 0;font-size:0.875rem;">Rejection Reason</h4>
+                <p style="margin:0;font-size:0.875rem;color:#7f1d1d;">${this.escapeHtml(product.rejection_reason)}</p>
+            </div>
+            ` : ''}
+            <div class="panel-section">
+                <h4>Actions</h4>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-ac-green product-approve-btn" data-product-id="${product.id}">Approve</button>
+                    <button class="btn btn-sm btn-ac-red product-reject-btn" data-product-id="${product.id}">Reject</button>
+                </div>
+            </div>
+        `;
+    }
+
     openOrderDetails(order) {
         const panel = document.getElementById('order-detail-panel');
         const content = document.getElementById('order-detail-content');
@@ -4996,23 +5367,50 @@ class AdminDashboard {
                 <h4>Customer</h4>
                 <table class="w-100" style="font-size:0.875rem;border-collapse:collapse;">
                     <tr>
-                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Full Name:</td>
-                        <td class="fw-semibold pb-1">${this.escapeHtml(order.customer_name || order.full_name || '—')}</td>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap;text-align:left">Full Name:</td>
+                        <td class="fw-semibold pb-1" style="text-align:left">${this.escapeHtml(order.customer_name || order.full_name || '—')}</td>
                     </tr>
                     <tr>
-                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Username:</td>
-                        <td class="pb-1">${this.escapeHtml(order.username || '—')}</td>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap;text-align:left">Username:</td>
+                        <td class="pb-1" style="text-align:left">${this.escapeHtml(order.username || '—')}</td>
                     </tr>
                     <tr>
-                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap">Email:</td>
-                        <td class="pb-1">${this.escapeHtml(order.email || '—')}</td>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap;text-align:left">Email:</td>
+                        <td class="pb-1" style="text-align:left">${this.escapeHtml(order.email || '—')}</td>
                     </tr>
                     <tr>
-                        <td class="text-muted pe-2" style="white-space:nowrap">Phone:</td>
-                        <td>${this.escapeHtml(order.customer_phone || '—')}</td>
+                        <td class="text-muted pe-2" style="white-space:nowrap;text-align:left">Phone:</td>
+                        <td style="text-align:left">${this.escapeHtml(order.customer_phone || '—')}</td>
                     </tr>
                 </table>
             </div>
+            ${order.farmer_name ? `
+            <div class="panel-section">
+                <h4>Farmer</h4>
+                <table class="w-100" style="font-size:0.875rem;border-collapse:collapse;">
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap;text-align:left">Shop Name:</td>
+                        <td class="fw-semibold pb-1" style="text-align:left">${this.escapeHtml(order.farmer_shop_name || '—')}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap;text-align:left">Full Name:</td>
+                        <td class="pb-1" style="text-align:left">${this.escapeHtml(order.farmer_name || '—')}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap;text-align:left">Username:</td>
+                        <td class="pb-1" style="text-align:left">${this.escapeHtml(order.farmer_username || '—')}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2 pb-1" style="white-space:nowrap;text-align:left">Email:</td>
+                        <td class="pb-1" style="text-align:left">${this.escapeHtml(order.farmer_email || '—')}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pe-2" style="white-space:nowrap;text-align:left">Address:</td>
+                        <td style="text-align:left">${this.escapeHtml(order.farmer_address || '—')}</td>
+                    </tr>
+                </table>
+            </div>
+            ` : ''}
             <div class="panel-section">
                 <h4>Chat Farmers</h4>
                 <div id="order-farmers-list" class="panel-item"></div>
@@ -5115,6 +5513,7 @@ class AdminDashboard {
                 if (!unique.has(it.farmer_id)) {
                     unique.set(it.farmer_id, {
                         id: it.farmer_id,
+                        shop_name: it.farmer_shop_name || '',
                         name: it.farmer_name || 'Farmer',
                         email: it.farmer_email || ''
                     });
@@ -5127,7 +5526,8 @@ class AdminDashboard {
                 list.innerHTML = Array.from(unique.values()).map(f => `
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e2e8f0;">
                         <div style="min-width:0;">
-                            <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(f.name)}</div>
+                            <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(f.shop_name || f.name)}</div>
+                            ${f.shop_name && f.name ? `<div style="color:#64748b;font-size:0.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(f.name)}</div>` : ''}
                             <div style="color:#64748b;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(f.email)}</div>
                         </div>
                         <button class="btn btn-primary btn-small farmer-chat-btn" type="button" data-farmer-id="${f.id}">
@@ -5175,7 +5575,7 @@ class AdminDashboard {
         // Clear text inputs that reset() might not catch
         ['create-user-firstname', 'create-user-middlename', 'create-user-lastname',
          'create-user-username', 'create-user-email', 'create-user-phone',
-         'create-user-password'].forEach(id => {
+         'create-user-password', 'create-user-shopname'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = '';
         });
@@ -5190,6 +5590,16 @@ class AdminDashboard {
             roles.push({ value: 'farmer', label: 'Farmer' });
             roleSel.innerHTML = roles.map(r => `<option value="${r.value}">${r.label}</option>`).join('');
             roleSel.value = ['customer', 'farmer', 'staff'].includes(preferredRole) ? preferredRole : 'customer';
+            
+            // Show/hide shop_name field based on role
+            const shopNameGroup = document.getElementById('create-user-shop-name-group');
+            if (shopNameGroup) {
+                const updateShopNameVisibility = () => {
+                    shopNameGroup.style.display = roleSel.value === 'farmer' ? 'block' : 'none';
+                };
+                roleSel.onchange = updateShopNameVisibility;
+                updateShopNameVisibility();
+            }
         } else {
             this.showMessage('Role dropdown not found', 'error');
             return;
@@ -5232,16 +5642,29 @@ class AdminDashboard {
         const firstNameEl = document.getElementById('edit-user-firstname');
         const middleNameEl = document.getElementById('edit-user-middlename');
         const lastNameEl = document.getElementById('edit-user-lastname');
+        const shopNameEl = document.getElementById('edit-user-shopname');
+        const shopNameGroup = document.getElementById('edit-user-shop-name-group');
         if (firstNameEl) firstNameEl.value = user.first_name || '';
         if (middleNameEl) middleNameEl.value = user.middle_name || '';
         if (lastNameEl) lastNameEl.value = user.last_name || '';
+        if (shopNameEl) shopNameEl.value = user.shop_name || '';
+        if (shopNameGroup) shopNameGroup.style.display = user.role === 'farmer' ? 'block' : 'none';
 
         if (usernameEl) usernameEl.value = user.username || '';
         if (emailEl) emailEl.value = user.email || '';
         if (passwordEl) passwordEl.value = '';
         if (phoneEl) {
-            const rawPhone = (user.phone || '').replace(/^\+63/, '');
-            phoneEl.value = rawPhone;
+            // Format phone with spaces (9XX XXX XXXX)
+            const phoneDigits = String(user.phone || '').replace(/\D/g, '');
+            if (phoneDigits.length > 0) {
+                let formatted = phoneDigits[0];
+                if (phoneDigits.length > 1) formatted += phoneDigits.slice(1, 3);
+                if (phoneDigits.length > 3) formatted += ' ' + phoneDigits.slice(3, 6);
+                if (phoneDigits.length > 6) formatted += ' ' + phoneDigits.slice(6, 10);
+                phoneEl.value = formatted;
+            } else {
+                phoneEl.value = '';
+            }
             phoneEl.oninput = () => {
                 phoneEl.value = phoneEl.value.replace(/\D/g, '').slice(0, 10);
                 if (phoneEl.value && !phoneEl.value.startsWith('9')) {
@@ -5331,11 +5754,19 @@ class AdminDashboard {
         const first_name = document.getElementById('edit-user-firstname')?.value || '';
         const middle_name = document.getElementById('edit-user-middlename')?.value || '';
         const last_name = document.getElementById('edit-user-lastname')?.value || '';
+        const shop_name = document.getElementById('edit-user-shopname')?.value || '';
         const username = document.getElementById('edit-user-username')?.value || '';
         const email = document.getElementById('edit-user-email')?.value || '';
         const password = document.getElementById('edit-user-password')?.value || '';
         const rawPhone = document.getElementById('edit-user-phone')?.value?.trim() || '';
         const phone = rawPhone ? ('+63' + rawPhone.replace(/^\+63/, '')) : '';
+
+        // Get user role to determine if shop_name should be included
+        const user = (this.lastUsers || []).find(u => u.id === Number(userId))
+            || (this.lastFarmers || []).find(f => f.id === Number(userId))
+            || (this.lastStaff || []).find(u => u.id === Number(userId))
+            || (this.lastAllUsers || []).find(u => u.id === Number(userId));
+        const isFarmer = user?.role === 'farmer';
 
         // Build address from PSGC fields (use preview if already composed)
         const province = document.getElementById('edit-user-province')?.value?.trim() || '';
@@ -5360,6 +5791,7 @@ class AdminDashboard {
         if (last_name.trim()) payload.last_name = last_name.trim();
         if (address) payload.address = address;
         if (password.trim()) payload.password = password;
+        if (isFarmer && shop_name.trim()) payload.shop_name = shop_name.trim();
 
         try {
             const response = await fetch(`${this.apiBase}/admin/users/${userId}`, {
@@ -5397,6 +5829,7 @@ class AdminDashboard {
         const username = document.getElementById('create-user-username')?.value?.trim() || '';
         const email = document.getElementById('create-user-email')?.value?.trim() || '';
         const role = document.getElementById('create-user-role')?.value?.trim() || '';
+        const shop_name = document.getElementById('create-user-shopname')?.value?.trim() || '';
         const rawPhone = document.getElementById('create-user-phone')?.value?.trim() || '';
         // Validate phone format: must be 10 digits starting with 9 if provided
         if (rawPhone && !/^9[0-9]{9}$/.test(rawPhone)) {
@@ -5430,6 +5863,7 @@ class AdminDashboard {
             password,
             phone: phone || null
         };
+        if (role === 'farmer' && shop_name) payload.shop_name = shop_name;
 
         try {
             if (submitBtn) {
@@ -5541,7 +5975,11 @@ class AdminDashboard {
                 <div class="card-body">
                     <h6 class="card-title mb-3">Farmer Information</h6>
                     <div class="mb-2">
-                        <label class="form-label text-muted small">Fullname:</label>
+                        <label class="form-label text-muted small">Shop Name:</label>
+                        <div class="fw-semibold">${this.escapeHtml(product.farmer_shop_name || '—')}</div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">Full Name:</label>
                         <div class="fw-semibold">${this.escapeHtml(product.farmer_name || '—')}</div>
                     </div>
                     <div class="mb-2">
@@ -5982,7 +6420,8 @@ class AdminDashboard {
             <tr>
                 <td class="text-center">
                     <div>
-                        <div class="small fw-semibold">${this.escapeHtml(farmer.full_name || farmer.username)}</div>
+                        <div class="small fw-semibold">${this.escapeHtml(farmer.shop_name || farmer.full_name || farmer.username)}</div>
+                        ${farmer.full_name && farmer.shop_name ? `<div class="text-muted" style="font-size:.7rem">${this.escapeHtml(farmer.full_name)}</div>` : ''}
                         <div class="text-muted" style="font-size:.7rem">${farmer.order_count} orders</div>
                     </div>
                 </td>
@@ -6004,8 +6443,8 @@ class AdminDashboard {
         if (!tbody) return;
 
         if (!orders.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No orders found</td></tr>`;
-            this.refreshSortableTable('orders-table', { columns: [{ select: 5, sortable: false }] });
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No orders found</td></tr>`;
+            this.refreshSortableTable('orders-table', { columns: [{ select: 6, sortable: false }] });
             return;
         }
 
@@ -6017,8 +6456,10 @@ class AdminDashboard {
                 <div class="fw-semibold">${this.escapeHtml(order.full_name || '—')}${order.username ? ` <span style="color:#777171f0;font-size:.75rem">(${this.escapeHtml(order.username)})</span>` : ''}</div>
                 ${order.email ? `<div class="text-muted">${this.escapeHtml(order.email)}</div>` : ''}
             `;
+            const productImage = order.product_image || '/images/placeholder-product.jpg';
             return `
             <tr>
+                <td class="text-center"><img src="${this.escapeHtml(productImage)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;"></td>
                 <td class="col-order">#${order.id}</td>
                 <td>${customerInfo}</td>
                 <td>${this.fmtCurrency(order.total_amount)}</td>
@@ -6031,7 +6472,7 @@ class AdminDashboard {
         `;
         }).join('');
 
-        this.refreshSortableTable('orders-table', { columns: [{ select: 5, sortable: false }], defaultSort: [4, 'desc'] });
+        this.refreshSortableTable('orders-table', { columns: [{ select: 6, sortable: false }], defaultSort: [5, 'desc'] });
     }
 
     renderRecentSalesTable(orders) {
@@ -6040,7 +6481,7 @@ class AdminDashboard {
         if (!tbody) return;
 
         if (!orders.length) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3 small">No recent sales</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-3 small">No recent sales</td></tr>`;
             this.renderPagination('recent-sales-pagination', this.pagination['recent-sales'], () => {});
             this.refreshSortableTable('recent-sales-table');
             return;
@@ -6048,12 +6489,19 @@ class AdminDashboard {
 
         tbody.innerHTML = orders.map((order) => {
             const customerName = order.full_name || (order.username ? `<span style="color:#777171f0">${this.escapeHtml(order.username)}</span>` : 'Customer');
+            const productImage = order.product_image || '/images/placeholder-product.jpg';
+            const unitPrice = order.price || 0;
+            const quantity = order.quantity || 1;
+            const revenue = order.total_amount || 0;
             return `
             <tr>
+                <td class="text-center"><img src="${this.escapeHtml(productImage)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;"></td>
                 <td class="small">#${order.id}</td>
                 <td class="small">${customerName}</td>
                 <td class="small">${this.escapeHtml(order.product_name || '—')}</td>
-                <td class="small">${this.fmtCurrency(order.total_amount)}</td>
+                <td class="small">${this.fmtCurrency(unitPrice)}</td>
+                <td class="small text-center">${quantity}</td>
+                <td class="small">${this.fmtCurrency(revenue)}</td>
                 <td>${this.renderStatus(this.formatStatus(order.status), order.status)}</td>
             </tr>
             `;
@@ -6124,13 +6572,13 @@ class AdminDashboard {
                 this.renderPagination('farmers-pagination', pg, (p) => this.loadFarmers(tab, p));
             } else {
                 const tbody = document.getElementById('farmers-all-tbody');
-                if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load farmers. Please try again.</td></tr>`;
+                if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-3">Failed to load farmers. Please try again.</td></tr>`;
                 this.showMessage('Failed to load farmers', 'error');
             }
         } catch (error) {
             console.error('Error loading farmers:', error);
             const tbody = document.getElementById('farmers-all-tbody');
-            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load farmers. Please try again.</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-3">Failed to load farmers. Please try again.</td></tr>`;
             this.showMessage('Failed to load farmers', 'error');
         }
     }
@@ -6147,10 +6595,13 @@ class AdminDashboard {
             const isDisabled = !!f.is_disabled;
             const isVerified = !!f.is_verified;
             const rating = f.rating ? `<span class="star-rating">★</span> ${Number(f.rating).toFixed(1)}` : '—';
+            const shopName = f.shop_name || '—';
+            const ownerName = `${f.first_name || ''} ${f.last_name || ''}`.trim() || f.full_name || '—';
             return `
                 <tr>
                     <td class="text-muted">${f.id}</td>
-                    <td class="fw-semibold">${this.escapeHtml(f.full_name || '—')}</td>
+                    <td class="fw-semibold">${this.escapeHtml(shopName)}</td>
+                    <td class="text-muted">${this.escapeHtml(ownerName)}</td>
                     <td style="color:#777171f0">${this.escapeHtml(f.username || '—')}</td>
                     <td>${this.escapeHtml(f.email)}</td>
                     <td>${rating}</td>
@@ -6172,10 +6623,10 @@ class AdminDashboard {
         if (allTbody) {
             allTbody.innerHTML = pagedFarmers.length
                 ? pagedFarmers.map(f => buildRow(f)).join('')
-                : `<tr><td colspan="8" class="text-center text-muted py-4">No farmers found</td></tr>`;
+                : `<tr><td colspan="9" class="text-center text-muted py-4">No farmers found</td></tr>`;
         }
 
-        this.refreshSortableTable('farmers-all-table', { columns: [{ select: 7, sortable: false }], defaultSort: [6, 'desc'] });
+        this.refreshSortableTable('farmers-all-table', { columns: [{ select: 8, sortable: false }], defaultSort: [7, 'desc'] });
 
         this.renderPagination('farmers-pagination', pageState, (page) => {
             this.loadFarmers('all', page);

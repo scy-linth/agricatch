@@ -1,5 +1,6 @@
 ﻿const express = require('express');
 const { pool } = require('../utils/db');
+const { broadcastEvent } = require('../utils/realtime');
 
 const router = express.Router();
 
@@ -58,6 +59,13 @@ const parseIsoDateOnly = (value) => {
   return s;
 };
 
+const calcPercentChange = (current, previous) => {
+  const c = Number(current) || 0;
+  const p = Number(previous) || 0;
+  if (p === 0) return c > 0 ? 100 : 0;
+  return Math.round(((c - p) / p) * 100);
+};
+
 // Public: get farmers listing
 router.get('/', async (req, res) => {
   try {
@@ -84,7 +92,7 @@ router.get('/:id/profile', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(`
-      SELECT u.id, u.username, u.full_name, u.email, u.phone, u.address as location, u.is_verified,
+      SELECT u.id, u.username, u.full_name, u.shop_name, u.email, u.phone, u.address as location, u.is_verified,
              u.shop_description, u.shop_banner_url, u.shop_avatar_url, u.created_at,
              -- Aggregate: total orders (all statuses) for farmer's products
              (SELECT COUNT(*) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.farmer_id = u.id)::int AS total_sales,
@@ -239,6 +247,16 @@ router.get('/me/metrics', async (req, res) => {
       paramsRange = [user.id, Number(rangeDays || 30)];
     }
 
+    let prevRangeWhere = '';
+    let paramsPrevRange = [];
+    if (!hasCustom && !isAllTime) {
+      prevRangeWhere = `
+        AND ${timeRef} >= (CURRENT_DATE - (((($2::int) * 2) - 1) * INTERVAL '1 day'))
+        AND ${timeRef} < (CURRENT_DATE - (($2::int - 1) * INTERVAL '1 day'))
+      `;
+      paramsPrevRange = [user.id, Number(rangeDays || 30)];
+    }
+
     // Revenue by day (delivered orders only)
     const revenueByDayResult = await pool.query(`
       SELECT TO_CHAR(${dateSelect}, 'YYYY-MM-DD') AS day,
@@ -339,7 +357,8 @@ router.get('/me/metrics', async (req, res) => {
     const topProductsResult = await pool.query(`
       SELECT p.id AS product_id,
              p.name AS product_name,
-             p.image AS product_image,
+             p.image_url AS product_image,
+             p.price,
              COALESCE(SUM(o.quantity), 0)::int AS sold_qty,
              COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
       FROM orders o
@@ -347,7 +366,7 @@ router.get('/me/metrics', async (req, res) => {
       WHERE p.farmer_id = $1
         ${rangeWhere}
         AND o.status = 'delivered'
-      GROUP BY p.id, p.name, p.image
+      GROUP BY p.id, p.name, p.image_url, p.price
       ORDER BY sold_qty DESC, revenue DESC
       LIMIT 5
     `, paramsRange);
@@ -356,11 +375,13 @@ router.get('/me/metrics', async (req, res) => {
     const recentOrdersResult = await pool.query(`
       SELECT o.id,
              o.status,
+             o.price,
+             o.quantity,
              o.total_amount,
              o.created_at,
              u.full_name AS customer_name,
              p.name AS product_name,
-             p.image AS product_image
+             p.image_url AS product_image
       FROM orders o
       JOIN products p ON o.product_id = p.id
       LEFT JOIN users u ON o.user_id = u.id
@@ -370,11 +391,48 @@ router.get('/me/metrics', async (req, res) => {
       LIMIT 8
     `, paramsRange);
 
+    let ordersChange = 0;
+    let soldChange = 0;
+    let revenueChange = 0;
+    if (!hasCustom && !isAllTime) {
+      const [currentTotalsResult, previousTotalsResult] = await Promise.all([
+        pool.query(`
+          SELECT
+            COUNT(*) FILTER (WHERE o.status != 'cancelled')::int AS orders,
+            COALESCE(SUM(o.quantity) FILTER (WHERE o.status = 'delivered'), 0)::numeric AS sold,
+            COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'delivered'), 0)::numeric AS revenue
+          FROM orders o
+          JOIN products p ON o.product_id = p.id
+          WHERE p.farmer_id = $1
+            ${rangeWhere}
+        `, paramsRange),
+        pool.query(`
+          SELECT
+            COUNT(*) FILTER (WHERE o.status != 'cancelled')::int AS orders,
+            COALESCE(SUM(o.quantity) FILTER (WHERE o.status = 'delivered'), 0)::numeric AS sold,
+            COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'delivered'), 0)::numeric AS revenue
+          FROM orders o
+          JOIN products p ON o.product_id = p.id
+          WHERE p.farmer_id = $1
+            ${prevRangeWhere}
+        `, paramsPrevRange)
+      ]);
+
+      const currentTotals = currentTotalsResult.rows[0] || {};
+      const previousTotals = previousTotalsResult.rows[0] || {};
+      ordersChange = calcPercentChange(currentTotals.orders, previousTotals.orders);
+      soldChange = calcPercentChange(currentTotals.sold, previousTotals.sold);
+      revenueChange = calcPercentChange(currentTotals.revenue, previousTotals.revenue);
+    }
+
     res.json({
       range: hasCustom ? 'custom' : (isAllTime ? 'all' : 'days'),
       rangeDays: (hasCustom || isAllTime) ? null : Number(rangeDays || 30),
       from: hasCustom ? from : null,
       to: hasCustom ? to : null,
+      ordersChange,
+      soldChange,
+      revenueChange,
       revenueByDay: revenueByDayResult.rows.map(r => ({
         date: r.day,
         revenue: Number(r.revenue) || 0
@@ -393,15 +451,18 @@ router.get('/me/metrics', async (req, res) => {
       })),
       ordersByStatus,
       topProducts: topProductsResult.rows.map(r => ({
-        product_id: r.product_id,
+        id: r.product_id,
         product_name: r.product_name,
         product_image: r.product_image,
+        price: Number(r.price) || 0,
         sold_qty: Number(r.sold_qty) || 0,
         revenue: Number(r.revenue) || 0
       })),
       recentOrders: recentOrdersResult.rows.map(r => ({
         id: r.id,
         status: r.status,
+        price: Number(r.price) || 0,
+        quantity: Number(r.quantity) || 1,
         total_amount: Number(r.total_amount) || 0,
         created_at: r.created_at,
         customer_name: r.customer_name,
@@ -411,6 +472,63 @@ router.get('/me/metrics', async (req, res) => {
     });
   } catch (error) {
     console.error('Get farmer metrics error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Farmer: time-series report (same format as admin /dashboard/report)
+// GET /api/farmers/me/report?period=today|week|month|year|all
+router.get('/me/report', async (req, res) => {
+  try {
+    const user = await requireFarmer(req, res);
+    if (!user) return;
+
+    const period = req.query.period || 'today';
+
+    let groupExpr, filterExpr;
+    if (period === 'today') {
+      groupExpr = `DATE_TRUNC('hour', o.created_at)`;
+      filterExpr = `DATE(o.created_at) = CURRENT_DATE`;
+    } else if (period === 'week') {
+      groupExpr = `DATE(o.created_at)`;
+      filterExpr = `o.created_at >= DATE_TRUNC('week', CURRENT_DATE)`;
+    } else if (period === 'month') {
+      groupExpr = `DATE(o.created_at)`;
+      filterExpr = `o.created_at >= DATE_TRUNC('month', CURRENT_DATE)`;
+    } else if (period === 'year') {
+      groupExpr = `DATE_TRUNC('month', o.created_at)`;
+      filterExpr = `o.created_at >= DATE_TRUNC('year', CURRENT_DATE)`;
+    } else {
+      groupExpr = `DATE_TRUNC('month', o.created_at)`;
+      filterExpr = '1=1';
+    }
+
+    const sql = `
+      SELECT
+        ${groupExpr} AS period_label,
+        COUNT(*) FILTER (WHERE o.status != 'cancelled') AS orders,
+        COALESCE(SUM(o.quantity) FILTER (WHERE o.status = 'delivered'), 0) AS items_sold,
+        COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'delivered'), 0) AS revenue
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE p.farmer_id = $1
+        AND ${filterExpr}
+      GROUP BY ${groupExpr}
+      ORDER BY ${groupExpr} ASC
+    `;
+
+    const result = await pool.query(sql, [user.id]);
+
+    const data = result.rows.map(r => ({
+      label: r.period_label,
+      revenue: parseFloat(r.revenue) || 0,
+      orders: parseInt(r.orders) || 0,
+      items_sold: parseInt(r.items_sold) || 0,
+    }));
+
+    res.json({ data });
+  } catch (err) {
+    console.error('Farmer report error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -591,7 +709,7 @@ router.put('/profile', async (req, res) => {
     if (!user) return;
 
     const body = req.body || {};
-    const { shop_description, shop_banner_url, shop_avatar_url, full_name, address } = body;
+    const { shop_name, shop_description, shop_banner_url, shop_avatar_url, full_name, address } = body;
     const hasPersonalNameFields = ['first_name', 'middle_name', 'last_name'].some((key) => Object.prototype.hasOwnProperty.call(body, key));
     const firstName = String(body.first_name || '').trim();
     const middleName = String(body.middle_name || '').trim();
@@ -626,6 +744,12 @@ router.put('/profile', async (req, res) => {
     const updates = [];
     const values = [];
     let paramIndex = 1;
+
+    if (shop_name !== undefined && shop_name !== null && shop_name !== '') {
+      updates.push(`shop_name = $${paramIndex}`);
+      values.push(shop_name);
+      paramIndex++;
+    }
 
     if (hasPersonalNameFields && recomputedFullName) {
       updates.push(`full_name = $${paramIndex}`);
@@ -735,6 +859,94 @@ router.put('/profile', async (req, res) => {
       message: 'Server error updating shop profile',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  }
+});
+
+// Farmer: request verification
+router.post('/me/verification-request', async (req, res) => {
+  try {
+    const user = await requireFarmer(req, res);
+    if (!user) return;
+
+    const { documents, notes } = req.body;
+
+    // Check if farmer is already verified
+    const userResult = await pool.query('SELECT is_verified FROM users WHERE id = $1', [user.id]);
+    if (userResult.rows[0].is_verified) {
+      return res.status(400).json({ message: 'Your account is already verified' });
+    }
+
+    // Check if there's already a pending verification request
+    const existingRequest = await pool.query(
+      'SELECT id FROM verification_requests WHERE farmer_id = $1 AND status = $2',
+      [user.id, 'pending']
+    );
+    if (existingRequest.rows.length > 0) {
+      return res.status(400).json({ message: 'You already have a pending verification request' });
+    }
+
+    // Create verification request
+    const documentsJson = documents ? JSON.stringify(documents) : null;
+    const result = await pool.query(
+      `INSERT INTO verification_requests (farmer_id, documents, notes, status)
+       VALUES ($1, $2, $3, 'pending')
+       RETURNING id, created_at`,
+      [user.id, documentsJson, notes || null]
+    );
+
+    // Notify all admins about new verification request
+    try {
+      const admins = await pool.query(
+        "SELECT id FROM users WHERE role IN ('staff', 'super_admin')"
+      );
+      
+      for (const admin of admins.rows) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+           VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+          [admin.id, 'verification_request', 'New Verification Request', 
+           'A farmer has requested account verification. Review the request in the admin panel.']
+        );
+        broadcastEvent('notification.created', { user_id: admin.id });
+      }
+    } catch (notifErr) {
+      console.error('Failed to send admin notifications:', notifErr);
+    }
+
+    res.json({ 
+      message: 'Verification request submitted successfully',
+      request_id: result.rows[0].id,
+      created_at: result.rows[0].created_at
+    });
+  } catch (error) {
+    console.error('Verification request error:', error);
+    res.status(500).json({ message: 'Server error submitting verification request' });
+  }
+});
+
+// Farmer: get verification request status
+router.get('/me/verification-request', async (req, res) => {
+  try {
+    const user = await requireFarmer(req, res);
+    if (!user) return;
+
+    const result = await pool.query(
+      `SELECT id, status, notes, rejection_reason, created_at, reviewed_at
+       FROM verification_requests
+       WHERE farmer_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ request: null });
+    }
+
+    res.json({ request: result.rows[0] });
+  } catch (error) {
+    console.error('Get verification request error:', error);
+    res.status(500).json({ message: 'Server error fetching verification request' });
   }
 });
 

@@ -29,7 +29,7 @@ router.get('/', async (req, res) => {
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
                COALESCE(f.is_disabled, false) as farmer_is_disabled,
-               f.full_name as farmer_name, p.location as farm_location,
+               COALESCE(f.shop_name, f.full_name) as farmer_name, p.location as farm_location,
                CASE
                  WHEN COALESCE(p.is_admin_disabled, false) THEN false
                  WHEN COALESCE(f.is_disabled, false) THEN false
@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
                COALESCE(f.is_disabled, false) as farmer_is_disabled,
-               f.full_name as farmer_name, p.location as farm_location,
+               COALESCE(f.shop_name, f.full_name) as farmer_name, p.location as farm_location,
                CASE
                  WHEN COALESCE(p.is_admin_disabled, false) THEN false
                  WHEN COALESCE(f.is_disabled, false) THEN false

@@ -28,6 +28,9 @@ class FarmerDashboard {
         this.overviewMetrics = null;
         this.hasLoadedOrders = false;
         this.isSubmittingAddProduct = false;
+
+        // Make instance accessible globally for onclick handlers
+        window.farmerApp = this;
         this.isSubmittingEditProduct = false;
         this.isSubmittingRequestProduct = false;
         this.overviewRecentOrdersCache = [];
@@ -37,10 +40,12 @@ class FarmerDashboard {
         this.sortableTables = {};
         this.overviewRefreshTimer = null;
         this.myProductsCache = [];
+        this.requestsCache = [];
         this.catalogProductNames = [];
         this.productNameActiveIndex = { add: -1, edit: -1 };
         this.realtimeSource = null;
         this.customerRatingDraft = { orderId: null, rating: 0, hasExisting: false };
+        this.lowStockThreshold = 15;
 
         if (!this.token) {
             window.location.href = '/?login=1';
@@ -72,26 +77,34 @@ class FarmerDashboard {
             mutations.forEach((mutation) => {
                 if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                     if (chatSection.classList.contains('active')) {
-                        // Chat section became active, use setInterval to keep scrolling for 10 seconds
-                        let elapsed = 0;
-                        const interval = 50;
-                        const maxDuration = 10000; // 10 seconds
-                        const scrollInterval = setInterval(() => {
-                            elapsed += interval;
-                            const chatMessages = document.getElementById('chat-messages');
-                            if (chatMessages && chatMessages.children.length > 0) {
-                                chatMessages.scrollTop = chatMessages.scrollHeight;
-                            }
-                            if (elapsed >= maxDuration) {
-                                clearInterval(scrollInterval);
-                            }
-                        }, interval);
+                        // Chat section became active, scroll browser to bottom
+                        window.scrollTo(0, document.body.scrollHeight);
+
+                        // Scroll chat messages to bottom
+                        const chatMessages = document.getElementById('chat-messages');
+                        if (chatMessages && chatMessages.children.length > 0) {
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
                     }
                 }
             });
         });
 
         observer.observe(chatSection, { attributes: true });
+
+        // Also scroll to bottom on initial load if chat section is already active
+        if (chatSection.classList.contains('active')) {
+            setTimeout(() => {
+                // Scroll browser to bottom
+                window.scrollTo(0, document.body.scrollHeight);
+
+                // Scroll chat messages to bottom
+                const chatMessages = document.getElementById('chat-messages');
+                if (chatMessages && chatMessages.children.length > 0) {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            }, 500);
+        }
     }
 
     setApiBase(nextBase) {
@@ -225,8 +238,53 @@ class FarmerDashboard {
     }
 
     _comparisonLabel(period) {
-        const map = { today: 'vs prev today', week: 'vs prev week', month: 'vs prev month', year: 'vs prev year', all: 'vs prev period' };
+        const map = { today: 'vs prev today', week: 'vs prev week', month: 'vs prev month', year: 'vs prev year', all: '' };
         return map[String(period || '').trim().toLowerCase()] || 'vs prev today';
+    }
+
+    updateKpiChange(changeId, labelId, change, period) {
+        const changeEl = document.getElementById(changeId);
+        const labelEl = document.getElementById(labelId);
+        if (period === 'all') {
+            if (changeEl) changeEl.textContent = '';
+            if (labelEl) labelEl.textContent = '';
+            return;
+        }
+
+        const value = Number(change) || 0;
+        const isPositive = value >= 0;
+        if (changeEl) {
+            changeEl.className = `small pt-1 fw-bold ${isPositive ? 'text-success' : 'text-danger'}`;
+            changeEl.textContent = `${isPositive ? '+' : ''}${value}%`;
+        }
+        if (labelEl) labelEl.textContent = this._comparisonLabel(period);
+    }
+
+    _loadPeriods() {
+        try {
+            const saved = localStorage.getItem('farmerDashboardPeriods');
+            if (!saved) return;
+            const parsed = JSON.parse(saved);
+            if (parsed.kpiPeriods) this._kpiPeriods = { ...this._kpiPeriods, ...parsed.kpiPeriods };
+            if (parsed.reportPeriod) this._reportPeriod = parsed.reportPeriod;
+            if (parsed.statusPeriod) this._statusPeriod = parsed.statusPeriod;
+            if (parsed.recentOrdersPeriod) this._recentOrdersPeriod = parsed.recentOrdersPeriod;
+            if (parsed.topProductsPeriod) this._topProductsPeriod = parsed.topProductsPeriod;
+            if (parsed.lowStockThreshold) this.lowStockThreshold = parsed.lowStockThreshold;
+        } catch (_) {}
+    }
+
+    _savePeriods() {
+        try {
+            localStorage.setItem('farmerDashboardPeriods', JSON.stringify({
+                kpiPeriods: this._kpiPeriods,
+                reportPeriod: this._reportPeriod,
+                statusPeriod: this._statusPeriod,
+                recentOrdersPeriod: this._recentOrdersPeriod,
+                topProductsPeriod: this._topProductsPeriod,
+                lowStockThreshold: this.lowStockThreshold,
+            }));
+        } catch (_) {}
     }
 
     _syncAllPeriods(period) {
@@ -262,6 +320,7 @@ class FarmerDashboard {
             const el = document.getElementById(id);
             if (el) el.textContent = comparisonText;
         });
+
         // Clear cached data when switching periods (but not for Recent Orders/Top Products)
         this.overviewMetrics = null;
         // Don't clear Recent Orders and Top Products cache since they're independent
@@ -301,9 +360,9 @@ class FarmerDashboard {
         const dataTableOptions = {
             searchable: false,
             paging: false,
+            fixedHeight: false,
             perPageSelect: false,
             sortable: true,
-            fixedHeight: false,
             destroyable: true,
             labels: {
                 placeholder: '',
@@ -381,10 +440,26 @@ class FarmerDashboard {
         this._statusPeriod = 'today';
         this._recentOrdersPeriod = 'today';
         this._topProductsPeriod = 'today';
+        // Load saved periods from localStorage
+        this._loadPeriods();
+        // Update low stock threshold label
+        const labelEl = document.getElementById('low-stock-threshold-label');
+        if (labelEl) labelEl.textContent = `| ≤${this.lowStockThreshold}`;
+        // Set active state in dropdown for current threshold
+        const lowStockDropdown = document.querySelector('.dropdown-menu .low-stock-threshold')?.closest('.dropdown-menu');
+        if (lowStockDropdown) {
+            lowStockDropdown.querySelectorAll('.low-stock-threshold').forEach(item => {
+                item.classList.remove('active');
+                if (Number(item.dataset.threshold) === this.lowStockThreshold) {
+                    item.classList.add('active');
+                }
+            });
+        }
         this.pagination = {
             'recent-orders': { page: 1, total: 0, limit: 5 },
             'top-products': { page: 1, total: 0, limit: 5 },
             'products': { page: 1, total: 0, limit: 50 },
+            'requests': { page: 1, total: 0, limit: 25 },
         };
         this.showDeniedBanner();
         await this.checkFarmerAuth();
@@ -399,6 +474,9 @@ class FarmerDashboard {
         this.setupRealtime();
         this.initChat();
         this.initUnitDropdowns();
+        this.loadNotifications();
+        this.loadMessages();
+        this.updateHeaderUser();
     }
 
     setupRequestModal() {
@@ -558,63 +636,250 @@ class FarmerDashboard {
 
     async loadRequestHistory() {
         try {
-            const requestUrls = [
-                `${this.apiBase}/products/category-requests/mine`,
-                `${this.apiBase}/products/requests/mine`
-            ];
-            let data = null;
-            for (const url of requestUrls) {
-                const res = await fetch(url, {
-                    headers: { Authorization: `Bearer ${this.token}` }
-                });
-                if (res.ok) {
-                    data = await res.json();
-                    break;
-                }
-                if (res.status === 401) {
-                    const errorData = await res.json().catch(() => ({}));
-                    this.showMessage(errorData.message || 'Session expired. Please log in again.', 'error');
+            const res = await fetch(`${this.apiBase}/products/requests/mine`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const listEl = document.getElementById('request-product-history');
+                if (!listEl) return;
+                const rows = Array.isArray(data.requests) ? data.requests : [];
+                if (!rows.length) {
+                    listEl.innerHTML = '<div class="overview-list-item">No requests yet.</div>';
                     return;
                 }
-                if (res.status !== 404) {
-                    const errorData = await res.json().catch(() => ({}));
-                    this.showMessage(errorData.message || 'Unable to load request history right now.', 'error');
-                    return;
-                }
-            }
-            if (!data) return;
-            const listEl = document.getElementById('request-product-history');
-            if (!listEl) return;
-            const rows = Array.isArray(data.requests) ? data.requests : [];
-            if (!rows.length) {
-                listEl.innerHTML = '<div class="overview-list-item">No requests yet.</div>';
-                return;
-            }
-            listEl.innerHTML = rows.map(r => {
-                    const status = String(r.status || 'pending');
-                    const statusClass = status === 'approved' ? 'badge badge-success' : status === 'rejected' ? 'badge badge-danger' : 'badge badge-secondary';
-                    const cat = this.escapeAttr(r.category_name || r.requested_category_name || 'Uncategorized');
-                    const when = new Date(r.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                    const note = this.escapeAttr(r.notes || '');
-                    const review = this.escapeAttr(r.review_notes || '');
-                    return `
-                        <div class="overview-list-item request-history-item" style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
-                            <div style="flex:1;">
-                                <div style="font-size:0.92rem;color:var(--text-secondary);">Product Name: <strong style="color:var(--text-primary);">${this.escapeAttr(r.name)}</strong></div>
-                                <div style="font-size:0.92rem;color:var(--text-secondary);">Product Category: <strong style="color:var(--text-primary);">${cat}</strong></div>
-                                <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.2rem;">${when}</div>
-                                ${note ? `<div style="margin-top:0.35rem;color:var(--text-muted);">${note}</div>` : ''}
-                                ${review ? `<div style="margin-top:0.35rem;color:var(--text-muted);font-style:italic;">Review: ${review}</div>` : ''}
+                listEl.innerHTML = rows.map(r => {
+                        const status = String(r.status || 'pending');
+                        const statusClass = status === 'approved' ? 'badge badge-success' : status === 'rejected' ? 'badge badge-danger' : 'badge badge-secondary';
+                        const cat = this.escapeAttr(r.category_name || r.requested_category_name || 'Uncategorized');
+                        const when = new Date(r.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                        const note = this.escapeAttr(r.notes || '');
+                        const review = this.escapeAttr(r.review_notes || '');
+                        return `
+                            <div class="overview-list-item request-history-item" style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+                                <div style="flex:1;">
+                                    <div style="font-size:0.92rem;color:var(--text-secondary);">Product Name: <strong style="color:var(--text-primary);">${this.escapeAttr(r.name)}</strong></div>
+                                    <div style="font-size:0.92rem;color:var(--text-secondary);">Product Category: <strong style="color:var(--text-primary);">${cat}</strong></div>
+                                    <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.2rem;">${when}</div>
+                                    ${note ? `<div style="margin-top:0.35rem;color:var(--text-muted);">${note}</div>` : ''}
+                                    ${review ? `<div style="margin-top:0.35rem;color:var(--text-muted);font-style:italic;">Review: ${review}</div>` : ''}
+                                </div>
+                                <div style="margin-left:0.75rem;white-space:nowrap;align-self:flex-start;">
+                                    <span class="${statusClass}" style="padding:6px 8px;border-radius:12px;font-weight:700;">${status}</span>
+                                </div>
                             </div>
-                            <div style="margin-left:0.75rem;white-space:nowrap;align-self:flex-start;">
-                                <span class="${statusClass}" style="padding:6px 8px;border-radius:12px;font-weight:700;">${status}</span>
-                            </div>
-                        </div>
-                    `;
-            }).join('');
+                        `;
+                }).join('');
+            } else {
+                const listEl = document.getElementById('request-product-history');
+                if (listEl) listEl.innerHTML = '<div class="overview-list-item">Failed to load requests</div>';
+            }
         } catch (e) {
             console.error('Load request history error:', e);
         }
+    }
+
+    async loadRequestsTable() {
+        try {
+            const res = await fetch(`${this.apiBase}/products/product-requests/mine`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                this.renderRequestsTable(data.requests || []);
+            } else {
+                const tbody = document.getElementById('requests-tbody');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3 small">Failed to load requests</td></tr>';
+            }
+        } catch (error) {
+            console.error('Error loading requests:', error);
+            const tbody = document.getElementById('requests-tbody');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3 small">Failed to load requests</td></tr>';
+        }
+    }
+
+    renderRequestsTable(requests) {
+        const tbody = document.getElementById('requests-tbody');
+        if (!tbody) return;
+
+        const list = Array.isArray(requests) ? requests : [];
+        this.requestsCache = list;
+        const pg = this.pagination['requests'];
+        pg.total = list.length;
+
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3 small">No pending products</td></tr>';
+            this.renderPagination('requests-pagination', pg, () => {});
+            return;
+        }
+
+        const start = (pg.page - 1) * pg.limit;
+        const pageItems = list.slice(start, start + pg.limit);
+
+        tbody.innerHTML = pageItems.map(r => {
+            const status = String(r.status || 'pending');
+            const statusClass = status === 'approved' ? 'bg-success' : status === 'rejected' ? 'bg-danger' : 'bg-secondary';
+            const cat = this.escapeHtml(r.category_name || 'Uncategorized');
+            const when = new Date(r.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' });
+            return `
+            <tr>
+                <td class="small text-center">#${r.id}</td>
+                <td class="small">${this.escapeHtml(r.name)}</td>
+                <td class="small">${cat}</td>
+                <td class="small text-center">${when}</td>
+                <td class="text-center"><span class="badge ${statusClass}">${status}</span></td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.farmerApp.viewRequestDetails(${r.id}, 'product_request')">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </td>
+            </tr>
+            `;
+        }).join('');
+
+        this.renderPagination('requests-pagination', pg, (page) => {
+            pg.page = page;
+            this.renderRequestsTable(this.requestsCache);
+        });
+    }
+
+    async viewRequestDetails(requestId, requestType = 'catalog_request') {
+        try {
+            const modal = document.getElementById('product-request-details-modal');
+            const contentEl = document.getElementById('request-details-content');
+            const resubmitBtn = document.getElementById('resubmit-product-request-btn');
+            if (!modal || !contentEl) return;
+
+            modal.classList.add('open');
+            document.documentElement.classList.add('modal-open');
+            document.body.classList.add('modal-open');
+
+            // Hide resubmit button initially
+            if (resubmitBtn) resubmitBtn.style.display = 'none';
+
+            contentEl.innerHTML = `
+                <div class="table-skeleton">
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row"></div>
+                </div>
+            `;
+
+            if (requestType === 'product_request') {
+                const res = await fetch(`${this.apiBase}/products/${requestId}`, {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const product = data.product;
+                    const status = product.status || 'pending';
+                    const statusClass = status === 'approved' ? 'bg-success' : status === 'rejected' ? 'bg-danger' : 'bg-secondary';
+                    const when = new Date(product.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    
+                    // Show resubmit button for rejected products
+                    if (status === 'rejected' && resubmitBtn) {
+                        resubmitBtn.style.display = 'inline-block';
+                        resubmitBtn.dataset.productId = requestId;
+                    }
+                    
+                    contentEl.innerHTML = `
+                        <div class="mb-3">
+                            <label class="small text-muted">Product Name</label>
+                            <div class="fw-bold">${this.escapeHtml(product.name)}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="small text-muted">Category</label>
+                            <div>${this.escapeHtml(product.category_name || 'Uncategorized')}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="small text-muted">Description</label>
+                            <div>${this.escapeHtml(product.description || 'No description')}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="small text-muted">Price</label>
+                            <div>₱${this.fmtCurrency(product.price || 0)}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="small text-muted">Stock</label>
+                            <div>${product.stock_quantity || 0} units</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="small text-muted">Status</label>
+                            <div><span class="badge ${statusClass}">${status}</span></div>
+                        </div>
+                        ${product.rejection_reason ? `
+                        <div class="mb-3">
+                            <label class="small text-muted">Rejection Reason</label>
+                            <div class="text-danger">${this.escapeHtml(product.rejection_reason)}</div>
+                        </div>
+                        ` : ''}
+                        <div class="mb-3">
+                            <label class="small text-muted">Requested Date</label>
+                            <div>${when}</div>
+                        </div>
+                    `;
+                } else {
+                    contentEl.innerHTML = '<div class="text-center text-muted py-3">Failed to load product details</div>';
+                }
+            } else {
+                contentEl.innerHTML = '<div class="text-center text-muted py-3">Catalog request details not implemented yet</div>';
+            }
+        } catch (error) {
+            console.error('Error loading request details:', error);
+            const contentEl = document.getElementById('request-details-content');
+            if (contentEl) contentEl.innerHTML = '<div class="text-center text-muted py-3">Failed to load details</div>';
+        }
+    }
+
+    closeRequestDetailsModal() {
+        const modal = document.getElementById('product-request-details-modal');
+        if (!modal) return;
+        modal.classList.remove('open');
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+    }
+
+    async resubmitProductRequest(productId) {
+        try {
+            const res = await fetch(`${this.apiBase}/products/${productId}/resubmit`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.showMessage('Product resubmitted for approval', 'success');
+                this.closeRequestDetailsModal();
+                this.loadRequestsTable();
+            } else {
+                this.showMessage(data.message || 'Failed to resubmit product', 'error');
+            }
+        } catch (error) {
+            console.error('Resubmit product error:', error);
+            this.showMessage('Failed to resubmit product', 'error');
+        }
+    }
+
+    filterRequests() {
+        const statusFilter = document.getElementById('request-status-filter')?.value || '';
+        const searchInput = document.getElementById('requests-search-input')?.value?.toLowerCase() || '';
+        
+        let filtered = this.requestsCache;
+        
+        if (statusFilter) {
+            filtered = filtered.filter(r => String(r.status || 'pending') === statusFilter);
+        }
+        
+        if (searchInput) {
+            filtered = filtered.filter(r => 
+                (r.name || '').toLowerCase().includes(searchInput) ||
+                (r.category_name || r.requested_category_name || '').toLowerCase().includes(searchInput)
+            );
+        }
+        
+        this.renderRequestsTable(filtered);
     }
 
     initChat() {
@@ -771,7 +1036,11 @@ class FarmerDashboard {
                     return;
                 }
                 const nameEl = document.getElementById('user-name');
-                if (nameEl) nameEl.textContent = `Farmer: ${data.user.full_name || data.user.username}`;
+                const shopName = data.user.shop_name || data.user.full_name || data.user.username || 'Farmer';
+                const formattedShopName = shopName.split(' ').map(word =>
+                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                ).join(' ');
+                if (nameEl) nameEl.textContent = formattedShopName;
                 const emailEl = document.getElementById('user-email');
                 if (emailEl) emailEl.textContent = data.user.email || '—';
                 const farmerUserLabel = document.getElementById('farmer-user-label');
@@ -917,6 +1186,76 @@ class FarmerDashboard {
         document.getElementById('add-product-form')?.addEventListener('submit', (e) => this.handleAddProduct(e));
         document.getElementById('edit-product-form')?.addEventListener('submit', (e) => this.handleEditProduct(e));
         document.getElementById('save-shop-profile-btn')?.addEventListener('click', (e) => this.handleShopProfileUpdate(e));
+        document.getElementById('profile-edit-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.updateProfile();
+        });
+        document.getElementById('profile-password-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.changePassword();
+        });
+
+        // Format phone input with spaces (9XX XXX XXXX)
+        const pePhone = document.getElementById('pe-phone');
+        if (pePhone) {
+            pePhone.addEventListener('input', () => {
+                // Remove non-digits
+                let digits = pePhone.value.replace(/\D/g, '');
+                // Limit to 10 digits
+                if (digits.length > 10) digits = digits.slice(0, 10);
+                // Format as 9XX XXX XXXX
+                if (digits.length > 0) {
+                    let formatted = digits[0];
+                    if (digits.length > 1) formatted += digits.slice(1, 3);
+                    if (digits.length > 3) formatted += ' ' + digits.slice(3, 6);
+                    if (digits.length > 6) formatted += ' ' + digits.slice(6, 10);
+                    pePhone.value = formatted;
+                } else {
+                    pePhone.value = '';
+                }
+            });
+        }
+
+        // Topbar dropdown links
+        document.getElementById('show-all-messages-link')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showSection('chat');
+        });
+        document.getElementById('show-all-notifications-link')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showSection('notifications');
+        });
+        document.getElementById('view-all-messages-badge')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showSection('chat');
+        });
+        document.getElementById('notif-mark-all-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.markAllNotifsRead();
+        });
+
+        // Order details modal close button
+        document.getElementById('close-order-details-modal')?.addEventListener('click', () => {
+            const modal = document.getElementById('order-details-modal');
+            if (modal) modal.classList.remove('open');
+        });
+
+        // Close modal on backdrop click
+        document.getElementById('order-details-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'order-details-modal') {
+                e.target.classList.remove('open');
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('order-details-modal');
+                if (modal && modal.classList.contains('open')) {
+                    modal.classList.remove('open');
+                }
+            }
+        });
 
         const editShopBtn = document.getElementById('edit-shop-profile-btn');
         if (editShopBtn) {
@@ -926,6 +1265,49 @@ class FarmerDashboard {
         if (cancelShopBtn) {
             cancelShopBtn.addEventListener('click', () => this.cancelShopProfileEdit());
         }
+
+        // My Requests tab - load requests when tab is shown
+        const requestsTab = document.querySelector('button[data-bs-target="#products-requests-tab"]');
+        if (requestsTab) {
+            requestsTab.addEventListener('shown.bs.tab', () => {
+                this.loadRequestsTable();
+            });
+        }
+
+        // Requests search button
+        document.getElementById('requests-search-btn')?.addEventListener('click', () => {
+            this.filterRequests();
+        });
+
+        // Requests refresh button
+        document.getElementById('requests-refresh-btn')?.addEventListener('click', () => {
+            this.loadRequestsTable();
+        });
+
+        // Requests status filter
+        document.getElementById('request-status-filter')?.addEventListener('change', () => {
+            this.filterRequests();
+        });
+
+        // Product request details modal close buttons
+        document.getElementById('close-request-details-modal')?.addEventListener('click', () => {
+            this.closeRequestDetailsModal();
+        });
+        document.getElementById('close-request-details-btn')?.addEventListener('click', () => {
+            this.closeRequestDetailsModal();
+        });
+        document.getElementById('product-request-details-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'product-request-details-modal') {
+                this.closeRequestDetailsModal();
+            }
+        });
+        document.getElementById('resubmit-product-request-btn')?.addEventListener('click', () => {
+            const btn = document.getElementById('resubmit-product-request-btn');
+            const productId = btn?.dataset.productId;
+            if (productId) {
+                this.resubmitProductRequest(productId);
+            }
+        });
 
         // Shop address modal
         this.initShopPsgc();
@@ -1066,7 +1448,6 @@ class FarmerDashboard {
         };
 
         setupAccountDropdown('farmer-user-account-btn', 'farmer-user-dropdown-menu');
-        setupAccountDropdown('farmer-sidebar-account-btn', 'farmer-sidebar-dropdown-menu');
 
         const myAccountDropdownBtn = document.getElementById('farmer-my-account-btn');
         if (myAccountDropdownBtn) {
@@ -1079,25 +1460,9 @@ class FarmerDashboard {
             });
         }
 
-        const sidebarMyAccountBtn = document.getElementById('farmer-sidebar-my-account-btn');
-        if (sidebarMyAccountBtn) {
-            sidebarMyAccountBtn.addEventListener('click', () => {
-                const sideMenu = document.getElementById('farmer-sidebar-dropdown-menu');
-                const sideBtn = document.getElementById('farmer-sidebar-account-btn');
-                if (sideMenu) sideMenu.style.display = 'none';
-                if (sideBtn) sideBtn.setAttribute('aria-expanded', 'false');
-                this.openAccountPanel();
-            });
-        }
-
         const logoutDropdownBtn = document.getElementById('farmer-logout-menu-btn');
         if (logoutDropdownBtn) {
             logoutDropdownBtn.addEventListener('click', () => this.logout());
-        }
-
-        const sidebarLogoutBtn = document.getElementById('farmer-sidebar-logout-btn');
-        if (sidebarLogoutBtn) {
-            sidebarLogoutBtn.addEventListener('click', () => this.logout());
         }
 
         // KPI card period filters (removed from HTML, keeping for reference)
@@ -1127,6 +1492,7 @@ class FarmerDashboard {
             const period = link.dataset.period;
             this._syncAllPeriods(period);
             this.loadOverviewMetrics({ force: true });
+            this._savePeriods();
         });
 
         // Status chart period filter
@@ -1137,6 +1503,33 @@ class FarmerDashboard {
             const period = link.dataset.period;
             this._syncAllPeriods(period);
             this.loadOverviewMetrics({ force: true });
+            this._savePeriods();
+        });
+
+        // Recent orders period filter (independent, not synced)
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.recent-orders-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._recentOrdersPeriod = period;
+            const lbl = document.getElementById('recent-orders-period-label');
+            if (lbl) lbl.textContent = `| ${this._periodLabel(period)}`;
+            this.loadRecentOrders(period);
+            this._savePeriods();
+        });
+
+        // Top products period filter (independent, not synced)
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.top-products-period-filter');
+            if (!link) return;
+            e.preventDefault();
+            const period = link.dataset.period;
+            this._topProductsPeriod = period;
+            const lbl = document.getElementById('top-products-period-label');
+            if (lbl) lbl.textContent = `| ${this._periodLabel(period)}`;
+            this.loadTopProducts(period);
+            this._savePeriods();
         });
 
         // Total orders period filter
@@ -1147,6 +1540,7 @@ class FarmerDashboard {
             const period = link.dataset.period;
             this._syncAllPeriods(period);
             this.loadOverviewMetrics({ force: true });
+            this._savePeriods();
         });
 
         // Items sold period filter
@@ -1157,6 +1551,7 @@ class FarmerDashboard {
             const period = link.dataset.period;
             this._syncAllPeriods(period);
             this.loadOverviewMetrics({ force: true });
+            this._savePeriods();
         });
 
         // Total revenue period filter
@@ -1167,6 +1562,30 @@ class FarmerDashboard {
             const period = link.dataset.period;
             this._syncAllPeriods(period);
             this.loadOverviewMetrics({ force: true });
+            this._savePeriods();
+        });
+
+        // Low stock threshold filter
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.low-stock-threshold');
+            if (!link) return;
+            e.preventDefault();
+            const threshold = Number(link.dataset.threshold);
+            if (Number.isFinite(threshold) && threshold > 0) {
+                this.lowStockThreshold = threshold;
+                this._savePeriods();
+                // Update active state in dropdown
+                const dropdown = link.closest('.dropdown-menu');
+                if (dropdown) {
+                    dropdown.querySelectorAll('.low-stock-threshold').forEach(item => item.classList.remove('active'));
+                    link.classList.add('active');
+                }
+                // Update label
+                const labelEl = document.getElementById('low-stock-threshold-label');
+                if (labelEl) labelEl.textContent = `| ≤${threshold}`;
+                // Always reload products to ensure fresh data for KPI calculation
+                this.loadMyProducts();
+            }
         });
 
 
@@ -1220,6 +1639,25 @@ class FarmerDashboard {
             customerRatingModal.addEventListener('click', (e) => {
                 if (e.target === customerRatingModal) {
                     this.closeCustomerRatingModal();
+                }
+            });
+        }
+
+        // Rejection reason modal event listeners
+        const rejectionReasonClose = document.getElementById('rejection-reason-close');
+        const rejectionReasonCloseBtn = document.getElementById('rejection-reason-close-btn');
+        const rejectionReasonModal = document.getElementById('rejection-reason-modal');
+        
+        if (rejectionReasonClose) {
+            rejectionReasonClose.addEventListener('click', () => this.closeRejectionReasonModal());
+        }
+        if (rejectionReasonCloseBtn) {
+            rejectionReasonCloseBtn.addEventListener('click', () => this.closeRejectionReasonModal());
+        }
+        if (rejectionReasonModal) {
+            rejectionReasonModal.addEventListener('click', (e) => {
+                if (e.target === rejectionReasonModal) {
+                    this.closeRejectionReasonModal();
                 }
             });
         }
@@ -1406,12 +1844,6 @@ class FarmerDashboard {
                 const orderId = Number(btn.getAttribute('data-order-id'));
                 if (!orderId) return;
                 this.rateCustomerForOrder(orderId);
-            }
-
-            if (action === 'view-order') {
-                const orderId = Number(btn.getAttribute('data-order-id'));
-                if (!orderId) return;
-                this.openOrderDetails(orderId);
             }
         });
 
@@ -2000,7 +2432,7 @@ class FarmerDashboard {
         });
 
         // Initial section based on saved state, hash, or default
-        const validSections = new Set(['overview', 'products', 'orders', 'chat', 'shop', 'reviews']);
+        const validSections = new Set(['overview', 'products', 'orders', 'chat', 'shop', 'reviews', 'profile', 'notifications']);
         const savedSectionRaw = localStorage.getItem('farmerActiveSection');
         const savedSection = String(savedSectionRaw || '').trim();
         const hash = String((window.location.hash || '')).replace('#', '').trim();
@@ -2010,6 +2442,11 @@ class FarmerDashboard {
             : (validSections.has(hash) ? hash : 'overview');
 
         this.showSection(initialSection);
+
+        // Load profile data immediately if profile section is active
+        if (initialSection === 'profile') {
+            this.loadProfile();
+        }
     }
 
     todayDateOnly() {
@@ -2114,8 +2551,8 @@ class FarmerDashboard {
         return true;
     }
 
-    showSection(section) {
-        const validSections = new Set(['overview', 'products', 'orders', 'chat', 'shop', 'reviews']);
+    showSection(section, tab = null) {
+        const validSections = new Set(['overview', 'products', 'orders', 'chat', 'shop', 'reviews', 'profile', 'notifications']);
         const normalized = String(section || '').trim();
         const safeSection = validSections.has(normalized) ? normalized : 'overview';
 
@@ -2138,13 +2575,26 @@ class FarmerDashboard {
             this.switchOrderTab('pending');
         }
 
+        // Load profile when profile section is opened
+        if (safeSection === 'profile') {
+            this.loadProfile();
+            this.activateProfileTab(tab || 'overview');
+        }
+
+        // Load notifications when notifications section is opened
+        if (safeSection === 'notifications') {
+            this.loadNotifications(1);
+        }
+
         const titles = {
             overview: 'Overview',
             products: 'My Products',
             orders: 'Order Management',
-            chat: 'Chat',
+            chat: 'Messages',
             shop: 'Shop Profile',
-            reviews: 'Reviews'
+            reviews: 'Reviews',
+            profile: 'My Profile',
+            notifications: 'Notifications'
         };
         const titleEl = document.getElementById('farmer-page-title');
         if (titleEl) titleEl.textContent = titles[safeSection] || 'Overview';
@@ -2158,7 +2608,9 @@ class FarmerDashboard {
                 orders: 'Order Management',
                 reviews: 'Reviews',
                 shop: 'Shop Profile',
-                chat: 'Messages'
+                chat: 'Messages',
+                profile: 'My Profile',
+                notifications: 'Notifications'
             };
             breadcrumbCurrent.textContent = breadcrumbLabels[safeSection] || 'Farmer Dashboard';
         }
@@ -2189,6 +2641,29 @@ class FarmerDashboard {
         } catch (_) {
             // ignore
         }
+    }
+
+    activateProfileTab(tab = 'overview') {
+        const targetMap = {
+            overview: '#profile-overview',
+            edit: '#profile-edit',
+            password: '#profile-change-password'
+        };
+        const targetSelector = targetMap[String(tab || 'overview').trim()] || targetMap.overview;
+        const tabs = document.querySelectorAll('#profileTabs .nav-link');
+        const panes = document.querySelectorAll('#profile .tab-pane');
+
+        tabs.forEach((btn) => {
+            const isActive = btn.getAttribute('data-bs-target') === targetSelector;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+
+        panes.forEach((pane) => {
+            const isActive = `#${pane.id}` === targetSelector;
+            pane.classList.toggle('show', isActive);
+            pane.classList.toggle('active', isActive);
+        });
     }
 
     setupDetailPanel() {
@@ -2293,10 +2768,10 @@ class FarmerDashboard {
                 const profile = data.profile || {};
                 this.currentShopProfile = profile;
 
-                const displayName = getName(profile) || getName(fallbackUser) || '—';
+                const displayName = profile.shop_name || getName(profile) || getName(fallbackUser) || '—';
                 const displayLocation = getLocation(profile) || getLocation(fallbackUser) || 'Farm location not set';
                 const displayDesc = getDesc(profile) || getDesc(fallbackUser) || 'No description yet.';
-                
+
                 // Populate read-only display fields
                 const shopNameDisplay = document.getElementById('shop-name-display');
                 if (shopNameDisplay) {
@@ -2315,9 +2790,9 @@ class FarmerDashboard {
                 const shopNameInput = document.getElementById('shop-name-input');
                 const shopLocationInput = document.getElementById('shop-location-input');
                 const shopDescriptionInput = document.getElementById('shop-description-input');
-                
+
                 if (shopNameInput) {
-                    const v = getName(profile) || getName(fallbackUser) || '';
+                    const v = profile.shop_name || getName(profile) || getName(fallbackUser) || '';
                     shopNameInput.value = v;
                     shopNameInput.placeholder = v || displayName;
                 }
@@ -2368,6 +2843,498 @@ class FarmerDashboard {
             }
         } catch (error) {
             console.error('Error loading shop profile:', error);
+        }
+    }
+
+    async loadProfile() {
+        try {
+            const response = await fetch(`${this.apiBase}/auth/profile`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const user = data.user || data;
+
+                // Update profile card
+                const shopNameEl = document.getElementById('profile-shop-name');
+                const ownerNameEl = document.getElementById('profile-owner-name');
+                const roleEl = document.getElementById('profile-role');
+                const avatarImg = document.getElementById('profile-avatar-img');
+                const avatarInitial = document.getElementById('profile-avatar-initial');
+                if (shopNameEl) shopNameEl.textContent = user.shop_name || '—';
+                if (ownerNameEl) ownerNameEl.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || '—';
+                if (roleEl) roleEl.textContent = (user.role || '—').toUpperCase();
+                
+                // Handle avatar display
+                if (avatarImg && avatarInitial) {
+                    if (user.avatar_url) {
+                        avatarImg.src = user.avatar_url;
+                        avatarImg.style.display = 'block';
+                        avatarInitial.style.display = 'none';
+                    } else {
+                        avatarImg.style.display = 'none';
+                        const initial = (user.shop_name || user.first_name || user.username || 'F').charAt(0).toUpperCase();
+                        avatarInitial.textContent = initial;
+                        avatarInitial.style.display = 'flex';
+                    }
+                }
+
+                // Update overview tab
+                const poShopName = document.getElementById('po-shop-name');
+                const poOwnerName = document.getElementById('po-owner-name');
+                const poEmail = document.getElementById('po-email');
+                const poPhone = document.getElementById('po-phone');
+                const poRole = document.getElementById('po-role');
+                const poJoined = document.getElementById('po-joined');
+
+                if (poShopName) poShopName.textContent = user.shop_name || '—';
+                if (poOwnerName) poOwnerName.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || '—';
+                if (poEmail) poEmail.textContent = user.email || '—';
+                if (poPhone) poPhone.textContent = user.phone ? `+63${user.phone}` : '—';
+                if (poRole) poRole.textContent = (user.role || '—').toUpperCase();
+                if (poJoined) poJoined.textContent = user.created_at
+                    ? new Date(user.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+                    : '—';
+
+                // Pre-populate edit form
+                const peFirstname = document.getElementById('pe-firstname');
+                const peMiddlename = document.getElementById('pe-middlename');
+                const peLastname = document.getElementById('pe-lastname');
+                const pePhone = document.getElementById('pe-phone');
+
+                if (peFirstname) peFirstname.value = user.first_name || '';
+                if (peMiddlename) peMiddlename.value = user.middle_name || '';
+                if (peLastname) peLastname.value = user.last_name || '';
+                if (pePhone) {
+                    // Format phone with spaces (9XX XXX XXXX)
+                    const phoneDigits = String(user.phone || '').replace(/\D/g, '');
+                    if (phoneDigits.length > 0) {
+                        let formatted = phoneDigits[0];
+                        if (phoneDigits.length > 1) formatted += phoneDigits.slice(1, 3);
+                        if (phoneDigits.length > 3) formatted += ' ' + phoneDigits.slice(3, 6);
+                        if (phoneDigits.length > 6) formatted += ' ' + phoneDigits.slice(6, 10);
+                        pePhone.value = formatted;
+                    } else {
+                        pePhone.value = '';
+                    }
+                }
+            } else {
+                console.error('Profile response not OK:', response.status);
+                this.showMessage('Failed to load profile', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading profile:', error);
+            this.showMessage('Error loading profile', 'error');
+        }
+    }
+
+    async updateProfile() {
+        const firstname = document.getElementById('pe-firstname').value.trim();
+        const middlename = document.getElementById('pe-middlename').value.trim();
+        const lastname = document.getElementById('pe-lastname').value.trim();
+        const phone = document.getElementById('pe-phone').value.trim();
+
+        if (!firstname || !lastname) {
+            this.showMessage('First name and last name are required', 'error');
+            return;
+        }
+
+        // Validate phone format (remove spaces for validation)
+        const phoneDigits = phone.replace(/\s/g, '');
+        if (phoneDigits && !/^9[0-9]{9}$/.test(phoneDigits)) {
+            this.showMessage('Phone must be 10 digits starting with 9 (e.g. 912 345 6789)', 'error');
+            return;
+        }
+
+        const saveBtn = document.getElementById('profile-save-btn');
+        const spinner = document.getElementById('profile-save-spinner');
+        const btnText = saveBtn.querySelector('.btn-text');
+
+        saveBtn.disabled = true;
+        spinner.classList.remove('d-none');
+        btnText.textContent = 'Saving...';
+
+        try {
+            const response = await fetch(`${this.apiBase}/auth/profile`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ first_name: firstname, middle_name: middlename, last_name: lastname, phone: phoneDigits })
+            });
+
+            if (response.ok) {
+                this.showMessage('Profile updated successfully', 'success');
+                this.loadProfile();
+            } else {
+                const errorData = await response.json();
+                this.showMessage(errorData.message || 'Failed to update profile', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            this.showMessage('Error updating profile', 'error');
+        } finally {
+            saveBtn.disabled = false;
+            spinner.classList.add('d-none');
+            btnText.textContent = 'Save Changes';
+        }
+    }
+
+    async changePassword() {
+        const current = document.getElementById('pp-current').value;
+        const newPass = document.getElementById('pp-new').value;
+        const confirm = document.getElementById('pp-confirm').value;
+        const errorEl = document.getElementById('pp-error');
+
+        if (!current || !newPass || !confirm) {
+            errorEl.textContent = 'All password fields are required';
+            errorEl.classList.remove('d-none');
+            return;
+        }
+
+        if (newPass !== confirm) {
+            errorEl.textContent = 'New password and confirmation do not match';
+            errorEl.classList.remove('d-none');
+            return;
+        }
+
+        if (newPass.length < 6) {
+            errorEl.textContent = 'Password must be at least 6 characters';
+            errorEl.classList.remove('d-none');
+            return;
+        }
+
+        const submitBtn = document.getElementById('pp-submit-btn');
+        const spinner = document.getElementById('pp-spinner');
+        const btnText = submitBtn.querySelector('.btn-text');
+
+        submitBtn.disabled = true;
+        spinner.classList.remove('d-none');
+        btnText.textContent = 'Changing...';
+        errorEl.classList.add('d-none');
+
+        try {
+            const response = await fetch(`${this.apiBase}/auth/change-password`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ current_password: current, new_password: newPass })
+            });
+
+            if (response.ok) {
+                this.showMessage('Password changed successfully', 'success');
+                document.getElementById('profile-password-form').reset();
+            } else {
+                const errorData = await response.json();
+                errorEl.textContent = errorData.message || 'Failed to change password';
+                errorEl.classList.remove('d-none');
+            }
+        } catch (error) {
+            console.error('Error changing password:', error);
+            errorEl.textContent = 'Error changing password';
+            errorEl.classList.remove('d-none');
+        } finally {
+            submitBtn.disabled = false;
+            spinner.classList.add('d-none');
+            btnText.textContent = 'Change Password';
+        }
+    }
+
+    togglePassword(inputId, button) {
+        const input = document.getElementById(inputId);
+        const icon = button.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        }
+    }
+
+    async loadNotifications(page = 1) {
+        try {
+            const limit = 20;
+            const res = await fetch(`${this.apiBase}/notifications?page=${page}&limit=${limit}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) throw new Error('Failed');
+            const data = await res.json();
+            const items = data.notifications || data || [];
+            const total = data.total || 0;
+
+            // Initialize pagination state if not exists
+            if (!this.pagination.notifications) {
+                this.pagination.notifications = { page: 1, total: 0, limit };
+            }
+            this.pagination.notifications.page = page;
+            this.pagination.notifications.total = total;
+            this.pagination.notifications.limit = limit;
+
+            this.renderNotifications(items);
+            this.renderPagination('notifications-pagination', this.pagination.notifications, (p) => this.loadNotifications(p));
+            this._updateNotifHeaderDropdown(items);
+
+            const unread = items.filter(n => !n.is_read).length;
+            const badge = document.getElementById('notif-badge');
+            const count = document.getElementById('notif-count');
+            const sidebarBadge = document.getElementById('notif-sidebar-badge');
+            if (badge) {
+                badge.textContent = unread > 99 ? '99+' : String(unread);
+                badge.style.display = unread ? '' : 'none';
+            }
+            if (count) count.textContent = unread > 99 ? '99+' : String(unread);
+            if (sidebarBadge) {
+                sidebarBadge.textContent = unread > 99 ? '99+' : String(unread);
+                sidebarBadge.style.display = unread ? '' : 'none';
+            }
+
+            // Play notification sound if unread count increased
+            if (this.previousUnreadCount !== undefined && unread > this.previousUnreadCount) {
+                this.playNotificationSound();
+            }
+            this.previousUnreadCount = unread;
+        } catch (err) {
+            const list = document.getElementById('notifications-list');
+            if (list) list.innerHTML = `<div class="text-center py-4 text-muted small">Failed to load notifications.</div>`;
+            this._updateNotifHeaderDropdown([], true);
+        }
+    }
+
+    playNotificationSound() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        } catch (err) {
+            console.log('Audio play failed:', err);
+        }
+    }
+
+    _updateNotifHeaderDropdown(items, error = null) {
+        const dropdownList = document.getElementById('notif-list');
+        if (!dropdownList) return;
+
+        if (error) {
+            dropdownList.innerHTML = `<li class="text-center py-2 small text-danger">Failed to load notifications</li>`;
+            return;
+        }
+
+        const recent = items.slice(0, 5);
+        if (!recent.length) {
+            dropdownList.innerHTML = `<li class="text-center py-2 small text-muted">No notifications</li>`;
+            return;
+        }
+        const iconMap = { order: 'bi-bag-check text-success', product: 'bi-box-seam text-primary', user: 'bi-person text-info', system: 'bi-gear text-secondary' };
+        dropdownList.innerHTML = recent.map(n => {
+            const ic = iconMap[n.type] || 'bi-bell text-muted';
+            const relTime = this._relativeTime(new Date(n.created_at));
+            const bg = n.is_read ? '' : 'bg-success bg-opacity-10';
+            return `<li>
+                <a class="dropdown-item d-flex align-items-start ${bg} py-2 notif-header-link" href="#">
+                    <i class="bi ${ic} me-2 mt-1 flex-shrink-0"></i>
+                    <div>
+                        <div class="small ${n.is_read ? '' : 'fw-semibold'}">${this.escapeHtml(n.title || 'Notification')}</div>
+                        <div style="font-size:.7rem" class="text-muted">${relTime}</div>
+                    </div>
+                </a>
+            </li>`;
+        }).join('');
+    }
+
+    async loadMessages() {
+        try {
+            const res = await fetch(`${this.apiBase}/messages/unread-count`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const unread = data.count || 0;
+                const badge = document.getElementById('farmer-chat-unread');
+                const count = document.getElementById('messages-count');
+                if (badge) {
+                    badge.textContent = unread > 99 ? '99+' : String(unread);
+                    badge.style.display = unread ? '' : 'none';
+                }
+                if (count) count.textContent = unread > 99 ? '99+' : String(unread);
+            }
+        } catch (err) {
+            console.error('Error loading messages:', err);
+        }
+    }
+
+    updateHeaderUser() {
+        const shopName = this.authProfile?.shop_name || this.authProfile?.full_name || this.authProfile?.username || 'Farmer';
+        const formattedShopName = shopName.split(' ').map(word =>
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+        const userEmail = this.authProfile?.email || '';
+        const userRole = this.authProfile?.role || 'farmer';
+
+        document.getElementById('user-name').textContent = formattedShopName;
+        document.getElementById('user-name-dd').textContent = formattedShopName;
+        document.getElementById('user-email').textContent = userEmail;
+
+        const roleBadge = document.getElementById('header-role-badge');
+        if (roleBadge) {
+            roleBadge.textContent = userRole.toUpperCase();
+            roleBadge.style.display = 'inline-block';
+        }
+
+        // Set profile initial from shop name
+        const initial = formattedShopName.charAt(0).toUpperCase();
+        const profileInitial = document.getElementById('header-profile-initial');
+        if (profileInitial) {
+            profileInitial.textContent = initial;
+        }
+    }
+
+    _relativeTime(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+        if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+        return date.toLocaleDateString();
+    }
+
+    renderNotifications(items) {
+        const list = document.getElementById('notifications-list');
+        if (!list) return;
+        if (!items.length) {
+            list.innerHTML = `<div class="text-center py-5 text-muted">
+                <i class="bi bi-bell-slash fs-2 d-block mb-2"></i>
+                No notifications yet.
+            </div>`;
+            return;
+        }
+        const iconMap = {
+            order: 'bi-bag-check text-success',
+            product: 'bi-box-seam text-primary',
+            product_approved: 'bi-check-circle text-success',
+            product_rejected: 'bi-x-circle text-danger',
+            product_deleted: 'bi-trash text-danger',
+            products_disabled: 'bi-toggle-off text-warning',
+            products_enabled: 'bi-toggle-on text-success',
+            account_disabled: 'bi-person-x text-danger',
+            account_enabled: 'bi-person-check text-success',
+            account_verified: 'bi-shield-check text-success',
+            account_unverified: 'bi-shield-x text-warning',
+            role_changed: 'bi-person-gear text-info',
+            new_review: 'bi-star-fill text-warning',
+            review_updated: 'bi-star-half text-warning',
+            order_cancelled_by_customer: 'bi-x-circle-fill text-danger',
+            low_stock_alert: 'bi-exclamation-triangle-fill text-warning',
+            product_back_in_stock: 'bi-arrow-up-circle-fill text-success',
+            price_changed: 'bi-currency-peso text-info',
+            new_product_submitted: 'bi-plus-circle text-primary',
+            order_status: 'bi-truck text-info',
+            order_placed: 'bi-bag-plus text-success',
+            order_update: 'bi-arrow-repeat text-primary',
+            product_removed: 'bi-bag-x-fill text-danger',
+            announcement: 'bi-megaphone-fill text-primary',
+            user: 'bi-person text-info',
+            system: 'bi-gear text-secondary',
+            payment: 'bi-credit-card text-warning',
+        };
+        list.innerHTML = items.map(n => {
+            const iconClass  = iconMap[n.type] || 'bi-bell text-muted';
+            const unreadCls  = n.is_read ? '' : 'fw-semibold';
+            const bgCls      = n.is_read ? '' : 'bg-success bg-opacity-10 border-start border-success border-3';
+            const relTime    = this._relativeTime(new Date(n.created_at));
+            const cursorCls  = n.is_read ? '' : 'cursor-pointer';
+            return `
+            <div class="d-flex align-items-start gap-3 py-3 px-3 ${bgCls} border-bottom notif-item ${cursorCls}" data-id="${n.id}">
+                <div class="flex-shrink-0 mt-1"><i class="bi ${iconClass} fs-5"></i></div>
+                <div class="flex-grow-1">
+                    <div class="${unreadCls} small">${this.escapeHtml(n.title || 'Notification')}</div>
+                    <div class="text-muted small">${this.escapeHtml(n.message || '')}</div>
+                    <div class="text-muted" style="font-size:.7rem">${relTime}</div>
+                </div>
+                ${!n.is_read ? `<button class="btn btn-sm py-0 px-1 text-muted flex-shrink-0 notif-mark-read-btn"
+                    data-id="${n.id}" title="Mark read">
+                    <i class="bi bi-check2"></i></button>` : ''}
+            </div>`;
+        }).join('');
+
+        // Add click handlers for mark read buttons
+        list.querySelectorAll('.notif-mark-read-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = Number(btn.dataset.id);
+                this.markNotifRead(id, btn);
+            });
+        });
+
+        // Add click handlers for notification items
+        list.querySelectorAll('.notif-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = Number(item.dataset.id);
+                const notif = items.find(n => n.id === id);
+                if (notif && !notif.is_read) {
+                    const btn = item.querySelector('.notif-mark-read-btn');
+                    if (btn) this.markNotifRead(id, btn);
+                }
+            });
+        });
+    }
+
+    async markNotifRead(id, btn) {
+        try {
+            const response = await fetch(`${this.apiBase}/notifications/${id}/read`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (response.ok) {
+                if (btn) btn.remove();
+                const item = document.querySelector(`.notif-item[data-id="${id}"]`);
+                if (item) {
+                    item.classList.remove('bg-success', 'bg-opacity-10', 'border-start', 'border-success', 'border-3', 'fw-semibold', 'cursor-pointer');
+                    item.classList.add('text-muted');
+                }
+                this.loadNotifications();
+            }
+        } catch (err) {
+            console.error('Error marking notification as read:', err);
+        }
+    }
+
+    async markAllNotifsRead() {
+        const btn = document.getElementById('notif-mark-all-btn');
+        if (btn) btn.disabled = true;
+        try {
+            const response = await fetch(`${this.apiBase}/notifications/read-all`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) {
+                this.showMessage('Failed to mark all as read', 'error');
+                return;
+            }
+            this.loadNotifications();
+        } catch (err) {
+            this.showMessage('Failed to mark all as read', 'error');
+        } finally {
+            if (btn) btn.disabled = false;
         }
     }
 
@@ -2468,7 +3435,7 @@ class FarmerDashboard {
         }
         
         if (shopNameInput && shopNameInput.value.trim()) {
-            payload.full_name = shopNameInput.value.trim();
+            payload.shop_name = shopNameInput.value.trim();
         }
         
         if (composedAddress) {
@@ -2497,6 +3464,7 @@ class FarmerDashboard {
             if (response.ok) {
                 this.showMessage('Shop profile updated!', 'success');
                 await this.loadShopProfile();
+                await this.loadProfile();
                 this.setShopProfileEditMode(false);
             } else {
                 const errorData = await response.json();
@@ -2568,6 +3536,37 @@ class FarmerDashboard {
                 const data = await response.json();
                 this.myProductsCache = Array.isArray(data.products) ? data.products : [];
                 this.renderMyProducts(data.products);
+                
+                // Show product limit warning for unverified farmers
+                try {
+                    const userRes = await fetch(`${this.apiBase}/auth/me`, {
+                        headers: { 'Authorization': `Bearer ${this.token}` }
+                    });
+                    if (userRes.ok) {
+                        const userData = await userRes.json();
+                        if (userData.user && userData.user.is_verified === false) {
+                            const productCount = this.myProductsCache.length;
+                            const limitWarningEl = document.getElementById('product-limit-warning');
+                            if (limitWarningEl) {
+                                if (productCount >= 8) {
+                                    limitWarningEl.style.display = '';
+                                    limitWarningEl.className = 'alert alert-warning';
+                                    limitWarningEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> You have ${productCount}/10 products. Unverified farmers can only have up to 10 products. <a href="#" onclick="window.scrollTo(0,0);return false;">Contact support</a> to verify your account for unlimited products.`;
+                                } else {
+                                    limitWarningEl.style.display = 'none';
+                                }
+                            }
+                        }
+                    }
+                } catch (_) { /* ignore user check error */ }
+                
+                // Reset filters to default
+                const statusFilter = document.getElementById('product-status-filter');
+                const categoryFilter = document.getElementById('product-category-filter');
+                const searchInput = document.getElementById('products-search-input');
+                if (statusFilter) statusFilter.value = '';
+                if (categoryFilter) categoryFilter.value = '';
+                if (searchInput) searchInput.value = '';
             }
         } catch (error) {
             console.error('Error loading products:', error);
@@ -2644,6 +3643,38 @@ class FarmerDashboard {
         try {
             if (!this.token) return;
             if (!document.getElementById('reportsChart')) return;
+
+            // Check if user is verified for advanced analytics access
+            let isVerified = true;
+            try {
+                const userRes = await fetch(`${this.apiBase}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                if (userRes.ok) {
+                    const userData = await userRes.json();
+                    if (userData.user && userData.user.is_verified === false) {
+                        isVerified = false;
+                    }
+                }
+            } catch (_) { /* ignore user check error */ }
+
+            // Show analytics access warning for unverified farmers
+            const analyticsWarningEl = document.getElementById('analytics-access-warning');
+            if (analyticsWarningEl) {
+                if (!isVerified) {
+                    analyticsWarningEl.style.display = '';
+                    analyticsWarningEl.className = 'alert alert-info';
+                    analyticsWarningEl.innerHTML = '<i class="fas fa-info-circle"></i> Advanced analytics (charts, trends, insights) are available for verified farmers only. <a href="#" onclick="window.scrollTo(0,0);return false;">Contact support</a> to verify your account.';
+                } else {
+                    analyticsWarningEl.style.display = 'none';
+                }
+            }
+
+            // If unverified, show only basic metrics and skip advanced charts
+            if (!isVerified) {
+                this.renderBasicMetricsOnly();
+                return;
+            }
 
             const now = Date.now();
             if (!force && now - this.overviewLastFetchAt < 5000) return;
@@ -2735,6 +3766,41 @@ class FarmerDashboard {
         this.renderOverviewCharts(metrics, statusCounts);
         this.renderRecentOrdersTable(metrics.recentOrders || []);
         this.renderTopProductsTable(metrics.topProducts || []);
+
+        // Load recent orders and top products with their saved independent periods
+        // This ensures the tables show data for the correct timeframe after refresh
+        this.loadRecentOrders(this._recentOrdersPeriod);
+        this.loadTopProducts(this._topProductsPeriod);
+    }
+
+    renderBasicMetricsOnly() {
+        // Show only basic metrics for unverified farmers (no charts, no advanced insights)
+        const lastUpdatedEl = document.getElementById('overview-last-updated');
+        if (lastUpdatedEl) {
+            const ts = new Date();
+            lastUpdatedEl.textContent = `Basic View • Updated: ${ts.toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+        }
+
+        // Hide advanced charts
+        const statusWrap = document.getElementById('statusChart');
+        if (statusWrap) {
+            statusWrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:320px;color:#9ca3af;font-size:14px;">Advanced charts available for verified farmers only</div>';
+        }
+
+        const reportsWrap = document.getElementById('reportsChart');
+        if (reportsWrap) {
+            reportsWrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:320px;color:#9ca3af;font-size:14px;">Advanced reports available for verified farmers only</div>';
+        }
+
+        // Load basic KPI cards only
+        this.loadKpiCard('kpi-products', 'all', this.overviewMetrics);
+        this.loadKpiCard('kpi-orders', 'today', this.overviewMetrics);
+        this.loadKpiCard('kpi-sold', 'today', this.overviewMetrics);
+        this.loadKpiCard('kpi-revenue', 'today', this.overviewMetrics);
+
+        // Show basic recent orders and top products (still available for unverified)
+        this.loadRecentOrders(this._recentOrdersPeriod);
+        this.loadTopProducts(this._topProductsPeriod);
     }
 
     getOverviewStatusCounts(metrics) {
@@ -2779,10 +3845,12 @@ class FarmerDashboard {
             const totalOrders = Object.values(statusCounts).reduce((sum, v) => sum + Number(v || 0), 0);
             const el = document.getElementById('total-orders');
             if (el) el.textContent = this.fmtNumber(totalOrders);
+            this.updateKpiChange('total-orders-change', 'total-orders-change-label', metrics?.ordersChange, period);
         }
         if (card === 'kpi-sold') {
             const el = document.getElementById('total-sold');
             if (el) el.textContent = this.fmtNumber(statusCounts.delivered || 0);
+            this.updateKpiChange('items-sold-change', 'items-sold-change-label', metrics?.soldChange, period);
         }
         if (card === 'kpi-revenue') {
             const totalRevenue = (Array.isArray(metrics?.revenueByDay)
@@ -2790,6 +3858,7 @@ class FarmerDashboard {
                 : 0);
             const el = document.getElementById('total-revenue');
             if (el) el.textContent = this.fmtCurrency(totalRevenue);
+            this.updateKpiChange('total-revenue-change', 'total-revenue-change-label', metrics?.revenueChange, period);
         }
     }
 
@@ -2809,7 +3878,7 @@ class FarmerDashboard {
         pg.total = list.length;
 
         if (list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3 small">No sales yet</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3 small">No sales yet</td></tr>';
             this.renderPagination('top-products-pagination', pg, () => {});
             return;
         }
@@ -2825,6 +3894,7 @@ class FarmerDashboard {
             return `
             <tr>
                 <td class="text-center"><img src="${this.escapeHtml(productImage)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;"></td>
+                <td class="small text-center">#${p.id}</td>
                 <td class="small">${this.escapeHtml(p.product_name || '—')}</td>
                 <td class="small text-center">${price}</td>
                 <td class="small text-center">${this.fmtNumber(sold)}</td>
@@ -2838,26 +3908,8 @@ class FarmerDashboard {
             this.renderTopProductsTable(this.overviewTopProductsCache);
         });
 
-        // Initialize simple-datatables with admin.js pattern
-        if (typeof window.simpleDatatables?.DataTable !== 'undefined') {
-            const existing = this.sortableTables?.['top-products-table'];
-            if (existing && typeof existing.destroy === 'function') {
-                try { existing.destroy(); } catch (_) {}
-                delete this.sortableTables['top-products-table'];
-            }
-            const table = document.getElementById('top-products-table');
-            if (table) {
-                this.sortableTables['top-products-table'] = new window.simpleDatatables.DataTable(table, {
-                    searchable: false,
-                    paging: false,
-                    perPageSelect: false,
-                    sortable: true,
-                    fixedHeight: false,
-                    destroyable: true,
-                    labels: { placeholder: '', noRows: 'No entries found', noResults: 'No results found' }
-                });
-            }
-        }
+        // Disable simple-datatables for top-products table (small overview table, no sorting needed)
+        // This prevents column misalignment issues after column count changes
     }
 
     renderOverviewStatusBreakdown(metrics, statusCounts = null) {
@@ -3110,6 +4162,44 @@ class FarmerDashboard {
         });
     }
 
+    async loadRecentOrders(period) {
+        try {
+            const response = await fetch(`${this.apiBase}/farmers/me/metrics?range=${period}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                this.renderRecentOrdersTable(data.recentOrders || []);
+            } else {
+                const tbody = document.getElementById('recent-orders-tbody');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3 small">Failed to load recent orders</td></tr>';
+            }
+        } catch (error) {
+            console.error('Error loading recent orders:', error);
+            const tbody = document.getElementById('recent-orders-tbody');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3 small">Failed to load recent orders</td></tr>';
+        }
+    }
+
+    async loadTopProducts(period) {
+        try {
+            const response = await fetch(`${this.apiBase}/farmers/me/metrics?range=${period}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                this.renderTopProductsTable(data.topProducts || []);
+            } else {
+                const tbody = document.getElementById('top-products-tbody');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3 small">Failed to load top products</td></tr>';
+            }
+        } catch (error) {
+            console.error('Error loading top products:', error);
+            const tbody = document.getElementById('top-products-tbody');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3 small">Failed to load top products</td></tr>';
+        }
+    }
+
     renderRecentOrdersTable(orders) {
         const tbody = document.getElementById('recent-orders-tbody');
         if (!tbody) return;
@@ -3120,7 +4210,7 @@ class FarmerDashboard {
         pg.total = list.length;
 
         if (list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3 small">No recent orders</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3 small">No recent orders</td></tr>';
             this.renderPagination('recent-orders-pagination', pg, () => {});
             return;
         }
@@ -3133,14 +4223,17 @@ class FarmerDashboard {
             const customerName = o.customer_name || 'Customer';
             const productImage = o.product_image || '/images/placeholder-product.jpg';
             const price = this.fmtCurrency(o.price || 0);
+            const sold = o.quantity || 1;
+            const revenue = this.fmtCurrency((o.price || 0) * sold);
             return `
             <tr>
                 <td class="text-center"><img src="${this.escapeHtml(productImage)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;"></td>
                 <td class="small text-center">#${o.id}</td>
-                <td class="small">${this.escapeHtml(o.product_name || '—')}</td>
                 <td class="small">${this.escapeHtml(customerName)}</td>
+                <td class="small">${this.escapeHtml(o.product_name || '—')}</td>
                 <td class="small text-center">${price}</td>
-                <td class="small text-center">${this.fmtCurrency(o.total_amount)}</td>
+                <td class="small text-center">${sold}</td>
+                <td class="small text-center">${revenue}</td>
                 <td class="text-center"><span class="badge bg-${this.getStatusBadgeColor(o.status)}">${statusLabel}</span></td>
             </tr>
             `;
@@ -3151,36 +4244,22 @@ class FarmerDashboard {
             this.renderRecentOrdersTable(this.overviewRecentOrdersCache);
         });
 
-        // Initialize simple-datatables with admin.js pattern
-        if (typeof window.simpleDatatables?.DataTable !== 'undefined') {
-            const existing = this.sortableTables?.['recent-orders-table'];
-            if (existing && typeof existing.destroy === 'function') {
-                try { existing.destroy(); } catch (_) {}
-                delete this.sortableTables['recent-orders-table'];
-            }
-            const table = document.getElementById('recent-orders-table');
-            if (table) {
-                this.sortableTables['recent-orders-table'] = new window.simpleDatatables.DataTable(table, {
-                    searchable: false,
-                    paging: false,
-                    perPageSelect: false,
-                    sortable: true,
-                    fixedHeight: false,
-                    destroyable: true,
-                    labels: { placeholder: '', noRows: 'No entries found', noResults: 'No results found' }
-                });
-            }
-        }
+        // Disable simple-datatables for recent-orders table (small overview table, no sorting needed)
+        // This prevents column misalignment issues after column count changes
     }
 
     renderOverviewLowStock() {
         const wrap = document.getElementById('overview-low-stock');
         if (!wrap) return;
 
-        const threshold = 5;
+        const threshold = this.lowStockThreshold;
         const products = Array.isArray(this.myProductsCache) ? this.myProductsCache : [];
         const low = products
-            .filter(p => Number(p.stock_quantity) <= threshold)
+            .filter(p => {
+                const stock = Number(p.stock_quantity ?? 0);
+                const status = String(p.status || 'approved').toLowerCase();
+                return status === 'approved' && stock > 0 && stock <= threshold;
+            })
             .sort((a, b) => Number(a.stock_quantity) - Number(b.stock_quantity))
             .slice(0, 8);
 
@@ -3227,14 +4306,60 @@ class FarmerDashboard {
         if (!products.length) {
             tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No products found</td></tr>`;
             this.refreshSortableTable('products-table', { columns: [{ select: 0, sortable: false }, { select: 8, sortable: false }] });
+            // Clear pagination
+            const paginationContainer = document.getElementById('products-pagination');
+            if (paginationContainer) paginationContainer.innerHTML = '';
             return;
         }
 
-        tbody.innerHTML = products.map(product => {
+        // Pre-sort products: Available first (lowest stock on top), then No Stock, Disabled, Pending, Rejected
+        products.sort((a, b) => {
+            const getPriority = (p) => {
+                const s = p.status || 'approved';
+                const avail = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+                const stock = Number(p.stock_quantity ?? 0);
+                if (s === 'pending') return 4;
+                if (s === 'rejected') return 5;
+                if (!avail) return 3;
+                if (stock <= 0) return 2;
+                return 1; // Available
+            };
+            const priorityA = getPriority(a);
+            const priorityB = getPriority(b);
+            if (priorityA !== priorityB) return priorityA - priorityB;
+            // Within Available group, sort by stock ascending (lowest first)
+            if (priorityA === 1) {
+                return Number(a.stock_quantity ?? 0) - Number(b.stock_quantity ?? 0);
+            }
+            return 0;
+        });
+
+        // Apply pagination
+        const pg = this.pagination['products'];
+        const total = products.length;
+        pg.total = total;
+        const offset = (pg.page - 1) * pg.limit;
+        const paginatedProducts = products.slice(offset, offset + pg.limit);
+
+        tbody.innerHTML = paginatedProducts.map(product => {
             const stock = Number(product.stock_quantity ?? 0);
             const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
-            const statusLabel = !isAvailable ? 'Disabled' : (stock <= 0 ? 'No Stock' : 'Available');
-            const statusKey = !isAvailable ? 'disabled' : (stock <= 0 ? 'no_stock' : 'available');
+            const approvalStatus = product.status || 'approved';
+            let statusLabel, statusKey;
+            
+            // Show approval status first if pending or rejected
+            if (approvalStatus === 'pending') {
+                statusLabel = 'Pending';
+                statusKey = 'pending';
+            } else if (approvalStatus === 'rejected') {
+                statusLabel = 'Rejected';
+                statusKey = 'rejected';
+            } else {
+                // Show availability status for approved products
+                statusLabel = !isAvailable ? 'Disabled' : (stock <= 0 ? 'No Stock' : 'Available');
+                statusKey = !isAvailable ? 'disabled' : (stock <= 0 ? 'no_stock' : 'available');
+            }
+            
             const reviewCount = Number(product.total_reviews || 0);
             const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
             const categoryName = String(product.category_name || '').trim();
@@ -3256,6 +4381,22 @@ class FarmerDashboard {
                 : '';
             const placeholder = `<div class="product-thumb-placeholder" ${productImageUrl ? 'style="display:none"' : ''}><i class="bi bi-image"></i></div>`;
 
+            // Disable edit button for pending/rejected products
+            const canEdit = approvalStatus === 'approved' || approvalStatus === 'rejected';
+            const editButton = canEdit 
+                ? `<button class="btn btn-sm py-0 px-2 btn-ac-green product-edit-btn" data-product-id="${product.id}">${approvalStatus === 'rejected' ? 'Resubmit' : 'Edit'}</button>`
+                : `<button class="btn btn-sm py-0 px-2 btn-secondary" disabled title="Cannot edit ${approvalStatus} products">Edit</button>`;
+
+            // Add rejection reason tooltip for rejected products
+            const statusWithReason = approvalStatus === 'rejected' && product.rejection_reason
+                ? `${this.renderStatus(statusLabel, statusKey)} <small class="text-muted d-block" title="${this.escapeHtml(product.rejection_reason)}">${this.escapeHtml(product.rejection_reason.substring(0, 30))}${product.rejection_reason.length > 30 ? '...' : ''}</small>`
+                : this.renderStatus(statusLabel, statusKey);
+
+            // Add click handler for rejected products to show full reason
+            const statusClickHandler = approvalStatus === 'rejected' && product.rejection_reason
+                ? `onclick="window.farmerApp.showRejectionReason('${this.escapeHtml(product.rejection_reason).replace(/'/g, "\\'")}')" style="cursor:pointer;"`
+                : '';
+
             return `
             <tr>
                 <td>${thumb}${placeholder}</td>
@@ -3264,17 +4405,23 @@ class FarmerDashboard {
                 <td class="text-muted">${this.escapeHtml(categoryName || '—')}</td>
                 <td>${this.fmtCurrency(product.price)}</td>
                 <td>${this.fmtNumber(stock)}</td>
-                <td>${this.renderStatus(statusLabel, statusKey)}</td>
+                <td ${statusClickHandler}>${statusWithReason}</td>
                 <td class="text-muted">${reviewCount} (${avgRating}★)</td>
                 <td>
-                    <button class="btn btn-sm py-0 px-2 btn-ac-green product-edit-btn" data-product-id="${product.id}">Edit</button>
+                    ${editButton}
                 </td>
             </tr>
         `;
         }).join('');
 
         this.refreshProductCategoryFilterOptions(products);
-        this.refreshSortableTable('products-table', { columns: [{ select: 0, sortable: false }, { select: 8, sortable: false }], defaultSort: [7, 'desc'] });
+        this.refreshSortableTable('products-table', { columns: [{ select: 0, sortable: false }, { select: 8, sortable: false }] });
+
+        // Render pagination
+        this.renderPagination('products-pagination', pg, (page) => {
+            this.pagination['products'].page = page;
+            this.filterProducts();
+        });
     }
 
     updateProductKPIs(products) {
@@ -3285,20 +4432,27 @@ class FarmerDashboard {
             return isAvailable && stock > 0;
         }).length;
         const lowStock = products.filter(p => {
-            const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
             const stock = Number(p.stock_quantity ?? 0);
-            return isAvailable && stock > 0 && stock <= 5;
+            const status = String(p.status || 'approved').toLowerCase().trim();
+            return status === 'approved' && stock > 0 && stock <= this.lowStockThreshold;
+        }).length;
+        const noStock = products.filter(p => {
+            const stock = Number(p.stock_quantity ?? 0);
+            const status = String(p.status || 'approved').toLowerCase().trim();
+            return status === 'approved' && stock === 0;
         }).length;
         const pending = products.filter(p => p.status === 'pending').length;
 
         const totalEl = document.getElementById('kpi-total-products');
         const activeEl = document.getElementById('kpi-active-products');
         const lowStockEl = document.getElementById('kpi-low-stock');
+        const noStockEl = document.getElementById('kpi-no-stock');
         const pendingEl = document.getElementById('kpi-pending-products');
 
         if (totalEl) totalEl.textContent = total;
         if (activeEl) activeEl.textContent = active;
         if (lowStockEl) lowStockEl.textContent = lowStock;
+        if (noStockEl) noStockEl.textContent = noStock;
         if (pendingEl) pendingEl.textContent = pending;
     }
 
@@ -3691,8 +4845,8 @@ class FarmerDashboard {
             return;
         }
 
-        const submitBtn = document.querySelector('#edit-product-form button[type="submit"]');
-        const originalSubmitText = submitBtn ? submitBtn.textContent : '';
+        const submitBtn = document.querySelector('button[form="edit-product-form"]');
+        const originalSubmitText = submitBtn ? submitBtn.textContent.trim() : '';
         this.isSubmittingEditProduct = true;
         this.setEditModalBusyState(true, originalSubmitText || 'Update Product');
 
@@ -3786,7 +4940,8 @@ class FarmerDashboard {
             const data = await response.json().catch(() => ({}));
 
             if (response.ok) {
-                this.showMessage('Product updated successfully!', 'success');
+                const isResubmit = this.currentEditProductStatus === 'rejected';
+                this.showMessage(isResubmit ? 'Product resubmitted for approval!' : 'Product updated successfully!', 'success');
                 this.closeEditModal(true);
                 this.loadMyProducts();
                 this.loadFarmerStats();
@@ -3799,7 +4954,9 @@ class FarmerDashboard {
         }
         } finally {
             this.isSubmittingEditProduct = false;
-            this.setEditModalBusyState(false, originalSubmitText || 'Update Product');
+            const isResubmit = this.currentEditProductStatus === 'rejected';
+            const label = isResubmit ? 'Resubmit Product' : (originalSubmitText || 'Update Product');
+            this.setEditModalBusyState(false, label);
         }
     }
 
@@ -4037,8 +5194,19 @@ class FarmerDashboard {
                     preview.innerHTML = `<img src="${this.escapeAttr(editPreviewUrl)}" alt="Current product image" style="max-width: 200px; margin-top: 10px;">`;
                 }
 
-                // Show modal
-                this.setEditModalBusyState(false, 'Update Product');
+                // Store current product status for resubmit logic
+                this.currentEditProductStatus = product.status || 'approved';
+
+                // Show modal with appropriate button text and title
+                const submitLabel = this.currentEditProductStatus === 'rejected' ? 'Resubmit Product' : 'Update Product';
+                const modalTitle = this.currentEditProductStatus === 'rejected' ? 'Resubmit Product' : 'Edit Product';
+                const modalTitleEl = document.getElementById('edit-product-modal-title');
+                if (modalTitleEl) {
+                    modalTitleEl.innerHTML = this.currentEditProductStatus === 'rejected' 
+                        ? '<i class="bi bi-arrow-repeat me-2 text-primary"></i>Resubmit Product'
+                        : '<i class="bi bi-pencil-square me-2 text-primary"></i>Edit Product';
+                }
+                this.setEditModalBusyState(false, submitLabel);
                 document.getElementById('edit-product-modal').classList.add('open');
                 this.switchTab('list-products');
             } else {
@@ -4054,7 +5222,8 @@ class FarmerDashboard {
         if (this.isSubmittingEditProduct && !forceClose) {
             return;
         }
-        this.setEditModalBusyState(false, 'Update Product');
+        const isResubmit = this.currentEditProductStatus === 'rejected';
+        this.setEditModalBusyState(false, isResubmit ? 'Resubmit Product' : 'Update Product');
         document.getElementById('edit-product-modal').classList.remove('open');
         document.getElementById('edit-product-form').reset();
         document.getElementById('edit-product-image-preview').innerHTML = '';
@@ -4062,7 +5231,7 @@ class FarmerDashboard {
 
     setEditModalBusyState(isBusy, submitLabel = 'Update Product') {
         const modalEl = document.getElementById('edit-product-modal');
-        const submitBtn = document.querySelector('#edit-product-form button[type="submit"]');
+        const submitBtn = document.querySelector('button[form="edit-product-form"]');
         const cancelBtn = document.getElementById('cancel-edit-btn');
         const closeBtn = document.querySelector('#edit-product-modal .close-btn');
 
@@ -4072,7 +5241,8 @@ class FarmerDashboard {
 
         if (submitBtn) {
             submitBtn.disabled = Boolean(isBusy);
-            submitBtn.textContent = isBusy ? 'Updating...' : submitLabel;
+            const icon = '<i class="bi bi-check-lg me-1"></i>';
+            submitBtn.innerHTML = isBusy ? 'Updating...' : icon + submitLabel;
             submitBtn.setAttribute('aria-busy', isBusy ? 'true' : 'false');
         }
         if (cancelBtn) {
@@ -4103,19 +5273,44 @@ class FarmerDashboard {
     }
 
     filterProducts() {
-        // Table-based filtering handled by simple-datatables
-        // This function is kept for compatibility but delegates to the table
-        const table = this.sortableTables['products-table'];
-        if (table) {
-            const searchTerm = (document.getElementById('products-search-input')?.value || '').toLowerCase().trim();
-            const statusFilter = (document.getElementById('product-status-filter')?.value || '').toLowerCase().trim();
-            const categoryFilter = (document.getElementById('product-category-filter')?.value || '').toLowerCase().trim();
-
-            // Apply filters using simple-datatables API
-            table.search = searchTerm;
-            table.page = 1;
-            table.update();
+        // Filter products from cache and re-render
+        if (!this.myProductsCache || !Array.isArray(this.myProductsCache)) {
+            return;
         }
+
+        const searchTerm = (document.getElementById('products-search-input')?.value || '').toLowerCase().trim();
+        const statusFilter = (document.getElementById('product-status-filter')?.value || '').toLowerCase().trim();
+        const categoryFilter = (document.getElementById('product-category-filter')?.value || '').toLowerCase().trim();
+
+        const filtered = this.myProductsCache.filter(product => {
+            // Search filter
+            const nameMatch = !searchTerm || String(product.name || '').toLowerCase().includes(searchTerm);
+            
+            // Status filter
+            let statusMatch = true;
+            if (statusFilter === 'available') {
+                const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+                const stock = Number(product.stock_quantity ?? 0);
+                statusMatch = isAvailable && stock > 0;
+            } else if (statusFilter === 'disabled') {
+                const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+                statusMatch = !isAvailable;
+            } else if (statusFilter === 'pending') {
+                statusMatch = product.status === 'pending';
+            } else if (statusFilter === 'rejected') {
+                statusMatch = product.status === 'rejected';
+            }
+
+            // Category filter
+            let categoryMatch = true;
+            if (categoryFilter) {
+                categoryMatch = String(product.category_name || '').toLowerCase().includes(categoryFilter);
+            }
+
+            return nameMatch && statusMatch && categoryMatch;
+        });
+
+        this.renderMyProducts(filtered);
     }
 
     applyProductSort() {
@@ -4644,11 +5839,8 @@ class FarmerDashboard {
                 </button>
             `;
         } else {
-            return `
-                <button class="btn btn-sm btn-secondary order-view-btn" data-action="view-order" data-order-id="${orderId}">
-                    <i class="bi bi-eye me-1"></i>View Details
-                </button>
-            `;
+            // Delivered and cancelled - no actions needed
+            return '';
         }
     }
 
@@ -4707,7 +5899,7 @@ class FarmerDashboard {
                 : '—';
             
             return `
-            <div class="order-card" data-order-id="${orderId}">
+            <div class="order-card" data-order-id="${orderId}" style="cursor:pointer;">
                 <div class="order-card-header">
                     <div>
                         <div class="order-card-id">#${orderId}</div>
@@ -4716,7 +5908,7 @@ class FarmerDashboard {
                     ${this.getOrderStatusBadge(currentStatus)}
                 </div>
                 <div class="order-card-product">
-                    <img src="${this.escapeAttr(productImage)}" 
+                    <img src="${this.escapeAttr(productImage)}"
                          alt="${this.escapeHtml(productName)}" class="order-card-product-img">
                     <div class="order-card-product-name">${this.escapeHtml(productName)}</div>
                     <div class="order-card-product-qty">Qty: ${quantity}</div>
@@ -4739,16 +5931,105 @@ class FarmerDashboard {
         this.applyOrdersSearch();
 
         this.updateOrdersTabCounts();
+
+        // Add click listeners to order cards
+        container.querySelectorAll('.order-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                // Don't open modal if clicking on action buttons
+                if (e.target.closest('.order-card-actions')) return;
+                const orderId = Number(card.dataset.orderId);
+                this.openOrderModal(orderId);
+            });
+        });
     }
 
-    openOrderDetails(orderId) {
+    openOrderModal(orderId) {
         const order = this.lastOrdersById.get(Number(orderId));
         if (!order) {
             this.showMessage('Order details not loaded yet. Please refresh orders.', 'error');
             return;
         }
 
-        // This function is no longer used - orders are displayed inline
+        const modal = document.getElementById('order-details-modal');
+        const body = document.getElementById('order-details-body');
+        if (!modal || !body) return;
+
+        const item = (order.items && order.items[0]) || order;
+        const currentStatus = item.status || order.status || 'pending';
+        const productImage = item.image_url || order.product_image || '/images/logo.png';
+        const productName = item.product_name || order.product_name || 'Product';
+        const quantity = item.quantity || order.quantity || 1;
+        const price = Number(String(item.price || order.price || 0).replace(/[^\d.-]/g, '')) || 0;
+        const totalAmount = Number(String(item.total_amount || order.total_amount || 0).replace(/[^\d.-]/g, '')) || 0;
+        const customerName = String(order.customer_name || '—').trim();
+        const customerEmail = String(order.customer_email || '—').trim();
+        const customerPhone = String(order.customer_phone || '—').trim();
+        const deliveryAddress = String(order.delivery_address || '').trim();
+        const specialInstructions = String(order.special_instructions || '').trim();
+        const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : 'Not specified';
+        const orderDate = order.created_at ? new Date(order.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+        body.innerHTML = `
+            <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">Order #${order.id}</h5>
+                    ${this.getOrderStatusBadge(currentStatus)}
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <h6 class="fw-semibold mb-2">Customer Information</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted pe-2" style="white-space:nowrap">Name:</td>
+                            <td>${this.escapeHtml(customerName)}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted pe-2" style="white-space:nowrap">Email:</td>
+                            <td>${this.escapeHtml(customerEmail)}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted pe-2" style="white-space:nowrap">Phone:</td>
+                            <td>${this.escapeHtml(customerPhone)}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <h6 class="fw-semibold mb-2">Delivery Information</h6>
+                <p class="mb-1"><strong>Address:</strong> ${this.escapeHtml(deliveryAddress || '—')}</p>
+                <p class="mb-1"><strong>Delivery Date:</strong> ${this.escapeHtml(deliveryDate)}</p>
+                ${specialInstructions ? `<p class="mb-0"><strong>Special Instructions:</strong> ${this.escapeHtml(specialInstructions)}</p>` : ''}
+            </div>
+
+            <div class="mb-3">
+                <h6 class="fw-semibold mb-2">Order Information</h6>
+                <p class="mb-1"><strong>Date:</strong> ${orderDate}</p>
+                <p class="mb-1"><strong>Total:</strong> ${this.fmtCurrency(totalAmount)}</p>
+            </div>
+
+            <div class="mb-3">
+                <h6 class="fw-semibold mb-2">Item</h6>
+                <div class="d-flex align-items-center gap-2 p-2 border rounded">
+                    <img src="${this.escapeHtml(productImage)}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'">
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">${this.escapeHtml(productName)}</div>
+                        <div class="small text-muted">${this.fmtNumber(quantity)} × ${this.fmtCurrency(price)} = ${this.fmtCurrency(totalAmount)}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <h6 class="fw-semibold mb-2">Actions</h6>
+                <div class="order-card-actions">
+                    ${this.getOrderActionButtons({ id: order.id, status: currentStatus })}
+                </div>
+            </div>
+        `;
+
+        modal.classList.add('open');
     }
 
     getStatusColor(status) {
@@ -5003,6 +6284,24 @@ class FarmerDashboard {
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
         this.customerRatingDraft = { orderId: null, rating: 0, hasExisting: false };
+    }
+
+    showRejectionReason(reason) {
+        const modal = document.getElementById('rejection-reason-modal');
+        const reasonText = document.getElementById('rejection-reason-text');
+        if (modal && reasonText) {
+            reasonText.textContent = reason;
+            modal.classList.add('open');
+            document.documentElement.classList.add('modal-open');
+            document.body.classList.add('modal-open');
+        }
+    }
+
+    closeRejectionReasonModal() {
+        const modal = document.getElementById('rejection-reason-modal');
+        if (modal) modal.classList.remove('open');
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
     }
 
     setCustomerRatingValue(value) {

@@ -547,6 +547,57 @@ router.get('/profile', async (req, res) => {
       'first_name',
       'middle_name',
       'last_name',
+      'shop_name',
+      'phone',
+      'address',
+      'shop_description',
+      'shop_banner_url',
+      'shop_avatar_url',
+      'is_verified',
+      'is_disabled',
+      'disabled_reason'
+    ].forEach((field) => {
+      if (columns.has(field)) selectFields.push(field);
+    });
+
+    const result = await pool.query(
+      `SELECT ${selectFields.join(', ')} FROM users WHERE id = $1`,
+      [decoded.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ user: result.rows[0] });
+
+  } catch (error) {
+    console.error('Get profile error:', error);
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Alias for /me endpoint (for compatibility)
+router.get('/me', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const columns = await getUserColumns();
+    const selectFields = ['id', 'username', 'email', 'full_name', 'role', 'created_at'];
+    [
+      'first_name',
+      'middle_name',
+      'last_name',
+      'shop_name',
       'phone',
       'address',
       'shop_description',
@@ -588,7 +639,7 @@ router.put('/profile', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const columns = await getUserColumns();
     const hasColumn = (column) => columns.has(column);
-    const currentUserFields = ['id', 'username', 'full_name', 'first_name', 'middle_name', 'last_name']
+    const currentUserFields = ['id', 'username', 'full_name', 'first_name', 'middle_name', 'last_name', 'shop_name']
       .filter(hasColumn);
     const profileRes = await pool.query(
       `SELECT ${currentUserFields.join(', ')} FROM users WHERE id = $1`,
@@ -603,10 +654,12 @@ router.put('/profile', async (req, res) => {
     const username = body.username;
     const phone = body.phone;
     const address = body.address;
+    const shopName = body.shop_name;
     const providedFirstName = Object.prototype.hasOwnProperty.call(body, 'first_name');
     const providedMiddleName = Object.prototype.hasOwnProperty.call(body, 'middle_name');
     const providedLastName = Object.prototype.hasOwnProperty.call(body, 'last_name');
     const providedFullName = Object.prototype.hasOwnProperty.call(body, 'full_name');
+    const providedShopName = Object.prototype.hasOwnProperty.call(body, 'shop_name');
 
     if (username && String(username).trim().length > 0) {
       const existing = await pool.query(
@@ -659,6 +712,17 @@ router.put('/profile', async (req, res) => {
       }
     }
 
+    if (providedShopName && hasColumn('shop_name')) {
+      const nextShopName = String(shopName || '').trim();
+      if (!nextShopName) {
+        return res.status(400).json({ message: 'Shop name cannot be empty' });
+      }
+      if (nextShopName.length > 100) {
+        return res.status(400).json({ message: 'Shop name must be 100 characters or less' });
+      }
+      push('shop_name', nextShopName);
+    }
+
     if (typeof phone !== 'undefined' && hasColumn('phone')) push('phone', String(phone || '').trim() || null);
     if (typeof address !== 'undefined' && hasColumn('address')) push('address', String(address || '').trim() || null);
 
@@ -676,6 +740,7 @@ router.put('/profile', async (req, res) => {
       'first_name',
       'middle_name',
       'last_name',
+      'shop_name',
       'phone',
       'address',
       'role',

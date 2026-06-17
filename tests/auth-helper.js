@@ -77,4 +77,60 @@ async function getAdminToken() {
   }
 }
 
-module.exports = { getAdminToken };
+async function getFarmerToken() {
+  const env = loadEnv();
+  const jwtSecret = env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET not found in .env');
+  }
+
+  const pool = new Pool({
+    host: env.DB_HOST,
+    port: parseInt(env.DB_PORT || '5432'),
+    database: env.DB_NAME,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    ssl: env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+  });
+
+  try {
+    // Get a farmer user
+    const result = await pool.query(
+      `SELECT id, email, username, role FROM users WHERE role = 'farmer' LIMIT 1`
+    );
+    if (result.rows.length === 0) {
+      throw new Error('No farmer user found in database');
+    }
+
+    const user = result.rows[0];
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      jwtSecret,
+      { expiresIn: '1h' }
+    );
+
+    return { token, user };
+  } finally {
+    await pool.end();
+  }
+}
+
+async function loginAsAdmin(page) {
+  const { token } = await getAdminToken();
+  await page.goto('/');
+  await page.evaluate((t) => {
+    localStorage.setItem('token', t);
+  }, token);
+  await page.reload();
+}
+
+async function loginAsFarmer(page) {
+  const { token } = await getFarmerToken();
+  await page.goto('/');
+  await page.evaluate((t) => {
+    localStorage.setItem('token', t);
+  }, token);
+  await page.reload();
+}
+
+module.exports = { getAdminToken, getFarmerToken, loginAsAdmin, loginAsFarmer };

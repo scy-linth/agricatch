@@ -238,6 +238,23 @@ router.post('/products/:id/reviews', async (req, res) => {
 
     await refreshFarmerRatingForProduct(productId);
 
+    // Send notification to farmer about new review
+    try {
+      const productResult = await pool.query('SELECT farmer_id, name FROM products WHERE id = $1', [productId]);
+      if (productResult.rows.length > 0 && productResult.rows[0].farmer_id) {
+        const farmerId = productResult.rows[0].farmer_id;
+        const productName = productResult.rows[0].name;
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+           VALUES ($1, $2, $3, $4, $5, false, CURRENT_TIMESTAMP)`,
+          [farmerId, 'new_review', 'New Review Received', `Your product "${productName}" received a new ${rating}-star review.`, productId]
+        );
+        broadcastEvent('notification.created', { user_id: farmerId });
+      }
+    } catch (notifErr) {
+      console.error('Failed to send review notification:', notifErr);
+    }
+
     // Real-time fraud alert: Check if this user has suspicious pattern
     const patternCheck = await pool.query(`
       SELECT 
@@ -314,6 +331,23 @@ router.put('/reviews/:id', async (req, res) => {
     `, [rating, comment, id]);
 
     await refreshFarmerRatingForProduct(reviewResult.rows[0].product_id);
+
+    // Send notification to farmer about review update
+    try {
+      const productResult = await pool.query('SELECT farmer_id, name FROM products WHERE id = $1', [reviewResult.rows[0].product_id]);
+      if (productResult.rows.length > 0 && productResult.rows[0].farmer_id) {
+        const farmerId = productResult.rows[0].farmer_id;
+        const productName = productResult.rows[0].name;
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+           VALUES ($1, $2, $3, $4, $5, false, CURRENT_TIMESTAMP)`,
+          [farmerId, 'review_updated', 'Review Updated', `A review for your product "${productName}" was updated to ${rating} stars.`, reviewResult.rows[0].product_id]
+        );
+        broadcastEvent('notification.created', { user_id: farmerId });
+      }
+    } catch (notifErr) {
+      console.error('Failed to send review update notification:', notifErr);
+    }
 
     res.json({ message: 'Review updated successfully' });
   } catch (error) {

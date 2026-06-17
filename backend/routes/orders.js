@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
              p.unit,
              p.image_url,
              p.farmer_id,
-            f.full_name as farmer_name,
+            COALESCE(f.shop_name, f.full_name) as farmer_name,
             f.address as farm_location
       FROM orders o
       JOIN products p ON o.product_id = p.id
@@ -380,7 +380,7 @@ router.get('/:id', async (req, res) => {
              p.unit,
              p.image_url,
              p.farmer_id,
-             f.full_name as farmer_name,
+             COALESCE(f.shop_name, f.full_name) as farmer_name,
                   f.address as farm_location
       FROM orders o
       JOIN products p ON o.product_id = p.id
@@ -565,9 +565,34 @@ router.post('/', async (req, res) => {
 
         // Update product stock
         const stockResult = await client.query(`
-          UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2
+          UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2 RETURNING stock_quantity, farmer_id, name
         `, [item.quantity, item.product_id]);
         console.log(`[Create Order] Stock updated for product ${item.product_id}, rows affected: ${stockResult.rowCount}`);
+
+        // Check if stock is low (below 15) and send alert to farmer
+        if (stockResult.rows.length > 0) {
+          const productInfo = stockResult.rows[0];
+          const lowStockThreshold = 15;
+          if (productInfo.stock_quantity <= lowStockThreshold && productInfo.stock_quantity > 0) {
+            try {
+              await client.query('SAVEPOINT low_stock_notify_sp');
+              await client.query(`
+                INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+                VALUES ($1, $2, $3, $4, $5, false, CURRENT_TIMESTAMP)
+              `, [productInfo.farmer_id, 'low_stock_alert', 'Low Stock Alert', `Your product "${productInfo.name}" is running low on stock (${productInfo.stock_quantity} units remaining).`, item.product_id]);
+              broadcastEvent('notification.created', { user_id: productInfo.farmer_id });
+              await client.query('RELEASE SAVEPOINT low_stock_notify_sp');
+              console.log(`[Create Order] Low stock alert sent to farmer ${productInfo.farmer_id} for product ${item.product_id}`);
+            } catch (lowStockErr) {
+              try {
+                await client.query('ROLLBACK TO SAVEPOINT low_stock_notify_sp');
+              } catch (savepointError) {
+                console.error('[Create Order] Low stock savepoint rollback error:', savepointError);
+              }
+              console.error('[Create Order] Low stock notification error:', lowStockErr);
+            }
+          }
+        }
 
         // Get farmer for this product and send notification
         const farmerResult = await client.query(`
@@ -925,12 +950,21 @@ router.put('/:id/cancel', async (req, res) => {
 
       await client.query('COMMIT');
 
+      // Send notification to customer
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, message, order_id)
          VALUES ($1, $2, $3, $4, $5)`,
         [decoded.id, 'order_update', 'Order cancelled', `Order #${id} (${orderResult.rows[0].product_name}) was cancelled.`, id]
       );
       broadcastEvent('notification.created', { user_id: decoded.id });
+
+      // Send notification to farmer
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, order_id, product_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [orderResult.rows[0].farmer_id, 'order_cancelled_by_customer', 'Order Cancelled by Customer', `Order #${id} for "${orderResult.rows[0].product_name}" was cancelled by the customer.`, id, orderResult.rows[0].product_id]
+      );
+      broadcastEvent('notification.created', { user_id: orderResult.rows[0].farmer_id });
 
       res.json({ message: 'Order cancelled successfully' });
 
