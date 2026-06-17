@@ -47,5 +47,34 @@ test.describe('Admin Verification E2E', () => {
         
         // Check that handleReviewAction method exists
         expect(adminJs).toContain('handleReviewAction');
+
+        // Check that unverify methods exist
+        expect(adminJs).toContain('openUnverifyModal');
+        expect(adminJs).toContain('closeUnverifyModal');
+        expect(adminJs).toContain('handleUnverifyAction');
+    });
+
+    test('unverify modal exists in HTML', () => {
+        // Test that the unverify modal structure exists
+        const adminHtml = fs.readFileSync(path.join(__dirname, '../frontend/admin.html'), 'utf8');
+
+        // Check that unverify modal exists
+        expect(adminHtml).toContain('id="unverify-modal"');
+        expect(adminHtml).toContain('unverify-modal');
+
+        // Check that confirm button exists
+        expect(adminHtml).toContain('id="confirm-unverify-btn"');
+
+        // Check that modal uses admin-modal-backdrop pattern
+        expect(adminHtml).toContain('admin-modal-backdrop');
+    });
+
+    test('unverify button uses correct color class', () => {
+        // Test that unverify button uses btn-ac-red instead of btn-warning
+        const adminJs = fs.readFileSync(path.join(__dirname, '../frontend/js/admin.js'), 'utf8');
+
+        // Check that unverify button uses btn-ac-red
+        expect(adminJs).toContain('unverify-verification-btn');
+        expect(adminJs).toContain('btn-ac-red');
     });
 });
