@@ -994,6 +994,9 @@ class AdminDashboard {
         document.getElementById('approve-btn')?.addEventListener('click', () => this.handleReviewAction('approved'));
         document.getElementById('reject-btn')?.addEventListener('click', () => this.handleReviewAction('rejected'));
 
+        // Unverify modal button
+        document.getElementById('confirm-unverify-btn')?.addEventListener('click', () => this.handleUnverifyAction());
+
         // Verification document view buttons (event delegation)
         document.getElementById('verification-requests-table')?.addEventListener('click', (e) => {
             // Image thumbnail click
@@ -1021,7 +1024,7 @@ class AdminDashboard {
             // Unverify button
             if (e.target.classList.contains('unverify-verification-btn')) {
                 const requestId = e.target.dataset.requestId;
-                this.handleUnverifyAction(requestId);
+                this.openUnverifyModal(requestId);
             }
         });
 
@@ -7169,7 +7172,7 @@ class AdminDashboard {
                             <button class="btn btn-sm btn-ac-red reject-verification-btn" data-request-id="${request.id}">Reject</button>
                         ` : ''}
                         ${request.status === 'approved' ? `
-                            <button class="btn btn-sm btn-warning unverify-verification-btn" data-request-id="${request.id}">Unverify</button>
+                            <button class="btn btn-sm btn-ac-red unverify-verification-btn" data-request-id="${request.id}">Unverify</button>
                         ` : ''}
                     </div>
                 </td>
@@ -7342,13 +7345,21 @@ class AdminDashboard {
         document.getElementById('verification-details-modal').classList.remove('open');
     }
 
-    async handleUnverifyAction(requestId) {
-        if (!confirm('Are you sure you want to unverify this farmer? This will change their status back to pending.')) {
-            return;
-        }
+    openUnverifyModal(requestId) {
+        this.currentUnverifyRequestId = requestId;
+        document.getElementById('unverify-modal').classList.add('open');
+    }
+
+    closeUnverifyModal() {
+        document.getElementById('unverify-modal').classList.remove('open');
+        this.currentUnverifyRequestId = null;
+    }
+
+    async handleUnverifyAction() {
+        if (!this.currentUnverifyRequestId) return;
 
         try {
-            const response = await fetch(`${this.apiBase}/admin/verification-requests/${requestId}/review`, {
+            const response = await fetch(`${this.apiBase}/admin/verification-requests/${this.currentUnverifyRequestId}/review`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
@@ -7362,6 +7373,7 @@ class AdminDashboard {
 
             if (response.ok) {
                 this.showToast('Verification request unverifed successfully', 'success');
+                this.closeUnverifyModal();
                 this.loadVerificationRequests(this.verificationCurrentPage, this.verificationCurrentStatus);
             } else {
                 const data = await response.json().catch(() => ({}));
