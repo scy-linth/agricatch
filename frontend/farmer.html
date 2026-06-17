@@ -1961,35 +1961,6 @@ window.addEventListener('load', function () {
 });
 </script>
 
-<!-- Verification Request Modal -->
-<div class="modal" id="verification-request-modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3>Request Account Verification</h3>
-      <button class="close-btn" onclick="farmerDashboard&&farmerDashboard.closeVerificationRequestModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <form id="verification-request-form">
-        <div class="mb-3">
-          <label class="form-label">Upload ID/Document (optional but recommended)</label>
-          <input type="file" class="form-control" id="verification-document" accept="image/jpeg,image/png" />
-          <small class="text-muted">JPG/PNG, max 5MB</small>
-        </div>
-        <div id="document-preview" class="mb-3" style="display:none;">
-          <label class="form-label">Preview:</label>
-          <img id="document-preview-img" style="max-width:100%; max-height:200px; border-radius:8px;" />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Additional Notes (optional)</label>
-          <textarea class="form-control" id="verification-notes" rows="3" placeholder="Any additional information..."></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary">Submit Request</button>
-        <button type="button" class="btn btn-secondary" onclick="farmerDashboard&&farmerDashboard.closeVerificationRequestModal()">Cancel</button>
-      </form>
-    </div>
-  </div>
-</div>
-
 <!-- Verification Rejection Modal -->
 <div class="modal" id="verification-rejection-modal">
   <div class="modal-content">
