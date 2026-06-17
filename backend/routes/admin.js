@@ -1025,15 +1025,15 @@ router.put('/verification-requests/:id/review', requireAdmin, async (req, res) =
     const { id } = req.params;
     const { status, rejection_reason } = req.body;
 
-    if (!['approved', 'rejected', 'pending'].includes(status)) {
-      return res.status(400).json({ message: 'Status must be approved, rejected, or pending' });
+    if (!['approved', 'rejected', 'unverified'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be approved, rejected, or unverified' });
     }
 
     if (status === 'rejected' && !rejection_reason) {
       return res.status(400).json({ message: 'Rejection reason is required' });
     }
 
-    if (status === 'pending' && !rejection_reason) {
+    if (status === 'unverified' && !rejection_reason) {
       return res.status(400).json({ message: 'Reason is required for unverify' });
     }
 
@@ -1049,9 +1049,9 @@ router.put('/verification-requests/:id/review', requireAdmin, async (req, res) =
     const request = requestRes.rows[0];
     const farmerId = request.farmer_id;
 
-    // For unverify (pending status), allow changing from approved
+    // For unverify (unverified status), allow changing from approved
     // For approve/reject, only allow from pending
-    if (status === 'pending' && request.status !== 'approved') {
+    if (status === 'unverified' && request.status !== 'approved') {
       return res.status(400).json({ message: 'Can only unverify approved requests' });
     }
 
@@ -1081,8 +1081,8 @@ router.put('/verification-requests/:id/review', requireAdmin, async (req, res) =
       broadcastEvent('notification.created', { user_id: farmerId });
     }
 
-    // If unverified (pending status), unverify the farmer
-    if (status === 'pending' && request.status === 'approved') {
+    // If unverified (unverified status), unverify the farmer
+    if (status === 'unverified' && request.status === 'approved') {
       await pool.query('UPDATE users SET is_verified = false WHERE id = $1', [farmerId]);
 
       // Send unverify notification
