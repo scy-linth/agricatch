@@ -7170,10 +7170,10 @@ class AdminDashboard {
             const row = document.createElement('tr');
 
             const statusBadge = {
-                'pending': '<span class="badge bg-warning">Pending</span>',
-                'approved': '<i class="bi bi-check-circle-fill text-primary fs-5"></i>',
-                'rejected': '<span class="badge bg-danger">Rejected</span>',
-                'unverified': '<i class="bi bi-x-circle-fill text-danger fs-5"></i>'
+                'pending': '<i class="bi bi-hourglass text-warning me-1"></i><span class="badge bg-warning">Pending</span>',
+                'approved': '<i class="bi bi-check-circle-fill text-primary me-1"></i><span class="badge bg-success">Approved</span>',
+                'rejected': '<i class="bi bi-x-circle-fill text-danger me-1"></i><span class="badge bg-danger">Rejected</span>',
+                'unverified': '<i class="bi bi-x-circle-fill text-danger me-1"></i><span class="badge bg-secondary">Unverified</span>'
             }[request.status] || request.status;
 
             const docIndicator = request.document_url
