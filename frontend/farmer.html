@@ -1500,6 +1500,141 @@
                 </div>
             </div>
         </div>
+
+        <!-- Verification Subsection -->
+        <div id="profile-verification" class="profile-subsection" style="display:none;">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Account Verification</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Header Section -->
+                    <div id="verification-header-section">
+                        <div id="verification-status-badge" class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> <span id="verification-status-text">Loading...</span>
+                        </div>
+                        <p id="verification-status-description"></p>
+                    </div>
+
+                    <!-- Benefits Section -->
+                    <div id="verification-benefits-section" style="display:none;">
+                        <h5>Benefits of Verification</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6><i class="bi bi-infinity text-success"></i> Unlimited Products</h6>
+                                        <small class="text-muted">List unlimited products vs 10 for unverified</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6><i class="bi bi-tag text-primary"></i> Custom Product Names</h6>
+                                        <small class="text-muted">Request custom product names</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6><i class="bi bi-shield-check text-success"></i> Verified Seller Badge</h6>
+                                        <small class="text-muted">Visible to customers on all products</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6><i class="bi bi-star text-warning"></i> Featured Placement</h6>
+                                        <small class="text-muted">Products appear in featured sections</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6><i class="bi bi-search text-info"></i> Better Search Ranking</h6>
+                                        <small class="text-muted">Verified sellers appear first in results</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6><i class="bi bi-lightning text-warning"></i> Priority Product Approval</h6>
+                                        <small class="text-muted">Faster approval queue for new products</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6><i class="bi bi-graph-up text-primary"></i> Analytics Dashboard</h6>
+                                        <small class="text-muted">Track sales, views, and customer data</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6><i class="bi bi-headset text-success"></i> Priority Customer Support</h6>
+                                        <small class="text-muted">Faster response times</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Request Form -->
+                    <div id="verification-request-form-section" style="display:none;">
+                        <h5>Submit Verification Request</h5>
+                        <form id="verification-request-form">
+                            <div class="mb-3">
+                                <label class="form-label">Upload ID/Document (optional but recommended)</label>
+                                <input type="file" class="form-control" id="verification-document" accept="image/jpeg,image/png" />
+                                <small class="text-muted">JPG/PNG, max 5MB</small>
+                            </div>
+                            <div id="document-preview" class="mb-3" style="display:none;">
+                                <label class="form-label">Preview:</label>
+                                <img id="document-preview-img" style="max-width:100%; max-height:200px; border-radius:8px;" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Additional Notes (optional)</label>
+                                <textarea class="form-control" id="verification-notes" rows="3" placeholder="Any additional information..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit Request</button>
+                        </form>
+                    </div>
+
+                    <!-- Status Display -->
+                    <div id="verification-status-display-section" style="display:none;">
+                        <h5>Verification Status</h5>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <p><strong>Status:</strong> <span id="display-status"></span></p>
+                                <p><strong>Submitted:</strong> <span id="display-submitted-date"></span></p>
+                                <p><strong>Estimated Review:</strong> <span id="display-estimated-time"></span></p>
+                                <div id="display-admin-notes" style="display:none;">
+                                    <p><strong>Admin Notes:</strong> <span id="display-notes"></span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="display-document-preview" style="display:none;">
+                            <h6>Submitted Document</h6>
+                            <img id="display-document-img" style="max-width:100%; max-height:300px; border-radius:8px;" />
+                        </div>
+                    </div>
+
+                    <!-- History Section -->
+                    <div id="verification-history-section" style="display:none;">
+                        <h5>Request History</h5>
+                        <div id="verification-history-timeline"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 
     <!-- MODAL: SHOP ADDRESS (PSGC) -->
