@@ -997,6 +997,12 @@ class AdminDashboard {
         // Unverify modal button
         document.getElementById('confirm-unverify-btn')?.addEventListener('click', () => this.handleUnverifyAction());
 
+        // Unverify button in details modal
+        document.getElementById('unverify-from-details-btn')?.addEventListener('click', (e) => {
+            const requestId = e.target.dataset.requestId;
+            this.openUnverifyModal(requestId);
+        });
+
         // Verification document view buttons (event delegation)
         document.getElementById('verification-requests-table')?.addEventListener('click', (e) => {
             // Image thumbnail click
@@ -7124,13 +7130,12 @@ class AdminDashboard {
 
     updateVerificationStats(requests) {
         const pending = requests.filter(r => r.status === 'pending').length;
-        const today = new Date().toDateString();
-        const approvedToday = requests.filter(r => r.status === 'approved' && new Date(r.updated_at).toDateString() === today).length;
-        const rejectedToday = requests.filter(r => r.status === 'rejected' && new Date(r.updated_at).toDateString() === today).length;
+        const approved = requests.filter(r => r.status === 'approved').length;
+        const rejected = requests.filter(r => r.status === 'rejected').length;
 
         document.getElementById('verification-pending-count').textContent = pending;
-        document.getElementById('verification-approved-today').textContent = approvedToday;
-        document.getElementById('verification-rejected-today').textContent = rejectedToday;
+        document.getElementById('verification-approved-count').textContent = approved;
+        document.getElementById('verification-rejected-count').textContent = rejected;
     }
 
     renderVerificationRequestsTable() {
@@ -7170,9 +7175,6 @@ class AdminDashboard {
                         ${request.status === 'pending' ? `
                             <button class="btn btn-sm btn-ac-green approve-verification-btn" data-request-id="${request.id}">Approve</button>
                             <button class="btn btn-sm btn-ac-red reject-verification-btn" data-request-id="${request.id}">Reject</button>
-                        ` : ''}
-                        ${request.status === 'approved' ? `
-                            <button class="btn btn-sm btn-ac-red unverify-verification-btn" data-request-id="${request.id}">Unverify</button>
                         ` : ''}
                     </div>
                 </td>
@@ -7284,10 +7286,12 @@ class AdminDashboard {
         const modal = document.getElementById('verification-details-modal');
         const title = document.getElementById('verification-details-modal-title');
         const content = document.getElementById('verification-details-content');
+        const unverifyBtn = document.getElementById('unverify-from-details-btn');
 
         title.textContent = 'Verification Details';
         content.innerHTML = '<div class="text-center py-5"><span class="spinner-border"></span></div>';
         modal.classList.add('open');
+        unverifyBtn.style.display = 'none';
 
         try {
             // Fetch verification request details
@@ -7299,6 +7303,12 @@ class AdminDashboard {
             if (response.ok) {
                 const request = data.requests.find(r => r.id === parseInt(requestId));
                 if (request) {
+                    // Show unverify button if status is approved
+                    if (request.status === 'approved') {
+                        unverifyBtn.style.display = 'inline-block';
+                        unverifyBtn.dataset.requestId = request.id;
+                    }
+
                     content.innerHTML = `
                         <div class="row">
                             <div class="col-md-6">
@@ -7358,6 +7368,13 @@ class AdminDashboard {
     async handleUnverifyAction() {
         if (!this.currentUnverifyRequestId) return;
 
+        const reason = document.getElementById('unverify-reason').value.trim();
+
+        if (!reason) {
+            this.showToast('Reason is required', 'error');
+            return;
+        }
+
         try {
             const response = await fetch(`${this.apiBase}/admin/verification-requests/${this.currentUnverifyRequestId}/review`, {
                 method: 'PUT',
@@ -7367,13 +7384,14 @@ class AdminDashboard {
                 },
                 body: JSON.stringify({
                     status: 'pending',
-                    rejection_reason: null
+                    rejection_reason: reason
                 })
             });
 
             if (response.ok) {
                 this.showToast('Verification request unverifed successfully', 'success');
                 this.closeUnverifyModal();
+                this.closeVerificationDetailsModal();
                 this.loadVerificationRequests(this.verificationCurrentPage, this.verificationCurrentStatus);
             } else {
                 const data = await response.json().catch(() => ({}));

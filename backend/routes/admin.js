@@ -28,27 +28,16 @@ const loadCategoryNameById = async (categoryId) => {
   return String(result.rows?.[0]?.name || 'uncategorized').trim() || 'uncategorized';
 };
 
-const categorizedProductPublicIdPrefix = ({ categoryName, productName, userId }) => {
-  return `agricatch/${cloudinary.slugify(categoryName || 'uncategorized')}/${cloudinary.slugify(productName || 'product')}/${String(userId || 'unknown').trim()}-`;
-};
-
-const rehomeProductImageToCategorizedId = async ({ categoryName, productName, userId, imagePublicId, imageUrl }) => {
+const rehomeProductImageToCategorizedId = async ({ categoryName, productName, productId, imagePublicId, imageUrl }) => {
   const sourcePublicId = imagePublicId || extractCloudinaryPublicId(imageUrl);
   if (!sourcePublicId) {
     return { imagePublicId, imageUrl, changed: false };
   }
 
-  const targetPrefix = categorizedProductPublicIdPrefix({ categoryName, productName, userId });
-  if (sourcePublicId.startsWith(targetPrefix)) {
+  const targetPublicId = `agricatch/${cloudinary.slugify(categoryName || 'uncategorized')}/${cloudinary.slugify(productName || 'product')}/${productId}.jpeg`;
+  if (sourcePublicId === targetPublicId) {
     return { imagePublicId: sourcePublicId, imageUrl, changed: false };
   }
-
-  const targetPublicId = cloudinary.publicIdForCategorizedProduct({
-    categoryName,
-    productName,
-    userId,
-    extension: 'jpeg'
-  });
 
   try {
     const renamed = await cloudinary.uploader.rename(sourcePublicId, targetPublicId, {
@@ -63,6 +52,19 @@ const rehomeProductImageToCategorizedId = async ({ categoryName, productName, us
     };
   } catch (err) {
     const message = String(err && (err.message || err));
+    const isMissingSource = /not found|404/i.test(message);
+    if (isMissingSource) {
+      try {
+        const existing = await cloudinary.api.resource(targetPublicId, { resource_type: 'image' });
+        return {
+          imagePublicId: targetPublicId,
+          imageUrl: existing.secure_url || cloudinary.url(targetPublicId, { secure: true }) || imageUrl,
+          changed: imagePublicId !== targetPublicId
+        };
+      } catch (_) {
+        // Fall through and keep existing DB values if neither source nor target is available.
+      }
+    }
     console.warn('Failed to rehome admin-updated product image:', sourcePublicId, '->', targetPublicId, message);
     return { imagePublicId: sourcePublicId, imageUrl, changed: false };
   }
@@ -1023,12 +1025,16 @@ router.put('/verification-requests/:id/review', requireAdmin, async (req, res) =
     const { id } = req.params;
     const { status, rejection_reason } = req.body;
 
-    if (!['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ message: 'Status must be approved or rejected' });
+    if (!['approved', 'rejected', 'pending'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be approved, rejected, or pending' });
     }
 
     if (status === 'rejected' && !rejection_reason) {
       return res.status(400).json({ message: 'Rejection reason is required' });
+    }
+
+    if (status === 'pending' && !rejection_reason) {
+      return res.status(400).json({ message: 'Reason is required for unverify' });
     }
 
     const requestRes = await pool.query(
@@ -1040,15 +1046,22 @@ router.put('/verification-requests/:id/review', requireAdmin, async (req, res) =
       return res.status(404).json({ message: 'Verification request not found' });
     }
 
-    if (requestRes.rows[0].status !== 'pending') {
+    const request = requestRes.rows[0];
+    const farmerId = request.farmer_id;
+
+    // For unverify (pending status), allow changing from approved
+    // For approve/reject, only allow from pending
+    if (status === 'pending' && request.status !== 'approved') {
+      return res.status(400).json({ message: 'Can only unverify approved requests' });
+    }
+
+    if (['approved', 'rejected'].includes(status) && request.status !== 'pending') {
       return res.status(400).json({ message: 'Request has already been reviewed' });
     }
 
-    const farmerId = requestRes.rows[0].farmer_id;
-
     // Update request status
     await pool.query(
-      `UPDATE verification_requests 
+      `UPDATE verification_requests
        SET status = $1, rejection_reason = $2, reviewed_by = $3, reviewed_at = CURRENT_TIMESTAMP
        WHERE id = $4`,
       [status, rejection_reason || null, req.user.id, id]
@@ -1057,7 +1070,7 @@ router.put('/verification-requests/:id/review', requireAdmin, async (req, res) =
     // If approved, verify the farmer
     if (status === 'approved') {
       await pool.query('UPDATE users SET is_verified = true WHERE id = $1', [farmerId]);
-      
+
       // Send verification notification
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
@@ -1066,16 +1079,21 @@ router.put('/verification-requests/:id/review', requireAdmin, async (req, res) =
          'Your farmer account has been verified! You now have access to all features including unlimited products, priority approval, custom product name requests, and advanced analytics.']
       );
       broadcastEvent('notification.created', { user_id: farmerId });
+    }
 
-      // Send analytics upgrade notification
+    // If unverified (pending status), unverify the farmer
+    if (status === 'pending' && request.status === 'approved') {
+      await pool.query('UPDATE users SET is_verified = false WHERE id = $1', [farmerId]);
+
+      // Send unverify notification
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
          VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
-        [farmerId, 'analytics_upgrade', 'Analytics Access Upgraded',
-         'Your account is now verified! You have access to advanced analytics including charts, trends, and insights. Check your dashboard to view detailed performance metrics.']
+        [farmerId, 'account_unverified', 'Account Unverified',
+         `Your farmer account has been unverified. Reason: ${rejection_reason}. Please contact support if you believe this is an error.`]
       );
       broadcastEvent('notification.created', { user_id: farmerId });
-    } else {
+    } else if (status === 'rejected') {
       // Send rejection notification
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
@@ -1528,13 +1546,7 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
     const nextName = String(name || current.name || '').trim();
     const nextCategoryId = Number.parseInt(category_id, 10) || Number.parseInt(current.category_id, 10) || null;
     const resolvedCategoryName = await loadCategoryNameById(nextCategoryId);
-    const uploaderUserId = current.farmer_id || req.user?.id || 'unknown';
-    const targetPublicId = cloudinary.publicIdForCategorizedProduct({
-      categoryName: resolvedCategoryName,
-      productName: nextName,
-      userId: uploaderUserId,
-      extension: 'jpeg'
-    });
+    const targetPublicId = `agricatch/${cloudinary.slugify(resolvedCategoryName)}/${cloudinary.slugify(nextName)}/${id}.jpeg`;
     const oldPublicId = current.cloudinary_public_id || extractCloudinaryPublicId(current.image_url) || null;
 
     if (req.file && req.file.path) {
@@ -1580,7 +1592,7 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
         const moved = await rehomeProductImageToCategorizedId({
           categoryName: resolvedCategoryName,
           productName: nextName,
-          userId: uploaderUserId,
+          productId: id,
           imagePublicId: explicitPublicId,
           imageUrl: image_url
         });

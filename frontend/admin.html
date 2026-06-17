@@ -2375,26 +2375,26 @@
                 <!-- Stats Dashboard -->
                 <div class="row mb-3">
                     <div class="col-md-4">
-                        <div class="card bg-warning text-dark">
-                            <div class="card-body">
-                                <h5>Pending</h5>
-                                <h3 id="verification-pending-count">0</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
                         <div class="card bg-success text-white">
                             <div class="card-body">
-                                <h5>Approved Today</h5>
-                                <h3 id="verification-approved-today">0</h3>
+                                <h5>Approved</h5>
+                                <h3 id="verification-approved-count">0</h3>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="card bg-danger text-white">
                             <div class="card-body">
-                                <h5>Rejected Today</h5>
-                                <h3 id="verification-rejected-today">0</h3>
+                                <h5>Rejected</h5>
+                                <h3 id="verification-rejected-count">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-secondary text-white">
+                            <div class="card-body">
+                                <h5>Pending</h5>
+                                <h3 id="verification-pending-count">0</h3>
                             </div>
                         </div>
                     </div>
@@ -2651,6 +2651,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" data-close-modal="verification-details-modal">Close</button>
+                <button class="btn btn-ac-red" id="unverify-from-details-btn" style="display:none;">Unverify</button>
             </div>
         </div>
     </div>
@@ -2666,6 +2667,11 @@
             </div>
             <div class="modal-body">
                 <p>Are you sure you want to unverify this farmer? This will change their status back to pending.</p>
+                <div class="mb-3">
+                    <label for="unverify-reason" class="form-label small fw-semibold">Reason <span class="text-danger">*</span></label>
+                    <textarea id="unverify-reason" class="form-control" rows="3" placeholder="Please explain why this farmer is being unverified..." required></textarea>
+                    <div class="form-text text-muted small">This reason will be visible to the farmer.</div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" data-close-modal="unverify-modal">Cancel</button>
