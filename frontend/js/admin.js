@@ -7171,9 +7171,9 @@ class AdminDashboard {
 
             const statusBadge = {
                 'pending': '<span class="badge bg-warning">Pending</span>',
-                'approved': '<span class="badge bg-success">Approved</span>',
+                'approved': '<i class="bi bi-check-circle-fill text-primary fs-5"></i>',
                 'rejected': '<span class="badge bg-danger">Rejected</span>',
-                'unverified': '<span class="badge bg-secondary">Unverified</span>'
+                'unverified': '<i class="bi bi-x-circle-fill text-danger fs-5"></i>'
             }[request.status] || request.status;
 
             const docIndicator = request.document_url
@@ -7402,7 +7402,7 @@ class AdminDashboard {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    status: 'pending',
+                    status: 'unverified',
                     rejection_reason: reason
                 })
             });
