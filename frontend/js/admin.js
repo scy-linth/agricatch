@@ -6688,8 +6688,8 @@ class AdminDashboard {
                     <td>${rating}</td>
                     <td style="text-align:center">
                         <div class="d-flex flex-column gap-1 align-items-center">
-                            ${this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active')}
-                            ${this.renderStatus(isVerified ? 'Verified' : 'Unverified', isVerified ? 'verified' : 'unverified')}
+                            ${isDisabled ? '<i class="bi bi-x-circle-fill text-danger me-1"></i><span class="badge bg-danger">Disabled</span>' : '<i class="bi bi-check-circle-fill text-success me-1"></i><span class="badge bg-success">Active</span>'}
+                            ${isVerified ? '<i class="bi bi-check-circle-fill text-primary me-1"></i><span class="badge bg-success">Verified</span>' : '<i class="bi bi-x-circle-fill text-danger me-1"></i><span class="badge bg-secondary">Unverified</span>'}
                         </div>
                     </td>
                     <td class="text-muted">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
