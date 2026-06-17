@@ -6695,12 +6695,8 @@ class AdminDashboard {
                     <td style="color:#777171f0">${this.escapeHtml(f.username || '—')}</td>
                     <td>${this.escapeHtml(f.email)}</td>
                     <td>${rating}</td>
-                    <td style="text-align:center">
-                        <div class="d-flex flex-column gap-1 align-items-center">
-                            ${this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active')}
-                            ${isVerified ? '<span class="badge bg-success">Verified<i class="bi bi-check-circle-fill ms-1"></i></span>' : '<span class="badge bg-secondary">Unverified<i class="bi bi-x-circle-fill ms-1"></i></span>'}
-                        </div>
-                    </td>
+                    <td style="text-align:center">${this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active')}</td>
+                    <td style="text-align:center">${isVerified ? '<span class="badge bg-success">Verified<i class="bi bi-check-circle-fill ms-1"></i></span>' : '<span class="badge bg-secondary">Unverified<i class="bi bi-x-circle-fill ms-1"></i></span>'}</td>
                     <td class="text-muted">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                     <td>
                         <button class="btn btn-sm py-0 px-2 btn-ac-green farmer-view-btn" data-farmer-id="${f.id}">View</button>
@@ -6713,10 +6709,10 @@ class AdminDashboard {
         if (allTbody) {
             allTbody.innerHTML = pagedFarmers.length
                 ? pagedFarmers.map(f => buildRow(f)).join('')
-                : `<tr><td colspan="9" class="text-center text-muted py-4">No farmers found</td></tr>`;
+                : `<tr><td colspan="10" class="text-center text-muted py-4">No farmers found</td></tr>`;
         }
 
-        this.refreshSortableTable('farmers-all-table', { columns: [{ select: 8, sortable: false }], defaultSort: [7, 'desc'] });
+        this.refreshSortableTable('farmers-all-table', { columns: [{ select: 9, sortable: false }], defaultSort: [8, 'desc'] });
 
         this.renderPagination('farmers-pagination', pageState, (page) => {
             this.loadFarmers('all', page);
