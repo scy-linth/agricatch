@@ -3247,6 +3247,7 @@ class AdminDashboard {
                         ['Address', farmer.address || '—'],
                         ['Verified', farmer.is_verified ? this.renderStatus('Yes', 'verified') : this.renderStatus('No', 'unverified')],
                         ['Status', farmer.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
+                        ['Rating', farmer.rating ? `<span class="star-rating">★</span> ${Number(farmer.rating).toFixed(1)}` : '—'],
                         ['Joined', farmer.created_at ? new Date(farmer.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
                         ['Total Revenue', this.fmtCurrency(revenue)], ['Order Count', order_count],
                     ].map(([k,v]) => `<div class="col-6"><div class="text-muted small">${k}</div><div class="fw-semibold small">${v}</div></div>`).join('')}
@@ -7507,6 +7508,18 @@ function closeVerificationDetailsModal() {
     if (adminDashboard) {
         adminDashboard.closeVerificationDetailsModal();
     }
+}
+
+function loadVerificationRequests(page, status) {
+    if (adminDashboard) {
+        adminDashboard.loadVerificationRequests(page, status);
+    }
+}
+
+
+
+
+
 }
 
 function loadVerificationRequests(page, status) {
