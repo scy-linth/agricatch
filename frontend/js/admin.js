@@ -32,6 +32,16 @@ class AdminDashboard {
         this.verificationCurrentStatus = 'all';
         this.currentReviewRequestId = null;
 
+        // Support tickets
+        this.supportTickets = [];
+        this.supportTicketsCurrentPage = 1;
+        this.supportTicketsPerPage = 10;
+        this.supportTicketsTotal = 0;
+        this.supportTicketsCurrentStatus = 'open';
+        this.currentTicketId = null;
+        this.ticketPollInterval = null;
+        this.ticketPollFailures = 0;
+
         if (!this.token) {
             window.location.href = '/?login=1';
             return;
@@ -331,6 +341,7 @@ class AdminDashboard {
             categories: { page: 1, total: 0, limit: 50 },
             'catalog-products': { page: 1, total: 0, limit: 50 },
             'category-requests': { page: 1, total: 0, limit: 50 },
+            'verification-requests': { page: 1, total: 0, limit: 50 },
             activity: { page: 1, total: 0, limit: 5 },
             'top-products': { page: 1, total: 0, limit: 5 },
             'top-farmers': { page: 1, total: 0, limit: 5 },
@@ -361,7 +372,14 @@ class AdminDashboard {
         this.setupRealtime();
         this.startUnreadPolling();
         this.loadProductApprovalsBadge();
+        this.loadSubscriptionBadgeCount();
+        this.loadSupportTicketsBadge();
         this.initChat();
+
+        // Poll support tickets badge every 60s
+        const loadSupportBadge = () => this.loadSupportTicketsBadge();
+        loadSupportBadge();
+        this._supportBadgeInterval = setInterval(loadSupportBadge, 60000);
         // Description char counter for product edit
         const desc = document.getElementById('edit-product-description');
         const count = document.getElementById('edit-product-description-count');
@@ -660,6 +678,13 @@ class AdminDashboard {
         this.activeSection = sectionId;
         localStorage.setItem('adminActiveSection', sectionId);
 
+        // Close all detail panels when navigating to a different section
+        this.closeOrderDetails();
+        this.closeProductApprovalDetails();
+        this.closeCategoryDetails();
+        this.closeCustomerDetails();
+        this.closeFarmerDetails();
+
         document.querySelectorAll('.admin-section-card').forEach(section => {
             section.classList.remove('active');
         });
@@ -682,6 +707,14 @@ class AdminDashboard {
 
         if (sectionId === 'verification-requests') {
             this.loadVerificationRequests();
+        }
+
+        if (sectionId === 'subscription-requests') {
+            this.loadSubscriptionRequests('pending');
+        }
+
+        if (sectionId === 'support-tickets') {
+            this.loadSupportTickets('open');
         }
 
         // Add active state to parent collapse menu for catalog sections
@@ -727,6 +760,8 @@ class AdminDashboard {
                 'category-requests': 'Product Catalog Requests',
                 'product-approvals': 'Pending Approvals',
                 'verification-requests': 'Verification Requests',
+                'subscription-requests': 'Subscription Requests',
+                'support-tickets': 'Support Tickets',
                 farmers: 'Farmer Management',
                 staff: 'Staff Management',
                 'all-users': 'All Users',
@@ -757,6 +792,8 @@ class AdminDashboard {
                 'category-requests': 'Product Catalog Requests',
                 'product-approvals': 'Pending Approvals',
                 'verification-requests': 'Verification Requests',
+                'subscription-requests': 'Subscription Requests',
+                'support-tickets': 'Support Tickets',
                 farmers: 'Farmers',
                 staff: 'Staff',
                 'all-users': 'All Users',
@@ -853,6 +890,10 @@ class AdminDashboard {
             this._loadedSections['platform-settings'] = true;
             this.loadPlatformSettings();
             this.loadServiceStatus();
+            if (this.currentUserRole === 'super_admin') {
+                this.loadPaymentAccounts();
+                this.loadSubscriptionSettings();
+            }
             
             document.getElementById('refresh-settings-btn')?.addEventListener('click', () => {
                 localStorage.removeItem('cached_delivery_fee');
@@ -983,18 +1024,56 @@ class AdminDashboard {
             this.navigateTo('chat');
         });
 
-        // Verification request status filter tabs
-        document.querySelectorAll('.verification-tabs .tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        // Verification request status filter tabs (event delegation)
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.verification-tabs .tab-btn')) {
                 document.querySelectorAll('.verification-tabs .tab-btn').forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
                 this.loadVerificationRequests(1, e.target.dataset.status);
-            });
+            }
         });
 
-        // Review modal buttons
-        document.getElementById('approve-btn')?.addEventListener('click', () => this.handleReviewAction('approved'));
-        document.getElementById('reject-btn')?.addEventListener('click', () => this.handleReviewAction('rejected'));
+        // Support ticket tabs
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.support-tabs .tab-btn')) {
+                document.querySelectorAll('.support-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.loadSupportTickets(e.target.dataset.status);
+            }
+        });
+
+        // Support ticket entries per page
+        document.getElementById('support-tickets-entries')?.addEventListener('change', (e) => {
+            this.supportTicketsPerPage = parseInt(e.target.value);
+            this.supportTicketsCurrentPage = 1;
+            this.loadSupportTickets(this.supportTicketsCurrentStatus);
+        });
+
+        // Admin send ticket message
+        document.getElementById('btn-admin-send-ticket-message')?.addEventListener('click', () => {
+            this.sendAdminTicketMessage();
+        });
+
+        // Admin ticket message input
+        document.getElementById('admin-ticket-message-input')?.addEventListener('input', (e) => {
+            const count = e.target.value.length;
+            const counterEl = document.getElementById('admin-ticket-message-char-count');
+            counterEl.textContent = `${count}/500 characters`;
+            counterEl.style.color = count > 450 ? 'red' : '';
+        });
+
+        // Admin ticket status change
+        document.getElementById('admin-ticket-status-select')?.addEventListener('change', (e) => {
+            this.updateTicketStatus(this.currentTicketId, e.target.value);
+        });
+
+        // Stop ticket polling when modal closes
+        document.getElementById('admin-ticket-detail-modal')?.addEventListener('hidden.bs.modal', () => {
+            this.stopAdminTicketPolling();
+            this.currentTicketId = null;
+        });
+
+        // Review modal buttons - now attached in openReviewModal to ensure they work
 
         // Unverify modal button
         document.getElementById('confirm-unverify-btn')?.addEventListener('click', () => this.handleUnverifyAction());
@@ -1006,29 +1085,29 @@ class AdminDashboard {
         });
 
         // Approve button in details modal
-        document.getElementById('approve-from-details-btn')?.addEventListener('click', (e) => {
+        document.getElementById('approve-from-details-btn')?.addEventListener('click', async (e) => {
             console.log('[DEBUG] Approve button clicked', e.target);
             const requestId = e.target.dataset.requestId;
             console.log('[DEBUG] Request ID from dataset:', requestId);
             console.log('[DEBUG] Calling closeVerificationDetailsModal...');
             this.closeVerificationDetailsModal();
             console.log('[DEBUG] Calling openReviewModal with approve...');
-            this.openReviewModal(requestId, 'approve');
+            await this.openReviewModal(requestId, 'approve');
         });
 
         // Reject button in details modal
-        document.getElementById('reject-from-details-btn')?.addEventListener('click', (e) => {
+        document.getElementById('reject-from-details-btn')?.addEventListener('click', async (e) => {
             console.log('[DEBUG] Reject button clicked', e.target);
             const requestId = e.target.dataset.requestId;
             console.log('[DEBUG] Request ID from dataset:', requestId);
             console.log('[DEBUG] Calling closeVerificationDetailsModal...');
             this.closeVerificationDetailsModal();
             console.log('[DEBUG] Calling openReviewModal with reject...');
-            this.openReviewModal(requestId, 'reject');
+            await this.openReviewModal(requestId, 'reject');
         });
 
         // Verification document view buttons (event delegation)
-        document.getElementById('verification-requests-table')?.addEventListener('click', (e) => {
+        document.getElementById('verification-requests-table')?.addEventListener('click', async (e) => {
             // Image thumbnail click
             if (e.target.classList.contains('verification-doc-thumb')) {
                 const docUrl = e.target.dataset.docUrl;
@@ -1044,12 +1123,12 @@ class AdminDashboard {
             // Approve button
             if (e.target.classList.contains('approve-verification-btn')) {
                 const requestId = e.target.dataset.requestId;
-                this.openReviewModal(requestId, 'approve');
+                await this.openReviewModal(requestId, 'approve');
             }
             // Reject button
             if (e.target.classList.contains('reject-verification-btn')) {
                 const requestId = e.target.dataset.requestId;
-                this.openReviewModal(requestId, 'reject');
+                await this.openReviewModal(requestId, 'reject');
             }
         });
 
@@ -1453,6 +1532,7 @@ class AdminDashboard {
                 'catalog-products': () => this.loadCatalogNames(),
                 'category-requests': () => this.loadCategoryRequests(),
                 'product-approvals': () => this.loadProductApprovals(),
+                'verification-requests': () => this.loadVerificationRequests(1, this.verificationCurrentStatus || 'all'),
                 'logs': () => this.loadAuditLogs(),
                 'activity': () => this.loadRecentActivity(this._activityPeriod || 'today'),
                 'top-products': () => this.loadTopProducts(this._topProductsPeriod || 'today'),
@@ -4731,6 +4811,326 @@ class AdminDashboard {
         }
     }
 
+    async loadSubscriptionBadgeCount() {
+        try {
+            const res = await fetch(`${this.apiBase}/admin/subscriptions?status=pending&limit=1`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const count = data.subscriptions?.length || 0;
+            const badge = document.getElementById('subscription-requests-badge');
+            if (badge) {
+                badge.textContent = count;
+                badge.style.display = count > 0 ? 'inline-block' : 'none';
+            }
+        } catch (e) { console.error('Error loading subscription badge:', e); }
+    }
+
+    async loadSupportTicketsBadge() {
+        try {
+            const response = await fetch(`${this.apiBase}/support-tickets?status=open&limit=1`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            const count = data.total || 0;
+            const badge = document.getElementById('support-tickets-badge');
+            if (badge) {
+                badge.textContent = count;
+                badge.style.display = count > 0 ? 'inline-block' : 'none';
+            }
+        } catch (error) {
+            console.error('Load support tickets badge error:', error);
+        }
+    }
+
+    async loadSupportTickets(status = 'open') {
+        this.supportTicketsCurrentStatus = status;
+        this.supportTicketsCurrentPage = 1;
+
+        try {
+            const response = await fetch(`${this.apiBase}/support-tickets?status=${status}&page=${this.supportTicketsCurrentPage}&limit=${this.supportTicketsPerPage}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to load tickets');
+
+            const data = await response.json();
+            this.supportTickets = data.tickets;
+            this.supportTicketsTotal = data.total;
+            this.renderAdminSupportTicketsTable();
+            this.renderAdminSupportTicketsPagination();
+        } catch (error) {
+            console.error('Load support tickets error:', error);
+            this.showError('Failed to load support tickets');
+        }
+    }
+
+    renderAdminSupportTicketsTable() {
+        const tbody = document.querySelector('#admin-support-tickets-table tbody');
+        if (!tbody) return;
+
+        if (this.supportTickets.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No support tickets in this status.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = this.supportTickets.map(ticket => {
+            const statusColors = {
+                open: 'bg-primary',
+                in_progress: 'bg-warning',
+                resolved: 'bg-success',
+                closed: 'bg-secondary'
+            };
+            const priorityColors = {
+                low: 'bg-info',
+                medium: 'bg-warning',
+                high: 'bg-danger'
+            };
+
+            return `
+                <tr>
+                    <td>${this.escapeHtml(ticket.farmer_name || 'Unknown')}</td>
+                    <td>${this.escapeHtml(ticket.subject)}</td>
+                    <td><span class="badge ${statusColors[ticket.status]}">${ticket.status.replace('_', ' ')}</span></td>
+                    <td><span class="badge ${priorityColors[ticket.priority]}">${ticket.priority}</span></td>
+                    <td>${new Date(ticket.created_at).toLocaleDateString('en-PH')}</td>
+                    <td>${ticket.updated_at ? new Date(ticket.updated_at).toLocaleDateString('en-PH') : '—'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary view-admin-ticket-btn" data-id="${ticket.id}">View</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        tbody.querySelectorAll('.view-admin-ticket-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.openAdminTicketDetail(btn.dataset.id));
+        });
+    }
+
+    renderAdminSupportTicketsPagination() {
+        const container = document.getElementById('admin-support-tickets-pagination');
+        if (!container) return;
+
+        const totalPages = Math.ceil(this.supportTicketsTotal / this.supportTicketsPerPage);
+        if (totalPages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = '<nav><ul class="pagination">';
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<li class="page-item ${i === this.supportTicketsCurrentPage ? 'active' : ''}">
+                <a class="page-link" href="#" data-page="${i}">${i}</a>
+            </li>`;
+        }
+        html += '</ul></nav>';
+        container.innerHTML = html;
+
+        container.querySelectorAll('.page-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.supportTicketsCurrentPage = parseInt(e.target.dataset.page);
+                this.loadSupportTickets(this.supportTicketsCurrentStatus);
+            });
+        });
+    }
+
+    async openAdminTicketDetail(ticketId) {
+        this.currentTicketId = ticketId;
+        this.loadAdminTicketDetail(ticketId);
+        new bootstrap.Modal(document.getElementById('admin-ticket-detail-modal')).show();
+        this.startAdminTicketPolling();
+    }
+
+    async loadAdminTicketDetail(ticketId) {
+        try {
+            const response = await fetch(`${this.apiBase}/support-tickets/${ticketId}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to load ticket');
+
+            const data = await response.json();
+            this.renderAdminTicketDetail(data.ticket, data.messages);
+        } catch (error) {
+            console.error('Load ticket detail error:', error);
+            this.showError('Failed to load ticket');
+        }
+    }
+
+    renderAdminTicketDetail(ticket, messages) {
+        document.getElementById('admin-ticket-detail-subject').textContent = ticket.subject;
+        
+        const statusColors = {
+            open: 'bg-primary',
+            in_progress: 'bg-warning',
+            resolved: 'bg-success',
+            closed: 'bg-secondary'
+        };
+        const priorityColors = {
+            low: 'bg-info',
+            medium: 'bg-warning',
+            high: 'bg-danger'
+        };
+
+        const statusEl = document.getElementById('admin-ticket-detail-status');
+        statusEl.textContent = ticket.status.replace('_', ' ');
+        statusEl.className = `badge ${statusColors[ticket.status]}`;
+
+        const priorityEl = document.getElementById('admin-ticket-detail-priority');
+        priorityEl.textContent = ticket.priority;
+        priorityEl.className = `badge ${priorityColors[ticket.priority]}`;
+
+        document.getElementById('admin-ticket-detail-created').textContent = new Date(ticket.created_at).toLocaleDateString('en-PH');
+        document.getElementById('admin-ticket-status-select').value = ticket.status;
+
+        this.renderAdminTicketMessages(messages);
+    }
+
+    renderAdminTicketMessages(messages) {
+        const container = document.getElementById('admin-ticket-messages-container');
+        if (!container) return;
+
+        if (messages.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center">No messages yet. Start the conversation.</p>';
+            return;
+        }
+
+        container.innerHTML = messages.map(msg => {
+            const isOwn = msg.sender_id === this.currentUserId;
+            const alignment = isOwn ? 'text-end' : 'text-start';
+            const bgColor = isOwn ? 'bg-primary text-white' : 'bg-white';
+            const senderName = msg.sender_role === 'staff' ? 'Support Staff' : msg.sender_name;
+
+            return `
+                <div class="d-flex ${alignment} mb-2">
+                    <div class="${bgColor} p-2 rounded" style="max-width: 70%;">
+                        <small class="d-block text-muted" style="${isOwn ? 'color: rgba(255,255,255,0.7) !important;' : ''}">${senderName}</small>
+                        <p class="mb-0">${this.escapeHtml(msg.message)}</p>
+                        <small class="d-block" style="${isOwn ? 'color: rgba(255,255,255,0.7) !important;' : 'color: #6c757d;'}">${new Date(msg.created_at).toLocaleString('en-PH')}</small>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.scrollTop = container.scrollHeight;
+    }
+
+    startAdminTicketPolling() {
+        this.stopAdminTicketPolling();
+        this.ticketPollFailures = 0;
+        this.ticketPollInterval = setInterval(() => {
+            this.pollAdminTicketMessages();
+        }, 5000);
+    }
+
+    stopAdminTicketPolling() {
+        if (this.ticketPollInterval) {
+            clearInterval(this.ticketPollInterval);
+            this.ticketPollInterval = null;
+        }
+    }
+
+    async pollAdminTicketMessages() {
+        if (!this.currentTicketId) return;
+
+        try {
+            const response = await fetch(`${this.apiBase}/support-tickets/${this.currentTicketId}/messages?page=1&limit=50`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (!response.ok) throw new Error('Polling failed');
+
+            const data = await response.json();
+            this.renderAdminTicketMessages(data.messages);
+            this.ticketPollFailures = 0;
+        } catch (error) {
+            console.error('Poll ticket messages error:', error);
+            this.ticketPollFailures++;
+            if (this.ticketPollFailures >= 3) {
+                this.stopAdminTicketPolling();
+                this.showError('Connection lost. Please refresh to see new messages.');
+            }
+        }
+    }
+
+    async sendAdminTicketMessage() {
+        const input = document.getElementById('admin-ticket-message-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        if (message.length > 500) {
+            this.showError('Message exceeds maximum length of 500 characters');
+            return;
+        }
+
+        const sendBtn = document.getElementById('btn-admin-send-ticket-message');
+        const originalText = sendBtn.innerHTML;
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
+
+        try {
+            const response = await fetch(`${this.apiBase}/support-tickets/${this.currentTicketId}/messages`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ message })
+            });
+
+            if (response.ok) {
+                input.value = '';
+                document.getElementById('admin-ticket-message-char-count').textContent = '0/500 characters';
+                this.loadAdminTicketDetail(this.currentTicketId);
+            } else {
+                const data = await response.json();
+                this.showError(data.message || 'Failed to send message');
+            }
+        } catch (error) {
+            console.error('Send ticket message error:', error);
+            this.showError('Failed to send message');
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = originalText;
+        }
+    }
+
+    async updateTicketStatus(ticketId, status) {
+        if (status === 'closed') {
+            if (!confirm('Are you sure you want to close this ticket?')) {
+                document.getElementById('admin-ticket-status-select').value = this.supportTickets.find(t => t.id === ticketId)?.status || 'open';
+                return;
+            }
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/support-tickets/${ticketId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ status })
+            });
+
+            if (response.ok) {
+                this.showToast('Ticket status updated', 'success');
+                this.loadAdminTicketDetail(ticketId);
+                this.loadSupportTickets(this.supportTicketsCurrentStatus);
+                this.loadSupportTicketsBadge();
+            } else {
+                const data = await response.json();
+                this.showError(data.message || 'Failed to update status');
+            }
+        } catch (error) {
+            console.error('Update ticket status error:', error);
+            this.showError('Failed to update status');
+        }
+    }
+
     async approveProduct(productId) {
         if (!await this.adminConfirm('Are you sure you want to approve this product?', { title: 'Approve Product', danger: false })) return;
         try {
@@ -5286,6 +5686,11 @@ class AdminDashboard {
         load();
         // Refresh on SSE chat.message events (wired in setupRealtime)
         this._refreshUnread = load;
+
+        // Poll subscription badge count every 60s
+        const loadSubBadge = () => this.loadSubscriptionBadgeCount();
+        loadSubBadge();
+        this._subscriptionBadgeInterval = setInterval(loadSubBadge, 60000);
     }
 
     initChat() {
@@ -5399,6 +5804,13 @@ class AdminDashboard {
                 ${this.renderStatus(this.formatStatus(product.status), product.status)}
             </div>
             <div class="panel-section">
+                <h4>Product Image</h4>
+                ${product.image_url
+                    ? `<img src="${this.escapeHtml(product.image_url)}" style="max-width:100%;max-height:300px;border-radius:8px;object-fit:contain;" onerror="this.style.display='none'">`
+                    : `<div style="color:#64748b;font-size:0.875rem;">No image uploaded</div>`
+                }
+            </div>
+            <div class="panel-section">
                 <h4>Product Information</h4>
                 <table class="w-100" style="font-size:0.875rem;border-collapse:collapse;">
                     <tr>
@@ -5438,6 +5850,7 @@ class AdminDashboard {
                 <p style="margin:0;font-size:0.875rem;color:#7f1d1d;">${this.escapeHtml(product.rejection_reason)}</p>
             </div>
             ` : ''}
+            ${product.status === 'pending' ? `
             <div class="panel-section">
                 <h4>Actions</h4>
                 <div class="d-flex gap-2">
@@ -5445,6 +5858,7 @@ class AdminDashboard {
                     <button class="btn btn-sm btn-ac-green product-approve-btn" data-product-id="${product.id}">Approve</button>
                 </div>
             </div>
+            ` : ''}
         `;
     }
 
@@ -5511,11 +5925,6 @@ class AdminDashboard {
                 </table>
             </div>
             ` : ''}
-            <div class="panel-section">
-                <h4>Chat Farmers</h4>
-                <div id="order-farmers-list" class="panel-item"></div>
-                <p style="color:#64748b;font-size:0.9rem;margin-top:8px;">Select a farmer to open the support inbox for this order.</p>
-            </div>
             <div class="panel-section">
                 <h4>Order Info</h4>
                 <p>Total: ${this.fmtCurrency(order.total_amount)}</p>
@@ -5601,68 +6010,6 @@ class AdminDashboard {
                 const shouldDisable = disableBtn.dataset.disable === 'true';
                 this.toggleOrderDisabled(orderId, shouldDisable);
             });
-        }
-
-        // Build farmer chat list (one farmer at a time)
-        const list = document.getElementById('order-farmers-list');
-        if (list) {
-            const items = Array.isArray(order.items) ? order.items : [];
-            const unique = new Map();
-            for (const it of items) {
-                if (!it?.farmer_id) continue;
-                if (!unique.has(it.farmer_id)) {
-                    unique.set(it.farmer_id, {
-                        id: it.farmer_id,
-                        shop_name: it.farmer_shop_name || '',
-                        name: it.farmer_name || 'Farmer',
-                        email: it.farmer_email || ''
-                    });
-                }
-            }
-
-            if (unique.size === 0) {
-                list.innerHTML = `<div style="color:#64748b;">No farmer information found for this order.</div>`;
-            } else {
-                list.innerHTML = Array.from(unique.values()).map(f => `
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e2e8f0;">
-                        <div style="min-width:0;">
-                            <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(f.shop_name || f.name)}</div>
-                            ${f.shop_name && f.name ? `<div style="color:#64748b;font-size:0.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(f.name)}</div>` : ''}
-                            <div style="color:#64748b;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(f.email)}</div>
-                        </div>
-                        <button class="btn btn-primary btn-small farmer-chat-btn" type="button" data-farmer-id="${f.id}">
-                            Chat
-                        </button>
-                    </div>
-                `).join('');
-                
-                // Add event listeners for chat buttons
-                list.querySelectorAll('.farmer-chat-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const farmerId = Number(btn.dataset.farmerId);
-                        this.openChatForFarmer(farmerId);
-                    });
-                });
-            }
-        }
-    }
-
-    openChatForFarmer(farmerId) {
-        const order = this.currentOrderDetail;
-        if (!order || !farmerId) return;
-        const items = Array.isArray(order.items) ? order.items : [];
-        const item = items.find(i => Number(i.farmer_id) === Number(farmerId));
-        const farmerName = item?.farmer_name || 'Farmer';
-
-        window.__chatContext = {
-            subtitle: `Pre-order #${order.id} • Customer: ${order.customer_name || order.username || 'N/A'}`
-        };
-
-        this.showSection('chat');
-        this.closeOrderDetails();
-
-        if (window.chatUI && typeof window.chatUI.openConversationWithFarmer === 'function') {
-            window.chatUI.openConversationWithFarmer(farmerId, farmerName);
         }
     }
 
@@ -6467,14 +6814,12 @@ class AdminDashboard {
     }
 
     renderTopProductsTable(products) {
-        this.destroySortableTable('top-products-table');
         const tbody = document.getElementById('top-products-tbody');
         if (!tbody) return;
 
         if (!products.length) {
             tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3 small">No data for this period</td></tr>`;
             this.renderPagination('top-products-pagination', this.pagination['top-products'], () => {});
-            this.refreshSortableTable('top-products-table', { columns: [{ select: 0, sortable: false }] });
             return;
         }
 
@@ -6500,19 +6845,15 @@ class AdminDashboard {
             this.pagination['top-products'].page = page;
             this.loadTopProducts(this._topProductsPeriod || 'today', page);
         });
-
-        this.refreshSortableTable('top-products-table', { columns: [{ select: 0, sortable: false }] });
     }
 
     renderTopFarmersTable(farmers) {
-        this.destroySortableTable('top-farmers-table');
         const tbody = document.getElementById('top-farmers-tbody');
         if (!tbody) return;
 
         if (!farmers.length) {
             tbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted py-3 small">No data for this period</td></tr>`;
             this.renderPagination('top-farmers-pagination', this.pagination['top-farmers'], () => {});
-            this.refreshSortableTable('top-farmers-table');
             return;
         }
 
@@ -6533,8 +6874,6 @@ class AdminDashboard {
             this.pagination['top-farmers'].page = page;
             this.loadTopFarmers(this._topFarmersPeriod || 'today', page);
         });
-
-        this.refreshSortableTable('top-farmers-table');
     }
 
     renderOrders(orders) {
@@ -6576,14 +6915,12 @@ class AdminDashboard {
     }
 
     renderRecentSalesTable(orders) {
-        this.destroySortableTable('recent-sales-table');
         const tbody = document.getElementById('recent-sales-tbody');
         if (!tbody) return;
 
         if (!orders.length) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-3 small">No recent sales</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3 small">No recent sales</td></tr>`;
             this.renderPagination('recent-sales-pagination', this.pagination['recent-sales'], () => {});
-            this.refreshSortableTable('recent-sales-table');
             return;
         }
 
@@ -6596,9 +6933,11 @@ class AdminDashboard {
             return `
             <tr>
                 <td class="text-center"><img src="${this.escapeHtml(productImage)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;"></td>
-                <td class="small">#${order.id}</td>
                 <td class="small">${customerName}</td>
-                <td class="small">${this.escapeHtml(order.product_name || '—')}</td>
+                <td class="small">
+                    <div class="fw-semibold">${this.escapeHtml(order.product_name || '—')}</div>
+                    <div class="text-muted" style="font-size:.7rem">#${order.id}</div>
+                </td>
                 <td class="small">${this.fmtCurrency(unitPrice)}</td>
                 <td class="small text-center">${quantity}</td>
                 <td class="small">${this.fmtCurrency(revenue)}</td>
@@ -6611,8 +6950,6 @@ class AdminDashboard {
             this.pagination['recent-sales'].page = page;
             this.loadRecentSales(this._recentSalesPeriod || 'today', page);
         });
-
-        this.refreshSortableTable('recent-sales-table');
     }
 
     async fetchAllFarmers() {
@@ -6704,7 +7041,7 @@ class AdminDashboard {
                     <td style="color:#777171f0">${this.escapeHtml(f.username || '—')}</td>
                     <td>${this.escapeHtml(f.email)}</td>
                     <td style="text-align:center">${this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active')}</td>
-                    <td style="text-align:center">${isVerified ? '<span class="badge bg-success">Verified<i class="bi bi-check-circle-fill ms-1"></i></span>' : '<span class="badge bg-secondary">Unverified<i class="bi bi-x-circle-fill ms-1"></i></span>'}</td>
+                    <td style="text-align:center">${isVerified ? '<span class="badge bg-success align-middle">Verified</span><i class="bi bi-check-circle-fill text-primary ms-1 align-middle"></i>' : '<span class="badge bg-secondary align-middle">Unverified</span><i class="bi bi-x-circle-fill text-danger ms-1 align-middle"></i>'}</td>
                     <td class="text-muted">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                     <td>
                         <button class="btn btn-sm py-0 px-2 btn-ac-green farmer-view-btn" data-farmer-id="${f.id}">View</button>
@@ -7120,7 +7457,17 @@ class AdminDashboard {
     // Verification requests functions
     async loadVerificationRequests(page = 1, status = 'all') {
         try {
-            const response = await fetch(`${this.apiBase}/admin/verification-requests?page=${page}&status=${status}`, {
+            const limit = this.pagination['verification-requests']?.limit || 50;
+            const searchInput = document.getElementById('verification-requests-search-input');
+            const searchQuery = searchInput ? searchInput.value.trim() : '';
+            const url = new URL(`${this.apiBase}/admin/verification-requests`, window.location.origin);
+            url.searchParams.set('page', page);
+            url.searchParams.set('status', status);
+            url.searchParams.set('limit', limit);
+            if (searchQuery) {
+                url.searchParams.set('search', searchQuery);
+            }
+            const response = await fetch(url.toString(), {
                 headers: { Authorization: `Bearer ${this.token}` }
             });
             const data = await response.json();
@@ -7163,14 +7510,16 @@ class AdminDashboard {
         const pending = requests.filter(r => r.status === 'pending').length;
         const approved = requests.filter(r => r.status === 'approved').length;
         const rejected = requests.filter(r => r.status === 'rejected').length;
+        const unverified = requests.filter(r => r.status === 'unverified').length;
 
         document.getElementById('verification-pending-count').textContent = pending;
         document.getElementById('verification-approved-count').textContent = approved;
         document.getElementById('verification-rejected-count').textContent = rejected;
+        document.getElementById('verification-unverified-count').textContent = unverified;
     }
 
     renderVerificationRequestsTable() {
-        const tbody = document.getElementById('verification-requests-table');
+        const tbody = document.getElementById('verification-requests-tbody');
         if (!tbody) return;
         tbody.innerHTML = '';
 
@@ -7183,14 +7532,14 @@ class AdminDashboard {
             const row = document.createElement('tr');
 
             const statusBadge = {
-                'pending': '<i class="bi bi-hourglass text-warning me-1"></i><span class="badge bg-warning">Pending</span>',
-                'approved': '<i class="bi bi-check-circle-fill text-primary me-1"></i><span class="badge bg-success">Approved</span>',
-                'rejected': '<i class="bi bi-x-circle-fill text-danger me-1"></i><span class="badge bg-danger">Rejected</span>',
-                'unverified': '<i class="bi bi-x-circle-fill text-danger me-1"></i><span class="badge bg-secondary">Unverified</span>'
+                'pending': '<span class="badge bg-warning align-middle">Pending</span><i class="bi bi-hourglass text-warning ms-1 align-middle"></i>',
+                'approved': '<span class="badge bg-success align-middle">Approved</span><i class="bi bi-check-circle-fill text-primary ms-1 align-middle"></i>',
+                'rejected': '<span class="badge bg-danger align-middle">Rejected</span><i class="bi bi-x-circle-fill text-danger ms-1 align-middle"></i>',
+                'unverified': '<span class="badge bg-secondary align-middle">Unverified</span><i class="bi bi-x-circle-fill text-danger ms-1 align-middle"></i>'
             }[request.status] || request.status;
 
             const docIndicator = request.document_url
-                ? `<img src="${this.escapeHtml(request.document_url)}" style="width:50px; height:50px; object-fit:cover; border-radius:4px; cursor:pointer;" class="verification-doc-thumb" data-doc-url="${this.escapeHtml(request.document_url)}" data-farmer-name="${this.escapeHtml(request.full_name || request.username)}" />`
+                ? `<img src="${this.escapeHtml(request.document_url)}" style="width:50px; height:50px; object-fit:cover; border-radius:4px; cursor:pointer;" class="verification-doc-thumb" data-doc-url="${this.escapeHtml(request.document_url)}" data-farmer-name="${this.escapeHtml(request.full_name || request.username)}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';" /><i class="bi bi-image-slash text-danger" style="display:none;font-size:1.2rem;"></i>`
                 : '<i class="bi bi-dash text-muted"></i>';
 
             row.innerHTML = `
@@ -7234,11 +7583,30 @@ class AdminDashboard {
         nav.innerHTML = html;
     }
 
-    openReviewModal(requestId, action) {
+    async openReviewModal(requestId, action) {
         this.currentReviewRequestId = requestId;
-        const request = this.verificationRequests.find(r => r.id === requestId);
+        let request = this.verificationRequests.find(r => r.id === requestId);
 
-        if (!request) return;
+        // If not in local cache, fetch from API
+        if (!request) {
+            try {
+                const response = await fetch(`${this.apiBase}/admin/verification-requests`, {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                const data = await response.json();
+                if (response.ok && data.requests) {
+                    request = data.requests.find(r => r.id === parseInt(requestId));
+                }
+            } catch (error) {
+                console.error('Failed to fetch request for review:', error);
+            }
+        }
+
+        if (!request) {
+            console.error('Request not found for review:', requestId);
+            this.showToast('Request not found. Please refresh the page.', 'error');
+            return;
+        }
 
         document.getElementById('review-modal-title').textContent =
             action === 'approve' ? 'Approve Verification Request' : 'Reject Verification Request';
@@ -7283,11 +7651,28 @@ class AdminDashboard {
             rejectBtn.style.display = 'none';
         }
 
-        document.getElementById('view-chat-btn').onclick = () => {
-            window.location.href = `/admin.html#chat?user_id=${request.farmer_id}`;
+        // Ensure event listeners are attached to approve/reject buttons
+        approveBtn.removeEventListener('click', this.boundHandleApprove);
+        rejectBtn.removeEventListener('click', this.boundHandleReject);
+        this.boundHandleApprove = (e) => {
+            console.log('[DEBUG] Approve button in review modal clicked', e);
+            e.preventDefault();
+            e.stopPropagation();
+            this.handleReviewAction('approved');
         };
+        this.boundHandleReject = (e) => {
+            console.log('[DEBUG] Reject button in review modal clicked', e);
+            e.preventDefault();
+            e.stopPropagation();
+            this.handleReviewAction('rejected');
+        };
+        approveBtn.addEventListener('click', this.boundHandleApprove);
+        rejectBtn.addEventListener('click', this.boundHandleReject);
 
-        document.getElementById('admin-review-modal').classList.add('open');
+        const reviewModal = document.getElementById('admin-review-modal');
+        this.modalZIndex++;
+        reviewModal.style.zIndex = this.modalZIndex;
+        reviewModal.classList.add('open');
     }
 
     closeReviewModal() {
@@ -7303,6 +7688,8 @@ class AdminDashboard {
 
         title.textContent = `Verification Document - ${farmerName}`;
         img.src = docUrl;
+        this.modalZIndex++;
+        modal.style.zIndex = this.modalZIndex;
         modal.classList.add('open');
     }
 
@@ -7320,6 +7707,8 @@ class AdminDashboard {
 
         title.textContent = 'Verification Details';
         content.innerHTML = '<div class="text-center py-5"><span class="spinner-border"></span></div>';
+        this.modalZIndex++;
+        modal.style.zIndex = this.modalZIndex;
         modal.classList.add('open');
         unverifyBtn.style.display = 'none';
         approveBtn.style.display = 'none';
@@ -7373,7 +7762,13 @@ class AdminDashboard {
                                 </table>
                                 ${request.document_url ? `
                                     <h5 class="mt-3">Document</h5>
-                                    <img src="${this.escapeHtml(request.document_url)}" style="max-width:100%; max-height:300px; border-radius:8px; cursor:pointer; position:relative; z-index:9999;" onclick="adminDashboard.openVerificationDocModal('${this.escapeHtml(request.document_url)}', '${this.escapeHtml(request.full_name || request.username)}')" />
+                                    <div>
+                                        <img src="${this.escapeHtml(request.document_url)}" style="max-width:100%; max-height:300px; border-radius:8px; cursor:pointer; position:relative; z-index:9999;" onclick="adminDashboard.openVerificationDocModal('${this.escapeHtml(request.document_url)}', '${this.escapeHtml(request.full_name || request.username)}')" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                                        <div style="display:none;padding:20px;text-align:center;background:#f8f9fa;border-radius:8px;">
+                                            <i class="bi bi-image-slash text-danger" style="font-size:2rem;"></i>
+                                            <p class="text-muted mt-2 mb-0">Document image not available (may have been deleted)</p>
+                                        </div>
+                                    </div>
                                 ` : '<p class="text-muted mt-3">No document uploaded</p>'}
                             </div>
                         </div>
@@ -7396,7 +7791,10 @@ class AdminDashboard {
 
     openUnverifyModal(requestId) {
         this.currentUnverifyRequestId = requestId;
-        document.getElementById('unverify-modal').classList.add('open');
+        const modal = document.getElementById('unverify-modal');
+        this.modalZIndex++;
+        modal.style.zIndex = this.modalZIndex;
+        modal.classList.add('open');
     }
 
     closeUnverifyModal() {
@@ -7443,14 +7841,24 @@ class AdminDashboard {
     }
 
     async handleReviewAction(action) {
+        console.log('[DEBUG] handleReviewAction called with action:', action);
+        console.log('[DEBUG] currentReviewRequestId:', this.currentReviewRequestId);
+
         if (!this.currentReviewRequestId) return;
 
         const rejectionReason = document.getElementById('rejection-reason-input').value;
+        console.log('[DEBUG] rejectionReason:', rejectionReason);
 
-        if (action === 'reject' && !rejectionReason.trim()) {
+        if (action === 'rejected' && !rejectionReason.trim()) {
             this.showToast('Rejection reason is required', 'error');
             return;
         }
+
+        const payload = {
+            status: action,
+            rejection_reason: action === 'rejected' ? rejectionReason : null
+        };
+        console.log('[DEBUG] Sending payload:', payload);
 
         try {
             const response = await fetch(`${this.apiBase}/admin/verification-requests/${this.currentReviewRequestId}/review`, {
@@ -7459,13 +7867,12 @@ class AdminDashboard {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify({
-                    status: action,
-                    rejection_reason: action === 'reject' ? rejectionReason : null
-                })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
+            console.log('[DEBUG] Response status:', response.status);
+            console.log('[DEBUG] Response data:', data);
 
             if (response.ok) {
                 this.closeReviewModal();
@@ -7480,18 +7887,229 @@ class AdminDashboard {
         }
     }
 
+    // ── Subscription Request Methods ─────────────────────────────────────
+    async loadSubscriptionRequests(status = 'pending') {
+        try {
+            const res = await fetch(`${this.apiBase}/admin/subscriptions?status=${status}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const tbody = document.querySelector('#subscriptions-table tbody');
+            if (!tbody) return;
+            tbody.innerHTML = data.subscriptions.map(s => `
+                <tr>
+                    <td>${this.escapeHtml(s.farm_name || `${s.first_name} ${s.last_name}`)}</td>
+                    <td>${s.plan_duration_months} month${s.plan_duration_months > 1 ? 's' : ''}</td>
+                    <td>₱${Number(s.amount_paid || 0).toLocaleString()}</td>
+                    <td>${s.payment_account_name ? `<span class="badge bg-${s.payment_account_type === 'gcash' ? 'success' : 'info'}">${s.payment_account_type === 'gcash' ? 'GCash' : 'Bank'}</span> ${this.escapeHtml(s.payment_account_name)}` : '—'}</td>
+                    <td>${new Date(s.created_at).toLocaleDateString('en-PH')}</td>
+                    <td>${s.payment_proof_url ? `<button class="btn btn-sm btn-outline-success view-proof-btn" data-url="${s.payment_proof_url}"><i class="bi bi-image"></i> View</button>` : '—'}</td>
+                    <td>
+                        ${status === 'pending' ? `
+                            <button class="btn btn-sm btn-success approve-sub-btn" data-id="${s.id}">Approve</button>
+                            <button class="btn btn-sm btn-danger reject-sub-btn" data-id="${s.id}">Reject</button>
+                        ` : `<span class="badge bg-${status === 'active' ? 'success' : status === 'rejected' ? 'danger' : 'secondary'}">${status}</span>`}
+                    </td>
+                </tr>
+            `).join('');
+            // Wire buttons
+            tbody.querySelectorAll('.approve-sub-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    if (!confirm('Approve this subscription?')) return;
+                    try {
+                        const res = await fetch(`${this.apiBase}/admin/subscriptions/${id}/approve`, {
+                            method: 'PUT', headers: { 'Authorization': `Bearer ${this.token}` }
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            this.showToast('Subscription approved', 'success');
+                            this.loadSubscriptionRequests('pending');
+                        } else { this.showToast(data.message || 'Failed to approve', 'error'); }
+                    } catch (e) { this.showToast('Error approving subscription', 'error'); }
+                });
+            });
+            tbody.querySelectorAll('.reject-sub-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    if (!confirm('Reject this subscription?')) return;
+                    try {
+                        const res = await fetch(`${this.apiBase}/admin/subscriptions/${id}/reject`, {
+                            method: 'PUT', headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ reason: '' })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            this.showToast('Subscription rejected', 'success');
+                            this.loadSubscriptionRequests('pending');
+                        } else { this.showToast(data.message || 'Failed to reject', 'error'); }
+                    } catch (e) { this.showToast('Error rejecting subscription', 'error'); }
+                });
+            });
+            tbody.querySelectorAll('.view-proof-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('sub-proof-img').src = btn.dataset.url;
+                    new bootstrap.Modal(document.getElementById('subscription-proof-modal')).show();
+                });
+            });
+        } catch (e) { console.error('Load subscriptions error:', e); }
+    }
+
+    async handleSubscriptionAction(id, action, data = {}) {
+        const method = action === 'delete' ? 'DELETE' : 'PUT';
+        const body = action === 'toggle' ? JSON.stringify(data) : undefined;
+        try {
+            const res = await fetch(`${this.apiBase}/admin/payment-accounts/${id}`, {
+                method, headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+                body
+            });
+            const json = await res.json().catch(() => ({}));
+            if (res.ok) {
+                this.showToast(json.message || 'Updated', 'success');
+                this.loadPaymentAccounts();
+            } else { this.showToast(json.message || 'Failed', 'error'); }
+        } catch (e) { this.showToast('Error', 'error'); }
+    }
+
+    async loadPaymentAccounts() {
+        try {
+            const res = await fetch(`${this.apiBase}/admin/payment-accounts`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const list = document.getElementById('payment-accounts-list');
+            if (!list) return;
+            list.innerHTML = data.accounts.map(acc => `
+                <div class="d-flex align-items-center justify-content-between p-2 border-bottom">
+                    <div>
+                        <strong>${this.escapeHtml(acc.name)}</strong><br>
+                        <small class="text-muted">${acc.type === 'gcash' ? 'GCash' : 'Bank'} — ${acc.account_number}</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary toggle-pay-btn" data-id="${acc.id}" data-active="${acc.is_active}">${acc.is_active ? 'Deactivate' : 'Activate'}</button>
+                        <button class="btn btn-sm btn-outline-danger delete-pay-btn" data-id="${acc.id}"><i class="bi bi-trash"></i></button>
+                    </div>
+                </div>
+            `).join('');
+            list.querySelectorAll('.toggle-pay-btn').forEach(btn => {
+                btn.addEventListener('click', () => this.handleSubscriptionAction(btn.dataset.id, 'toggle', { is_active: btn.dataset.active !== 'true' }));
+            });
+            list.querySelectorAll('.delete-pay-btn').forEach(btn => {
+                btn.addEventListener('click', () => { if (confirm('Delete this payment account?')) this.handleSubscriptionAction(btn.dataset.id, 'delete'); });
+            });
+        } catch (e) { console.error('Load payment accounts error:', e); }
+    }
+
+    async addPaymentAccount() {
+        const name = document.getElementById('new-pay-name')?.value?.trim();
+        const number = document.getElementById('new-pay-number')?.value?.trim();
+        const type = document.getElementById('new-pay-type')?.value;
+        const order = document.getElementById('new-pay-order')?.value || '0';
+        if (!name || !number) { this.showToast('Name and number are required', 'error'); return; }
+        try {
+            const res = await fetch(`${this.apiBase}/admin/payment-accounts`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, account_number: number, type, sort_order: Number(order) })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.showToast('Payment account added', 'success');
+                this.loadPaymentAccounts();
+                document.getElementById('new-pay-name').value = '';
+                document.getElementById('new-pay-number').value = '';
+            } else { this.showToast(data.message || 'Failed to add', 'error'); }
+        } catch (e) { this.showToast('Error adding payment account', 'error'); }
+    }
+
+    async loadSubscriptionSettings() {
+        try {
+            const res = await fetch(`${this.apiBase}/subscriptions/settings`);
+            if (!res.ok) return;
+            const data = await res.json();
+            const monthlyEl = document.getElementById('setting-premium-monthly-price');
+            const d3El = document.getElementById('setting-discount-3m');
+            const d6El = document.getElementById('setting-discount-6m');
+            if (monthlyEl) monthlyEl.value = data.monthly_price;
+            if (d3El) d3El.value = data.durations[3]?.discount_pct || 10;
+            if (d6El) d6El.value = data.durations[6]?.discount_pct || 20;
+        } catch (e) { console.error('Load subscription settings error:', e); }
+    }
+
+    async saveSubscriptionSettings() {
+        const updates = [
+            { key: 'premium_monthly_price', value: document.getElementById('setting-premium-monthly-price')?.value },
+            { key: 'premium_3month_discount_pct', value: document.getElementById('setting-discount-3m')?.value },
+            { key: 'premium_6month_discount_pct', value: document.getElementById('setting-discount-6m')?.value }
+        ];
+        try {
+            const res = await fetch(`${this.apiBase}/superadmin/settings`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ updates })
+            });
+            const data = await res.json();
+            if (res.ok) { this.showToast('Pricing saved', 'success'); }
+            else { this.showToast(data.message || 'Failed to save', 'error'); }
+        } catch (e) { this.showToast('Error saving pricing', 'error'); }
+    }
+
 }
 
 // Initialize admin dashboard when DOM is loaded
 let adminDashboard;
 document.addEventListener('DOMContentLoaded', () => {
     adminDashboard = new AdminDashboard();
+
+    // Verification request search (event delegation)
+    document.addEventListener('click', (e) => {
+        if (e.target.matches('#verification-requests-search-btn') || e.target.closest('#verification-requests-search-btn')) {
+            adminDashboard.loadVerificationRequests(1, adminDashboard.verificationCurrentStatus || 'all');
+        }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.target.matches('#verification-requests-search-input') && e.key === 'Enter') {
+            adminDashboard.loadVerificationRequests(1, adminDashboard.verificationCurrentStatus || 'all');
+        }
+    });
+
+    // Verification request refresh (event delegation)
+    document.addEventListener('click', (e) => {
+        if (e.target.matches('#verification-requests-refresh-btn') || e.target.closest('#verification-requests-refresh-btn')) {
+            adminDashboard.loadVerificationRequests(1, adminDashboard.verificationCurrentStatus || 'all');
+        }
+    });
+
+    // Subscription request tabs (event delegation)
+    document.addEventListener('click', (e) => {
+        if (e.target.matches('.subscription-tabs .tab-btn')) {
+            document.querySelectorAll('.subscription-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            adminDashboard.loadSubscriptionRequests(e.target.dataset.status);
+        }
+    });
+
+    // Payment accounts buttons
+    document.addEventListener('click', (e) => {
+        if (e.target.matches('#btn-add-payment-account') || e.target.closest('#btn-add-payment-account')) {
+            adminDashboard.addPaymentAccount();
+        }
+    });
+
+    // Save pricing settings
+    document.addEventListener('click', (e) => {
+        if (e.target.matches('#btn-save-subscription-settings') || e.target.closest('#btn-save-subscription-settings')) {
+            adminDashboard.saveSubscriptionSettings();
+        }
+    });
 });
 
 // Global functions for onclick handlers (kept for backward compatibility)
-function openReviewModal(requestId, action) {
+async function openReviewModal(requestId, action) {
     if (adminDashboard) {
-        adminDashboard.openReviewModal(requestId, action);
+        await adminDashboard.openReviewModal(requestId, action);
     }
 }
 
