@@ -402,6 +402,50 @@
     width: 100%;
     box-sizing: border-box;
 }
+
+/* Subscription Section Styles — matches existing verification-tabs pattern */
+.subscription-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.subscription-tabs .tab-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--ac-border, #e2e8e4);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--ac-text-muted, #6b7e72);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.subscription-tabs .tab-btn:hover {
+    background: var(--ac-bg, #f5f7f5);
+    color: var(--ac-text, #1a2e1e);
+}
+.subscription-tabs .tab-btn.active {
+    background: var(--ac-primary, #2d7a3a);
+    color: #fff;
+    border-color: var(--ac-primary, #2d7a3a);
+}
+.plan-option {
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+.plan-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+#subscription-modal .modal-body { padding: 1.5rem; }
+#sub-amount-total { font-size: 1.25rem; }
+
+/* Mobile: scroll tabs horizontally */
+@media (max-width: 768px) {
+    .subscription-tabs { overflow-x: auto; white-space: nowrap; }
+    .subscription-tabs .tab-btn { flex: 0 0 auto; }
+}
 </style>
 
 <body>
@@ -485,14 +529,18 @@
                     <div class="profile-avatar-ring">
                         <span class="profile-initial" id="header-profile-initial">F</span>
                     </div>
-                    <span class="d-none d-md-block dropdown-toggle ps-2 fw-semibold" id="user-name">Farmer</span>
+                    <span class="d-none d-md-block dropdown-toggle ps-2 fw-semibold" id="user-name" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Farmer</span>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
                     <li class="dropdown-header">
-                        <h6 class="mb-0 fw-semibold" id="user-name-dd"></h6>
-                        <span id="user-email" class="small text-muted"></span>
-                        <div class="mt-1">
-                            <span id="header-role-badge" class="badge bg-primary" style="display:none"></span>
+                        <div class="d-flex align-items-center justify-content-center gap-1">
+                            <h6 class="mb-0 fw-semibold" id="user-name-dd" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></h6>
+                            <i id="header-verified-icon" class="bi bi-check-circle-fill text-primary" style="display:none;font-size:0.9rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Verified"></i>
+                            <i id="header-premium-icon" class="bi bi-gem text-warning" style="display:none;font-size:0.9rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Premium Partner"></i>
+                        </div>
+                        <span id="user-email" class="small text-muted" style="display:block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+                        <div class="mt-1 d-flex align-items-center justify-content-center">
+                            <span id="header-role-badge" class="badge bg-primary" style="display:none;font-size:0.65rem;padding:0.2rem 0.4rem;"></span>
                         </div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
@@ -521,6 +569,12 @@
                         <a class="dropdown-item d-flex align-items-center" href="#"
                            onclick="farmerDashboard&&farmerDashboard.showSection('profile','password');return false;">
                             <i class="bi bi-shield-lock"></i><span>Change Password</span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center" href="#" id="dropdown-support-tickets">
+                            <i class="bi bi-ticket-perforated"></i><span>Support Tickets</span>
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
@@ -577,6 +631,12 @@
             </a>
         </li>
         <li class="nav-heading">Account</li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#subscription" data-section="subscription">
+                <i class="bi bi-star-fill"></i><span>Subscription</span>
+                <span id="subscription-status-badge" class="badge bg-danger ms-auto" style="display:none;">Pending</span>
+            </a>
+        </li>
         <li class="nav-item">
             <a class="nav-link collapsed sidebar-link" href="#shop" data-section="shop">
                 <i class="bi bi-shop"></i><span>Shop Profile</span>
@@ -788,7 +848,6 @@
                             <thead>
                                 <tr>
                                     <th scope="col" class="text-center">Image</th>
-                                    <th scope="col" class="text-center">#</th>
                                     <th scope="col">Customer</th>
                                     <th scope="col">Product</th>
                                     <th scope="col" class="text-center">Price</th>
@@ -798,7 +857,7 @@
                                 </tr>
                             </thead>
                             <tbody id="recent-orders-tbody">
-                                <tr><td colspan="8" class="text-center text-muted">
+                                <tr><td colspan="7" class="text-center text-muted">
                                     <span class="spinner-border spinner-border-sm"></span>
                                 </td></tr>
                             </tbody>
@@ -851,7 +910,6 @@
                             <thead>
                                 <tr>
                                     <th scope="col" class="text-center">Image</th>
-                                    <th scope="col" class="text-center">#</th>
                                     <th scope="col">Product</th>
                                     <th scope="col" class="text-center">Price</th>
                                     <th scope="col" class="text-center">Sold</th>
@@ -859,7 +917,7 @@
                                 </tr>
                             </thead>
                             <tbody id="top-products-tbody">
-                                <tr><td colspan="6" class="text-center text-muted">
+                                <tr><td colspan="5" class="text-center text-muted">
                                     <span class="spinner-border spinner-border-sm"></span>
                                 </td></tr>
                             </tbody>
@@ -1440,6 +1498,9 @@
                             <li class="nav-item">
                                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#profile-change-password">Change Password</button>
                             </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#profile-verification">Verification</button>
+                            </li>
                         </ul>
                         <div class="tab-content pt-2">
                             <!-- Overview Tab -->
@@ -1553,7 +1614,7 @@
         </div>
 
         <!-- Verification Subsection -->
-        <div id="profile-verification" class="profile-subsection" style="display:none;">
+        <div id="profile-verification" class="tab-pane fade profile-verification">
             <div class="card">
                 <div class="card-header">
                     <h4>Account Verification</h4>
@@ -1683,6 +1744,49 @@
                         <h5>Request History</h5>
                         <div id="verification-history-timeline"></div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SUBSCRIPTION SECTION -->
+    <section id="subscription" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-star-fill"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Subscription</h4>
+                <p class="ac-section-hero__sub">Manage your premium plan, billing, and benefits.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div id="subscription-free-panel">
+                    <p class="text-muted">You are on the <strong>Free</strong> tier.</p>
+                    <ul class="list-unstyled small text-muted">
+                        <li><i class="bi bi-check text-success"></i> Up to 10 product listings</li>
+                        <li><i class="bi bi-check text-success"></i> Basic sales analytics</li>
+                        <li><i class="bi bi-x text-danger"></i> Unlimited products</li>
+                        <li><i class="bi bi-x text-danger"></i> Featured/priority badge</li>
+                    </ul>
+                    <button class="btn ac-btn-primary btn-sm" id="btn-upgrade-premium">
+                        <i class="bi bi-star-fill me-1"></i> Go Premium
+                    </button>
+                </div>
+                <div id="subscription-active-panel" style="display:none;">
+                    <div class="alert alert-success"><i class="bi bi-gem"></i> <strong>Premium Partner</strong></div>
+                    <p>Expires: <strong id="subscription-expiry-date">—</strong></p>
+                    <div id="subscription-expiry-warning" style="display:none;"></div>
+                    <button class="btn ac-btn-primary btn-sm" id="btn-extend-subscription">
+                        <i class="bi bi-plus-circle me-1"></i> Extend Subscription
+                    </button>
+                </div>
+                <div id="subscription-pending-panel" style="display:none;">
+                    <div class="alert alert-info"><i class="bi bi-hourglass"></i> Payment under review.</div>
+                </div>
+                <div id="subscription-expired-panel" style="display:none;">
+                    <div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Premium expired. Renew to restore features.</div>
+                    <button class="btn ac-btn-primary btn-sm" id="btn-renew-premium"><i class="bi bi-star-fill me-1"></i> Renew Premium</button>
                 </div>
             </div>
         </div>
@@ -2123,6 +2227,171 @@
         </div>
         <div class="modal-footer">
             <button type="button" id="rejection-reason-close-btn" class="btn btn-sm btn-primary">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Support Tickets List Modal -->
+<div class="modal fade" id="support-tickets-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Support Tickets</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex gap-2">
+                        <select class="form-select form-select-sm" id="support-tickets-entries" style="width: auto;">
+                            <option value="10">10 per page</option>
+                            <option value="25">25 per page</option>
+                            <option value="50">50 per page</option>
+                        </select>
+                    </div>
+                    <button class="btn ac-btn-primary btn-sm" id="btn-create-support-ticket">
+                        <i class="bi bi-plus-lg me-1"></i>Create New Ticket
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table" id="support-tickets-table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Date</th>
+                                <th>Last Message</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div id="support-tickets-pagination" class="d-flex justify-content-center mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Support Ticket Modal -->
+<div class="modal fade" id="create-support-ticket-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Support Ticket</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="create-support-ticket-form">
+                    <div class="mb-3">
+                        <label class="form-label">Subject <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="support-ticket-subject" maxlength="200" required>
+                        <small class="text-muted" id="subject-char-count">0/200 characters</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="support-ticket-description" rows="4" maxlength="500" required></textarea>
+                        <small class="text-muted" id="description-char-count">0/500 characters</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <select class="form-select" id="support-ticket-priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn ac-btn-primary" id="btn-submit-support-ticket">Submit Ticket</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ticket Detail & Chat Modal -->
+<div class="modal fade" id="ticket-detail-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Support Ticket</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 id="ticket-detail-subject"></h6>
+                        <div class="d-flex gap-2 mb-2">
+                            <span class="badge" id="ticket-detail-status"></span>
+                            <span class="badge" id="ticket-detail-priority"></span>
+                        </div>
+                        <small class="text-muted">Created: <span id="ticket-detail-created"></span></small>
+                    </div>
+                </div>
+                <div id="ticket-messages-container" style="max-height: 400px; overflow-y: auto;" class="mb-3 p-3 bg-light rounded">
+                    <!-- Messages will be loaded here -->
+                </div>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="ticket-message-input" maxlength="500" placeholder="Type your message...">
+                    <button class="btn ac-btn-primary" id="btn-send-ticket-message">Send</button>
+                </div>
+                <small class="text-muted" id="ticket-message-char-count">0/500 characters</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: SUBSCRIPTION UPGRADE / EXTEND -->
+<div class="modal fade" id="subscription-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="subscription-modal-title">Go Premium</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="subscription-current-info" class="alert alert-light border mb-3" style="display:none;">
+                    <p class="mb-1"><strong>Current expiry:</strong> <span id="sub-current-expiry">—</span></p>
+                    <p class="mb-0"><strong>New expiry:</strong> <span id="sub-new-expiry">—</span></p>
+                </div>
+                <p class="text-muted small">Select plan duration:</p>
+                <div class="row g-3 mb-4" id="subscription-plan-options"></div>
+                <div class="mb-3">
+                    <label class="form-label">Select Payment Account</label>
+                    <select class="form-select" id="sub-payment-account">
+                        <option value="">Loading accounts...</option>
+                    </select>
+                    <div id="sub-payment-details" class="mt-2 p-2 border rounded" style="display:none; background:var(--ac-bg,#f5f7f5);">
+                        <p class="mb-1 small"><strong>Name:</strong> <span id="sub-pay-name">—</span></p>
+                        <p class="mb-1 small"><strong>Number:</strong> <span id="sub-pay-number">—</span></p>
+                        <p class="mb-0 small"><strong>Type:</strong> <span id="sub-pay-type">—</span></p>
+                    </div>
+                </div>
+                <div class="card mb-3" style="background:var(--ac-bg,#f5f7f5); border-color:var(--ac-border,#e2e8e0);">
+                    <div class="card-body">
+                        <h6><i class="bi bi-cash-stack"></i> Amount to Send</h6>
+                        <p class="mb-0"><strong id="sub-amount-total" style="color:var(--ac-primary,#2d7a3a); font-size:1.25rem;">—</strong></p>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Upload receipt screenshot</label>
+                    <input type="file" class="form-control" id="sub-payment-proof" accept="image/*" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn ac-btn-primary" id="btn-submit-subscription">
+                    <i class="bi bi-send me-1"></i>Submit Request
+                </button>
+            </div>
         </div>
     </div>
 </div>
