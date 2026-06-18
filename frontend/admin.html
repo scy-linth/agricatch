@@ -250,6 +250,20 @@
                 <span id="category-requests-badge" class="sidebar-badge" style="display:none">0</span>
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#subscription-requests" data-section="subscription-requests">
+                <i class="bi bi-star-fill"></i>
+                <span>Subscription Requests</span>
+                <span id="subscription-requests-badge" class="sidebar-badge" style="display:none">0</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#support-tickets" data-section="support-tickets">
+                <i class="bi bi-life-preserver"></i>
+                <span>Support Tickets</span>
+                <span id="support-tickets-badge" class="sidebar-badge" style="display:none">0</span>
+            </a>
+        </li>
 
         <!-- ── People (collapsible submenu) ─────────────────── -->
         <li class="nav-heading">People</li>
@@ -610,7 +624,7 @@
                         </ul>
                     </div>
                     <div class="card-body">
-                        <h5 class="card-title">Recent Sales <span id="recent-sales-period-label">| Today</span></h5>
+                        <h5 class="card-title">Recent Orders <span id="recent-sales-period-label">| Today</span></h5>
                         <div class="d-flex align-items-center gap-2 mb-2">
                             <label class="small fw-semibold text-muted">Show</label>
                             <select class="form-select form-select-sm" style="width:auto" data-entries-section="recent-sales">
@@ -625,7 +639,6 @@
                             <thead>
                                 <tr>
                                     <th scope="col" class="text-center">IMAGE</th>
-                                    <th scope="col">#</th>
                                     <th scope="col">Customer</th>
                                     <th scope="col">Product</th>
                                     <th scope="col">Price</th>
@@ -635,7 +648,7 @@
                                 </tr>
                             </thead>
                             <tbody id="recent-sales-tbody">
-                                <tr><td colspan="8" class="text-center text-muted">
+                                <tr><td colspan="7" class="text-center text-muted">
                                     <span class="spinner-border spinner-border-sm"></span>
                                 </td></tr>
                             </tbody>
@@ -1841,6 +1854,68 @@
 
         </div>
 
+        <!-- Payment Accounts & Pricing Settings (superadmin only) -->
+        <div data-roles="super_admin">
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-credit-card"></i> Payment Accounts</h5>
+                    <p class="text-muted small">Farmers will see all active accounts when subscribing. Add multiple GCash or bank accounts.</p>
+                    <div id="payment-accounts-list" class="mb-3"></div>
+                    <div class="border rounded p-3" style="background:var(--ac-bg,#f5f7f5); border-color:var(--ac-border,#e2e8e0);">
+                        <h6 class="mb-3">Add New Account</h6>
+                        <div class="row g-2">
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted">Account Name</label>
+                                <input type="text" class="form-control" id="new-pay-name" placeholder="e.g. AgriCatch GCash 2">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted">Number</label>
+                                <input type="text" class="form-control" id="new-pay-number" placeholder="0917...">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-muted">Type</label>
+                                <select class="form-select" id="new-pay-type">
+                                    <option value="gcash">GCash</option>
+                                    <option value="bank_transfer">Bank</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-muted">Order</label>
+                                <input type="number" class="form-control" id="new-pay-order" placeholder="0" value="0">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button class="btn ac-btn-primary w-100" id="btn-add-payment-account"><i class="bi bi-plus-lg me-1"></i>Add</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pricing Settings -->
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-gear"></i> Subscription Pricing</h5>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted">Monthly Price (₱)</label>
+                            <input type="number" class="form-control" id="setting-premium-monthly-price" value="299">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted">3-Month Discount (%)</label>
+                            <input type="number" class="form-control" id="setting-discount-3m" value="10">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted">6-Month Discount (%)</label>
+                            <input type="number" class="form-control" id="setting-discount-6m" value="20">
+                        </div>
+                    </div>
+                    <button class="btn ac-btn-primary btn-sm mt-3" id="btn-save-subscription-settings">
+                        <i class="bi bi-check-lg me-1"></i>Save Pricing
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </section><!-- /platform-settings -->
 
 
@@ -2373,7 +2448,15 @@
             <div class="card-body">
                 <!-- Stats Dashboard -->
                 <div class="row mb-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <div class="card bg-warning text-white">
+                            <div class="card-body">
+                                <h5>Pending</h5>
+                                <h3 id="verification-pending-count">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
                         <div class="card bg-success text-white">
                             <div class="card-body">
                                 <h5>Approved</h5>
@@ -2381,7 +2464,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="card bg-danger text-white">
                             <div class="card-body">
                                 <h5>Rejected</h5>
@@ -2389,17 +2472,41 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="card bg-secondary text-white">
                             <div class="card-body">
-                                <h5>Pending</h5>
-                                <h3 id="verification-pending-count">0</h3>
+                                <h5>Unverified</h5>
+                                <h3 id="verification-unverified-count">0</h3>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Filter Bar -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="verification-requests" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="verification-requests-search-input" class="form-control"
+                                       placeholder="Farmer or shop name…">
+                                <button id="verification-requests-search-btn" class="btn btn-primary" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                            </div>
+                            <button id="verification-requests-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Tabs -->
                 <div class="verification-tabs mb-3">
                     <button class="tab-btn active" data-status="all">All</button>
                     <button class="tab-btn" data-status="pending">Pending</button>
@@ -2410,7 +2517,7 @@
 
                 <!-- Requests Table -->
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table id="verification-requests-table" class="table table-hover ac-table table-sm align-middle">
                         <thead>
                             <tr>
                                 <th>Farmer</th>
@@ -2423,7 +2530,7 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="verification-requests-table">
+                        <tbody id="verification-requests-tbody">
                             <!-- Dynamic content -->
                         </tbody>
                     </table>
@@ -2436,7 +2543,88 @@
     </section><!-- /verification-requests -->
 
     <!-- ════════════════════════════════════════════════════════════════
-         § 12 — PROFILE SECTION
+         § 13 — SUBSCRIPTION REQUESTS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="subscription-requests" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-star-fill"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Subscription Requests</h4>
+                <p class="ac-section-hero__sub">Review, approve, and manage farmer premium subscriptions.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <!-- Reuse existing .verification-tabs class from agricatch-admin.css -->
+                <div class="verification-tabs subscription-tabs mb-3">
+                    <button class="tab-btn active" data-status="pending">Pending</button>
+                    <button class="tab-btn" data-status="active">Active</button>
+                    <button class="tab-btn" data-status="expired">Expired</button>
+                    <button class="tab-btn" data-status="rejected">Rejected</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table" id="subscriptions-table">
+                        <thead><tr><th>Farmer</th><th>Plan</th><th>Amount</th><th>Payment To</th><th>Date</th><th>Proof</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 14 — SUPPORT TICKETS SECTION
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="support-tickets" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-life-preserver"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Support Tickets</h4>
+                <p class="ac-section-hero__sub">Manage and respond to farmer support requests.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="verification-tabs support-tabs mb-3">
+                    <button class="tab-btn active" data-status="open">Open</button>
+                    <button class="tab-btn" data-status="in_progress">In Progress</button>
+                    <button class="tab-btn" data-status="resolved">Resolved</button>
+                    <button class="tab-btn" data-status="closed">Closed</button>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex gap-2">
+                        <select class="form-select form-select-sm" id="support-tickets-entries" style="width: auto;">
+                            <option value="10">10 per page</option>
+                            <option value="25">25 per page</option>
+                            <option value="50">50 per page</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table" id="admin-support-tickets-table">
+                        <thead>
+                            <tr>
+                                <th>Farmer</th>
+                                <th>Subject</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Date</th>
+                                <th>Last Message</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div id="admin-support-tickets-pagination" class="d-flex justify-content-center mt-3"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 15 — PROFILE SECTION
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="profile" class="admin-section-card">
 
@@ -2597,11 +2785,6 @@
                     <h5>Uploaded Document</h5>
                     <img id="review-document-img" style="max-width:100%; max-height:300px; border-radius:8px;" />
                 </div>
-                <div class="mt-3">
-                    <button class="btn btn-info" id="view-chat-btn">
-                        <i class="bi bi-chat"></i> View Chat
-                    </button>
-                </div>
                 <div id="rejection-reason-section" class="mt-3" style="display:none;">
                     <label class="form-label">Rejection Reason (required):</label>
                     <textarea class="form-control" id="rejection-reason-input" rows="3"></textarea>
@@ -2650,8 +2833,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-ac-red me-auto" id="reject-from-details-btn" style="display:none;">Reject</button>
-                <button class="btn btn-ac-red" id="unverify-from-details-btn" style="display:none;">Unverify</button>
+                <button class="btn btn-ac-red me-auto" id="unverify-from-details-btn" style="display:none;">Unverify</button>
+                <button class="btn btn-ac-red" id="reject-from-details-btn" style="display:none;">Reject</button>
                 <button class="btn btn-ac-green" id="approve-from-details-btn" style="display:none;">Approve</button>
             </div>
         </div>
@@ -2667,7 +2850,7 @@
                 </button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to unverify this farmer? This will change their status back to pending.</p>
+                <p>Are you sure you want to unverify this farmer? This will remove their verified status and they will need to submit a new verification request.</p>
                 <div class="mb-3">
                     <label for="unverify-reason" class="form-label small fw-semibold">Reason <span class="text-danger">*</span></label>
                     <textarea id="unverify-reason" class="form-control" rows="3" placeholder="Please explain why this farmer is being unverified..." required></textarea>
@@ -3201,6 +3384,23 @@
     </div>
 </div>
 
+<!-- Subscription Proof Modal -->
+<div class="modal fade" id="subscription-proof-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Proof</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="sub-proof-img" src="" alt="Payment Proof" style="max-width:100%;max-height:70vh;object-fit:contain;">
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ── Rejection Reason Modal ─────────────────────────────────────────── -->
 <div id="reject-product-modal" class="admin-modal-backdrop">
     <div class="admin-modal modal-sm">
@@ -3521,6 +3721,50 @@
                 <button type="submit" class="btn btn-primary" id="sa-user-modal-save">Create User</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Admin Ticket Detail & Chat Modal -->
+<div class="modal fade" id="admin-ticket-detail-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Support Ticket</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 id="admin-ticket-detail-subject"></h6>
+                        <div class="d-flex gap-2 mb-2">
+                            <span class="badge" id="admin-ticket-detail-status"></span>
+                            <span class="badge" id="admin-ticket-detail-priority"></span>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center">
+                            <small class="text-muted">Created: <span id="admin-ticket-detail-created"></span></small>
+                            <div class="ms-auto">
+                                <select class="form-select form-select-sm" id="admin-ticket-status-select" style="width: auto;">
+                                    <option value="open">Open</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="resolved">Resolved</option>
+                                    <option value="closed">Closed</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="admin-ticket-messages-container" style="max-height: 400px; overflow-y: auto;" class="mb-3 p-3 bg-light rounded">
+                    <!-- Messages will be loaded here -->
+                </div>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="admin-ticket-message-input" maxlength="500" placeholder="Type your message...">
+                    <button class="btn ac-btn-primary" id="btn-admin-send-ticket-message">Send</button>
+                </div>
+                <small class="text-muted" id="admin-ticket-message-char-count">0/500 characters</small>
+            </div>
+        </div>
     </div>
 </div>
 
