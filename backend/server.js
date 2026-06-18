@@ -24,6 +24,7 @@ const PORT = process.env.PORT || 3000;
 
 // Health route for uptime pings
 const healthRouter = require('./routes/health');
+const supportTicketsRouter = require('./routes/support-tickets');
 app.use('/_health', healthRouter);
 // Local ingest logger helper (disabled in production by default)
 const _INGEST_URL = 'http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c';
@@ -885,6 +886,20 @@ try {
 }
 
 try {
+  app.use('/api/subscriptions', require('./routes/subscriptions'));
+  console.log('âœ… Subscriptions route loaded successfully');
+} catch (error) {
+  console.error('âŒ Subscriptions route failed to load:', error.message);
+}
+
+try {
+  app.use('/api/admin', require('./routes/payment-accounts'));
+  console.log('âœ… Payment accounts route loaded successfully');
+} catch (error) {
+  console.error('âŒ Payment accounts route failed to load:', error.message);
+}
+
+try {
   app.use('/api/settings', require('./routes/settings'));
   console.log('âœ… Settings route loaded successfully');
 } catch (error) {
@@ -929,6 +944,13 @@ try {
   // #region agent log
   sendIngest({location:'server.js:58',message:'Farmers route failed to load',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion
+}
+
+try {
+  app.use('/api/support-tickets', supportTicketsRouter);
+  console.log('✓ Support tickets route loaded successfully');
+} catch (error) {
+  console.error('❌ Support tickets route failed to load:', error);
 }
 
 // Test database connection route
