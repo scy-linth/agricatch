@@ -74,6 +74,8 @@ if (status === 'unverified' && !rejection_reason) {
 }
 ```
 
+Note: The unverify action in frontend already sets status to 'unverified' (line 7405 in admin.js).
+
 - [ ] **Step 2: Update state transition validation**
 
 Find the status check around line 1054 and update:
@@ -157,16 +159,16 @@ git commit -m "feat: allow new verification requests regardless of status"
 **Files:**
 - Modify: `frontend/js/admin.js:7172-7176`
 
-- [ ] **Step 1: Add unverified badge color**
+- [x] **Step 1: Add unverified badge with icon+text**
 
-Update the statusBadge object:
+Update the statusBadge object (already completed with icon+text format):
 
 ```javascript
 const statusBadge = {
-    'pending': '<span class="badge bg-warning">Pending</span>',
-    'approved': '<span class="badge bg-success">Approved</span>',
-    'rejected': '<span class="badge bg-danger">Rejected</span>',
-    'unverified': '<span class="badge bg-secondary">Unverified</span>'
+    'pending': '<i class="bi bi-hourglass text-warning me-1"></i><span class="badge bg-warning">Pending</span>',
+    'approved': '<i class="bi bi-check-circle-fill text-primary me-1"></i><span class="badge bg-success">Approved</span>',
+    'rejected': '<i class="bi bi-x-circle-fill text-danger me-1"></i><span class="badge bg-danger">Rejected</span>',
+    'unverified': '<i class="bi bi-x-circle-fill text-danger me-1"></i><span class="badge bg-secondary">Unverified</span>'
 }[request.status] || request.status;
 ```
 
@@ -174,7 +176,7 @@ const statusBadge = {
 
 ```bash
 git add frontend/js/admin.js
-git commit -m "feat: add unverified status badge (gray)"
+git commit -m "feat: add unverified status badge with icon+text (gray)"
 ```
 
 ---
@@ -210,9 +212,9 @@ This is already correct - no changes needed for this step.
 **Files:**
 - Modify: `frontend/admin.html:2404-2409`
 
-- [ ] **Step 1: Add unverified button to filter tabs**
+- [x] **Step 1: Add unverified button to filter tabs**
 
-Find the verification-tabs section and add the unverified button:
+Find the verification-tabs section and add the unverified button (already completed):
 
 ```html
 <!-- Filter Bar -->
@@ -308,7 +310,7 @@ npm start
 
 - [ ] **Step 2: Open admin panel in browser**
 
-Navigate to admin panel and login as admin/staff.
+Navigate to admin panel and login as admin/admin.
 
 - [ ] **Step 3: Navigate to Verification Requests section**
 

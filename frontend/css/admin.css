@@ -341,7 +341,7 @@ body.admin-theme {
 .badge-low-stock,
 .badge-out-stock,
 .badge-role-super_admin,
-.badge-role-staff,
+.badge-role-admin,
 .badge-role-farmer,
 .badge-role-customer {
   display: inline-flex;
@@ -362,7 +362,7 @@ body.admin-theme {
 .badge-unverified,
 .badge-low-stock { background: #fff7ed; color: #9a3412; }
 .badge-confirmed,
-.badge-role-staff { background: #e0f2fe; color: #075985; }
+.badge-role-admin { background: #e0f2fe; color: #075985; }
 .badge-preparing { background: #f5f3ff; color: #7c3aed; }
 .badge-ready,
 .badge-delivered { background: #f0faf2; color: #2d7a3a; }

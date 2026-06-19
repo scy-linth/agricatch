@@ -1,5 +1,5 @@
-# AgriCatch Staff Dashboard — NiceAdmin Migration Plan
-> Phase 1: Staff Dashboard (`admin.html`) Only  
+# AgriCatch Admin Dashboard — NiceAdmin Migration Plan
+> Phase 1: Admin Dashboard (`admin.html`) Only  
 > Date: May 25, 2026  
 > Status: IN PROGRESS
 
@@ -15,9 +15,9 @@
 
 ## 1. EXECUTIVE MIGRATION OVERVIEW
 
-Full UI rebuild of the AgriCatch Staff Dashboard using the NiceAdmin Bootstrap 5 design system. This is NOT a reskin — the entire HTML/CSS shell is replaced while keeping every line of `admin.js`, `admin-charts.js`, and all backend integrations completely untouched.
+Full UI rebuild of the AgriCatch Admin Dashboard using the NiceAdmin Bootstrap 5 design system. This is NOT a reskin — the entire HTML/CSS shell is replaced while keeping every line of `admin.js`, `admin-charts.js`, and all backend integrations completely untouched.
 
-After migration the staff dashboard must be functionally identical: every CRUD operation, fetch call, auth flow, role check, chart, toast, modal, panel, SSE event, and inline `onclick` must work exactly as before.
+After migration the Admin Dashboard must be functionally identical: every CRUD operation, fetch call, auth flow, role check, chart, toast, modal, panel, SSE event, and inline `onclick` must work exactly as before.
 
 ---
 
@@ -444,7 +444,7 @@ Structure:
 - [ ] No token → redirect `/?login=1`
 - [ ] Customer role → redirect `/`
 - [ ] Farmer role → redirect `/farmer.html?denied=admin`
-- [ ] Staff role → dashboard shows
+- [ ] Admin role → dashboard shows
 - [ ] `#user-name` / `#user-email` populate
 - [ ] Role recovery overlay works
 - [ ] Logout clears token and redirects

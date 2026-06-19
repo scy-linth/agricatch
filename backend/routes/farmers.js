@@ -33,6 +33,21 @@ const requireFarmer = async (req, res) => {
   return user;
 };
 
+async function getFarmerTier(userId) {
+  try {
+    const subRes = await pool.query(
+      `SELECT tier, status, expires_at FROM farmer_subscriptions
+       WHERE farmer_id = $1 AND status = 'active' ORDER BY expires_at DESC LIMIT 1`, [userId]
+    );
+    if (subRes.rows.length === 0 || new Date(subRes.rows[0].expires_at) < new Date()) return 'free';
+    return subRes.rows[0].tier;
+  } catch (err) {
+    // Table doesn't exist yet, default to free tier
+    if (err.code === '42P01') return 'free';
+    throw err;
+  }
+}
+
 const parseRangeDays = (range) => {
   if (range === null || range === undefined || range === '') return 30;
   const str = String(range).trim().toLowerCase();
@@ -199,12 +214,23 @@ router.get('/me/metrics', async (req, res) => {
     const user = await requireFarmer(req, res);
     if (!user) return;
 
+    const tier = await getFarmerTier(user.id);
+
     const from = parseIsoDateOnly(req.query.from);
     const to = parseIsoDateOnly(req.query.to);
     const hasCustom = !!(from && to);
 
-    const rangeDays = parseRangeDays(req.query.rangeDays || req.query.range || '30');
-    const isAllTime = !hasCustom && rangeDays === null;
+    let rangeDays = parseRangeDays(req.query.rangeDays || req.query.range || '30');
+    let isAllTime = !hasCustom && rangeDays === null;
+
+    // Free tier: max 30 days, no custom ranges, no all-time
+    if (tier !== 'premium') {
+      if (hasCustom || isAllTime) {
+        return res.status(403).json({ message: 'Custom date ranges and all-time analytics are a Premium feature. Upgrade to Premium for advanced analytics.' });
+      }
+      if (rangeDays > 30) rangeDays = 30;
+      isAllTime = false;
+    }
 
     if (hasCustom) {
       // Basic validation: from must be <= to, limit range to 366 days
@@ -538,6 +564,11 @@ router.get('/me/metrics/export.csv', async (req, res) => {
   try {
     const user = await requireFarmer(req, res);
     if (!user) return;
+
+    const tier = await getFarmerTier(user.id);
+    if (tier !== 'premium') {
+      return res.status(403).json({ message: 'CSV export is a Premium feature. Upgrade to Premium for advanced analytics.' });
+    }
 
     const from = parseIsoDateOnly(req.query.from);
     const to = parseIsoDateOnly(req.query.to);
@@ -897,7 +928,7 @@ router.post('/me/verification-request', async (req, res) => {
     // Notify all admins about new verification request
     try {
       const admins = await pool.query(
-        "SELECT id FROM users WHERE role IN ('staff', 'super_admin')"
+        "SELECT id FROM users WHERE role IN ('admin', 'super_admin')"
       );
       
       for (const admin of admins.rows) {
@@ -934,16 +965,15 @@ router.get('/me/verification-request', async (req, res) => {
       `SELECT id, status, notes, rejection_reason, created_at, reviewed_at
        FROM verification_requests
        WHERE farmer_id = $1
-       ORDER BY created_at DESC
-       LIMIT 1`,
+       ORDER BY created_at DESC`,
       [user.id]
     );
 
     if (result.rows.length === 0) {
-      return res.json({ request: null });
+      return res.json({ request: null, history: [] });
     }
 
-    res.json({ request: result.rows[0] });
+    res.json({ request: result.rows[0], history: result.rows });
   } catch (error) {
     console.error('Get verification request error:', error);
     res.status(500).json({ message: 'Server error fetching verification request' });

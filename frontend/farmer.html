@@ -29,11 +29,15 @@
 #customer-rating-modal .modal-header,
 #product-address-modal .modal-header {
   background: #fff !important;
-  color: var(--ac-text) !important;
+  color: #fff !important;
 }
 #customer-rating-modal .modal-header h3,
 #product-address-modal .modal-header h3 {
-  color: var(--ac-text) !important;
+  color: #fff !important;
+}
+/* Bootstrap modal titles should also be white */
+.modal-title {
+  color: #fff !important;
 }
 /* Sidebar account dropdown hover styles */
 #farmer-sidebar-account-btn:hover {
@@ -46,7 +50,7 @@
 .modal.open { display:flex; }
 .modal .modal-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:100%; max-width:620px; margin:auto; position:relative; overflow:hidden; display:flex; flex-direction:column; }
 .modal .modal-header { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); background:#fff; position:sticky; top:0; z-index:2; }
-.modal .modal-header h3 { margin:0; font-size:1.05rem; font-weight:700; color:var(--ac-text,#1a2e1e); }
+.modal .modal-header h3 { margin:0; font-size:1.05rem; font-weight:700; color:#fff; }
 .modal .close-btn { background:white; border:1px solid rgba(0,0,0,0.08); color:var(--ac-text-muted,#6b7e72); cursor:pointer; font-size:.9rem; padding:4px; border-radius:50%; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); transition:all .15s; }
 .modal .close-btn:hover { background:#f8f9fa; color:var(--ac-primary,#2d7a3a); }
 .product-details-modal { display:none; position:fixed; inset:0; z-index:1070; align-items:center; justify-content:center; }
@@ -446,9 +450,195 @@
     .subscription-tabs { overflow-x: auto; white-space: nowrap; }
     .subscription-tabs .tab-btn { flex: 0 0 auto; }
 }
+
+/* Support dropdown badge width fix */
+.support-dropdown-badge {
+    min-width: unset !important;
+    width: auto !important;
+    padding: 0.25rem 0.5rem !important;
+}
+
+/* Modern Notification Styling - Minimal Clean */
+.notifications-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.notification-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.notification-item:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+}
+
+.notification-item.unread {
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-left: 3px solid #10b981;
+}
+
+.notification-item.unread:hover {
+    background: #e8f5e9;
+    border-color: #c8e6c9;
+}
+
+.notification-item.read {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+    opacity: 0.9;
+}
+
+.notification-item.read:hover {
+    background: #e8f5e9;
+    border-color: #c8e6c9;
+    opacity: 1;
+}
+
+.notification-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: #f3f4f6;
+    font-size: 1rem;
+    color: #6b7280;
+}
+
+.notification-item.unread .notification-icon {
+    background: #ecfdf5;
+    color: #10b981;
+}
+
+.notification-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-title {
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: #111827;
+    margin-bottom: 0.25rem;
+    line-height: 1.4;
+}
+
+.notification-item.unread .notification-title {
+    color: #065f46;
+    font-weight: 600;
+}
+
+.notification-message {
+    font-size: 0.8rem;
+    color: #6b7280;
+    line-height: 1.4;
+    margin-bottom: 0.25rem;
+}
+
+.notification-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+.notification-item.unread .notification-meta {
+    color: #6b7280;
+}
+
+.notification-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+
+.notification-mark-read-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    font-size: 0.875rem;
+}
+
+.notification-mark-read-btn:hover {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.notification-item.unread .notification-mark-read-btn {
+    color: #10b981;
+}
+
+.notification-item.unread .notification-mark-read-btn:hover {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+/* Unread indicator */
+.notification-item.unread::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 1rem;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+}
+
+/* Dropdown notification items */
+.notification-item-dropdown {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+}
+
+.notification-item-dropdown:hover {
+    background: #f9fafb;
+}
+
+/* Fix dropdown overflow */
+.dropdown-menu.notifications {
+    overflow: hidden;
+}
+
+/* Notification highlight fade animation */
+.notification-item.highlighted {
+    transition: background 0.5s ease, border-color 0.5s ease, opacity 0.5s ease;
+}
+
+.notification-item.highlighted.fading {
+    opacity: 0;
+}
 </style>
 
 <body>
+
+<!-- Toast Stack -->
+<div id="admin-toast-stack" class="admin-toast-stack" aria-live="polite"></div>
 
 <!-- Loading Screen -->
 <div id="admin-loading-screen" class="loading-screen">
@@ -481,27 +671,6 @@
     <nav class="header-nav ms-auto">
         <ul class="d-flex align-items-center list-unstyled mb-0 gap-1">
 
-            <!-- Messages dropdown -->
-            <li class="nav-item dropdown">
-                <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" aria-expanded="false" id="farmer-float-chat-btn">
-                    <i class="bi bi-chat-left-text"></i>
-                    <span id="farmer-chat-unread" class="badge bg-success badge-number" style="display:none">0</span>
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow messages" style="min-width:360px;">
-                    <li class="dropdown-header d-flex align-items-center justify-content-between">
-                        <span>You have <span id="messages-count">0</span> new messages</span>
-                        <a href="#" id="view-all-messages-badge">
-                            <span class="badge rounded-pill bg-primary p-2 ms-2">View all</span>
-                        </a>
-                    </li>
-                    <li><hr class="dropdown-divider"></li>
-                    <div id="messages-list"><!-- populated by farmer.js --></div>
-                    <li><hr class="dropdown-divider"></li>
-                    <li class="dropdown-footer">
-                        <a href="#" id="show-all-messages-link">Show all messages</a>
-                    </li>
-                </ul>
-            </li><!-- End Messages Nav -->
 
             <!-- Notifications dropdown -->
             <li class="nav-item dropdown">
@@ -527,7 +696,7 @@
                 <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#"
                    data-bs-toggle="dropdown" aria-expanded="false">
                     <div class="profile-avatar-ring">
-                        <span class="profile-initial" id="header-profile-initial">F</span>
+                        <span class="profile-initial" id="header-profile-initial"></span>
                     </div>
                     <span class="d-none d-md-block dropdown-toggle ps-2 fw-semibold" id="user-name" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Farmer</span>
                 </a>
@@ -575,6 +744,7 @@
                     <li>
                         <a class="dropdown-item d-flex align-items-center" href="#" id="dropdown-support-tickets">
                             <i class="bi bi-ticket-perforated"></i><span>Support Tickets</span>
+                            <span id="support-tickets-dropdown-badge" class="badge bg-danger ms-auto support-dropdown-badge" style="display:none;">0</span>
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
@@ -611,12 +781,6 @@
                 <i class="bi bi-box-seam"></i><span>My Products</span>
             </a>
         </li>
-        <li class="nav-heading">Reputation</li>
-        <li class="nav-item">
-            <a class="nav-link collapsed sidebar-link" href="#reviews" data-section="reviews">
-                <i class="bi bi-star-half"></i><span>Reviews</span>
-            </a>
-        </li>
         <li class="nav-heading">Communication</li>
         <li class="nav-item">
             <a class="nav-link collapsed sidebar-link" href="#chat" data-section="chat">
@@ -631,6 +795,11 @@
             </a>
         </li>
         <li class="nav-heading">Account</li>
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#reviews" data-section="reviews">
+                <i class="bi bi-star-half"></i><span>Reviews</span>
+            </a>
+        </li>
         <li class="nav-item">
             <a class="nav-link collapsed sidebar-link" href="#subscription" data-section="subscription">
                 <i class="bi bi-star-fill"></i><span>Subscription</span>
@@ -657,7 +826,7 @@
         <h1 id="farmer-page-title" class="page-title">Farmer Dashboard</h1>
         <nav>
             <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item">Home</li>
                 <li class="breadcrumb-item active" id="breadcrumb-current">Farmer Dashboard</li>
             </ol>
         </nav>
@@ -675,7 +844,7 @@
 
         <div class="row g-3 mb-3">
             <!-- My Products KPI -->
-            <div class="col-xxl-3 col-md-6">
+            <div class="col-xxl-3 col-md-6" id="my-products-card">
                 <div class="card info-card sales-card">
                     <div class="card-body">
                         <h5 class="card-title">My Products</h5>
@@ -692,7 +861,7 @@
                 </div>
             </div>
             <!-- Total Orders KPI -->
-            <div class="col-xxl-3 col-md-6">
+            <div class="col-xxl-3 col-md-6" id="total-orders-card">
                 <div class="card info-card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
@@ -706,21 +875,21 @@
                         </ul>
                     </div>
                     <div class="card-body">
-                        <h5 class="card-title">Total Orders <span id="total-orders-period-label" class="small text-muted">| Today</span></h5>
+                        <h5 class="card-title">Total Orders <span id="total-orders-period-label" class="small text-muted">| This Month</span></h5>
                         <div class="d-flex align-items-center">
                             <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                                 <i class="bi bi-bag-check" style="color:#f59e0b"></i>
                             </div>
                             <div class="ps-3">
                                 <h6 id="total-orders">--</h6>
-                                <span class="text-success small pt-1 fw-bold" id="total-orders-change">+0%</span> <span id="total-orders-change-label" class="text-muted small">vs prev today</span>
+                                <span class="text-success small pt-1 fw-bold" id="total-orders-change">+0%</span> <span id="total-orders-change-label" class="text-muted small">vs prev month</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
             <!-- Items Sold KPI -->
-            <div class="col-xxl-3 col-md-6">
+            <div class="col-xxl-3 col-md-6" id="items-sold-card">
                 <div class="card info-card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
@@ -748,7 +917,7 @@
                 </div>
             </div>
             <!-- Total Revenue KPI -->
-            <div class="col-xxl-3 col-md-6">
+            <div class="col-xxl-3 col-md-6" id="total-revenue-card">
                 <div class="card info-card revenue-card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
@@ -780,38 +949,16 @@
         <div class="row g-3 mb-3">
             <div class="col-lg-8">
                 <div class="card h-100">
-                    <div class="filter">
-                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
-                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
-                            <li><a class="dropdown-item report-period-filter" href="#" data-period="today">Today</a></li>
-                            <li><a class="dropdown-item report-period-filter" href="#" data-period="week">This Week</a></li>
-                            <li><a class="dropdown-item report-period-filter" href="#" data-period="month">This Month</a></li>
-                            <li><a class="dropdown-item report-period-filter" href="#" data-period="year">This Year</a></li>
-                            <li><a class="dropdown-item report-period-filter" href="#" data-period="all">All Time</a></li>
-                        </ul>
-                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Reports <span id="reports-period-label">| Today</span></h5>
+                        <h5 class="card-title">Reports</h5>
                         <div id="reportsChart" style="min-height:350px;"></div>
                     </div>
                 </div>
             </div>
             <div class="col-lg-4">
                 <div class="card h-100">
-                    <div class="filter">
-                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
-                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
-                            <li><a class="dropdown-item status-period-filter" href="#" data-period="today">Today</a></li>
-                            <li><a class="dropdown-item status-period-filter" href="#" data-period="week">This Week</a></li>
-                            <li><a class="dropdown-item status-period-filter" href="#" data-period="month">This Month</a></li>
-                            <li><a class="dropdown-item status-period-filter" href="#" data-period="year">This Year</a></li>
-                            <li><a class="dropdown-item status-period-filter" href="#" data-period="all">All Time</a></li>
-                        </ul>
-                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Orders by Status <span id="status-period-label">| Today</span></h5>
+                        <h5 class="card-title">Order Status</h5>
                         <div id="statusChart" style="min-height:320px;"></div>
                         <div id="overview-status-breakdown" class="mt-2"></div>
                     </div>
@@ -820,7 +967,7 @@
         </div>
         <!-- Recent Orders + Announcements Row -->
         <div class="row g-3 mb-3">
-            <div class="col-lg-8">
+            <div class="col-lg-8" id="recent-orders-card">
                 <div class="card h-100">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
@@ -882,7 +1029,7 @@
         </div>
         <!-- Top Products Row -->
         <div class="row g-3">
-            <div class="col-12">
+            <div class="col-12" id="top-products-card">
                 <div class="card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
@@ -948,95 +1095,59 @@
         </div>
 
         <!-- KPI Summary Cards -->
-        <div class="row g-3 mb-3">
+        <div class="row mb-3">
             <div class="col">
-                <div class="card info-card sales-card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">Total Products</h5>
-                        <div class="d-flex align-items-center">
-                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
-                                <i class="bi bi-box-seam" style="color:var(--ac-primary,#2d7a3a)"></i>
+                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                    <div class="card-body py-2">
+                        <h6 class="text-muted mb-0 small">Total Products</h6>
+                        <h4 class="mb-0 fw-bold" style="color: #146c43;" id="kpi-total-products">--</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%); border-left: 4px solid #22c55e;">
+                    <div class="card-body py-2">
+                        <h6 class="text-muted mb-0 small">Active Products</h6>
+                        <h4 class="mb-0 fw-bold" style="color: #15803d;" id="kpi-active-products">--</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-0 small">Low Stock <span id="low-stock-threshold-label" class="small">| ≤15</span></h6>
+                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="kpi-low-stock">--</h4>
                             </div>
-                            <div class="ps-3">
-                                <h6 id="kpi-total-products">--</h6>
-                                <span class="text-success small pt-1 fw-bold">All listings</span>
+                            <div class="dropdown">
+                                <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+                                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                                    <li class="dropdown-header text-start"><h6>Low Stock Threshold</h6></li>
+                                    <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="3">3 items</a></li>
+                                    <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="5">5 items</a></li>
+                                    <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="10">10 items</a></li>
+                                    <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="15">15 items</a></li>
+                                    <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="20">20 items</a></li>
+                                </ul>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col">
-                <div class="card info-card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">Active Products</h5>
-                        <div class="d-flex align-items-center">
-                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
-                                <i class="bi bi-check-circle" style="color:#22c55e"></i>
-                            </div>
-                            <div class="ps-3">
-                                <h6 id="kpi-active-products">--</h6>
-                                <span class="text-success small pt-1 fw-bold">Currently for sale</span>
-                            </div>
-                        </div>
+                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fde8e8 0%, #f8d7da 100%); border-left: 4px solid #dc3545;">
+                    <div class="card-body py-2">
+                        <h6 class="text-muted mb-0 small">No Stock</h6>
+                        <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="kpi-no-stock">--</h4>
                     </div>
                 </div>
             </div>
             <div class="col">
-                <div class="card info-card h-100">
-                    <div class="filter">
-                        <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
-                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                            <li class="dropdown-header text-start"><h6>Low Stock Threshold</h6></li>
-                            <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="3">3 items</a></li>
-                            <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="5">5 items</a></li>
-                            <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="10">10 items</a></li>
-                            <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="15">15 items</a></li>
-                            <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="20">20 items</a></li>
-                        </ul>
-                    </div>
-                    <div class="card-body">
-                        <h5 class="card-title">Low Stock <span id="low-stock-threshold-label" class="small text-muted">| ≤15</span></h5>
-                        <div class="d-flex align-items-center">
-                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
-                                <i class="bi bi-exclamation-triangle" style="color:#f59e0b"></i>
-                            </div>
-                            <div class="ps-3">
-                                <h6 id="kpi-low-stock">--</h6>
-                                <span class="text-warning small pt-1 fw-bold">Below threshold</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col">
-                <div class="card info-card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">No Stock</h5>
-                        <div class="d-flex align-items-center">
-                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
-                                <i class="bi bi-x-circle" style="color:#dc2626"></i>
-                            </div>
-                            <div class="ps-3">
-                                <h6 id="kpi-no-stock">--</h6>
-                                <span class="text-danger small pt-1 fw-bold">Out of stock</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col">
-                <div class="card info-card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">Pending</h5>
-                        <div class="d-flex align-items-center">
-                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
-                                <i class="bi bi-clock" style="color:#6c757d"></i>
-                            </div>
-                            <div class="ps-3">
-                                <h6 id="kpi-pending-products">--</h6>
-                                <span class="text-muted small pt-1 fw-bold">Awaiting approval</span>
-                            </div>
-                        </div>
+                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 4px solid #6c757d;">
+                    <div class="card-body py-2">
+                        <h6 class="text-muted mb-0 small">Pending</h6>
+                        <h4 class="mb-0 fw-bold" style="color: #5a6268;" id="kpi-pending-products">--</h4>
                     </div>
                 </div>
             </div>
@@ -1204,8 +1315,60 @@
         </div>
         <div class="card">
             <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-2 col-sm-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Pending</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="orders-pending-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Confirmed</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #146c43;" id="orders-confirmed-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-left: 4px solid #0d6efd;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Preparing</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #0a58ca;" id="orders-preparing-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); border-left: 4px solid #6f42c1;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Out for Delivery</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #59359a;" id="orders-out_for_delivery-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a8d5ba 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Delivered</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #0f5132;" id="orders-delivered-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Cancelled</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="orders-cancelled-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row g-2 mb-3">
-                    <div class="col-md-3 col-sm-6">
+                    <div class="col-md-4 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Date Range</label>
                         <select id="orders-date-filter" class="form-select form-select-sm">
                             <option value="all">All Time</option>
@@ -1214,23 +1377,11 @@
                             <option value="month">This Month</option>
                         </select>
                     </div>
-                    <div class="col-md-3 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="orders-status-filter" class="form-select form-select-sm">
-                            <option value="all">All Statuses</option>
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="preparing">Preparing</option>
-                            <option value="out_for_delivery">Out for Delivery</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                    <div class="col-md-6 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm flex-grow-1">
-                                <input type="text" id="orders-search-input" class="form-control me-2" 
+                                <input type="text" id="orders-search-input" class="form-control me-2"
                                        placeholder="Order ID, product name, or customer…">
                                 <button id="orders-search-btn" class="btn btn-sm btn-ac-green" type="button">
                                     <i class="bi bi-search me-1"></i>Search
@@ -1366,7 +1517,7 @@
             <div class="ac-section-hero__icon"><i class="bi bi-chat-dots"></i></div>
             <div class="ac-section-hero__body">
                 <h4 class="ac-section-hero__title">Messages</h4>
-                <p class="ac-section-hero__sub">Manage customer support conversations and inquiries.</p>
+                <p class="ac-section-hero__sub">Chat with customers about your products and orders.</p>
             </div>
         </div>
 
@@ -1422,6 +1573,139 @@
         </div>
     </section>
 
+    <!-- SUPPORT TICKETS SECTION -->
+    <section id="support-tickets" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-ticket-perforated"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Support Tickets</h4>
+                <p class="ac-section-hero__sub">Get help from our support team and track your requests.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button class="btn btn-sm ac-btn-primary" id="btn-create-support-ticket">
+                    <i class="bi bi-plus-lg me-1"></i>Create New Ticket
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex gap-2">
+                        <select class="form-select form-select-sm" id="support-tickets-entries" style="width: auto;">
+                            <option value="10">10 per page</option>
+                            <option value="25">25 per page</option>
+                            <option value="50">50 per page</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table" id="support-tickets-table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th class="text-center">Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div id="support-tickets-pagination" class="d-flex justify-content-center mt-3"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SUPPORT TICKET CHAT SECTION -->
+    <section id="support-ticket-chat" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-ticket-perforated"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Support Chat</h4>
+                <p class="ac-section-hero__sub">Chat with our support team about your tickets.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="support-chat-back-btn" class="btn btn-outline-secondary btn-sm" type="button">
+                    <i class="bi bi-arrow-left me-1"></i>Back to Tickets
+                </button>
+            </div>
+        </div>
+
+        <div id="support-chat-drawer" class="admin-chat-drawer chat-section-mode">
+            <div class="chat-sidebar-panel">
+                <div class="chat-sidebar-header">
+                    <div class="support-sidebar-header-row">
+                        <h3 class="chat-sidebar-title">
+                            <i class="bi bi-ticket-perforated"></i>
+                            My Tickets
+                        </h3>
+                        <span id="support-chat-conv-count" class="support-conv-count">0</span>
+                    </div>
+                    <div class="support-search-wrap">
+                        <i class="bi bi-search support-search-icon"></i>
+                        <input type="text" id="support-chat-search-input" class="support-search-input" placeholder="Search tickets…" autocomplete="off">
+                    </div>
+                </div>
+                <div id="support-chat-conversation-list" class="conversation-list"></div>
+                <div id="support-chat-empty-state" class="text-center py-5" style="display:none">
+                    <i class="bi bi-ticket-perforated text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">No support tickets found</p>
+                    <p class="text-muted small">Create a ticket to start chatting with support</p>
+                </div>
+                <div class="support-pagination" id="support-chat-pagination">
+                    <button class="support-page-btn" id="support-chat-prev-btn" disabled>
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <span id="support-chat-page-info" class="support-page-info">1–10 of 0</span>
+                    <button class="support-page-btn" id="support-chat-next-btn" disabled>
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="chat-main-panel">
+                <div id="support-chat-header" class="chat-thread-header">
+                    <div class="chat-thread-identity">
+                        <div class="chat-thread-avatar">
+                            <i class="bi bi-ticket-perforated"></i>
+                        </div>
+                        <div style="flex:1;">
+                            <div id="support-chat-header-title" class="chat-thread-name">
+                                Select a ticket
+                            </div>
+                            <div id="support-chat-header-reason" class="chat-thread-sub" style="display:none;">
+                                <strong>Reason:</strong> <span id="support-chat-reason-text"></span>
+                            </div>
+                            <div id="support-chat-header-subtitle" class="chat-thread-sub"></div>
+                        </div>
+                        <div id="support-chat-ticket-number" class="chat-thread-ticket-number" style="display:none;">
+                            #<span id="support-chat-ticket-id"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="support-chat-messages" class="chat-messages-feed"></div>
+
+                <form id="support-chat-form" class="chat-compose-bar">
+                    <div class="chat-input-wrap" style="flex:1;position:relative;">
+                        <input id="support-chat-input"
+                               class="chat-compose-input"
+                               type="text"
+                               placeholder="Type a message…"
+                               autocomplete="off"
+                               maxlength="500"
+                               required>
+                        <span id="support-chat-char-counter" class="char-counter">500</span>
+                    </div>
+                    <button type="submit" class="btn btn-primary chat-send-btn">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
     <!-- NOTIFICATIONS SECTION -->
     <section id="notifications" class="admin-section-card">
         <div class="ac-section-hero ac-section-hero--primary mb-4">
@@ -1441,7 +1725,7 @@
 
         <div class="card">
             <div class="card-body">
-                <div id="notifications-list">
+                <div id="notifications-list" class="notifications-list">
                     <div class="text-center py-4">
                         <span class="spinner-border spinner-border-sm text-success"></span>
                     </div>
@@ -1635,16 +1919,8 @@
                             <div class="col-md-6 mb-3">
                                 <div class="card h-100">
                                     <div class="card-body">
-                                        <h6><i class="bi bi-infinity text-success"></i> Unlimited Products</h6>
-                                        <small class="text-muted">List unlimited products vs 10 for unverified</small>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="card h-100">
-                                    <div class="card-body">
-                                        <h6><i class="bi bi-tag text-primary"></i> Custom Product Names</h6>
-                                        <small class="text-muted">Request custom product names</small>
+                                        <h6><i class="bi bi-shop text-success"></i> Sell Products</h6>
+                                        <small class="text-muted">List and sell up to 10 products on the Free tier</small>
                                     </div>
                                 </div>
                             </div>
@@ -1652,50 +1928,30 @@
                                 <div class="card h-100">
                                     <div class="card-body">
                                         <h6><i class="bi bi-shield-check text-success"></i> Verified Seller Badge</h6>
-                                        <small class="text-muted">Visible to customers on all products</small>
+                                        <small class="text-muted">Blue checkmark visible to customers on all products</small>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="card h-100">
                                     <div class="card-body">
-                                        <h6><i class="bi bi-star text-warning"></i> Featured Placement</h6>
-                                        <small class="text-muted">Products appear in featured sections</small>
+                                        <h6><i class="bi bi-graph-up text-primary"></i> Basic Analytics</h6>
+                                        <small class="text-muted">Track sales, orders, and revenue metrics</small>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <div class="card h-100">
                                     <div class="card-body">
-                                        <h6><i class="bi bi-search text-info"></i> Better Search Ranking</h6>
-                                        <small class="text-muted">Verified sellers appear first in results</small>
+                                        <h6><i class="bi bi-star text-warning"></i> Customer Reviews</h6>
+                                        <small class="text-muted">Receive and display customer ratings</small>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="card h-100">
-                                    <div class="card-body">
-                                        <h6><i class="bi bi-lightning text-warning"></i> Priority Product Approval</h6>
-                                        <small class="text-muted">Faster approval queue for new products</small>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="card h-100">
-                                    <div class="card-body">
-                                        <h6><i class="bi bi-graph-up text-primary"></i> Analytics Dashboard</h6>
-                                        <small class="text-muted">Track sales, views, and customer data</small>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="card h-100">
-                                    <div class="card-body">
-                                        <h6><i class="bi bi-headset text-success"></i> Priority Customer Support</h6>
-                                        <small class="text-muted">Faster response times</small>
-                                    </div>
-                                </div>
-                            </div>
+                        </div>
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Upgrade to Premium</strong> for unlimited products, priority search ranking, custom product names, and advanced analytics.
                         </div>
                     </div>
 
@@ -1741,8 +1997,45 @@
 
                     <!-- History Section -->
                     <div id="verification-history-section" style="display:none;">
-                        <h5>Request History</h5>
-                        <div id="verification-history-timeline"></div>
+                        <h5 class="mt-4 mb-3">Request History</h5>
+                        <div class="card">
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Status</th>
+                                                <th>Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="verification-history-table-body">
+                                            <!-- Populated by JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="verification-history-empty" class="text-center py-4" style="display:none;">
+                                    <i class="bi bi-clock-history text-muted" style="font-size:2rem;"></i>
+                                    <p class="text-muted mt-2">No verification history</p>
+                                </div>
+                            </div>
+                            <div class="card-footer d-flex justify-content-between align-items-center" id="verification-history-pagination" style="display:none;">
+                                <span class="text-muted small" id="verification-history-info">Showing 0 of 0</span>
+                                <nav>
+                                    <ul class="pagination pagination-sm mb-0">
+                                        <li class="page-item" id="verification-history-prev">
+                                            <a class="page-link" href="#" data-page="prev" style="color:var(--ac-primary,#2d7a3a);border-color:var(--ac-primary-light,#c8ecd0);"><i class="bi bi-chevron-left"></i></a>
+                                        </li>
+                                        <li class="page-item active">
+                                            <span class="page-link" id="verification-history-current" style="background-color:var(--ac-primary,#2d7a3a);border-color:var(--ac-primary,#2d7a3a);">1</span>
+                                        </li>
+                                        <li class="page-item" id="verification-history-next">
+                                            <a class="page-link" href="#" data-page="next" style="color:var(--ac-primary,#2d7a3a);border-color:var(--ac-primary-light,#c8ecd0);"><i class="bi bi-chevron-right"></i></a>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1761,32 +2054,167 @@
 
         <div class="card">
             <div class="card-body">
-                <div id="subscription-free-panel">
+                <div id="subscription-free-panel" style="display:none;">
                     <p class="text-muted">You are on the <strong>Free</strong> tier.</p>
-                    <ul class="list-unstyled small text-muted">
-                        <li><i class="bi bi-check text-success"></i> Up to 10 product listings</li>
-                        <li><i class="bi bi-check text-success"></i> Basic sales analytics</li>
-                        <li><i class="bi bi-x text-danger"></i> Unlimited products</li>
-                        <li><i class="bi bi-x text-danger"></i> Featured/priority badge</li>
-                    </ul>
-                    <button class="btn ac-btn-primary btn-sm" id="btn-upgrade-premium">
-                        <i class="bi bi-star-fill me-1"></i> Go Premium
+                    
+                    <!-- Free vs Premium Comparison -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-0 h-100" style="background: #f8f9fa; color: #1a2e1e;">
+                                <div class="card-body p-3">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-circle me-2"></i>Free Tier</h6>
+                                    <ul class="list-unstyled small mb-0">
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Up to <strong>10 product listings</strong></li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Basic sales analytics</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Customer chat support</li>
+                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>Standard product approval</li>
+                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>This Month Dashboard Filter Only</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-0 h-100" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                                <div class="card-body p-3">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-gem me-2 text-success"></i>Premium Tier</h6>
+                                    <ul class="list-unstyled small mb-0">
+                                        <li class="mb-2"><i class="bi bi-infinity text-success me-2"></i><strong>Unlimited product listings</strong></li>
+                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
+                                        <li class="mb-2"><i class="bi bi-graph-up text-success me-2"></i>Advanced sales analytics</li>
+                                        <li class="mb-2"><i class="bi bi-palette text-success me-2"></i>Custom product branding</li>
+                                        <li class="mb-2"><i class="bi bi-clock-history text-success me-2"></i>All-Time Dashboard Filter</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn ac-btn-primary btn-sm w-100" id="btn-upgrade-premium">
+                        <i class="bi bi-star-fill me-1"></i> Upgrade to Premium
                     </button>
                 </div>
                 <div id="subscription-active-panel" style="display:none;">
                     <div class="alert alert-success"><i class="bi bi-gem"></i> <strong>Premium Partner</strong></div>
                     <p>Expires: <strong id="subscription-expiry-date">—</strong></p>
                     <div id="subscription-expiry-warning" style="display:none;"></div>
-                    <button class="btn ac-btn-primary btn-sm" id="btn-extend-subscription">
+                    
+                    <!-- Free vs Premium Comparison -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-0 h-100" style="background: #f8f9fa; color: #1a2e1e;">
+                                <div class="card-body p-3">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-circle me-2"></i>Free Tier</h6>
+                                    <ul class="list-unstyled small mb-0">
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Up to <strong>10 product listings</strong></li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Basic sales analytics</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Customer chat support</li>
+                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>Standard product approval</li>
+                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>This Month Dashboard Filter Only</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-0 h-100" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                                <div class="card-body p-3">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-gem me-2 text-success"></i>Premium Tier</h6>
+                                    <ul class="list-unstyled small mb-0">
+                                        <li class="mb-2"><i class="bi bi-infinity text-success me-2"></i><strong>Unlimited product listings</strong></li>
+                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
+                                        <li class="mb-2"><i class="bi bi-graph-up text-success me-2"></i>Advanced sales analytics</li>
+                                        <li class="mb-2"><i class="bi bi-palette text-success me-2"></i>Custom product branding</li>
+                                        <li class="mb-2"><i class="bi bi-clock-history text-success me-2"></i>All-Time Dashboard Filter</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn ac-btn-primary btn-sm w-100" id="btn-extend-subscription">
                         <i class="bi bi-plus-circle me-1"></i> Extend Subscription
                     </button>
                 </div>
                 <div id="subscription-pending-panel" style="display:none;">
                     <div class="alert alert-info"><i class="bi bi-hourglass"></i> Payment under review.</div>
+                    
+                    <!-- Free vs Premium Comparison -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-0 h-100" style="background: #f8f9fa; color: #1a2e1e;">
+                                <div class="card-body p-3">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-circle me-2"></i>Free Tier</h6>
+                                    <ul class="list-unstyled small mb-0">
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Up to <strong>10 product listings</strong></li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Basic sales analytics</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Customer chat support</li>
+                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>Standard product approval</li>
+                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>This Month Dashboard Filter Only</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-0 h-100" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                                <div class="card-body p-3">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-gem me-2 text-success"></i>Premium Tier</h6>
+                                    <ul class="list-unstyled small mb-0">
+                                        <li class="mb-2"><i class="bi bi-infinity text-success me-2"></i><strong>Unlimited product listings</strong></li>
+                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
+                                        <li class="mb-2"><i class="bi bi-graph-up text-success me-2"></i>Advanced sales analytics</li>
+                                        <li class="mb-2"><i class="bi bi-palette text-success me-2"></i>Custom product branding</li>
+                                        <li class="mb-2"><i class="bi bi-clock-history text-success me-2"></i>All-Time Dashboard Filter</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div id="subscription-expired-panel" style="display:none;">
-                    <div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Premium expired. Renew to restore features.</div>
-                    <button class="btn ac-btn-primary btn-sm" id="btn-renew-premium"><i class="bi bi-star-fill me-1"></i> Renew Premium</button>
+                    <div class="alert alert-warning" style="font-size: 1.0rem;"><i class="bi bi-exclamation-triangle"></i> Premium expired. Renew to restore features.</div>
+                    
+                    <!-- Free vs Premium Comparison -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-0 h-100" style="background: #f8f9fa; color: #1a2e1e;">
+                                <div class="card-body p-3">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-circle me-2"></i>Free Tier</h6>
+                                    <ul class="list-unstyled small mb-0">
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Up to <strong>10 product listings</strong></li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Basic sales analytics</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Customer chat support</li>
+                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>Standard product approval</li>
+                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>This Month Dashboard Filter Only</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-0 h-100" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                                <div class="card-body p-3">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-gem me-2 text-success"></i>Premium Tier</h6>
+                                    <ul class="list-unstyled small mb-0">
+                                        <li class="mb-2"><i class="bi bi-infinity text-success me-2"></i><strong>Unlimited product listings</strong></li>
+                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
+                                        <li class="mb-2"><i class="bi bi-graph-up text-success me-2"></i>Advanced sales analytics</li>
+                                        <li class="mb-2"><i class="bi bi-palette text-success me-2"></i>Custom product branding</li>
+                                        <li class="mb-2"><i class="bi bi-clock-history text-success me-2"></i>All-Time Dashboard Filter</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn ac-btn-primary btn-sm w-100" id="btn-renew-premium"><i class="bi bi-star-fill me-1"></i> Renew Premium</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subscription History -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6 class="card-title mb-3"><i class="bi bi-clock-history me-2"></i>Subscription History</h6>
+                <div id="subscription-history-container">
+                    <p class="text-muted small">Loading history...</p>
                 </div>
             </div>
         </div>
@@ -1795,8 +2223,8 @@
     <!-- MODAL: SHOP ADDRESS (PSGC) -->
     <div id="shop-address-modal" class="modal" style="z-index:1090;">
         <div class="modal-content" style="max-width:500px;">
-            <div class="modal-header" style="background:#fff!important;color:var(--ac-text)!important;">
-                <h3 style="color:var(--ac-text)!important;"><i class="bi bi-geo-alt me-2 text-success"></i>Farm / Pick-up Location</h3>
+            <div class="modal-header" style="background:#fff!important;color:#fff!important;">
+                <h3 style="color:#fff!important;"><i class="bi bi-geo-alt me-2 text-success"></i>Farm / Pick-up Location</h3>
                 <button class="close-btn" id="close-shop-address-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
             </div>
             <div style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(80vh - 58px);">
@@ -2130,7 +2558,7 @@
             <button class="product-details-close" id="request-modal-close" aria-label="Close" style="color:#fff;"><i class="bi bi-x-lg"></i></button>
         </div>
         <div style="padding:1rem 1.25rem;overflow:auto;">
-            <p class="text-muted small mb-3">Cannot find a product in the catalog? Request it here and staff will review it.</p>
+            <p class="text-muted small mb-3">Cannot find a product in the catalog? Request it here and admin will review it.</p>
             <form id="request-product-form-modal" class="product-form">
                 <div class="form-group">
                     <label for="request-product-name">Product Name <span class="text-danger">*</span></label>
@@ -2138,7 +2566,7 @@
                            placeholder="Enter the product name you want to request" required>
                 </div>
                 <div class="form-group">
-                    <label for="request-product-notes">Notes for Staff <span class="text-muted">(optional)</span></label>
+                    <label for="request-product-notes">Notes for Admin <span class="text-muted">(optional)</span></label>
                     <textarea id="request-product-notes" class="form-control form-control-sm" rows="3" maxlength="500"
                               placeholder="e.g., local name, usual unit of sale, quality details..."></textarea>
                 </div>
@@ -2231,50 +2659,6 @@
     </div>
 </div>
 
-<!-- Support Tickets List Modal -->
-<div class="modal fade" id="support-tickets-modal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Support Tickets</h5>
-                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
-                    <i class="bi bi-x-lg"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="d-flex gap-2">
-                        <select class="form-select form-select-sm" id="support-tickets-entries" style="width: auto;">
-                            <option value="10">10 per page</option>
-                            <option value="25">25 per page</option>
-                            <option value="50">50 per page</option>
-                        </select>
-                    </div>
-                    <button class="btn ac-btn-primary btn-sm" id="btn-create-support-ticket">
-                        <i class="bi bi-plus-lg me-1"></i>Create New Ticket
-                    </button>
-                </div>
-                <div class="table-responsive">
-                    <table class="table" id="support-tickets-table">
-                        <thead>
-                            <tr>
-                                <th>Subject</th>
-                                <th>Status</th>
-                                <th>Priority</th>
-                                <th>Date</th>
-                                <th>Last Message</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                <div id="support-tickets-pagination" class="d-flex justify-content-center mt-3"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Create Support Ticket Modal -->
 <div class="modal fade" id="create-support-ticket-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
@@ -2315,40 +2699,6 @@
     </div>
 </div>
 
-<!-- Ticket Detail & Chat Modal -->
-<div class="modal fade" id="ticket-detail-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Support Ticket</h5>
-                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
-                    <i class="bi bi-x-lg"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <h6 id="ticket-detail-subject"></h6>
-                        <div class="d-flex gap-2 mb-2">
-                            <span class="badge" id="ticket-detail-status"></span>
-                            <span class="badge" id="ticket-detail-priority"></span>
-                        </div>
-                        <small class="text-muted">Created: <span id="ticket-detail-created"></span></small>
-                    </div>
-                </div>
-                <div id="ticket-messages-container" style="max-height: 400px; overflow-y: auto;" class="mb-3 p-3 bg-light rounded">
-                    <!-- Messages will be loaded here -->
-                </div>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="ticket-message-input" maxlength="500" placeholder="Type your message...">
-                    <button class="btn ac-btn-primary" id="btn-send-ticket-message">Send</button>
-                </div>
-                <small class="text-muted" id="ticket-message-char-count">0/500 characters</small>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- MODAL: SUBSCRIPTION UPGRADE / EXTEND -->
 <div class="modal fade" id="subscription-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -2362,6 +2712,53 @@
                     <p class="mb-1"><strong>Current expiry:</strong> <span id="sub-current-expiry">—</span></p>
                     <p class="mb-0"><strong>New expiry:</strong> <span id="sub-new-expiry">—</span></p>
                 </div>
+                
+                <div class="card mb-3 border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 12px; overflow: hidden;">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="bg-white rounded-circle p-2 me-3 shadow-sm" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+                                <i class="bi bi-gem" style="font-size: 1.5rem; color: #2d7a3a;"></i>
+                            </div>
+                            <div>
+                                <h5 class="card-title mb-0 fw-bold" style="color: #1a5c2a;">Premium Benefits</h5>
+                                <small style="color: #4a7c59;">Unlock exclusive features</small>
+                            </div>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
+                                    <i class="bi bi-infinity me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
+                                    <span class="small" style="color: #1a5c2a;">Unlimited product listings</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
+                                    <i class="bi bi-lightning-charge me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
+                                    <span class="small" style="color: #1a5c2a;">Priority product approval</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
+                                    <i class="bi bi-palette me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
+                                    <span class="small" style="color: #1a5c2a;">Custom product branding</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
+                                    <i class="bi bi-graph-up me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
+                                    <span class="small" style="color: #1a5c2a;">Advanced sales analytics</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
+                                    <i class="bi bi-search me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
+                                    <span class="small" style="color: #1a5c2a;">Priority search placement</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <p class="text-muted small">Select plan duration:</p>
                 <div class="row g-3 mb-4" id="subscription-plan-options"></div>
                 <div class="mb-3">
@@ -2406,15 +2803,7 @@
 <script src="/js/psgc.js"></script>
 <script src="/js/farmer.js"></script>
 <script src="/js/chat.js"></script>
-
-<script>
-window.addEventListener('load', function () {
-    setTimeout(function () {
-        var ls = document.getElementById('admin-loading-screen');
-        if (ls) ls.classList.add('hidden');
-    }, 500);
-});
-</script>
+<script src="/js/support-ticket-chat.js"></script>
 
 <!-- Verification Rejection Modal -->
 <div class="modal" id="verification-rejection-modal">
@@ -2428,6 +2817,24 @@ window.addEventListener('load', function () {
       <button class="btn btn-primary" id="resubmit-verification-btn">Submit New Request</button>
     </div>
   </div>
+</div>
+
+<!-- Subscription Reason View Modal -->
+<div class="modal fade" id="subscription-reason-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="subscription-reason-modal-title">Reason</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="subscription-reason-text" class="text-muted"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 </body>

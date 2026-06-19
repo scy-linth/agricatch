@@ -72,27 +72,6 @@
                 </a>
             </li>
 
-            <!-- Messages dropdown -->
-            <li class="nav-item dropdown">
-                <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" aria-expanded="false" id="admin-float-chat-btn">
-                    <i class="bi bi-chat-left-text"></i>
-                    <span id="admin-chat-unread" class="badge bg-success badge-number" style="display:none">0</span>
-                </a>
-                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow messages" style="min-width:360px;">
-                    <li class="dropdown-header d-flex align-items-center justify-content-between">
-                        <span>You have <span id="messages-count">0</span> new messages</span>
-                        <a href="#" id="view-all-messages-badge">
-                            <span class="badge rounded-pill bg-primary p-2 ms-2">View all</span>
-                        </a>
-                    </li>
-                    <li><hr class="dropdown-divider"></li>
-                    <div id="messages-list"><!-- populated by admin.js --></div>
-                    <li><hr class="dropdown-divider"></li>
-                    <li class="dropdown-footer">
-                        <a href="#" id="show-all-messages-link">Show all messages</a>
-                    </li>
-                </ul>
-            </li><!-- End Messages Nav -->
 
             <!-- Notifications dropdown -->
             <li class="nav-item dropdown">
@@ -257,14 +236,6 @@
                 <span id="subscription-requests-badge" class="sidebar-badge" style="display:none">0</span>
             </a>
         </li>
-        <li class="nav-item">
-            <a class="nav-link collapsed sidebar-link" href="#support-tickets" data-section="support-tickets">
-                <i class="bi bi-life-preserver"></i>
-                <span>Support Tickets</span>
-                <span id="support-tickets-badge" class="sidebar-badge" style="display:none">0</span>
-            </a>
-        </li>
-
         <!-- ── People (collapsible submenu) ─────────────────── -->
         <li class="nav-heading">People</li>
 
@@ -285,9 +256,9 @@
                         <i class="bi bi-circle"></i><span>Farmers</span>
                     </a>
                 </li>
-                <li data-roles="super_admin">
-                    <a href="#staff" class="sidebar-link" data-section="staff">
-                        <i class="bi bi-circle"></i><span>Staff</span>
+                <li>
+                    <a href="#admin" class="sidebar-link" data-section="admin">
+                        <i class="bi bi-circle"></i><span>Admin</span>
                     </a>
                 </li>
             </ul>
@@ -305,7 +276,8 @@
         <li class="nav-item">
             <a class="nav-link collapsed sidebar-link" href="#chat" data-section="chat">
                 <i class="bi bi-chat-dots"></i>
-                <span>Chat & Support</span>
+                <span>Support Center</span>
+                <span id="chat-support-badge" class="sidebar-badge" style="display:none">0</span>
             </a>
         </li>
         <li class="nav-item">
@@ -365,6 +337,18 @@
                 <span>Broadcast</span>
             </a>
         </li>
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#database-backup" data-section="database-backup">
+                <i class="bi bi-database"></i>
+                <span>Database Data Backup</span>
+            </a>
+        </li>
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#image-manager" data-section="image-manager">
+                <i class="bi bi-images"></i>
+                <span>Image Manager</span>
+            </a>
+        </li>
 
 
     </ul>
@@ -382,7 +366,7 @@
         <h1 class="page-title">Dashboard Overview</h1>
         <nav>
             <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item">Home</li>
                 <li class="breadcrumb-item active" id="breadcrumb-current">Dashboard</li>
             </ol>
         </nav>
@@ -787,18 +771,6 @@
                         </select>
                     </div>
                     <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="order-status-filter" class="form-select form-select-sm">
-                            <option value="">Any status</option>
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="preparing">Preparing</option>
-                            <option value="out_for_delivery">Out for Delivery</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Price Range</label>
                         <select id="order-price-filter" class="form-select form-select-sm">
                             <option value="">Any price</option>
@@ -829,6 +801,17 @@
                             <button id="order-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh orders"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Status Tabs -->
+                <div class="verification-tabs order-tabs mb-3">
+                    <button class="tab-btn active" data-status="">All</button>
+                    <button class="tab-btn" data-status="pending">Pending</button>
+                    <button class="tab-btn" data-status="confirmed">Confirmed</button>
+                    <button class="tab-btn" data-status="preparing">Preparing</button>
+                    <button class="tab-btn" data-status="out_for_delivery">Out for Delivery</button>
+                    <button class="tab-btn" data-status="delivered">Delivered</button>
+                    <button class="tab-btn" data-status="cancelled">Cancelled</button>
                 </div>
 
                 <div class="table-responsive">
@@ -900,14 +883,6 @@
                             <option value="100">100</option>
                         </select>
                     </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="users-status-filter" class="form-select form-select-sm">
-                            <option value="">Any status</option>
-                            <option value="active">Active</option>
-                            <option value="disabled">Disabled</option>
-                        </select>
-                    </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
@@ -918,6 +893,13 @@
                             <button id="users-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh customers"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Status Tabs -->
+                <div class="verification-tabs users-tabs mb-3">
+                    <button class="tab-btn active" data-status="">All</button>
+                    <button class="tab-btn" data-status="active">Active</button>
+                    <button class="tab-btn" data-status="disabled">Disabled</button>
                 </div>
 
                 <div class="table-responsive">
@@ -962,7 +944,7 @@
                 <i class="bi bi-box-seam"></i>
             </div>
             <div class="ac-section-hero__body">
-                <h4 class="ac-section-hero__title">Products</h4>
+                <h4 class="ac-section-hero__title">Listings</h4>
                 <p class="ac-section-hero__sub">View and manage all product listings across the marketplace.</p>
             </div>
         </div>
@@ -986,14 +968,6 @@
                             <option value="">All categories</option>
                         </select>
                     </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="products-status-filter" class="form-select form-select-sm">
-                            <option value="available">Active</option>
-                            <option value="">Any status</option>
-                            <option value="disabled">Disabled</option>
-                        </select>
-                    </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
@@ -1004,6 +978,13 @@
                             <button id="products-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Status Tabs -->
+                <div class="verification-tabs products-tabs mb-3">
+                    <button class="tab-btn active" data-status="">All</button>
+                    <button class="tab-btn" data-status="available">Active</button>
+                    <button class="tab-btn" data-status="disabled">Disabled</button>
                 </div>
 
                 <div class="table-responsive">
@@ -1077,14 +1058,6 @@
                             <option value="100">100</option>
                         </select>
                     </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="category-status-filter" class="form-select form-select-sm">
-                            <option value="">All</option>
-                            <option value="active">Active</option>
-                            <option value="disabled">Disabled</option>
-                        </select>
-                    </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
@@ -1095,6 +1068,13 @@
                             <button id="categories-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh categories"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Status Tabs -->
+                <div class="verification-tabs categories-tabs mb-3">
+                    <button class="tab-btn active" data-status="">All</button>
+                    <button class="tab-btn" data-status="active">Active</button>
+                    <button class="tab-btn" data-status="disabled">Disabled</button>
                 </div>
 
                 <div class="table-responsive">
@@ -1131,7 +1111,7 @@
                 <i class="bi bi-box-seam"></i>
             </div>
             <div class="ac-section-hero__body">
-                <h4 class="ac-section-hero__title">Products</h4>
+                <h4 class="ac-section-hero__title">Product Catalog</h4>
                 <p class="ac-section-hero__sub">Manage product catalog including creation, editing, and status management.</p>
             </div>
             <div class="ac-section-hero__actions">
@@ -1161,14 +1141,6 @@
                             <option value="">All categories</option>
                         </select>
                     </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="catalog-status-filter" class="form-select form-select-sm">
-                            <option value="">All</option>
-                            <option value="active">Active</option>
-                            <option value="disabled">Disabled</option>
-                        </select>
-                    </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
@@ -1179,6 +1151,13 @@
                             <button id="catalog-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh catalog"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Status Tabs -->
+                <div class="verification-tabs catalog-tabs mb-3">
+                    <button class="tab-btn active" data-status="">All</button>
+                    <button class="tab-btn" data-status="active">Active</button>
+                    <button class="tab-btn" data-status="disabled">Disabled</button>
                 </div>
 
                 <div class="table-responsive">
@@ -1240,14 +1219,6 @@
                         </select>
                     </div>
                     <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="farmers-status-filter" class="form-select form-select-sm">
-                            <option value="">Any status</option>
-                            <option value="active">Active</option>
-                            <option value="disabled">Disabled</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Verification</label>
                         <select id="farmers-verification-filter" class="form-select form-select-sm">
                             <option value="">All</option>
@@ -1265,6 +1236,13 @@
                             <button id="farmers-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh farmers"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Status Tabs -->
+                <div class="verification-tabs farmers-tabs mb-3">
+                    <button class="tab-btn active" data-status="">All</button>
+                    <button class="tab-btn" data-status="active">Active</button>
+                    <button class="tab-btn" data-status="disabled">Disabled</button>
                 </div>
 
                 <!-- Farmers table -->
@@ -1591,21 +1569,21 @@
 
 
     <!-- ════════════════════════════════════════════════════════════════
-         § 8 — STAFF MANAGEMENT SECTION (superadmin only)
+         § 8 — ADMIN MANAGEMENT SECTION (admin and superadmin)
     ═══════════════════════════════════════════════════════════════════ -->
-    <section id="staff" class="admin-section-card" data-roles="super_admin">
+    <section id="admin" class="admin-section-card">
 
         <div class="ac-section-hero ac-section-hero--primary mb-4">
             <div class="ac-section-hero__icon">
                 <i class="bi bi-person-workspace"></i>
             </div>
             <div class="ac-section-hero__body">
-                <h4 class="ac-section-hero__title">Staff Management</h4>
-                <p class="ac-section-hero__sub">Manage staff accounts and permissions for platform administration.</p>
+                <h4 class="ac-section-hero__title">Admin Management</h4>
+                <p class="ac-section-hero__sub">Manage admin accounts and permissions for platform administration.</p>
             </div>
             <div class="ac-section-hero__actions">
-                <button class="btn ac-btn-primary btn-sm" id="create-staff-btn" type="button">
-                    <i class="bi bi-plus-lg me-1"></i>New Staff
+                <button class="btn ac-btn-primary btn-sm" id="create-admin-btn" type="button">
+                    <i class="bi bi-plus-lg me-1"></i>New Admin
                 </button>
             </div>
         </div>
@@ -1615,23 +1593,15 @@
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
                     <div class="col-md-1 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Show</label>
-                        <select class="form-select form-select-sm" data-entries-section="staff" style="min-width: 60px;">
+                        <select class="form-select form-select-sm" data-entries-section="admin" style="min-width: 60px;">
                             <option value="10">10</option>
                             <option value="25" selected>25</option>
                             <option value="50">50</option>
                         </select>
                     </div>
                     <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="staff-status-filter" class="form-select form-select-sm">
-                            <option value="">Any status</option>
-                            <option value="active">Active</option>
-                            <option value="disabled">Disabled</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Verification</label>
-                        <select id="staff-verification-filter" class="form-select form-select-sm">
+                        <select id="admin-verification-filter" class="form-select form-select-sm">
                             <option value="">All</option>
                             <option value="verified">Verified</option>
                             <option value="unverified">Unverified</option>
@@ -1641,18 +1611,25 @@
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm flex-grow-1">
-                                <input type="text" id="staff-search-input" class="form-control me-2"
+                                <input type="text" id="admin-search-input" class="form-control me-2"
                                        placeholder="Name, username, or email…">
-                                <button id="staff-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
+                                <button id="admin-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
                                     <i class="bi bi-search me-1"></i>Search
                                 </button>
                             </div>
-                            <button id="staff-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh staff"><i class="bi bi-arrow-clockwise"></i></button>
+                            <button id="admin-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh admin"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
                 </div>
+
+                <!-- Status Tabs -->
+                <div class="verification-tabs admin-tabs mb-3">
+                    <button class="tab-btn active" data-status="">All</button>
+                    <button class="tab-btn" data-status="active">Active</button>
+                    <button class="tab-btn" data-status="disabled">Disabled</button>
+                </div>
                 <div class="table-responsive">
-                    <table id="staff-table" class="table table-hover ac-table table-sm align-middle text-center">
+                    <table id="admin-table" class="table table-hover ac-table table-sm align-middle text-center">
                         <thead>
                             <tr>
                                 <th>ID</th>
@@ -1665,17 +1642,17 @@
                                 <th class="col-actions">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="staff-tbody">
+                        <tbody id="admin-tbody">
                             <tr><td colspan="8" class="text-center text-muted py-4">
                                 <span class="spinner-border spinner-border-sm"></span>
                             </td></tr>
                         </tbody>
                     </table>
                 </div>
-                <div id="staff-pagination" class="pagination-container"></div>
+                <div id="admin-pagination" class="pagination-container"></div>
             </div>
         </div>
-    </section><!-- /staff -->
+    </section><!-- /admin -->
 
 
     <!-- ════════════════════════════════════════════════════════════════
@@ -1714,25 +1691,9 @@
                         <select id="all-users-role-filter" class="form-select form-select-sm">
                             <option value="">All roles</option>
                             <option value="super_admin">Super Admin</option>
-                            <option value="staff">Staff</option>
+                            <option value="admin">Admin</option>
                             <option value="farmer">Farmer</option>
                             <option value="customer">Customer</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="all-users-status-filter" class="form-select form-select-sm">
-                            <option value="">Any status</option>
-                            <option value="active">Active</option>
-                            <option value="disabled">Disabled</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Verification</label>
-                        <select id="all-users-verification-filter" class="form-select form-select-sm">
-                            <option value="">All</option>
-                            <option value="verified">Verified</option>
-                            <option value="unverified">Unverified</option>
                         </select>
                     </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
@@ -1748,6 +1709,13 @@
                             <button id="all-users-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh users"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Status Tabs -->
+                <div class="verification-tabs all-users-tabs mb-3">
+                    <button class="tab-btn active" data-status="">All</button>
+                    <button class="tab-btn" data-status="active">Active</button>
+                    <button class="tab-btn" data-status="disabled">Disabled</button>
                 </div>
                 <div class="table-responsive">
                     <table id="all-users-table" class="table table-hover ac-table table-sm align-middle text-center">
@@ -2134,7 +2102,7 @@
                                 <span class="ac-audience-icon ac-audience-icon--purple"><i class="bi bi-shield-check"></i></span>
                                 <span class="ac-audience-info">
                                     <span class="ac-audience-name">Admins</span>
-                                    <span class="ac-audience-desc">Staff &amp; Super Admins</span>
+                                    <span class="ac-audience-desc">Admin &amp; Super Admins</span>
                                 </span>
                                 <input class="form-check-input ms-auto" type="checkbox" id="audience-admin" value="admin">
                             </label>
@@ -2154,7 +2122,106 @@
 
 
     <!-- ════════════════════════════════════════════════════════════════
-         § 13 — NOTIFICATIONS SECTION
+         § 14 — DATABASE DATA BACKUP SECTION
+         (Future Development — for database data backup)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="database-backup" class="admin-section-card" data-roles="super_admin">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-database"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Database Data Backup</h4>
+                <p class="ac-section-hero__sub">Manage database backups for future development features.</p>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="card ac-data-card">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-cone-striped"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Under Development</h6>
+                                <p class="ac-data-card__subtitle">This feature is coming soon</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Database backup functionality is currently under development. This section will allow you to download all data from the database including:
+                            <ul class="mb-0 mt-2">
+                                <li>Products</li>
+                                <li>Users (Customers, Farmers, Admin)</li>
+                                <li>Orders</li>
+                                <li>Categories</li>
+                                <li>And other database records</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </section><!-- /database-backup -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 15 — IMAGE MANAGER SECTION
+         (Future Development — for cloudinary image management)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="image-manager" class="admin-section-card" data-roles="super_admin">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-images"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Image Manager</h4>
+                <p class="ac-section-hero__sub">Manage uploaded images in Cloudinary with bulk operations.</p>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="card ac-data-card">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-cone-striped"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Under Development</h6>
+                                <p class="ac-data-card__subtitle">This feature is coming soon</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Image Manager is currently under development. This section will include:
+                            <ul class="mb-0 mt-2">
+                                <li>Tabs for: All Images, Products, Verification, Subscription Payment Proof</li>
+                                <li>Bulk select functionality</li>
+                                <li>Backup/download capabilities</li>
+                                <li>Delete operations</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </section><!-- /image-manager -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 16 — NOTIFICATIONS SECTION
          (Placeholder — title already mapped in admin.js, no backend yet)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="notifications" class="admin-section-card">
@@ -2193,10 +2260,7 @@
 
 
     <!-- ════════════════════════════════════════════════════════════════
-         § 9 — CHAT SECTION (full-page support inbox)
-         admin.js showSection('chat') navigates here.
-         #admin-chat-drawer is inside this section — chat.js still works
-         because all its target IDs are preserved below.
+         § 9 — SUPPORT & CHATS SECTION (Unified customer messages + support tickets)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="chat" class="admin-section-card">
 
@@ -2205,70 +2269,144 @@
                 <i class="bi bi-chat-dots"></i>
             </div>
             <div class="ac-section-hero__body">
-                <h4 class="ac-section-hero__title">Support Chat</h4>
-                <p class="ac-section-hero__sub">Manage customer support conversations and inquiries.</p>
+                <h4 class="ac-section-hero__title">Support Center</h4>
+                <p class="ac-section-hero__sub">Manage customer conversations and farmer support tickets.</p>
             </div>
         </div>
 
-        <!-- admin-chat-drawer INSIDE the section: becomes a full-width inbox panel.
-             CSS makes it position:static + full height when inside .admin-section-card.
-             chat.js still toggles .active on it — CSS makes that a no-op here. -->
-        <div id="admin-chat-drawer" class="admin-chat-drawer chat-section-mode">
-
-            <!-- Left panel: conversation list -->
-            <div class="chat-sidebar-panel">
-                <div class="chat-sidebar-header">
-                    <h3 class="chat-sidebar-title">
-                        <i class="bi bi-chat-dots"></i>
-                        Conversations
-                    </h3>
-                </div>
-                <!-- #conversation-list → chat.js populates this -->
-                <div id="conversation-list" class="conversation-list"></div>
-                <div id="chat-empty-state" class="text-center py-5" style="display:none">
-                    <i class="bi bi-chat-dots text-muted" style="font-size: 3rem;"></i>
-                    <p class="text-muted mt-3">No conversations yet</p>
-                    <p class="text-muted small">Messages from customers and farmers will appear here</p>
-                </div>
-            </div>
-
-            <!-- Right panel: message thread -->
-            <div class="chat-main-panel">
-
-                <!-- #chat-header → chat.js updates title/subtitle -->
-                <div id="chat-header" class="chat-thread-header">
-                    <div class="chat-thread-identity">
-                        <div class="chat-thread-avatar">
-                            <i class="bi bi-person"></i>
-                        </div>
-                        <div>
-                            <div id="chat-header-title" class="chat-thread-name">
-                                Select a conversation
+        <div class="card">
+            <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Open</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="support-open-count">0</h4>
                             </div>
-                            <div id="chat-header-subtitle" class="chat-thread-sub"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%); border-left: 4px solid #0dcaf0;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">In Progress</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #0aa2c0;" id="support-in-progress-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Resolved</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #146c43;" id="support-resolved-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 4px solid #6c757d;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Closed</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #5a6268;" id="support-closed-count">0</h4>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <!-- #chat-messages → chat.js populates messages -->
-                <div id="chat-messages" class="chat-messages-feed"></div>
+        <!-- Panel: Unified Inbox - moved outside card for full height -->
+        <div id="panel-conversations" class="support-chat-panel" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;">
 
-                <!-- #chat-form → chat.js handles submit -->
-                <form id="chat-form" class="chat-compose-bar">
-                    <input id="chat-input"
-                           class="chat-compose-input"
-                           type="text"
-                           placeholder="Type a message…"
-                           autocomplete="off"
-                           required>
-                    <button type="submit" class="btn btn-primary chat-send-btn">
-                        <i class="bi bi-send-fill"></i>
-                    </button>
-                </form>
+            <!-- admin-chat-drawer INSIDE the section: becomes a full-width inbox panel. -->
+            <div id="admin-chat-drawer" class="admin-chat-drawer chat-section-mode">
+
+                <!-- Left panel: conversation list -->
+                <div class="chat-sidebar-panel">
+                    <!-- Sidebar Header with count -->
+                    <div class="chat-sidebar-header">
+                        <div class="support-sidebar-header-row">
+                            <span class="chat-sidebar-title"><i class="bi bi-chat-dots"></i> Inbox</span>
+                            <span id="support-conv-count" class="support-conv-count">0</span>
+                        </div>
+                        <!-- Search -->
+                        <div class="support-search-wrap">
+                            <i class="bi bi-search support-search-icon"></i>
+                            <input type="text" id="support-search-input" class="support-search-input" placeholder="Search conversations…" autocomplete="off">
+                        </div>
+                        <!-- Status Tabs -->
+                        <div class="support-status-tabs" id="support-status-tabs">
+                            <button class="support-status-pill active" data-status="all" style="display:none;">All</button>
+                            <button class="support-status-pill" data-status="open">Open</button>
+                            <button class="support-status-pill" data-status="in_progress">In Progress</button>
+                            <button class="support-status-pill" data-status="resolved">Resolved</button>
+                            <button class="support-status-pill" data-status="closed">Closed</button>
+                        </div>
+                    </div>
+                    <!-- #conversation-list → chat.js populates this -->
+                    <div id="conversation-list" class="conversation-list"></div>
+                    <!-- Empty state -->
+                    <div id="chat-empty-state" class="support-empty-state" style="display:none">
+                        <i class="bi bi-chat-dots"></i>
+                        <p>No conversations found</p>
+                        <span>Try adjusting your filters or search</span>
+                    </div>
+                    <!-- Pagination footer -->
+                    <div class="support-pagination" id="support-pagination">
+                        <button class="support-page-btn" id="support-prev-btn" disabled>
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <span id="support-page-info" class="support-page-info">1–10 of 0</span>
+                        <button class="support-page-btn" id="support-next-btn" disabled>
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right panel: message thread -->
+                <div class="chat-main-panel">
+
+                    <!-- #chat-header → chat.js updates title/subtitle -->
+                    <div id="chat-header" class="chat-thread-header">
+                        <div class="chat-thread-identity">
+                            <div class="chat-thread-avatar">
+                                <i class="bi bi-person"></i>
+                            </div>
+                            <div>
+                                <div id="chat-header-title" class="chat-thread-name">
+                                    Select a conversation
+                                </div>
+                                <div id="chat-header-reason" class="chat-thread-sub" style="display:none;">
+                                    <strong>Reason:</strong> <span id="chat-header-reason-text"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Ticket number display (hidden by default, shown for tickets) -->
+                        <div id="ticket-number-control" class="ticket-number-control" style="display:none;">
+                            <span class="badge bg-primary" id="chat-ticket-number">#—</span>
+                        </div>
+                    </div>
+
+                    <!-- #chat-messages → chat.js populates messages -->
+                    <div id="chat-messages" class="chat-messages-feed"></div>
+
+                    <!-- #chat-form → chat.js handles submit -->
+                    <form id="chat-form" class="chat-compose-bar">
+                        <input id="chat-input"
+                               class="chat-compose-input"
+                               type="text"
+                               placeholder="Type a message…"
+                               autocomplete="off"
+                               required>
+                        <button type="submit" class="btn btn-primary chat-send-btn">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </form>
+
+                </div>
 
             </div>
-
         </div>
+
     </section><!-- /chat -->
 
     <!-- ════════════════════════════════════════════════════════════════
@@ -2288,18 +2426,36 @@
 
         <div class="card">
             <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Pending</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="category-request-pending-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Approved</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #146c43;" id="category-request-approved-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fde8e8 0%, #f8d7da 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Rejected</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="category-request-rejected-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="cat-req-status-filter" class="form-select form-select-sm">
-                            <option value="pending">Pending</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="all">All</option>
-                        </select>
-                    </div>
                     <div class="col-md-2 col-sm-4">
                         <label class="form-label small fw-semibold mb-1">Show</label>
                         <select class="form-select form-select-sm" data-entries-section="category-requests">
@@ -2322,6 +2478,14 @@
                             <button id="cat-req-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh requests"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Status Tabs -->
+                <div class="verification-tabs category-request-tabs mb-3">
+                    <button class="tab-btn active" data-status="all">All</button>
+                    <button class="tab-btn" data-status="pending">Pending</button>
+                    <button class="tab-btn" data-status="approved">Approved</button>
+                    <button class="tab-btn" data-status="rejected">Rejected</button>
                 </div>
 
                 <div class="table-responsive">
@@ -2366,6 +2530,33 @@
 
         <div class="card">
             <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Pending</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="product-approval-pending-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Approved</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #146c43;" id="product-approval-approved-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fde8e8 0%, #f8d7da 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Rejected</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="product-approval-rejected-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -2376,15 +2567,6 @@
                             <option value="25">25</option>
                             <option value="50" selected>50</option>
                             <option value="100">100</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Status</label>
-                        <select id="product-approval-status-filter" class="form-select form-select-sm">
-                            <option value="pending">Pending</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="all">All</option>
                         </select>
                     </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
@@ -2400,6 +2582,14 @@
                             <button id="product-approval-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh approvals"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Status Tabs -->
+                <div class="verification-tabs product-approval-tabs mb-3">
+                    <button class="tab-btn active" data-status="all">All</button>
+                    <button class="tab-btn" data-status="pending">Pending</button>
+                    <button class="tab-btn" data-status="approved">Approved</button>
+                    <button class="tab-btn" data-status="rejected">Rejected</button>
                 </div>
 
                 <div class="table-responsive">
@@ -2449,34 +2639,34 @@
                 <!-- Stats Dashboard -->
                 <div class="row mb-3">
                     <div class="col-md-3">
-                        <div class="card bg-warning text-white">
-                            <div class="card-body">
-                                <h5>Pending</h5>
-                                <h3 id="verification-pending-count">0</h3>
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Pending</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="verification-pending-count">0</h4>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card bg-success text-white">
-                            <div class="card-body">
-                                <h5>Approved</h5>
-                                <h3 id="verification-approved-count">0</h3>
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Approved</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #146c43;" id="verification-approved-count">0</h4>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card bg-danger text-white">
-                            <div class="card-body">
-                                <h5>Rejected</h5>
-                                <h3 id="verification-rejected-count">0</h3>
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fde8e8 0%, #f8d7da 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Rejected</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="verification-rejected-count">0</h4>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card bg-secondary text-white">
-                            <div class="card-body">
-                                <h5>Unverified</h5>
-                                <h3 id="verification-unverified-count">0</h3>
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 4px solid #6c757d;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Unverified</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #5a6268;" id="verification-unverified-count">0</h4>
                             </div>
                         </div>
                     </div>
@@ -2499,7 +2689,9 @@
                             <div class="input-group input-group-sm flex-grow-1">
                                 <input type="text" id="verification-requests-search-input" class="form-control"
                                        placeholder="Farmer or shop name…">
-                                <button id="verification-requests-search-btn" class="btn btn-primary" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                                <button id="verification-requests-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
                             </div>
                             <button id="verification-requests-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
@@ -2522,8 +2714,6 @@
                             <tr>
                                 <th>Farmer</th>
                                 <th>Shop</th>
-                                <th>Products</th>
-                                <th>Orders</th>
                                 <th>Document</th>
                                 <th>Date</th>
                                 <th>Status</th>
@@ -2556,72 +2746,89 @@
 
         <div class="card">
             <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Pending</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="subscription-pending-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Active</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #146c43;" id="subscription-active-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fde8e8 0%, #f8d7da 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Rejected</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="subscription-rejected-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 4px solid #6c757d;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Expired</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #5a6268;" id="subscription-expired-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Bar -->
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="subscriptions" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="subscriptions-search-input" class="form-control"
+                                       placeholder="Farmer or shop name…">
+                                <button id="subscriptions-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
+                            </div>
+                            <button id="subscriptions-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Reuse existing .verification-tabs class from agricatch-admin.css -->
                 <div class="verification-tabs subscription-tabs mb-3">
-                    <button class="tab-btn active" data-status="pending">Pending</button>
+                    <button class="tab-btn active" data-status="all">All</button>
+                    <button class="tab-btn" data-status="pending">Pending</button>
                     <button class="tab-btn" data-status="active">Active</button>
-                    <button class="tab-btn" data-status="expired">Expired</button>
                     <button class="tab-btn" data-status="rejected">Rejected</button>
+                    <button class="tab-btn" data-status="expired">Expired</button>
                 </div>
                 <div class="table-responsive">
                     <table class="table" id="subscriptions-table">
-                        <thead><tr><th>Farmer</th><th>Plan</th><th>Amount</th><th>Payment To</th><th>Date</th><th>Proof</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Farmer</th><th>Plan</th><th>Amount</th><th>Payment To</th><th>Date</th><th>Status</th><th>Proof</th><th>Actions</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
+
+                <!-- Pagination -->
+                <nav id="subscriptions-pagination"></nav>
             </div>
         </div>
     </section>
 
-    <!-- ════════════════════════════════════════════════════════════════
-         § 14 — SUPPORT TICKETS SECTION
-    ═══════════════════════════════════════════════════════════════════ -->
-    <section id="support-tickets" class="admin-section-card">
-        <div class="ac-section-hero ac-section-hero--primary mb-4">
-            <div class="ac-section-hero__icon"><i class="bi bi-life-preserver"></i></div>
-            <div class="ac-section-hero__body">
-                <h4 class="ac-section-hero__title">Support Tickets</h4>
-                <p class="ac-section-hero__sub">Manage and respond to farmer support requests.</p>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-body">
-                <div class="verification-tabs support-tabs mb-3">
-                    <button class="tab-btn active" data-status="open">Open</button>
-                    <button class="tab-btn" data-status="in_progress">In Progress</button>
-                    <button class="tab-btn" data-status="resolved">Resolved</button>
-                    <button class="tab-btn" data-status="closed">Closed</button>
-                </div>
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="d-flex gap-2">
-                        <select class="form-select form-select-sm" id="support-tickets-entries" style="width: auto;">
-                            <option value="10">10 per page</option>
-                            <option value="25">25 per page</option>
-                            <option value="50">50 per page</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="table-responsive">
-                    <table class="table" id="admin-support-tickets-table">
-                        <thead>
-                            <tr>
-                                <th>Farmer</th>
-                                <th>Subject</th>
-                                <th>Status</th>
-                                <th>Priority</th>
-                                <th>Date</th>
-                                <th>Last Message</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                <div id="admin-support-tickets-pagination" class="d-flex justify-content-center mt-3"></div>
-            </div>
-        </div>
-    </section>
 
     <!-- ════════════════════════════════════════════════════════════════
          § 15 — PROFILE SECTION
@@ -3171,8 +3378,8 @@
                         </button>
                     </div>
                     <div class="form-hint">
-                        Staff can create customer and farmer accounts.
-                        Super admins can also create staff accounts.
+                        Admin can create customer and farmer accounts.
+                        Super admins can also create admin accounts.
                     </div>
                 </div>
 
@@ -3401,6 +3608,170 @@
     </div>
 </div>
 
+<!-- Subscription Details Modal -->
+<div class="modal fade" id="subscription-details-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Subscription Details</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Farmer Name</label>
+                        <div id="sub-detail-farmer-name" class="fw-semibold">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Email</label>
+                        <div id="sub-detail-email">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Shop Name</label>
+                        <div id="sub-detail-shop-name">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Plan</label>
+                        <div id="sub-detail-plan">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Amount</label>
+                        <div id="sub-detail-amount">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Duration</label>
+                        <div id="sub-detail-duration">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Payment To</label>
+                        <div id="sub-detail-payment-to">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Account Number</label>
+                        <div id="sub-detail-account-number">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Status</label>
+                        <div id="sub-detail-status">—</div>
+                    </div>
+                    <div class="col-12" id="sub-detail-reason-container" style="display:none">
+                        <label class="small fw-semibold text-muted">Reason</label>
+                        <div id="sub-detail-reason" class="text-danger small">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Requested Date</label>
+                        <div id="sub-detail-created-at">—</div>
+                    </div>
+                    <div class="col-md-6" id="sub-detail-starts-at-container" style="display:none">
+                        <label class="small fw-semibold text-muted">Start Date</label>
+                        <div id="sub-detail-starts-at">—</div>
+                    </div>
+                    <div class="col-md-6" id="sub-detail-expires-at-container" style="display:none">
+                        <label class="small fw-semibold text-muted">Expiry Date</label>
+                        <div id="sub-detail-expires-at">—</div>
+                    </div>
+                    <div class="col-12" id="sub-detail-proof-container">
+                        <label class="small fw-semibold text-muted">Payment Proof</label>
+                        <div class="mt-2">
+                            <img id="sub-detail-proof-img" src="" alt="Payment Proof" style="max-width:100%;max-height:300px;object-fit:contain;border-radius:8px;cursor:pointer;" onclick="openPaymentProofModal()">
+                        </div>
+                    </div>
+                    <div class="col-12 mt-4">
+                        <label class="small fw-semibold text-muted">Premium Benefits</label>
+                        <div class="mt-2 p-3 bg-light rounded">
+                            <ul class="mb-0 ps-3" style="font-size:0.9rem;">
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Unlimited product listings</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Priority approval for products</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Custom product names</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Advanced analytics & reports</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>All-time data access</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger btn-sm" id="sub-detail-expire-btn" style="display:none">Expire Subscription</button>
+                <button class="btn btn-danger btn-sm" id="sub-detail-reject-btn" style="display:none">Reject</button>
+                <button class="btn btn-success btn-sm ms-auto" id="sub-detail-approve-btn" style="display:none">Approve</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Proof Modal -->
+<div class="modal fade" id="payment-proof-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Proof</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body d-flex justify-content-center align-items-center" style="background: #000; min-height: 400px;">
+                <img id="payment-proof-modal-img" src="" alt="Payment Proof" style="max-width:100%;max-height:80vh;object-fit:contain;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Subscription Reason Modal -->
+<div class="modal fade" id="reject-subscription-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reject Subscription</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Reason for rejection <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="reject-subscription-reason" rows="4" maxlength="500" placeholder="Please provide a reason for rejecting this subscription..."></textarea>
+                    <div class="text-end small text-muted mt-1">
+                        <span id="reject-subscription-reason-count">0</span>/500
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-reject-subscription-btn">Reject</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Expire Subscription Reason Modal -->
+<div class="modal fade" id="expire-subscription-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Expire Subscription</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Reason for expiry <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="expire-subscription-reason" rows="4" maxlength="500" placeholder="Please provide a reason for expiring this subscription..."></textarea>
+                    <div class="text-end small text-muted mt-1">
+                        <span id="expire-subscription-reason-count">0</span>/500
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-expire-subscription-btn">Expire</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ── Rejection Reason Modal ─────────────────────────────────────────── -->
 <div id="reject-product-modal" class="admin-modal-backdrop">
     <div class="admin-modal modal-sm">
@@ -3531,11 +3902,11 @@
                 <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-enable-spinner"></span>
                 Enable
             </button>
-            <button class="btn btn-sm d-none btn-ac-green" id="fdt-verify-btn" type="button">
+            <button class="btn btn-sm d-none btn-ac-green" id="fdt-verify-btn" type="button" data-roles="super_admin">
                 <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-verify-spinner"></span>
                 Verify
             </button>
-            <button class="btn btn-sm d-none btn-ac-red" id="fdt-unverify-btn" type="button">
+            <button class="btn btn-sm d-none btn-ac-red" id="fdt-unverify-btn" type="button" data-roles="super_admin">
                 <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-unverify-spinner"></span>
                 Unverify
             </button>
@@ -3544,17 +3915,17 @@
     </div>
 </div>
 
-<!-- ── Staff Detail Modal ───────────────────────────────────────────── -->
-<div id="staff-detail-modal" class="admin-modal-backdrop">
+<!-- ── Admin Detail Modal ───────────────────────────────────────────── -->
+<div id="admin-detail-modal" class="admin-modal-backdrop">
     <div class="admin-modal modal-lg">
         <div class="modal-header">
-            <h4 class="modal-title">Staff Details</h4>
-            <button class="modal-close-btn" data-close-modal="staff-detail-modal" aria-label="Close">
+            <h4 class="modal-title">Admin Details</h4>
+            <button class="modal-close-btn" data-close-modal="admin-detail-modal" aria-label="Close">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
         <div class="modal-body">
-            <ul class="nav nav-tabs nav-tabs-bordered" id="staffDetailTabs">
+            <ul class="nav nav-tabs nav-tabs-bordered" id="adminDetailTabs">
                 <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#sdt-overview">Overview</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#sdt-activity">Activity</button></li>
             </ul>
@@ -3631,7 +4002,7 @@
 ══════════════════════════════════════════════════════════════════════ -->
 <div id="sa-toast-stack" class="admin-toast-stack"></div>
 
-<!-- User Detail Modal (for Staff and All Users) -->
+<!-- User Detail Modal (for Admin and All Users) -->
 <div id="sa-user-detail-modal" class="admin-modal-backdrop">
     <div class="admin-modal modal-lg">
         <div class="modal-header">
@@ -3695,7 +4066,7 @@
                             <option value="">Select role…</option>
                             <option value="customer">Customer</option>
                             <option value="farmer">Farmer</option>
-                            <option value="staff">Staff</option>
+                            <option value="admin">Admin</option>
                         </select>
                     </div>
                     <div class="col-md-6">
@@ -3726,43 +4097,110 @@
 
 <!-- Admin Ticket Detail & Chat Modal -->
 <div class="modal fade" id="admin-ticket-detail-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Support Ticket</h5>
-                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 800px;">
+        <div class="modal-content" style="border-radius: 12px; overflow: hidden;">
+            <!-- Modal Header - Ticket Info -->
+            <div class="modal-header" style="border-bottom: 1px solid #e9ecef; padding: 16px 20px; background: #f8f9fa; color: #fff !important;">
+                <div style="flex: 1;">
+                    <h5 class="modal-title mb-1" id="admin-ticket-detail-subject" style="font-size: 16px; font-weight: 600; color: #fff !important;">Ticket Subject</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge" id="admin-ticket-detail-status" style="font-size: 11px; padding: 4px 8px;">Status</span>
+                        <small class="text-muted" style="font-size: 12px; margin-left: auto;">
+                            <span id="admin-ticket-detail-created">Created Date</span>
+                        </small>
+                    </div>
+                </div>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close" style="background: none; border: none; font-size: 20px; color: #6c757d; cursor: pointer; padding: 0;">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
-            <div class="modal-body">
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <h6 id="admin-ticket-detail-subject"></h6>
-                        <div class="d-flex gap-2 mb-2">
-                            <span class="badge" id="admin-ticket-detail-status"></span>
-                            <span class="badge" id="admin-ticket-detail-priority"></span>
-                        </div>
-                        <div class="d-flex gap-2 align-items-center">
-                            <small class="text-muted">Created: <span id="admin-ticket-detail-created"></span></small>
-                            <div class="ms-auto">
-                                <select class="form-select form-select-sm" id="admin-ticket-status-select" style="width: auto;">
-                                    <option value="open">Open</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="resolved">Resolved</option>
-                                    <option value="closed">Closed</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div id="admin-ticket-messages-container" style="max-height: 400px; overflow-y: auto;" class="mb-3 p-3 bg-light rounded">
+
+            <!-- Modal Body - Chat Area -->
+            <div class="modal-body" style="padding: 0; display: flex; flex-direction: column; height: 500px;">
+                <!-- Messages Container -->
+                <div id="admin-ticket-messages-container" style="flex: 1; overflow-y: auto; padding: 20px; background: #f0f2f5;">
                     <!-- Messages will be loaded here -->
                 </div>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="admin-ticket-message-input" maxlength="500" placeholder="Type your message...">
-                    <button class="btn ac-btn-primary" id="btn-admin-send-ticket-message">Send</button>
+
+                <!-- Message Input -->
+                <div style="padding: 16px 20px; background: white; border-top: 1px solid #e9ecef;">
+                    <div style="display: flex; gap: 10px; align-items: flex-end;">
+                        <div style="flex: 1; position: relative;">
+                            <input type="text" class="form-control" id="admin-ticket-message-input" maxlength="500" 
+                                   placeholder="Type a message..." 
+                                   style="border-radius: 20px; padding: 12px 20px; border: 1px solid #ddd;">
+                            <span id="admin-ticket-message-char-count" style="position: absolute; right: 15px; bottom: 12px; font-size: 11px; color: #999;">0/500</span>
+                        </div>
+                        <button class="btn btn-primary" id="btn-admin-send-ticket-message" 
+                                style="border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; background: #0084ff; border: none;">
+                            <i class="bi bi-send-fill" style="font-size: 18px;"></i>
+                        </button>
+                    </div>
+                    <!-- Status Update Dropdown (Admin Only) -->
+                    <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 12px; color: #666; margin: 0;">Update Status:</label>
+                        <select class="form-select form-select-sm" id="admin-ticket-status-select" style="width: auto; font-size: 12px; padding: 4px 8px;">
+                            <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
+                        </select>
+                    </div>
                 </div>
-                <small class="text-muted" id="admin-ticket-message-char-count">0/500 characters</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ticket Detail Modal -->
+<div class="modal fade" id="ticket-detail-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-ticket-perforated me-2"></i>Ticket Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">Ticket Number</label>
+                        <div id="ticket-detail-number" class="fw-bold">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">Farmer</label>
+                        <div id="ticket-detail-farmer" class="fw-bold">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">Status</label>
+                        <div id="ticket-detail-status" class="fw-bold">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">Created</label>
+                        <div id="ticket-detail-created">—</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small text-muted">Subject</label>
+                        <div id="ticket-detail-subject" class="fw-bold">—</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small text-muted">Reason</label>
+                        <div id="ticket-detail-reason" class="bg-light p-3 rounded">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <div class="d-flex gap-2 ms-auto">
+                    <select class="form-select" id="ticket-detail-status-select" style="width: auto;">
+                        <option value="open">Open</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                    <button type="button" class="btn btn-primary" id="ticket-detail-update-status-btn">Update Status</button>
+                </div>
             </div>
         </div>
     </div>
@@ -3784,15 +4222,6 @@
 <script src="/js/admin.js?v=ui-refinements-20260603g"></script>
 <script src="/js/chat.js"></script>
 
-<script>
-// Hide loading screen on page load
-window.addEventListener('load', function () {
-  setTimeout(function () {
-    var ls = document.getElementById('admin-loading-screen');
-    if (ls) ls.classList.add('hidden');
-  }, 500);
-});
-</script>
 
 </body>
 </html>

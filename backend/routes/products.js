@@ -23,6 +23,24 @@ function containsFisheryKeywords(text) {
   return new RegExp(FISHERY_KEYWORDS_PATTERN, 'i').test(String(text || ''));
 }
 
+// ── Tier helpers for subscription system ────────────────────────────────────
+async function getFarmerTier(farmerId) {
+  const subRes = await pool.query(
+    `SELECT tier, status, expires_at FROM farmer_subscriptions
+     WHERE farmer_id = $1 AND status = 'active' ORDER BY expires_at DESC LIMIT 1`, [farmerId]
+  );
+  if (subRes.rows.length === 0 || new Date(subRes.rows[0].expires_at) < new Date()) return 'free';
+  return subRes.rows[0].tier;
+}
+
+async function getFarmerProductCount(userId) {
+  const countRes = await pool.query(
+    `SELECT COUNT(*) FROM products WHERE farmer_id = $1 AND status IN ($2, $3) AND is_admin_disabled = false`,
+    [userId, 'approved', 'pending']
+  );
+  return parseInt(countRes.rows[0].count, 10);
+}
+
 function normalizeDescription(value) {
   if (typeof value === 'undefined' || value === null) return null;
   const cleaned = String(value).trim();
@@ -37,19 +55,6 @@ const extractCloudinaryPublicId = (url) => {
     /^https:\/\/res\.cloudinary\.com\/[^\/]+\/(?:image|video)\/upload\/(?:[^\/]+\/)*?(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?(?:\?.*)?$/
   );
   return match && match[1] ? match[1] : null;
-};
-
-const categorizedProductPublicId = ({ categoryName, productName, userId }) => {
-  return cloudinary.publicIdForCategorizedProduct({
-    categoryName,
-    productName,
-    userId,
-    extension: 'jpeg'
-  });
-};
-
-const categorizedProductPublicIdPrefix = ({ categoryName, productName, userId }) => {
-  return `agricatch/${cloudinary.slugify(categoryName || 'uncategorized')}/${cloudinary.slugify(productName || 'product')}/${String(userId || 'unknown').trim()}-`;
 };
 
 const loadCategoryNameById = async (categoryId) => {
@@ -70,7 +75,7 @@ const cloudinaryUrlForPublicId = (publicId) => {
 const rehomeProductImageToCategorizedId = async ({
   categoryName,
   productName,
-  userId,
+  productId,
   imagePublicId,
   imageUrl
 }) => {
@@ -79,13 +84,8 @@ const rehomeProductImageToCategorizedId = async ({
     return { imagePublicId, imageUrl, changed: false };
   }
 
-  const targetPrefix = categorizedProductPublicIdPrefix({ categoryName, productName, userId });
-  if (sourcePublicId.startsWith(targetPrefix)) {
-    return { imagePublicId: sourcePublicId, imageUrl, changed: false };
-  }
-
-  const targetPublicId = categorizedProductPublicId({ categoryName, productName, userId });
-  if (!targetPublicId || sourcePublicId === targetPublicId) {
+  const targetPublicId = `agricatch/${cloudinary.slugify(categoryName || 'uncategorized')}/${cloudinary.slugify(productName || 'product')}/${productId}.jpeg`;
+  if (sourcePublicId === targetPublicId) {
     return { imagePublicId: sourcePublicId, imageUrl, changed: false };
   }
 
@@ -264,24 +264,38 @@ router.get('/categories', async (_req, res) => {
   }
 });
 
-// Farmer custom product-name request (requires staff approval)
+// Farmer custom product-name request (requires admin approval)
 router.post('/category-requests', async (req, res) => {
   try {
     const decoded = getUserFromToken(req);
     if (!decoded?.id) return res.status(401).json({ message: 'Invalid or expired token' });
 
-    const roleResult = await pool.query('SELECT role, is_verified FROM users WHERE id = $1', [decoded.id]);
+    const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
     const role = roleResult.rows[0]?.role;
-    const isVerified = roleResult.rows[0]?.is_verified;
-    
+
     if (role !== 'farmer') {
       return res.status(403).json({ message: 'Only farmers can request custom product names' });
     }
 
-    if (!isVerified) {
-      return res.status(403).json({ 
-        message: 'Custom product name requests are available for verified farmers only. Please contact support to verify your account.' 
-      });
+    // Check verification status from verification_requests table
+    let isVerified = false;
+    try {
+      const verifResult = await pool.query(
+        'SELECT status FROM verification_requests WHERE farmer_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [decoded.id]
+      );
+      isVerified = verifResult.rows.length > 0 && verifResult.rows[0].status === 'approved';
+    } catch (verifError) {
+      console.error('Error checking verification status:', verifError);
+      // If verification_requests table doesn't exist or query fails, fall back to checking users.is_verified
+      const userVerifResult = await pool.query('SELECT is_verified FROM users WHERE id = $1', [decoded.id]);
+      isVerified = userVerifResult.rows[0]?.is_verified === true;
+    }
+
+    // getFarmerTier now uses user_id directly (farmers table doesn't exist)
+    const tier = await getFarmerTier(decoded.id);
+    if (tier !== 'premium') {
+      return res.status(403).json({ message: 'Custom product names are a Premium feature.' });
     }
 
     const name = String(req.body?.name || '').trim();
@@ -291,7 +305,7 @@ router.post('/category-requests', async (req, res) => {
     const categoryId = Number.isFinite(parsedCategoryId) && parsedCategoryId > 0 ? parsedCategoryId : 0;
 
     if (!name) return res.status(400).json({ message: 'Product name is required' });
-    // Category is now optional - staff will determine it
+    // Category is now optional - admin will determine it
     if (requestedCategoryName.length > 120) {
       return res.status(400).json({ message: 'Requested category is too long (max 120 chars)' });
     }
@@ -351,7 +365,7 @@ router.post('/category-requests', async (req, res) => {
     );
 
     return res.status(201).json({
-      message: 'Request submitted. Staff will review and approve it.',
+      message: 'Request submitted. Admin will review and approve it.',
       request: inserted.rows[0]
     });
   } catch (error) {
@@ -434,14 +448,14 @@ router.get('/', async (req, res) => {
 
     const normalizedSort = String(sort || 'latest').trim().toLowerCase();
     const orderByMap = {
-      latest: 'COALESCE(u.is_verified, false) DESC, p.created_at DESC',
-      harvest_date: 'COALESCE(u.is_verified, false) DESC, p.harvest_date DESC NULLS LAST, p.created_at DESC',
-      expiry_date: 'COALESCE(u.is_verified, false) DESC, p.expiry_date ASC NULLS LAST, p.created_at DESC',
-      expiration_date: 'COALESCE(u.is_verified, false) DESC, p.expiry_date ASC NULLS LAST, p.created_at DESC',
-      ratings: 'COALESCE(u.is_verified, false) DESC, average_rating DESC, total_reviews DESC, p.created_at DESC',
-      top_sales: 'COALESCE(u.is_verified, false) DESC, p.sales_count DESC, p.created_at DESC',
-      price_low_high: 'COALESCE(u.is_verified, false) DESC, p.price ASC, p.created_at DESC',
-      price_high_low: 'COALESCE(u.is_verified, false) DESC, p.price DESC, p.created_at DESC'
+      latest: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.created_at DESC',
+      harvest_date: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.harvest_date DESC NULLS LAST, p.created_at DESC',
+      expiry_date: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.expiry_date ASC NULLS LAST, p.created_at DESC',
+      expiration_date: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.expiry_date ASC NULLS LAST, p.created_at DESC',
+      ratings: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, average_rating DESC, total_reviews DESC, p.created_at DESC',
+      top_sales: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.sales_count DESC, p.created_at DESC',
+      price_low_high: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.price ASC, p.created_at DESC',
+      price_high_low: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.price DESC, p.created_at DESC'
     };
     const orderByClause = orderByMap[normalizedSort] || orderByMap.latest;
 
@@ -450,6 +464,7 @@ router.get('/', async (req, res) => {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN users u ON p.farmer_id = u.id
+      LEFT JOIN farmer_subscriptions fs ON fs.farmer_id = u.id AND fs.status = 'active' AND fs.expires_at > CURRENT_TIMESTAMP
       WHERE p.is_available = true
         AND COALESCE(p.is_admin_disabled, false) = false
         AND COALESCE(u.is_disabled, false) = false
@@ -814,8 +829,8 @@ router.get('/:id', async (req, res) => {
     } else if (userId) {
       const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
       const role = roleResult.rows[0]?.role;
-      if (role === 'staff' || role === 'super_admin') {
-        // Staff can view all products
+      if (role === 'admin' || role === 'super_admin') {
+        // Admin can view all products
       } else if (role === 'farmer') {
         // Farmers can view their own products (including rejected) and available products from others
         whereClause += ` AND (p.farmer_id = $2 OR (${availabilityFilter}))`;
@@ -999,42 +1014,52 @@ router.post('/', productUpload.single('image'), async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if user is a farmer and get verification status
-    const userResult = await pool.query('SELECT role, is_verified FROM users WHERE id = $1', [decoded.id]);
+    // Check if user is a farmer
+    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
     if (userResult.rows[0].role !== 'farmer') {
       return res.status(403).json({ message: 'Only farmers can add products' });
     }
 
-    const isVerified = userResult.rows[0].is_verified;
-
-    // Product limit check for unverified farmers (max 10 products)
-    if (!isVerified) {
-      const productCountResult = await pool.query(
-        `SELECT COUNT(*) as count FROM products 
-         WHERE farmer_id = $1 
-         AND status IN ('pending', 'approved') 
-         AND is_disabled = false`,
+    // Check verification status from verification_requests table
+    let isVerified = false;
+    try {
+      const verifResult = await pool.query(
+        'SELECT status FROM verification_requests WHERE farmer_id = $1 ORDER BY created_at DESC LIMIT 1',
         [decoded.id]
       );
-      const productCount = parseInt(productCountResult.rows[0].count, 10);
-      
-      if (productCount >= 10) {
-        // Send notification about product limit reached
+      isVerified = verifResult.rows.length > 0 && verifResult.rows[0].status === 'approved';
+    } catch (verifError) {
+      // If verification_requests table doesn't exist or query fails, fall back to checking users.is_verified
+      const userVerifResult = await pool.query('SELECT is_verified FROM users WHERE id = $1', [decoded.id]);
+      isVerified = userVerifResult.rows[0]?.is_verified === true;
+    }
+
+    // getFarmerTier now uses user_id directly (farmers table doesn't exist)
+    const tier = await getFarmerTier(decoded.id);
+
+    // Unverified farmers cannot sell at all
+    if (!isVerified) {
+      return res.status(403).json({ message: 'Please verify your account before adding products.' });
+    }
+
+    // Free verified: max 10 products
+    if (tier === 'free') {
+      const count = await getFarmerProductCount(decoded.id);
+      if (count >= 10) {
         try {
           await pool.query(
             `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
              VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
-            [decoded.id, 'product_limit_reached', 'Product Limit Reached', 
-             'You have reached the maximum of 10 products. Upgrade to a verified account to add unlimited products.']
+            [decoded.id, 'product_limit_reached', 'Product Limit Reached',
+             'You have reached the maximum of 10 products. Upgrade to Premium for unlimited listings.']
           );
           broadcastEvent('notification.created', { user_id: decoded.id });
         } catch (notifErr) {
           console.error('Failed to send product limit notification:', notifErr);
         }
-        
-        return res.status(403).json({ 
-          message: 'Product limit reached. Unverified farmers can only have up to 10 active products. Please contact support to verify your account.',
-          current_count: productCount,
+        return res.status(403).json({
+          message: 'Free tier limit: 10 active products max. Upgrade to Premium for unlimited listings.',
+          current_count: count,
           limit: 10
         });
       }
@@ -1127,7 +1152,7 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       const moved = await rehomeProductImageToCategorizedId({
         categoryName,
         productName: createdProduct.name,
-        userId: decoded.id,
+        productId: createdProduct.id,
         imagePublicId: createdProduct.cloudinary_public_id,
         imageUrl: createdProduct.image_url
       });
@@ -1155,7 +1180,7 @@ router.post('/', productUpload.single('image'), async (req, res) => {
     // Send notification to admin about new product submission
     try {
       const adminResult = await pool.query(
-        "SELECT id FROM users WHERE role IN ('staff', 'super_admin') LIMIT 1"
+        "SELECT id FROM users WHERE role IN ('admin', 'super_admin') LIMIT 1"
       );
       if (adminResult.rows.length > 0) {
         await pool.query(
@@ -1256,11 +1281,7 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
     const oldPublicId = current.cloudinary_public_id || extractCloudinaryPublicId(current.image_url) || null;
     let newPublicId = imagePublicId;
     const resolvedCategoryName = await loadCategoryNameById(nextCategoryId);
-    const targetPublicId = categorizedProductPublicId({
-      categoryName: resolvedCategoryName,
-      productName: nextName,
-      userId: decoded.id
-    });
+    const targetPublicId = `agricatch/${cloudinary.slugify(resolvedCategoryName)}/${cloudinary.slugify(nextName)}/${id}.jpeg`;
 
     if (typeof image_url !== 'undefined' && image_url !== null && String(image_url).trim() !== '') {
       imageUrl = String(image_url).trim();
@@ -1290,7 +1311,7 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
         const moved = await rehomeProductImageToCategorizedId({
           categoryName: resolvedCategoryName,
           productName: nextName,
-          userId: decoded.id,
+          productId: id,
           imagePublicId,
           imageUrl
         });

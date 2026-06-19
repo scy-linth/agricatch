@@ -29,7 +29,7 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="request-product-notes">Details for staff (optional)</label>
+                        <label for="request-product-notes">Details for admin (optional)</label>
                         <textarea id="request-product-notes" rows="4" maxlength="500" placeholder="e.g., local/common name, quality details, suggested unit, etc."></textarea>
                     </div>
                     <div class="form-actions">
@@ -136,7 +136,7 @@
                         return;
                     }
 
-                    showToast('Request submitted for staff approval.', 'success');
+                    showToast('Request submitted for admin approval.', 'success');
                     form.reset();
                     syncNameState();
                 } catch (error) {

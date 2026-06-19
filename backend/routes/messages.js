@@ -26,11 +26,12 @@ router.get('/conversations', async (req, res) => {
     const user = getUserFromToken(req);
     if (!user) return res.status(401).json({ message: 'Authentication required' });
 
-    // Query returns full_name as other_name (shop name for farmers, personal name for customers)
+    // Query returns shop_name and full_name separately for proper formatting
     // LEFT JOIN ensures NULL values are handled gracefully, with username as fallback
     const result = await pool.query(`
       SELECT c.*,
-             u.full_name as other_name,
+             COALESCE(u.shop_name, u.full_name) as other_shop_name,
+             u.full_name as other_full_name,
              u.username as other_username,
              (
                SELECT COUNT(*) FROM messages m
@@ -163,15 +164,15 @@ router.post('/send', async (req, res) => {
     let farmerId;
     let customerId;
 
-    if (role === 'staff') {
+    if (role === 'admin') {
       if (receiverRole !== 'farmer') {
-        return res.status(403).json({ message: 'Staff can only chat with farmers' });
+        return res.status(403).json({ message: 'Admin can only chat with farmers' });
       }
       farmerId = receiver_id;
       customerId = user.id;
     } else if (role === 'farmer') {
-      if (!['customer', 'staff'].includes(receiverRole)) {
-        return res.status(403).json({ message: 'Farmer can only chat with customers or staff' });
+      if (!['customer', 'admin'].includes(receiverRole)) {
+        return res.status(403).json({ message: 'Farmer can only chat with customers or admin' });
       }
       farmerId = user.id;
       customerId = receiver_id;

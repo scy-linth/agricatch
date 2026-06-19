@@ -206,27 +206,27 @@ router.get('/status', requireSuperAdmin, async (req, res) => {
   }
 });
 
-// ── GET /api/superadmin/staff ──────────────────────────────────────────────────
-router.get('/staff', requireSuperAdmin, async (req, res) => {
+// ── GET /api/superadmin/admin ──────────────────────────────────────────────────
+router.get('/admin', requireSuperAdmin, async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 200);
     const offset = (page - 1) * limit;
 
     const totalRes = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM users WHERE role IN ('staff', 'super_admin')`
+      `SELECT COUNT(*)::int AS count FROM users WHERE role IN ('admin', 'super_admin')`
     );
     const result = await pool.query(
       `SELECT id, username, email, full_name, first_name, middle_name, last_name, role, is_verified, is_disabled, created_at
        FROM users
-       WHERE role IN ('staff', 'super_admin')
+       WHERE role IN ('admin', 'super_admin')
        ORDER BY created_at DESC
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
-    res.json({ staff: result.rows, total: totalRes.rows[0]?.count || 0, page, limit });
+    res.json({ admin: result.rows, total: totalRes.rows[0]?.count || 0, page, limit });
   } catch (err) {
-    console.error('Superadmin get staff error:', err);
+    console.error('Superadmin get admin error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -241,8 +241,8 @@ router.post('/announcements', requireSuperAdmin, requireAnnouncementsEnabled, as
     const audienceMap = {
       farmer: ['farmer'],
       customer: ['customer'],
-      admin: ['staff', 'super_admin'],
-      all: ['farmer', 'customer', 'staff', 'super_admin']
+      admin: ['admin', 'super_admin'],
+      all: ['farmer', 'customer', 'admin', 'super_admin']
     };
 
     if (!title || !message) {
@@ -311,7 +311,7 @@ router.post('/users', requireSuperAdmin, async (req, res) => {
   try {
     const { first_name, middle_name, last_name, full_name, email, username, password, role } = req.body || {};
 
-    const allowedRoles = ['staff', 'super_admin', 'farmer', 'customer'];
+    const allowedRoles = ['admin', 'super_admin', 'farmer', 'customer'];
     const cleanRole = String(role || '').trim().toLowerCase();
     if (!allowedRoles.includes(cleanRole)) {
       return res.status(400).json({ message: `Invalid role. Allowed: ${allowedRoles.join(', ')}` });
@@ -414,7 +414,7 @@ router.put('/users/:id', requireSuperAdmin, async (req, res) => {
       push('password', pwHash);
     }
     if (typeof role !== 'undefined') {
-      const allowedRoles = ['staff', 'super_admin', 'farmer', 'customer'];
+      const allowedRoles = ['admin', 'super_admin', 'farmer', 'customer'];
       const r = String(role).trim().toLowerCase();
       if (!allowedRoles.includes(r)) return res.status(400).json({ message: `Invalid role` });
       push('role', r);

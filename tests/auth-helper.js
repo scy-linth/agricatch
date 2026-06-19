@@ -49,9 +49,9 @@ async function getAdminToken() {
       `SELECT id, email, username, role FROM users WHERE role = 'super_admin' OR role = 'superadmin' LIMIT 1`
     );
     if (result.rows.length === 0) {
-      // Fallback to staff or admin
+      // Fallback to admin
       result = await pool.query(
-        `SELECT id, email, username, role FROM users WHERE role = 'staff' OR role = 'admin' LIMIT 1`
+        `SELECT id, email, username, role FROM users WHERE role = 'admin' LIMIT 1`
       );
     }
     if (result.rows.length === 0) {
@@ -94,12 +94,25 @@ async function getFarmerToken() {
   });
 
   try {
-    // Get a farmer user
+    // Get specific farmer user for testing
     const result = await pool.query(
-      `SELECT id, email, username, role FROM users WHERE role = 'farmer' LIMIT 1`
+      `SELECT id, email, username, role, full_name, shop_name FROM users WHERE email = 'dhelhilis@gmail.com' LIMIT 1`
     );
     if (result.rows.length === 0) {
-      throw new Error('No farmer user found in database');
+      // Fallback to any farmer user
+      const fallbackResult = await pool.query(
+        `SELECT id, email, username, role, full_name, shop_name FROM users WHERE role = 'farmer' LIMIT 1`
+      );
+      if (fallbackResult.rows.length === 0) {
+        throw new Error('No farmer user found in database');
+      }
+      const user = fallbackResult.rows[0];
+      const token = jwt.sign(
+        { id: user.id, email: user.email, role: user.role },
+        jwtSecret,
+        { expiresIn: '1h' }
+      );
+      return { token, user };
     }
 
     const user = result.rows[0];

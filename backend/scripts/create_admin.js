@@ -50,7 +50,7 @@ async function main() {
           UPDATE users
           SET username = $1,
               email = $2,
-              role = 'staff',
+              role = 'admin',
               password = $3,
               password_hash = $4
               ${useUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''}
@@ -60,7 +60,7 @@ async function main() {
       } else {
         const sql = `
           INSERT INTO users (username, email, role, password, password_hash, created_at)
-          VALUES ($1, $2, 'staff', $3, $4, NOW());
+          VALUES ($1, $2, 'admin', $3, $4, NOW());
         `;
         await pool.query(sql, [username, email, password, hash]);
       }
@@ -70,7 +70,7 @@ async function main() {
           UPDATE users
           SET username = $1,
               email = $2,
-              role = 'staff',
+              role = 'admin',
               password_hash = $3
               ${useUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''}
           WHERE id = $4;
@@ -79,7 +79,7 @@ async function main() {
       } else {
         const sql = `
           INSERT INTO users (username, email, role, password_hash, created_at)
-          VALUES ($1, $2, 'staff', $3, NOW());
+          VALUES ($1, $2, 'admin', $3, NOW());
         `;
         await pool.query(sql, [username, email, hash]);
       }
@@ -89,7 +89,7 @@ async function main() {
           UPDATE users
           SET username = $1,
               email = $2,
-              role = 'staff',
+              role = 'admin',
               password = $3
               ${useUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''}
           WHERE id = $4;
@@ -98,13 +98,13 @@ async function main() {
       } else {
         const sql = `
           INSERT INTO users (username, email, role, password, created_at)
-          VALUES ($1, $2, 'staff', $3, NOW());
+          VALUES ($1, $2, 'admin', $3, NOW());
         `;
         await pool.query(sql, [username, email, password]);
       }
     }
 
-    console.log(`Admin (staff) ensured: ${email}`);
+    console.log(`Admin (admin) ensured: ${email}`);
     process.exit(0);
   } catch (err) {
     console.error('Failed to create admin:', err && err.message ? err.message : err);

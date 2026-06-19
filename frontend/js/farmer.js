@@ -256,6 +256,14 @@ class FarmerDashboard {
         return map[String(period || '').trim().toLowerCase()] || 'vs prev today';
     }
 
+    isPremium() {
+        return this.subscriptionData?.status === 'active';
+    }
+
+    isVerified() {
+        return this.currentVerificationRequest?.status === 'approved' || this.authProfile?.is_verified === true;
+    }
+
     updateKpiChange(changeId, labelId, change, period) {
         const changeEl = document.getElementById(changeId);
         const labelEl = document.getElementById(labelId);
@@ -392,6 +400,28 @@ class FarmerDashboard {
 
         this.sortableTables[tableId] = new window.simpleDatatables.DataTable(table, dataTableOptions);
         this.sortableTables[tableId]?.wrapperDOM?.classList.add('admin-sortable-wrapper');
+
+        // Save sort state when user clicks a header
+        const wrapper = this.sortableTables[tableId].wrapperDOM;
+        if (wrapper) {
+            const headers = wrapper.querySelectorAll('th');
+            headers.forEach((th, index) => {
+                th.addEventListener('click', () => {
+                    // Toggle direction: if clicking same column, flip direction; otherwise use asc
+                    const currentSort = localStorage.getItem(`farmerTableSort_${tableId}`);
+                    let newDirection = 'asc';
+                    if (currentSort) {
+                        try {
+                            const [savedCol, savedDir] = JSON.parse(currentSort);
+                            if (savedCol === index) {
+                                newDirection = savedDir === 'asc' ? 'desc' : 'asc';
+                            }
+                        } catch (_) {}
+                    }
+                    localStorage.setItem(`farmerTableSort_${tableId}`, JSON.stringify([index, newDirection]));
+                });
+            });
+        }
     }
 
     getStatusClass(status) {
@@ -449,13 +479,23 @@ class FarmerDashboard {
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
         // Dashboard period state (mirrors admin.js patterns)
-        this._kpiPeriods = { 'kpi-products': 'all', 'kpi-orders': 'today', 'kpi-sold': 'today', 'kpi-revenue': 'today' };
-        this._reportPeriod = 'today';
-        this._statusPeriod = 'today';
-        this._recentOrdersPeriod = 'today';
-        this._topProductsPeriod = 'today';
+        // Default to 'month' for verified users' metrics (orders, sold, revenue, recent orders, top products)
+        this._kpiPeriods = { 'kpi-products': 'all', 'kpi-orders': 'month', 'kpi-sold': 'month', 'kpi-revenue': 'month' };
+        this._reportPeriod = 'month';
+        this._statusPeriod = 'month';
+        this._recentOrdersPeriod = 'month';
+        this._topProductsPeriod = 'month';
         // Load saved periods from localStorage
         this._loadPeriods();
+        // Force reset to 'month' for verified users to ensure correct default
+        if (this.isVerified()) {
+            this._kpiPeriods = { 'kpi-products': 'all', 'kpi-orders': 'month', 'kpi-sold': 'month', 'kpi-revenue': 'month' };
+            this._reportPeriod = 'month';
+            this._statusPeriod = 'month';
+            this._recentOrdersPeriod = 'month';
+            this._topProductsPeriod = 'month';
+            this._savePeriods();
+        }
         // Update low stock threshold label
         const labelEl = document.getElementById('low-stock-threshold-label');
         if (labelEl) labelEl.textContent = `| ≤${this.lowStockThreshold}`;
@@ -477,6 +517,7 @@ class FarmerDashboard {
         };
         this.showDeniedBanner();
         await this.checkFarmerAuth();
+        await this.loadVerificationStatus();
         this.setupEventListeners();
         this.setupRequestModal();
         this.loadCategories();
@@ -491,6 +532,11 @@ class FarmerDashboard {
         this.loadNotifications();
         this.loadMessages();
         this.updateHeaderUser();
+        // Re-trigger verification UI update after header is updated
+        this.updateVerificationUI();
+
+        // Load initial section data before hiding loading screen
+        this.loadInitialSectionData();
     }
 
     setupRequestModal() {
@@ -630,7 +676,7 @@ class FarmerDashboard {
             if (!res.ok) {
                 this.showMessage(data.message || 'Unable to submit request', 'error');
             } else {
-                this.showMessage('Request submitted for staff approval.', 'success');
+                this.showMessage('Request submitted for admin approval.', 'success');
                 // reset
                 (document.getElementById('request-product-form-modal') || {}).reset?.();
                 await this.loadRequestHistory();
@@ -996,7 +1042,7 @@ class FarmerDashboard {
                         <span style="font-size:18px;">⛔</span>
                         <div>
                             <div style="font-weight:700;">Access denied</div>
-                            <div style="font-size:13px;">You tried to open the Staff Panel. Only staff can access it.</div>
+                            <div style="font-size:13px;">You tried to open the Admin Panel. Only admin can access it.</div>
                         </div>
                     </div>
                     <button id="dismiss-denied-banner" style="border:1px solid #fecaca;background:#fff;padding:8px 10px;border-radius:10px;cursor:pointer;">
@@ -1040,8 +1086,8 @@ class FarmerDashboard {
             if (response.ok) {
                 const data = await response.json();
                 this.authProfile = data?.user || null;
-                // If a staff user opens farmer page, send them back to staff panel
-                if (data.user.role === 'staff') {
+                // If a admin user opens farmer page, send them back to admin panel
+                if (data.user.role === 'admin') {
                     this.showAdminDeniedBannerAndRedirect();
                     return;
                 }
@@ -1081,6 +1127,7 @@ class FarmerDashboard {
                 this.loadOverviewMetrics({ force: true });
                 this.loadAnnouncements();
                 this.loadSubscription();
+                this.loadSupportTicketsBadge();
             } else {
                 // Never bounce farmer users to home on transient backend errors (causes redirect loop).
                 // Only force-login on unauthorized/forbidden responses.
@@ -1145,7 +1192,7 @@ class FarmerDashboard {
                         <span style="font-size:18px;">⛔</span>
                         <div>
                             <div style="font-weight:700;">Access denied</div>
-                            <div style="font-size:13px;">Staff users cannot access the Farmer Dashboard. Redirecting to Staff Panel...</div>
+                            <div style="font-size:13px;">Admin users cannot access the Farmer Dashboard. Redirecting to Admin Panel...</div>
                         </div>
                     </div>
                 </div>
@@ -1266,7 +1313,7 @@ class FarmerDashboard {
         // Support tickets
         document.getElementById('dropdown-support-tickets')?.addEventListener('click', (e) => {
             e.preventDefault();
-            this.openSupportTicketsModal();
+            this.showSection('support-tickets');
         });
 
         document.getElementById('btn-create-support-ticket')?.addEventListener('click', () => {
@@ -1294,26 +1341,28 @@ class FarmerDashboard {
             this.loadSupportTickets();
         });
 
-        document.getElementById('btn-send-ticket-message')?.addEventListener('click', () => {
-            this.sendTicketMessage();
-        });
-
-        document.getElementById('ticket-message-input')?.addEventListener('input', (e) => {
-            const count = e.target.value.length;
-            const counterEl = document.getElementById('ticket-message-char-count');
-            counterEl.textContent = `${count}/500 characters`;
-            counterEl.style.color = count > 450 ? 'red' : '';
-        });
-
-        // Stop ticket polling when modal closes
-        document.getElementById('ticket-detail-modal')?.addEventListener('hidden.bs.modal', () => {
-            this.stopTicketPolling();
-            this.currentTicketId = null;
+        // Support ticket view button opens dedicated support ticket chat section
+        document.querySelector('#support-tickets-table')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.view-ticket-btn');
+            if (!btn) return;
+            const ticketId = btn.dataset.id;
+            if (!ticketId) return;
+            this.showSection('support-ticket-chat');
+            if (window.supportTicketChat && typeof window.supportTicketChat.openTicket === 'function') {
+                setTimeout(() => window.supportTicketChat.openTicket(ticketId), 300);
+            }
         });
 
         // My Requests tab - load requests when tab is shown
         const requestsTab = document.querySelector('button[data-bs-target="#products-requests-tab"]');
         if (requestsTab) {
+            requestsTab.addEventListener('show.bs.tab', (e) => {
+                if (!this.isVerified()) {
+                    e.preventDefault();
+                    this.showMessage('Please verify your account to view product approvals.', 'error');
+                    return false;
+                }
+            });
             requestsTab.addEventListener('shown.bs.tab', () => {
                 this.loadRequestsTable();
             });
@@ -1535,6 +1584,11 @@ class FarmerDashboard {
             if (!link) return;
             e.preventDefault();
             const period = link.dataset.period;
+            // Premium restriction: only allow changing from 'month' if user is premium
+            if (!this.isPremium() && period !== 'month') {
+                this.showToast('🚀 Unlock advanced analytics! Upgrade to Premium to access custom timeframes and detailed insights.', 'warning');
+                return;
+            }
             this._syncAllPeriods(period);
             this.loadOverviewMetrics({ force: true });
             this._savePeriods();
@@ -1546,6 +1600,11 @@ class FarmerDashboard {
             if (!link) return;
             e.preventDefault();
             const period = link.dataset.period;
+            // Premium restriction: only allow changing from 'month' if user is premium
+            if (!this.isPremium() && period !== 'month') {
+                this.showToast('🚀 Unlock advanced analytics! Upgrade to Premium to access custom timeframes and detailed insights.', 'warning');
+                return;
+            }
             this._syncAllPeriods(period);
             this.loadOverviewMetrics({ force: true });
             this._savePeriods();
@@ -1557,6 +1616,11 @@ class FarmerDashboard {
             if (!link) return;
             e.preventDefault();
             const period = link.dataset.period;
+            // Premium restriction: only allow changing from 'month' if user is premium
+            if (!this.isPremium() && period !== 'month') {
+                this.showToast('🚀 Unlock advanced analytics! Upgrade to Premium to access custom timeframes and detailed insights.', 'warning');
+                return;
+            }
             this._recentOrdersPeriod = period;
             const lbl = document.getElementById('recent-orders-period-label');
             if (lbl) lbl.textContent = `| ${this._periodLabel(period)}`;
@@ -1570,6 +1634,11 @@ class FarmerDashboard {
             if (!link) return;
             e.preventDefault();
             const period = link.dataset.period;
+            // Premium restriction: only allow changing from 'month' if user is premium
+            if (!this.isPremium() && period !== 'month') {
+                this.showToast('🚀 Unlock advanced analytics! Upgrade to Premium to access custom timeframes and detailed insights.', 'warning');
+                return;
+            }
             this._topProductsPeriod = period;
             const lbl = document.getElementById('top-products-period-label');
             if (lbl) lbl.textContent = `| ${this._periodLabel(period)}`;
@@ -1583,6 +1652,11 @@ class FarmerDashboard {
             if (!link) return;
             e.preventDefault();
             const period = link.dataset.period;
+            // Verified users can always use "this month", premium users can use any period
+            if (!this.isPremium() && period !== 'month') {
+                this.showToast('🚀 Unlock advanced analytics! Upgrade to Premium to access custom timeframes and detailed insights.', 'warning');
+                return;
+            }
             this._syncAllPeriods(period);
             this.loadOverviewMetrics({ force: true });
             this._savePeriods();
@@ -1593,6 +1667,11 @@ class FarmerDashboard {
             const link = e.target.closest('.items-sold-period-filter');
             if (!link) return;
             e.preventDefault();
+            // Free tier restriction: only allow This Month
+            if (!this.isPremium()) {
+                this.showToast('🚀 Unlock advanced analytics! Upgrade to Premium to access custom timeframes and detailed insights.', 'warning');
+                return;
+            }
             const period = link.dataset.period;
             this._syncAllPeriods(period);
             this.loadOverviewMetrics({ force: true });
@@ -1604,6 +1683,11 @@ class FarmerDashboard {
             const link = e.target.closest('.total-revenue-period-filter');
             if (!link) return;
             e.preventDefault();
+            // Free tier restriction: only allow This Month
+            if (!this.isPremium()) {
+                this.showToast('🚀 Unlock advanced analytics! Upgrade to Premium to access custom timeframes and detailed insights.', 'warning');
+                return;
+            }
             const period = link.dataset.period;
             this._syncAllPeriods(period);
             this.loadOverviewMetrics({ force: true });
@@ -1654,6 +1738,10 @@ class FarmerDashboard {
         // Tab switching
         document.getElementById('list-products-tab')?.addEventListener('click', () => this.switchTab('list-products'));
         document.getElementById('add-product-tab')?.addEventListener('click', () => {
+            if (!this.isVerified()) {
+                this.showMessage('Please verify your account before adding products.', 'error');
+                return;
+            }
             this.openAddProductModal();
         });
 
@@ -2352,14 +2440,31 @@ class FarmerDashboard {
         }
         if (addCategory) addCategory.addEventListener('change', async () => {
             this.syncProductNameAvailability('add');
+            const addNameEl = document.getElementById('product-name');
+            if (addNameEl) {
+                addNameEl.disabled = true;
+                addNameEl.placeholder = 'Loading products...';
+            }
             await this.loadProductCatalogNames(addCategory.dataset.value || addCategory.value || null);
+            if (addNameEl) {
+                addNameEl.disabled = false;
+                addNameEl.placeholder = 'Select a product';
+            }
             this.updatePriceSuggestion('add');
         });
         if (editCategory) editCategory.addEventListener('change', async () => {
             const editNameEl = document.getElementById('edit-product-name');
             if (editNameEl) editNameEl.value = '';
             this.syncProductNameAvailability('edit');
+            if (editNameEl) {
+                editNameEl.disabled = true;
+                editNameEl.placeholder = 'Loading products...';
+            }
             await this.loadProductCatalogNames(editCategory.dataset.value || editCategory.value || null);
+            if (editNameEl) {
+                editNameEl.disabled = false;
+                editNameEl.placeholder = 'Select a product';
+            }
             this.updatePriceSuggestion('edit');
         });
 
@@ -2411,7 +2516,7 @@ class FarmerDashboard {
                 return;
             }
 
-            this.showMessage('Request submitted for staff approval.', 'success');
+            this.showMessage('Request submitted for admin approval.', 'success');
             const requestNameEl = document.getElementById('custom-product-name-request');
             const requestNotesEl = document.getElementById('custom-product-request-notes');
             if (requestNameEl) requestNameEl.value = '';
@@ -2483,7 +2588,7 @@ class FarmerDashboard {
         });
 
         // Initial section based on saved state, hash, or default
-        const validSections = new Set(['overview', 'products', 'orders', 'chat', 'shop', 'reviews', 'profile', 'notifications', 'subscription']);
+        const validSections = new Set(['overview', 'products', 'orders', 'chat', 'shop', 'reviews', 'profile', 'notifications', 'subscription', 'support-tickets', 'support-ticket-chat']);
         const savedSectionRaw = localStorage.getItem('farmerActiveSection');
         const savedSection = String(savedSectionRaw || '').trim();
         const hash = String((window.location.hash || '')).replace('#', '').trim();
@@ -2603,9 +2708,14 @@ class FarmerDashboard {
     }
 
     showSection(section, tab = null) {
-        const validSections = new Set(['overview', 'products', 'orders', 'chat', 'shop', 'reviews', 'profile', 'notifications', 'subscription']);
+        const validSections = new Set(['overview', 'products', 'orders', 'chat', 'shop', 'reviews', 'profile', 'notifications', 'subscription', 'support-tickets', 'support-ticket-chat']);
         const normalized = String(section || '').trim();
         const safeSection = validSections.has(normalized) ? normalized : 'overview';
+
+        // Clear notification highlight when leaving notifications section
+        if (this.activeSection === 'notifications' && safeSection !== 'notifications') {
+            this.clearNotificationHighlight();
+        }
 
         this.activeSection = safeSection;
         // Save current section to localStorage
@@ -2632,9 +2742,65 @@ class FarmerDashboard {
             this.activateProfileTab(tab || 'overview');
         }
 
+        // Auto-select first ticket when support-ticket-chat section is opened
+        if (safeSection === 'support-ticket-chat') {
+            if (window.supportTicketChat && typeof window.supportTicketChat.onSectionVisible === 'function') {
+                window.supportTicketChat.onSectionVisible();
+            }
+        }
+
+        // Hide breadcrumbs when support-ticket-chat section is active
+        const pagetitle = document.querySelector('.pagetitle');
+        if (pagetitle) {
+            pagetitle.style.display = safeSection === 'support-ticket-chat' ? 'none' : '';
+        }
+
         // Load notifications when notifications section is opened
         if (safeSection === 'notifications') {
-            this.loadNotifications(1);
+            this.loadNotifications(1).then(() => {
+                // Apply highlight after notifications are loaded and DOM is updated
+                requestAnimationFrame(() => {
+                    if (this.highlightedNotifId) {
+                        const item = document.querySelector(`.notification-item[data-id="${this.highlightedNotifId}"]`);
+                        if (item) {
+                            item.classList.add('highlighted');
+                            item.style.background = '#fef9c3';
+                            item.style.borderColor = '#facc15';
+                            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // Mark as read
+                            this.markNotifRead(this.highlightedNotifId, null, true);
+
+                            // Transition from yellow highlight to read status after 1 second
+                            setTimeout(() => {
+                                item.style.background = '#fafafa';
+                                item.style.borderColor = '#e5e7eb';
+                                item.style.opacity = '0.7';
+                                this.highlightedNotifId = null;
+                            }, 1000);
+                        }
+                    }
+                });
+            });
+        }
+
+        // Load support tickets when support-tickets section is opened
+        if (safeSection === 'support-tickets') {
+            this.loadSupportTickets();
+        }
+
+        // Load data when navigating to sections
+        if (safeSection === 'products') {
+            this.loadMyProducts();
+        } else if (safeSection === 'reviews') {
+            this.loadReviews(1);
+        } else if (safeSection === 'shop') {
+            this.loadShopProfile();
+        } else if (safeSection === 'subscription') {
+            this.loadSubscription();
+        } else if (safeSection === 'overview') {
+            // Clear KPI values to N/A immediately to prevent visual flash for unverified farmers
+            this.clearKpiValues();
+            this.loadOverviewMetrics();
         }
 
         const titles = {
@@ -2646,10 +2812,15 @@ class FarmerDashboard {
             reviews: 'Reviews',
             profile: 'My Profile',
             notifications: 'Notifications',
-            subscription: 'Subscription'
+            subscription: 'Subscription',
+            'support-tickets': 'Support Tickets'
         };
         const titleEl = document.getElementById('farmer-page-title');
-        if (titleEl) titleEl.textContent = titles[safeSection] || 'Overview';
+        if (titleEl) {
+            // Hide page title for all sections with hero titles (all except overview)
+            titleEl.style.display = safeSection === 'overview' ? 'block' : 'none';
+            titleEl.textContent = titles[safeSection] || 'Overview';
+        }
 
         // Update breadcrumb
         const breadcrumbCurrent = document.getElementById('breadcrumb-current');
@@ -2663,7 +2834,8 @@ class FarmerDashboard {
                 chat: 'Messages',
                 profile: 'My Profile',
                 notifications: 'Notifications',
-                subscription: 'Subscription'
+                subscription: 'Subscription',
+                'support-tickets': 'Support Tickets'
             };
             breadcrumbCurrent.textContent = breadcrumbLabels[safeSection] || 'Farmer Dashboard';
         }
@@ -2804,6 +2976,13 @@ class FarmerDashboard {
                 if (chatBadge) {
                     chatBadge.textContent = this.fmtNumber(unread);
                     chatBadge.style.display = Number(unread) > 0 ? 'inline-flex' : 'none';
+                }
+
+                // Also update dropdown chat badge
+                const dropdownChatBadge = document.getElementById('dropdown-chat-badge');
+                if (dropdownChatBadge) {
+                    dropdownChatBadge.textContent = this.fmtNumber(unread);
+                    dropdownChatBadge.style.display = Number(unread) > 0 ? 'inline-block' : 'none';
                 }
             }
 
@@ -3016,7 +3195,175 @@ class FarmerDashboard {
             this.updateSubscriptionUI();
             this.updatePremiumBadge();
             this.updateAddProductButton();
+            this.loadSubscriptionHistory();
         } catch (e) { console.error('Load subscription error:', e); }
+    }
+
+    async loadSubscriptionHistory() {
+        try {
+            const res = await fetch(`${this.apiBase}/subscriptions/farmers/me/subscription/history`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                this.renderSubscriptionHistory(data.history || []);
+            } else {
+                document.getElementById('subscription-history-container').innerHTML = '<p class="text-muted small">Failed to load history.</p>';
+            }
+        } catch (e) {
+            console.error('Load subscription history error:', e);
+            document.getElementById('subscription-history-container').innerHTML = '<p class="text-muted small">Failed to load history.</p>';
+        }
+    }
+
+    renderSubscriptionHistory(history) {
+        const container = document.getElementById('subscription-history-container');
+        if (!history || history.length === 0) {
+            container.innerHTML = '<p class="text-muted small">No subscription history yet.</p>';
+            return;
+        }
+
+        const statusColors = {
+            pending: 'bg-warning',
+            active: 'bg-success',
+            expired: 'bg-secondary',
+            rejected: 'bg-danger'
+        };
+
+        const statusIcons = {
+            pending: 'hourglass',
+            active: 'check-circle',
+            expired: 'x-circle',
+            rejected: 'x-circle'
+        };
+
+        let html = '<div class="table-responsive"><table class="table table-sm table-hover">';
+        html += '<thead><tr><th>Date</th><th>Plan</th><th>Amount</th><th>Status</th><th>Period</th><th>Actions</th></tr></thead><tbody>';
+
+        history.forEach(sub => {
+            const date = new Date(sub.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+            const months = sub.plan_duration_months || 1;
+            const amount = sub.amount_paid ? `₱${parseFloat(sub.amount_paid).toLocaleString()}` : '—';
+            const status = sub.status || 'unknown';
+            const statusClass = statusColors[status] || 'bg-secondary';
+            const statusIcon = statusIcons[status] || 'question-circle';
+
+            let period = '—';
+            if (sub.starts_at && sub.expires_at) {
+                const start = new Date(sub.starts_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+                const end = new Date(sub.expires_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+                period = `${start} - ${end}`;
+            }
+
+            html += `
+                <tr>
+                    <td class="small">${date}</td>
+                    <td class="small">${months} Month${months > 1 ? 's' : ''}</td>
+                    <td class="small">${amount}</td>
+                    <td><span class="badge ${statusClass}"><i class="bi bi-${statusIcon} me-1"></i>${status}</span></td>
+                    <td class="small">${period}</td>
+                    <td class="small">
+                        <button class="btn btn-sm btn-success view-subscription-details-btn" data-id="${sub.id}">View</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+
+        // Wire view details buttons
+        container.querySelectorAll('.view-subscription-details-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const subscriptionId = btn.dataset.id;
+                await this.showSubscriptionDetails(subscriptionId);
+            });
+        });
+    }
+
+    async showSubscriptionDetails(subscriptionId) {
+        try {
+            const res = await fetch(`${this.apiBase}/subscriptions/farmers/me/subscription/history`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) {
+                this.showMessage('Failed to load subscription details', 'error');
+                return;
+            }
+            const data = await res.json();
+            const subscription = data.history.find(s => s.id === subscriptionId);
+            
+            if (!subscription) {
+                this.showMessage('Subscription not found', 'error');
+                return;
+            }
+
+            // Populate modal with full details
+            const status = subscription.status || 'unknown';
+            const statusClass = status === 'active' ? 'success' : status === 'pending' ? 'warning' : status === 'rejected' ? 'danger' : 'secondary';
+            
+            let reasonHtml = '';
+            if (status === 'rejected' && subscription.rejection_reason) {
+                reasonHtml = `
+                    <div class="mt-3 p-3 bg-danger bg-opacity-10 rounded">
+                        <label class="small fw-semibold text-danger">Rejection Reason</label>
+                        <p class="mb-0 small text-danger">${this.escapeHtml(subscription.rejection_reason)}</p>
+                    </div>
+                `;
+            } else if (status === 'expired' && subscription.expiry_reason) {
+                reasonHtml = `
+                    <div class="mt-3 p-3 bg-danger bg-opacity-10 rounded">
+                        <label class="small fw-semibold text-danger">Expiry Reason</label>
+                        <p class="mb-0 small text-danger">${this.escapeHtml(subscription.expiry_reason)}</p>
+                    </div>
+                `;
+            }
+
+            const modalHtml = `
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Plan</label>
+                        <div class="fw-semibold">${subscription.tier || '—'}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Duration</label>
+                        <div>${subscription.plan_duration_months} month${subscription.plan_duration_months > 1 ? 's' : ''}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Amount Paid</label>
+                        <div>₱${Number(subscription.amount_paid || 0).toLocaleString()}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Status</label>
+                        <div><span class="badge bg-${statusClass}">${status}</span></div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Requested Date</label>
+                        <div>${new Date(subscription.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                    </div>
+                    ${subscription.starts_at ? `
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Start Date</label>
+                        <div>${new Date(subscription.starts_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                    </div>
+                    ` : ''}
+                    ${subscription.expires_at ? `
+                    <div class="col-md-6">
+                        <label class="small fw-semibold text-muted">Expiry Date</label>
+                        <div>${new Date(subscription.expires_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                    </div>
+                    ` : ''}
+                </div>
+                ${reasonHtml}
+            `;
+
+            document.getElementById('subscription-reason-modal-title').textContent = 'Subscription Details';
+            document.getElementById('subscription-reason-text').innerHTML = modalHtml;
+            new bootstrap.Modal(document.getElementById('subscription-reason-modal')).show();
+        } catch (e) {
+            console.error('Error loading subscription details:', e);
+            this.showMessage('Error loading subscription details', 'error');
+        }
     }
 
     updateSubscriptionUI() {
@@ -3043,13 +3390,16 @@ class FarmerDashboard {
         if (d.profile_incomplete) {
             const freePanel = document.getElementById('subscription-free-panel');
             if (freePanel) {
+                // Show the comparison cards first, then add profile completion prompt
+                const existingContent = freePanel.innerHTML;
                 freePanel.innerHTML = `
-                    <div class="alert alert-info">
+                    <div class="alert alert-info mb-3">
                         <i class="bi bi-info-circle"></i> Complete your farmer profile to access subscription features.
                     </div>
-                    <button class="btn ac-btn-primary btn-sm" onclick="window.farmerDashboard.showSection('profile','edit');return false;">
+                    <button class="btn ac-btn-primary btn-sm mb-3" onclick="window.farmerDashboard.showSection('profile','edit');return false;">
                         <i class="bi bi-person-check me-1"></i>Complete Profile
                     </button>
+                    ${existingContent}
                 `;
             }
             ['active','pending','expired'].forEach(s => {
@@ -3092,7 +3442,7 @@ class FarmerDashboard {
     updateAddProductButton() {
         const btn = document.getElementById('btn-add-product');
         if (!btn) return;
-        const isVerified = this.userData?.is_verified === true;
+        const isVerified = this.isVerified();
         if (!isVerified) {
             btn.disabled = true;
             btn.title = 'Verify your account to start selling products';
@@ -3107,6 +3457,13 @@ class FarmerDashboard {
     }
 
     async openSubscriptionModal(mode) {
+        // Check if user is verified before allowing premium upgrade
+        if (!this.isVerified()) {
+            this.showSection('profile', 'verification');
+            this.showMessage('Please verify your account before upgrading to Premium.', 'warning');
+            return;
+        }
+
         const settingsRes = await fetch(`${this.apiBase}/subscriptions/settings`);
         const settings = await settingsRes.json();
 
@@ -3197,8 +3554,14 @@ class FarmerDashboard {
     async submitSubscriptionRequest() {
         const input = document.getElementById('sub-payment-proof');
         const submitBtn = document.getElementById('btn-submit-subscription');
-        if (!input.files?.length) { alert('Please upload your payment receipt.'); return; }
-        if (!this.selectedPaymentAccount) { alert('Please select a payment account.'); return; }
+        if (!input?.files?.length) {
+            input?.classList.add('is-invalid');
+            input?.focus();
+            this.showMessage('Please upload your payment receipt screenshot before submitting.', 'error');
+            return;
+        }
+        input.classList.remove('is-invalid');
+        if (!this.selectedPaymentAccount) { this.showMessage('Please select a payment account.', 'error'); return; }
 
         // Loading state
         const originalText = submitBtn.innerHTML;
@@ -3219,13 +3582,20 @@ class FarmerDashboard {
             const data = await res.json();
             if (res.ok) {
                 bootstrap.Modal.getInstance(document.getElementById('subscription-modal')).hide();
-                alert(data.message);
+                this.showMessage(data.message || 'Subscription request submitted.', 'success');
                 input.value = ''; // Clear file input
                 await this.loadSubscription();
             } else {
-                alert(data.message || 'Failed to submit request.');
+                const msg = data.message || 'Failed to submit request.';
+                const userMsg = msg.toLowerCase().includes('cloudinary')
+                    ? 'Failed to upload image. Please try again.'
+                    : msg;
+                this.showMessage(userMsg, 'error');
             }
-        } catch (e) { console.error(e); alert('Network error. Please try again.'); }
+        } catch (e) {
+            console.error(e);
+            this.showMessage('Network error. Please try again.', 'error');
+        }
         finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalText;
@@ -3388,6 +3758,7 @@ class FarmerDashboard {
             const badge = document.getElementById('notif-badge');
             const count = document.getElementById('notif-count');
             const sidebarBadge = document.getElementById('notif-sidebar-badge');
+            const dropdownNotifBadge = document.getElementById('dropdown-notif-badge');
             if (badge) {
                 badge.textContent = unread > 99 ? '99+' : String(unread);
                 badge.style.display = unread ? '' : 'none';
@@ -3396,6 +3767,10 @@ class FarmerDashboard {
             if (sidebarBadge) {
                 sidebarBadge.textContent = unread > 99 ? '99+' : String(unread);
                 sidebarBadge.style.display = unread ? '' : 'none';
+            }
+            if (dropdownNotifBadge) {
+                dropdownNotifBadge.textContent = unread > 99 ? '99+' : String(unread);
+                dropdownNotifBadge.style.display = unread ? 'inline-block' : 'none';
             }
 
             // Play notification sound if unread count increased
@@ -3450,17 +3825,58 @@ class FarmerDashboard {
         dropdownList.innerHTML = recent.map(n => {
             const ic = iconMap[n.type] || 'bi-bell text-muted';
             const relTime = this._relativeTime(new Date(n.created_at));
-            const bg = n.is_read ? '' : 'bg-success bg-opacity-10';
+            const readStatus = n.is_read ? 'read' : 'unread';
             return `<li>
-                <a class="dropdown-item d-flex align-items-start ${bg} py-2 notif-header-link" href="#">
-                    <i class="bi ${ic} me-2 mt-1 flex-shrink-0"></i>
-                    <div>
-                        <div class="small ${n.is_read ? '' : 'fw-semibold'}">${this.escapeHtml(n.title || 'Notification')}</div>
-                        <div style="font-size:.7rem" class="text-muted">${relTime}</div>
+                <a class="dropdown-item notification-item-dropdown ${readStatus} py-2 notif-header-link" href="#" style="border:none;padding:0.75rem 1rem;margin:0.25rem 0.5rem;border-radius:8px;">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="notification-icon-dropdown" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${n.is_read ? '#f3f4f6' : '#ecfdf5'};color:${n.is_read ? '#6b7280' : '#10b981'};font-size:0.875rem;">
+                            <i class="bi ${ic}"></i>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div class="small" style="font-weight:${n.is_read ? '500' : '600'};color:${n.is_read ? '#111827' : '#065f46'};line-height:1.4;">${this.escapeHtml(n.title || 'Notification')}</div>
+                            <div style="font-size:0.75rem;color:#9ca3af;">${relTime}</div>
+                        </div>
+                        ${!n.is_read ? '<div style="width:6px;height:6px;border-radius:50%;background:#10b981;flex-shrink:0;"></div>' : ''}
                     </div>
                 </a>
             </li>`;
         }).join('');
+
+        // Add click handlers to navigate to notifications section and highlight selected notification
+        dropdownList.querySelectorAll('.notif-header-link').forEach((link, index) => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const notifId = recent[index]?.id;
+                this.showSection('notifications');
+                if (notifId) {
+                    this.highlightNotification(notifId);
+                }
+            });
+        });
+    }
+
+    highlightNotification(notifId) {
+        // Remove any existing highlight
+        document.querySelectorAll('.notification-item.highlighted').forEach(item => {
+            item.classList.remove('highlighted');
+            item.style.background = '';
+            item.style.borderColor = '';
+        });
+
+        // Store highlighted notification ID before navigation
+        this.highlightedNotifId = notifId;
+    }
+
+    clearNotificationHighlight() {
+        if (this.highlightedNotifId) {
+            const item = document.querySelector(`.notification-item[data-id="${this.highlightedNotifId}"]`);
+            if (item) {
+                item.classList.remove('highlighted');
+                item.style.background = '';
+                item.style.borderColor = '';
+            }
+            this.highlightedNotifId = null;
+        }
     }
 
     async loadMessages() {
@@ -3521,6 +3937,43 @@ class FarmerDashboard {
         }
     }
 
+    async loadInitialSectionData() {
+        try {
+            const savedSection = localStorage.getItem('farmerActiveSection') || 'overview';
+            const validSections = new Set(['overview', 'products', 'orders', 'chat', 'shop', 'reviews', 'profile', 'notifications', 'subscription', 'support-tickets', 'support-ticket-chat']);
+            const safeSection = validSections.has(savedSection) ? savedSection : 'overview';
+
+            // Load data based on initial section
+            if (safeSection === 'overview') {
+                await this.loadOverviewMetrics();
+            } else if (safeSection === 'products') {
+                await this.loadMyProducts();
+            } else if (safeSection === 'orders') {
+                await this.loadOrdersByStatus('pending');
+            } else if (safeSection === 'support-tickets') {
+                await this.loadSupportTickets();
+            } else if (safeSection === 'notifications') {
+                await this.loadNotifications(1);
+            } else if (safeSection === 'profile') {
+                await this.loadProfile();
+            } else if (safeSection === 'reviews') {
+                await this.loadReviews(1);
+            } else if (safeSection === 'shop') {
+                await this.loadShopProfile();
+            } else if (safeSection === 'subscription') {
+                await this.loadSubscription();
+            }
+        } catch (error) {
+            console.error('Error loading initial section data:', error);
+        } finally {
+            // Always hide loading screen, even if there's an error
+            const loadingScreen = document.getElementById('admin-loading-screen');
+            if (loadingScreen) {
+                loadingScreen.classList.add('hidden');
+            }
+        }
+    }
+
     _relativeTime(date) {
         const seconds = Math.floor((new Date() - date) / 1000);
         if (seconds < 60) return 'Just now';
@@ -3571,26 +4024,31 @@ class FarmerDashboard {
         };
         list.innerHTML = items.map(n => {
             const iconClass  = iconMap[n.type] || 'bi-bell text-muted';
-            const unreadCls  = n.is_read ? '' : 'fw-semibold';
-            const bgCls      = n.is_read ? '' : 'bg-success bg-opacity-10 border-start border-success border-3';
+            const readStatus = n.is_read ? 'read' : 'unread';
             const relTime    = this._relativeTime(new Date(n.created_at));
             const cursorCls  = n.is_read ? '' : 'cursor-pointer';
             return `
-            <div class="d-flex align-items-start gap-3 py-3 px-3 ${bgCls} border-bottom notif-item ${cursorCls}" data-id="${n.id}">
-                <div class="flex-shrink-0 mt-1"><i class="bi ${iconClass} fs-5"></i></div>
-                <div class="flex-grow-1">
-                    <div class="${unreadCls} small">${this.escapeHtml(n.title || 'Notification')}</div>
-                    <div class="text-muted small">${this.escapeHtml(n.message || '')}</div>
-                    <div class="text-muted" style="font-size:.7rem">${relTime}</div>
+            <div class="notification-item ${readStatus} ${cursorCls}" data-id="${n.id}">
+                <div class="notification-icon">
+                    <i class="bi ${iconClass}"></i>
                 </div>
-                ${!n.is_read ? `<button class="btn btn-sm py-0 px-1 text-muted flex-shrink-0 notif-mark-read-btn"
-                    data-id="${n.id}" title="Mark read">
-                    <i class="bi bi-check2"></i></button>` : ''}
+                <div class="notification-content">
+                    <div class="notification-title">${this.escapeHtml(n.title || 'Notification')}</div>
+                    <div class="notification-message">${this.escapeHtml(n.message || '')}</div>
+                    <div class="notification-meta">
+                        <span>${relTime}</span>
+                    </div>
+                </div>
+                ${!n.is_read ? `<div class="notification-actions">
+                    <button class="notification-mark-read-btn" data-id="${n.id}" title="Mark read">
+                        <i class="bi bi-check2"></i>
+                    </button>
+                </div>` : ''}
             </div>`;
         }).join('');
 
         // Add click handlers for mark read buttons
-        list.querySelectorAll('.notif-mark-read-btn').forEach(btn => {
+        list.querySelectorAll('.notification-mark-read-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const id = Number(btn.dataset.id);
@@ -3599,32 +4057,37 @@ class FarmerDashboard {
         });
 
         // Add click handlers for notification items
-        list.querySelectorAll('.notif-item').forEach(item => {
+        list.querySelectorAll('.notification-item').forEach(item => {
             item.addEventListener('click', () => {
                 const id = Number(item.dataset.id);
                 const notif = items.find(n => n.id === id);
                 if (notif && !notif.is_read) {
-                    const btn = item.querySelector('.notif-mark-read-btn');
+                    const btn = item.querySelector('.notification-mark-read-btn');
                     if (btn) this.markNotifRead(id, btn);
                 }
             });
         });
     }
 
-    async markNotifRead(id, btn) {
+    async markNotifRead(id, btn, skipReload = false) {
         try {
             const response = await fetch(`${this.apiBase}/notifications/${id}/read`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (response.ok) {
-                if (btn) btn.remove();
-                const item = document.querySelector(`.notif-item[data-id="${id}"]`);
-                if (item) {
-                    item.classList.remove('bg-success', 'bg-opacity-10', 'border-start', 'border-success', 'border-3', 'fw-semibold', 'cursor-pointer');
-                    item.classList.add('text-muted');
+                if (btn) {
+                    const actionsDiv = btn.closest('.notification-actions');
+                    if (actionsDiv) actionsDiv.remove();
                 }
-                this.loadNotifications();
+                const item = document.querySelector(`.notification-item[data-id="${id}"]`);
+                if (item && !skipReload) {
+                    item.classList.remove('unread', 'cursor-pointer');
+                    item.classList.add('read');
+                }
+                if (!skipReload) {
+                    this.loadNotifications();
+                }
             }
         } catch (err) {
             console.error('Error marking notification as read:', err);
@@ -3957,37 +4420,24 @@ class FarmerDashboard {
             if (!this.token) return;
             if (!document.getElementById('reportsChart')) return;
 
-            // Check if user is verified for advanced analytics access
-            let isVerified = true;
-            try {
-                const userRes = await fetch(`${this.apiBase}/auth/me`, {
-                    headers: { 'Authorization': `Bearer ${this.token}` }
-                });
-                if (userRes.ok) {
-                    const userData = await userRes.json();
-                    if (userData.user && userData.user.is_verified === false) {
-                        isVerified = false;
-                    }
-                }
-            } catch (_) { /* ignore user check error */ }
+            // Check if user has premium subscription for advanced analytics access
+            const hasPremium = this.currentSubscription && this.currentSubscription.status === 'active';
 
-            // Show analytics access warning for unverified farmers
+            // Show analytics access warning for non-premium farmers
             const analyticsWarningEl = document.getElementById('analytics-access-warning');
             if (analyticsWarningEl) {
-                if (!isVerified) {
+                if (!hasPremium) {
                     analyticsWarningEl.style.display = '';
                     analyticsWarningEl.className = 'alert alert-info';
-                    analyticsWarningEl.innerHTML = '<i class="fas fa-info-circle"></i> Advanced analytics (charts, trends, insights) are available for verified farmers only. <a href="#" onclick="window.scrollTo(0,0);return false;">Contact support</a> to verify your account.';
+                    analyticsWarningEl.innerHTML = '<i class="fas fa-info-circle"></i> Advanced analytics (charts, trends, insights) are available for premium users only. <a href="#" onclick="window.scrollTo(0,0);return false;">Upgrade to premium</a> to unlock all features.';
                 } else {
                     analyticsWarningEl.style.display = 'none';
                 }
             }
 
-            // If unverified, show only basic metrics and skip advanced charts
-            if (!isVerified) {
-                this.renderBasicMetricsOnly();
-                return;
-            }
+            // If non-premium, show only basic metrics and skip advanced charts
+            // But still fetch metrics for KPI cards
+            const isNonPremium = !hasPremium;
 
             const now = Date.now();
             if (!force && now - this.overviewLastFetchAt < 5000) return;
@@ -4017,17 +4467,31 @@ class FarmerDashboard {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             })
                 .then(async (res) => {
+                    if (res.status === 403) {
+                        // Premium feature requested by free tier user - show message and fall back to default period
+                        this.showToast('All-time analytics is a Premium feature. Showing last 30 days instead.', 'warning');
+                        this._syncAllPeriods('30');
+                        this._savePeriods();
+                        // Retry with default period
+                        this.loadOverviewMetrics({ force: true });
+                        return null;
+                    }
                     const json = await res.json().catch(() => null);
                     if (!res.ok) throw new Error(json?.message || 'Failed to load metrics');
                     return json;
                 })
                 .then((metrics) => {
+                    if (!metrics) return;
                     this.overviewMetrics = metrics;
                     this.renderOverview(metrics);
                 })
                 .catch((err) => {
                     const el = document.getElementById('overview-last-updated');
                     if (el) el.textContent = 'Could not load report.';
+                    const msg = err?.message || '';
+                    if (msg.includes('403') || msg.includes('Premium')) {
+                        return;
+                    }
                     console.error('Overview metrics error:', err);
                 })
                 .finally(() => {
@@ -4041,6 +4505,34 @@ class FarmerDashboard {
     }
 
     renderOverview(metrics) {
+        // Hide/show metrics sections based on verification status
+        const isVerified = this.isVerified();
+        const isPremium = this.isPremium();
+        
+        // Reset periods to 'month' for verified users if they're not already set correctly
+        // This handles the case where localStorage overrides happened before verification data loaded
+        if (isVerified && this._reportPeriod !== 'month') {
+            this._kpiPeriods = { 'kpi-products': 'all', 'kpi-orders': 'month', 'kpi-sold': 'month', 'kpi-revenue': 'month' };
+            this._reportPeriod = 'month';
+            this._statusPeriod = 'month';
+            this._recentOrdersPeriod = 'month';
+            this._topProductsPeriod = 'month';
+            this._savePeriods();
+        }
+        const metricsCards = ['my-products-card', 'total-orders-card', 'items-sold-card', 'total-revenue-card', 'recent-orders-card', 'top-products-card'];
+        metricsCards.forEach(cardId => {
+            const card = document.getElementById(cardId);
+            if (card) {
+                card.style.display = 'block';
+            }
+        });
+
+        // Show period filter dropdowns for all users (marketing strategy - let them see what they're missing)
+        const filterDropdowns = document.querySelectorAll('.filter');
+        filterDropdowns.forEach(filter => {
+            filter.style.display = 'block';
+        });
+
         const lastUpdatedEl = document.getElementById('overview-last-updated');
         if (lastUpdatedEl) {
             const ts = new Date();
@@ -4087,31 +4579,31 @@ class FarmerDashboard {
     }
 
     renderBasicMetricsOnly() {
-        // Show only basic metrics for unverified farmers (no charts, no advanced insights)
+        // Show only basic metrics for non-premium farmers (no charts, no advanced insights)
         const lastUpdatedEl = document.getElementById('overview-last-updated');
         if (lastUpdatedEl) {
             const ts = new Date();
             lastUpdatedEl.textContent = `Basic View • Updated: ${ts.toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
         }
 
-        // Hide advanced charts
+        // Hide advanced charts - available for premium users only
         const statusWrap = document.getElementById('statusChart');
         if (statusWrap) {
-            statusWrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:320px;color:#9ca3af;font-size:14px;">Advanced charts available for verified farmers only</div>';
+            statusWrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:320px;color:#9ca3af;font-size:14px;">Advanced charts available for premium users only</div>';
         }
 
         const reportsWrap = document.getElementById('reportsChart');
         if (reportsWrap) {
-            reportsWrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:320px;color:#9ca3af;font-size:14px;">Advanced reports available for verified farmers only</div>';
+            reportsWrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:320px;color:#9ca3af;font-size:14px;">Advanced reports available for premium users only</div>';
         }
 
         // Load basic KPI cards only
-        this.loadKpiCard('kpi-products', 'all', this.overviewMetrics);
-        this.loadKpiCard('kpi-orders', 'today', this.overviewMetrics);
-        this.loadKpiCard('kpi-sold', 'today', this.overviewMetrics);
-        this.loadKpiCard('kpi-revenue', 'today', this.overviewMetrics);
+        this.loadKpiCard('kpi-products', this._kpiPeriods['kpi-products'] || 'all', this.overviewMetrics);
+        this.loadKpiCard('kpi-orders', this._kpiPeriods['kpi-orders'] || 'month', this.overviewMetrics);
+        this.loadKpiCard('kpi-sold', this._kpiPeriods['kpi-sold'] || 'month', this.overviewMetrics);
+        this.loadKpiCard('kpi-revenue', this._kpiPeriods['kpi-revenue'] || 'month', this.overviewMetrics);
 
-        // Show basic recent orders and top products (still available for unverified)
+        // Show basic recent orders and top products (still available for non-premium)
         this.loadRecentOrders(this._recentOrdersPeriod);
         this.loadTopProducts(this._topProductsPeriod);
     }
@@ -4131,14 +4623,51 @@ class FarmerDashboard {
         }, {});
     }
 
+    clearKpiValues() {
+        // Clear KPI values to N/A immediately to prevent visual flash for unverified farmers
+        const totalOrdersEl = document.getElementById('total-orders');
+        const totalOrdersChangeEl = document.getElementById('total-orders-change');
+        const totalOrdersChangeLabelEl = document.getElementById('total-orders-change-label');
+        
+        const itemsSoldEl = document.getElementById('total-sold');
+        const itemsSoldChangeEl = document.getElementById('items-sold-change');
+        const itemsSoldChangeLabelEl = document.getElementById('items-sold-change-label');
+        
+        const totalRevenueEl = document.getElementById('total-revenue');
+        const totalRevenueChangeEl = document.getElementById('total-revenue-change');
+        const totalRevenueChangeLabelEl = document.getElementById('total-revenue-change-label');
+
+        if (totalOrdersEl) totalOrdersEl.textContent = 'N/A';
+        if (totalOrdersChangeEl) totalOrdersChangeEl.textContent = '';
+        if (totalOrdersChangeLabelEl) {
+            totalOrdersChangeLabelEl.textContent = 'Verify your account to view metrics';
+            totalOrdersChangeLabelEl.style.whiteSpace = 'nowrap';
+        }
+
+        if (itemsSoldEl) itemsSoldEl.textContent = 'N/A';
+        if (itemsSoldChangeEl) itemsSoldChangeEl.textContent = '';
+        if (itemsSoldChangeLabelEl) {
+            itemsSoldChangeLabelEl.textContent = 'Verify your account to view metrics';
+            itemsSoldChangeLabelEl.style.whiteSpace = 'nowrap';
+        }
+
+        if (totalRevenueEl) totalRevenueEl.textContent = 'N/A';
+        if (totalRevenueChangeEl) totalRevenueChangeEl.textContent = '';
+        if (totalRevenueChangeLabelEl) {
+            totalRevenueChangeLabelEl.textContent = 'Verify your account to view metrics';
+            totalRevenueChangeLabelEl.style.whiteSpace = 'nowrap';
+        }
+    }
+
     loadKpiCard(card, period, metrics) {
+        if (!metrics) return;
         const periodLabel = this._periodLabel(period);
         const periodEl = document.getElementById(`${card}-period`);
         if (periodEl) periodEl.textContent = `| ${periodLabel}`;
 
         const valEl = document.getElementById('my-products');
         if (card === 'kpi-products' && valEl) {
-            // Product count is static (current total listings)
+            // Product count is static (current total listings) - available for all users
             if (this.myProductsCache) {
                 const availableProducts = this.myProductsCache.filter(p => {
                     const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
@@ -4149,65 +4678,65 @@ class FarmerDashboard {
             return;
         }
 
-        // Check if farmer is unverified
-        const isUnverified = !this.currentVerificationRequest || this.currentVerificationRequest.status === 'unverified';
+        // Check if farmer is verified (verified users can see metrics)
+        const isVerified = this.isVerified();
 
         // For orders, sold, revenue — derive from the metrics data.
         // Since /farmers/me/metrics returns data for a single period,
         // all KPIs share the same data. If period differs from _reportPeriod,
         // metrics reflect _reportPeriod; ideally we'd refetch per card.
-        const statusCounts = this.getOverviewStatusCounts(metrics);
         if (card === 'kpi-orders') {
             const el = document.getElementById('total-orders');
             const changeEl = document.getElementById('total-orders-change');
             const changeLabelEl = document.getElementById('total-orders-change-label');
-            if (isUnverified) {
+            if (!isVerified) {
                 if (el) el.textContent = 'N/A';
                 if (changeEl) changeEl.textContent = '';
                 if (changeLabelEl) {
-                    changeLabelEl.textContent = 'Available for verified farmers only';
+                    changeLabelEl.textContent = 'Verify your account to view metrics';
                     changeLabelEl.style.whiteSpace = 'nowrap';
                 }
-            } else {
-                const totalOrders = Object.values(statusCounts).reduce((sum, v) => sum + Number(v || 0), 0);
-                if (el) el.textContent = this.fmtNumber(totalOrders);
-                this.updateKpiChange('total-orders-change', 'total-orders-change-label', metrics?.ordersChange, period);
+                return;
             }
+            const statusCounts = this.getOverviewStatusCounts(metrics);
+            const totalOrders = Object.values(statusCounts).reduce((sum, v) => sum + Number(v || 0), 0);
+            if (el) el.textContent = this.fmtNumber(totalOrders);
+            this.updateKpiChange('total-orders-change', 'total-orders-change-label', metrics?.ordersChange, period);
         }
         if (card === 'kpi-sold') {
             const el = document.getElementById('total-sold');
             const changeEl = document.getElementById('items-sold-change');
             const changeLabelEl = document.getElementById('items-sold-change-label');
-            if (isUnverified) {
+            if (!isVerified) {
                 if (el) el.textContent = 'N/A';
                 if (changeEl) changeEl.textContent = '';
                 if (changeLabelEl) {
-                    changeLabelEl.textContent = 'Available for verified farmers only';
+                    changeLabelEl.textContent = 'Verify your account to view metrics';
                     changeLabelEl.style.whiteSpace = 'nowrap';
                 }
-            } else {
-                if (el) el.textContent = this.fmtNumber(statusCounts.delivered || 0);
-                this.updateKpiChange('items-sold-change', 'items-sold-change-label', metrics?.soldChange, period);
+                return;
             }
+            if (el) el.textContent = this.fmtNumber(statusCounts.delivered || 0);
+            this.updateKpiChange('items-sold-change', 'items-sold-change-label', metrics?.soldChange, period);
         }
         if (card === 'kpi-revenue') {
             const el = document.getElementById('total-revenue');
             const changeEl = document.getElementById('total-revenue-change');
             const changeLabelEl = document.getElementById('total-revenue-change-label');
-            if (isUnverified) {
+            if (!isVerified) {
                 if (el) el.textContent = 'N/A';
                 if (changeEl) changeEl.textContent = '';
                 if (changeLabelEl) {
-                    changeLabelEl.textContent = 'Available for verified farmers only';
+                    changeLabelEl.textContent = 'Verify your account to view metrics';
                     changeLabelEl.style.whiteSpace = 'nowrap';
                 }
-            } else {
-                const totalRevenue = (Array.isArray(metrics?.revenueByDay)
-                    ? metrics.revenueByDay.reduce((sum, row) => sum + Number(row?.revenue || 0), 0)
-                    : 0);
-                if (el) el.textContent = this.fmtCurrency(totalRevenue);
-                this.updateKpiChange('total-revenue-change', 'total-revenue-change-label', metrics?.revenueChange, period);
+                return;
             }
+            const totalRevenue = (Array.isArray(metrics?.revenueByDay)
+                ? metrics.revenueByDay.reduce((sum, row) => sum + Number(row?.revenue || 0), 0)
+                : 0);
+            if (el) el.textContent = this.fmtCurrency(totalRevenue);
+            this.updateKpiChange('total-revenue-change', 'total-revenue-change-label', metrics?.revenueChange, period);
         }
     }
 
@@ -4338,95 +4867,112 @@ class FarmerDashboard {
 
     async loadFarmerReportsChart(period) {
         try {
-            const res = await fetch(`${this.apiBase}/farmers/me/report?period=${period}`, {
-                headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-            if (!res.ok) return;
-            const { data } = await res.json();
+            const reportsChartEl = document.getElementById('reportsChart');
+            if (!reportsChartEl) return;
 
-            const el = document.getElementById('reportsChart');
-            if (!el) return;
-
-            if (this.overviewCharts.reports) {
-                this.overviewCharts.reports.destroy();
-                this.overviewCharts.reports = null;
-            }
-            el.innerHTML = '';
-
-            if (typeof ApexCharts === 'undefined') return;
-
-            if (!data || data.length === 0) {
-                el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:350px;color:#9ca3af;font-size:14px;">No data available</div>';
+            // Show premium upgrade message for non-premium users
+            if (!this.isPremium()) {
+                reportsChartEl.innerHTML = `
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:350px;color:#6b7280;font-size:14px;text-align:center;padding:20px;">
+                        <i class="fas fa-lock" style="font-size:32px;margin-bottom:12px;color:#9ca3af;"></i>
+                        <div style="font-weight:600;margin-bottom:8px;">Advanced Analytics</div>
+                        <div style="font-size:13px;">Upgrade to Premium to access detailed revenue trends and performance insights.</div>
+                        <button onclick="window.farmerDashboard.openSubscriptionModal('upgrade')" style="margin-top:12px;padding:8px 16px;background:#4154f1;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;">Upgrade to Premium</button>
+                    </div>
+                `;
                 return;
             }
 
-            const labels = data.map(d => {
-                const dt = new Date(d.label);
-                if (period === 'today') return dt.getHours() + ':00';
-                if (period === 'year' || period === 'all') return dt.toLocaleString('default', { month: 'short' });
-                return dt.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+            const res = await fetch(`${this.apiBase}/farmers/me/report?period=${period}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
             });
+            if (res.ok) {
+                const { data } = await res.json();
 
-            this.overviewCharts.reports = new ApexCharts(el, {
-                series: [
-                    { name: 'Revenue (₱)', data: data.map(d => parseFloat(d.revenue) || 0) },
-                    { name: 'Orders', data: data.map(d => parseInt(d.orders) || 0) },
-                    { name: 'Items Sold', data: data.map(d => parseInt(d.items_sold) || 0) },
-                ],
-                chart: {
-                    height: 350,
-                    type: 'area',
-                    toolbar: { show: false },
-                    animations: {
-                        enabled: true,
-                        easing: 'easeinout',
-                        speed: 800,
-                    }
-                },
-                markers: {
-                    size: 4,
-                    hover: {
-                        size: 8,
-                        sizeOffset: 4
-                    }
-                },
-                colors: ['#4154f1', '#2eca6a', '#ff771d'],
-                fill: {
-                    type: 'gradient',
-                    gradient: {
-                        shadeIntensity: 1,
-                        opacityFrom: 0.3,
-                        opacityTo: 0.4,
-                        stops: [0, 90, 100]
-                    }
-                },
-                dataLabels: { enabled: false },
-                stroke: { curve: 'smooth', width: 2, hover: { width: 4 } },
-                xaxis: {
-                    categories: labels,
-                    tickAmount: Math.min(labels.length, 7),
-                },
-                yaxis: [
-                    { labels: { formatter: v => '₱' + this.fmtNumber(v) } },
-                    { opposite: true, labels: { formatter: v => String(Math.round(v)) } },
-                ],
-                tooltip: {
-                    shared: true,
-                    intersect: false,
-                    y: {
-                        formatter: (v, { seriesIndex }) => seriesIndex === 0 ? '₱' + Number(v).toLocaleString() : String(Math.round(v))
-                    }
-                },
-                states: {
-                    hover: {
-                        filter: {
-                            type: 'darken',
-                            value: 0.1
+                const el = document.getElementById('reportsChart');
+                if (!el) return;
+
+                if (this.overviewCharts.reports) {
+                    this.overviewCharts.reports.destroy();
+                    this.overviewCharts.reports = null;
+                }
+                el.innerHTML = '';
+
+                if (typeof ApexCharts === 'undefined') return;
+
+                if (!data || data.length === 0) {
+                    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:350px;color:#9ca3af;font-size:14px;">No data available</div>';
+                    return;
+                }
+
+                const labels = data.map(d => {
+                    const dt = new Date(d.label);
+                    if (period === 'today') return dt.getHours() + ':00';
+                    if (period === 'year' || period === 'all') return dt.toLocaleString('default', { month: 'short' });
+                    return dt.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+                });
+
+                this.overviewCharts.reports = new ApexCharts(el, {
+                    series: [
+                        { name: 'Revenue (₱)', data: data.map(d => parseFloat(d.revenue) || 0) },
+                        { name: 'Orders', data: data.map(d => parseInt(d.orders) || 0) },
+                        { name: 'Items Sold', data: data.map(d => parseInt(d.items_sold) || 0) },
+                    ],
+                    chart: {
+                        height: 350,
+                        type: 'area',
+                        toolbar: { show: false },
+                        animations: {
+                            enabled: true,
+                            easing: 'easeinout',
+                            speed: 800,
                         }
-                    }
-                },
-            });
-            this.overviewCharts.reports.render();
+                    },
+                    markers: {
+                        size: 4,
+                        hover: {
+                            size: 8,
+                            sizeOffset: 4
+                        }
+                    },
+                    colors: ['#4154f1', '#2eca6a', '#ff771d'],
+                    fill: {
+                        type: 'gradient',
+                        gradient: {
+                            shadeIntensity: 1,
+                            opacityFrom: 0.3,
+                            opacityTo: 0.4,
+                            stops: [0, 90, 100]
+                        }
+                    },
+                    dataLabels: { enabled: false },
+                    stroke: { curve: 'smooth', width: 2, hover: { width: 4 } },
+                    xaxis: {
+                        categories: labels,
+                        tickAmount: Math.min(labels.length, 7),
+                    },
+                    yaxis: [
+                        { labels: { formatter: v => '₱' + this.fmtNumber(v) } },
+                        { opposite: true, labels: { formatter: v => String(Math.round(v)) } },
+                    ],
+                    tooltip: {
+                        shared: true,
+                        intersect: false,
+                        y: {
+                            formatter: (v, { seriesIndex }) => seriesIndex === 0 ? '₱' + Number(v).toLocaleString() : String(Math.round(v))
+                        }
+                    },
+                    states: {
+                        hover: {
+                            filter: {
+                                type: 'darken',
+                                value: 0.1
+                            }
+                        }
+                    },
+                });
+                this.overviewCharts.reports.render();
+            }
         } catch (err) {
             console.warn('Farmer reports chart error:', err);
         }
@@ -4436,6 +4982,19 @@ class FarmerDashboard {
         // Orders by status pie chart — Chart.js (NiceAdmin style)
         const statusWrap = document.getElementById('statusChart');
         if (!statusWrap) return;
+
+        // Show premium upgrade message for non-premium users
+        if (!this.isPremium()) {
+            statusWrap.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:320px;color:#6b7280;font-size:14px;text-align:center;padding:20px;">
+                    <i class="fas fa-lock" style="font-size:32px;margin-bottom:12px;color:#9ca3af;"></i>
+                    <div style="font-weight:600;margin-bottom:8px;">Advanced Analytics</div>
+                    <div style="font-size:13px;">Upgrade to Premium to access detailed order status breakdowns and insights.</div>
+                    <button onclick="window.farmerDashboard.openSubscriptionModal('upgrade')" style="margin-top:12px;padding:8px 16px;background:#4154f1;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;">Upgrade to Premium</button>
+                </div>
+            `;
+            return;
+        }
 
         const statusKeys = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
         const counts = statusCounts || this.getOverviewStatusCounts(metrics);
@@ -4521,6 +5080,15 @@ class FarmerDashboard {
             if (response.ok) {
                 const data = await response.json();
                 this.renderRecentOrdersTable(data.recentOrders || []);
+            } else if (response.status === 403) {
+                // Premium feature requested by free tier user - show message and fall back to default period
+                this.showToast('All-time analytics is a Premium feature. Showing last 30 days instead.', 'warning');
+                this._recentOrdersPeriod = '30';
+                const lbl = document.getElementById('recent-orders-period-label');
+                if (lbl) lbl.textContent = `| ${this._periodLabel('30')}`;
+                this._savePeriods();
+                // Retry with default period
+                this.loadRecentOrders('30');
             } else {
                 const tbody = document.getElementById('recent-orders-tbody');
                 if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3 small">Failed to load recent orders</td></tr>';
@@ -4540,6 +5108,15 @@ class FarmerDashboard {
             if (response.ok) {
                 const data = await response.json();
                 this.renderTopProductsTable(data.topProducts || []);
+            } else if (response.status === 403) {
+                // Premium feature requested by free tier user - show message and fall back to default period
+                this.showToast('All-time analytics is a Premium feature. Showing last 30 days instead.', 'warning');
+                this._topProductsPeriod = '30';
+                const lbl = document.getElementById('top-products-period-label');
+                if (lbl) lbl.textContent = `| ${this._periodLabel('30')}`;
+                this._savePeriods();
+                // Retry with default period
+                this.loadTopProducts('30');
             } else {
                 const tbody = document.getElementById('top-products-tbody');
                 if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3 small">Failed to load top products</td></tr>';
@@ -4665,27 +5242,77 @@ class FarmerDashboard {
             return;
         }
 
-        // Pre-sort products: Available first (lowest stock on top), then No Stock, Disabled, Pending, Rejected
-        products.sort((a, b) => {
-            const getPriority = (p) => {
-                const s = p.status || 'approved';
-                const avail = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
-                const stock = Number(p.stock_quantity ?? 0);
-                if (s === 'pending') return 4;
-                if (s === 'rejected') return 5;
-                if (!avail) return 3;
-                if (stock <= 0) return 2;
-                return 1; // Available
-            };
-            const priorityA = getPriority(a);
-            const priorityB = getPriority(b);
-            if (priorityA !== priorityB) return priorityA - priorityB;
-            // Within Available group, sort by stock ascending (lowest first)
-            if (priorityA === 1) {
-                return Number(a.stock_quantity ?? 0) - Number(b.stock_quantity ?? 0);
-            }
-            return 0;
-        });
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('farmerTableSort_products-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                products.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 1: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 2: // name
+                            valA = (a.name || '').toLowerCase();
+                            valB = (b.name || '').toLowerCase();
+                            break;
+                        case 3: // category_name
+                            valA = (a.category_name || '').toLowerCase();
+                            valB = (b.category_name || '').toLowerCase();
+                            break;
+                        case 4: // price
+                            valA = parseFloat(a.price) || 0;
+                            valB = parseFloat(b.price) || 0;
+                            break;
+                        case 5: // stock_quantity
+                            valA = a.stock_quantity || 0;
+                            valB = b.stock_quantity || 0;
+                            break;
+                        case 6: // status
+                            const statusA = a.status || 'approved';
+                            const statusB = b.status || 'approved';
+                            valA = statusA;
+                            valB = statusB;
+                            break;
+                        case 7: // reviews
+                            valA = a.total_reviews || 0;
+                            valB = b.total_reviews || 0;
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        } else {
+            // Default sort if no saved sort: Available first (lowest stock on top), then No Stock, Disabled, Pending, Rejected
+            products.sort((a, b) => {
+                const getPriority = (p) => {
+                    const s = p.status || 'approved';
+                    const avail = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+                    const stock = Number(p.stock_quantity ?? 0);
+                    if (s === 'pending') return 4;
+                    if (s === 'rejected') return 5;
+                    if (!avail) return 3;
+                    if (stock <= 0) return 2;
+                    return 1; // Available
+                };
+                const priorityA = getPriority(a);
+                const priorityB = getPriority(b);
+                if (priorityA !== priorityB) return priorityA - priorityB;
+                // Within Available group, sort by stock ascending (lowest first)
+                if (priorityA === 1) {
+                    return Number(a.stock_quantity ?? 0) - Number(b.stock_quantity ?? 0);
+                }
+                return 0;
+            });
+        }
 
         // Apply pagination
         const pg = this.pagination['products'];
@@ -6096,6 +6723,7 @@ class FarmerDashboard {
         statuses.forEach((status) => {
             const tab = document.getElementById(`${status}-orders-tab`);
             const badge = document.getElementById(`${status}-orders-count`);
+            const statsCard = document.getElementById(`orders-${status}-count`);
             const count = Array.isArray(this.lastOrdersByStatus[status]) ? this.lastOrdersByStatus[status].length : 0;
 
             this.ordersCountByStatus[status] = count;
@@ -6110,6 +6738,10 @@ class FarmerDashboard {
                 tab.innerHTML = count > 0
                     ? `${label} <span class="tab-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">${count}</span>`
                     : label;
+            }
+            // Update stats card in order management section
+            if (statsCard) {
+                statsCard.textContent = String(count);
             }
         });
 
@@ -6744,28 +7376,41 @@ class FarmerDashboard {
     }
 
     showMessage(message, type = 'info') {
-        // Create a simple toast notification
+        this.showToast(message, type);
+    }
+
+    showToast(message, type = 'info') {
+        let stack = document.getElementById('admin-toast-stack');
+        if (!stack) {
+            stack = document.createElement('div');
+            stack.id = 'admin-toast-stack';
+            stack.className = 'admin-toast-stack';
+            document.body.appendChild(stack);
+        }
+
+        const typeClass = type === 'error' ? 'toast-error' : type === 'success' ? 'toast-success' : type === 'warning' ? 'toast-warning' : 'toast-info';
+
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed;
-            top: 100px;
-            right: 20px;
-            background: ${type === 'success' ? '#4caf50' : type === 'error' ? '#f44336' : '#2196f3'};
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 10000;
-            max-width: 300px;
+        toast.className = `admin-toast ${typeClass}`;
+        toast.innerHTML = `
+            <div class="toast-body"><p class="toast-msg">${this.escapeHtml(message)}</p></div>
+            <button class="toast-close" aria-label="Dismiss">&times;</button>
         `;
 
-        document.body.appendChild(toast);
+        const dismiss = () => {
+            toast.classList.add('dismissing');
+            toast.addEventListener('animationend', () => toast.remove(), { once: true });
+        };
+        toast.querySelector('.toast-close').addEventListener('click', dismiss);
 
-        setTimeout(() => {
-            toast.remove();
-        }, 3000);
+        stack.appendChild(toast);
+        setTimeout(dismiss, 3500);
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     // Verification request functions
@@ -6892,9 +7537,9 @@ class FarmerDashboard {
 
     async loadVerificationStatus() {
         try {
-            const response = await fetch('/api/farmers/me/verification-request', {
+            const response = await fetch(`${this.apiBase}/farmers/me/verification-request`, {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${this.token}`
                 }
             });
             const data = await response.json();
@@ -6930,7 +7575,7 @@ class FarmerDashboard {
         } else if (!this.currentVerificationRequest || this.currentVerificationRequest.status === 'unverified') {
             bannerEl.style.display = '';
             bannerEl.style.cssText += ';background:#fef9c3;color:#713f12;border:1px solid #fde047;';
-            bannerEl.innerHTML = '<i class="fas fa-info-circle"></i> Your account is unverified. Submit a verification request to unlock unlimited products and advanced analytics.';
+            bannerEl.innerHTML = '<i class="fas fa-info-circle"></i> Your account is unverified. Submit a verification request to unlock unlimited products (up to 10 products without verification). <button onclick="farmerDashboard.openVerificationSection()" style="margin-left:10px;padding:6px 12px;background:#2d7a3a;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Verify Now</button>';
         } else if (this.currentVerificationRequest.status === 'pending') {
             bannerEl.style.display = '';
             bannerEl.style.cssText += ';background:#fef9c3;color:#713f12;border:1px solid #fde047;';
@@ -7082,25 +7727,118 @@ class FarmerDashboard {
     }
 
     renderHistoryTimeline() {
-        const timeline = document.getElementById('verification-history-timeline');
+        const tableBody = document.getElementById('verification-history-table-body');
+        const emptyState = document.getElementById('verification-history-empty');
+        const pagination = document.getElementById('verification-history-pagination');
+        const infoEl = document.getElementById('verification-history-info');
+        const currentEl = document.getElementById('verification-history-current');
+        const prevBtn = document.getElementById('verification-history-prev');
+        const nextBtn = document.getElementById('verification-history-next');
+
         if (!this.verificationHistory || this.verificationHistory.length === 0) {
-            timeline.innerHTML = '<p class="text-muted">No verification history.</p>';
+            tableBody.innerHTML = '';
+            emptyState.style.display = 'block';
+            pagination.style.display = 'none';
             return;
         }
 
-        const historyHtml = this.verificationHistory.map(request => `
-            <div class="timeline-item">
-                <div class="timeline-marker bg-${request.status === 'approved' ? 'success' : request.status === 'rejected' ? 'danger' : request.status === 'pending' ? 'warning' : 'info'}"></div>
-                <div class="timeline-content">
-                    <strong>${new Date(request.created_at).toLocaleString()}</strong>
-                    <p>Status: ${request.status}</p>
-                    ${request.admin_notes ? `<p class="text-muted">${request.admin_notes}</p>` : ''}
-                    ${request.rejection_reason ? `<p class="text-danger">Reason: ${request.rejection_reason}</p>` : ''}
-                </div>
-            </div>
-        `).join('');
+        emptyState.style.display = 'none';
+        pagination.style.display = 'flex';
 
-        timeline.innerHTML = historyHtml;
+        // Pagination setup
+        const itemsPerPage = 5;
+        const totalPages = Math.ceil(this.verificationHistory.length / itemsPerPage);
+        let currentPage = this._verificationHistoryPage || 1;
+
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const pageData = this.verificationHistory.slice(startIndex, endIndex);
+
+        // Render table rows
+        const statusBadgeClass = {
+            'approved': 'bg-success',
+            'rejected': 'bg-danger',
+            'pending': 'bg-warning',
+            'unverified': 'bg-secondary'
+        };
+
+        const rowsHtml = pageData.map(request => {
+            const notes = request.admin_notes || request.rejection_reason || '-';
+            const badgeClass = statusBadgeClass[request.status] || 'bg-secondary';
+            const truncatedNotes = notes.length > 50 ? notes.substring(0, 50) + '...' : notes;
+            const isTruncated = notes.length > 50;
+            return `
+                <tr>
+                    <td>${new Date(request.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td><span class="badge ${badgeClass}">${request.status.charAt(0).toUpperCase() + request.status.slice(1)}</span></td>
+                    <td class="text-muted small" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="farmerDashboard.showVerificationNotes('${notes.replace(/'/g, "\\'").replace(/"/g, '\\"')}')" title="${isTruncated ? 'Click to view full notes' : notes}">${truncatedNotes}</td>
+                </tr>
+            `;
+        }).join('');
+
+        tableBody.innerHTML = rowsHtml;
+
+        // Update pagination UI
+        infoEl.textContent = `Showing ${startIndex + 1}-${Math.min(endIndex, this.verificationHistory.length)} of ${this.verificationHistory.length}`;
+        currentEl.textContent = currentPage;
+
+        prevBtn.classList.toggle('disabled', currentPage === 1);
+        nextBtn.classList.toggle('disabled', currentPage === totalPages);
+
+        // Store current page
+        this._verificationHistoryPage = currentPage;
+    }
+
+    handleVerificationHistoryPagination(direction) {
+        const itemsPerPage = 5;
+        const totalPages = Math.ceil((this.verificationHistory?.length || 0) / itemsPerPage);
+        let currentPage = this._verificationHistoryPage || 1;
+
+        if (direction === 'prev' && currentPage > 1) {
+            currentPage--;
+        } else if (direction === 'next' && currentPage < totalPages) {
+            currentPage++;
+        }
+
+        this._verificationHistoryPage = currentPage;
+        this.renderHistoryTimeline();
+    }
+
+    showVerificationNotes(notes) {
+        if (!notes || notes === '-') return;
+
+        // Create modal if it doesn't exist
+        let modal = document.getElementById('verification-notes-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'verification-notes-modal';
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Admin Notes</h3>
+                        <button class="close-btn" onclick="farmerDashboard.closeVerificationNotesModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="verification-notes-content" style="white-space:pre-wrap;line-height:1.6;"></p>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        document.getElementById('verification-notes-content').textContent = notes;
+        modal.classList.add('open');
+    }
+
+    closeVerificationNotesModal() {
+        const modal = document.getElementById('verification-notes-modal');
+        if (modal) {
+            modal.classList.remove('open');
+        }
     }
 
     showVerificationBanner() {
@@ -7126,7 +7864,7 @@ class FarmerDashboard {
 
         if (this.currentVerificationRequest.status === 'unverified') {
             banner.classList.add('alert-info');
-            message.textContent = 'Your account is unverified. Submit a verification request to unlock unlimited products and advanced analytics.';
+            message.textContent = 'Your account is unverified. Submit a verification request to unlock unlimited products (up to 10 products without verification).';
             openChatBtn.style.display = 'none';
         } else if (this.currentVerificationRequest.status === 'pending') {
             banner.classList.add('alert-warning');
@@ -7135,7 +7873,7 @@ class FarmerDashboard {
             openChatBtn.onclick = () => this.showSection('chat');
         } else if (this.currentVerificationRequest.status === 'approved') {
             banner.classList.add('alert-success');
-            message.textContent = 'Account Verified! You now have unlimited products and advanced analytics';
+            message.textContent = 'Account Verified! You now have unlimited products. Upgrade to Premium for advanced analytics.';
             openChatBtn.style.display = 'none';
         } else if (this.currentVerificationRequest.status === 'rejected') {
             banner.classList.add('alert-danger');
@@ -7167,12 +7905,6 @@ class FarmerDashboard {
     }
 
     // Support Tickets Methods
-    openSupportTicketsModal() {
-        this.supportTicketsCurrentPage = 1;
-        this.loadSupportTickets();
-        new bootstrap.Modal(document.getElementById('support-tickets-modal')).show();
-    }
-
     async loadSupportTickets() {
         try {
             const response = await fetch(`${this.apiBase}/support-tickets/my?page=${this.supportTicketsCurrentPage}&limit=${this.supportTicketsPerPage}`, {
@@ -7186,9 +7918,48 @@ class FarmerDashboard {
             this.supportTicketsTotal = data.total;
             this.renderSupportTicketsTable();
             this.renderSupportTicketsPagination();
+            this.updateSupportTicketsBadge();
         } catch (error) {
             console.error('Load support tickets error:', error);
             this.showError('Failed to load support tickets');
+        }
+    }
+
+    async loadSupportTicketsBadge() {
+        try {
+            const response = await fetch(`${this.apiBase}/support-tickets/my?limit=100`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            const tickets = data.tickets || [];
+            const unreadCount = tickets.reduce((sum, ticket) => sum + Number(ticket.unread_count || 0), 0);
+            const badge = document.getElementById('support-tickets-dropdown-badge');
+            if (badge) {
+                const displayValue = unreadCount > 99 ? '99+' : String(unreadCount);
+                badge.textContent = displayValue;
+                badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+                badge.style.minWidth = 'unset';
+                badge.style.width = 'auto';
+            }
+        } catch (error) {
+            console.error('Load support tickets badge error:', error);
+        }
+    }
+
+    updateSupportTicketsBadge() {
+        const unreadCount = this.supportTickets.reduce((sum, ticket) => sum + Number(ticket.unread_count || 0), 0);
+        const badge = document.getElementById('support-tickets-dropdown-badge');
+        if (badge) {
+            if (unreadCount > 0) {
+                const displayValue = unreadCount > 99 ? '99+' : String(unreadCount);
+                badge.textContent = displayValue;
+                badge.style.display = 'inline-block';
+                badge.style.minWidth = 'unset';
+                badge.style.width = 'auto';
+            } else {
+                badge.style.display = 'none';
+            }
         }
     }
 
@@ -7197,41 +7968,33 @@ class FarmerDashboard {
         if (!tbody) return;
 
         if (this.supportTickets.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No support tickets yet. Click "Create New Ticket" to get help.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No support tickets yet. Click "Create New Ticket" to get help.</td></tr>';
             return;
         }
 
         tbody.innerHTML = this.supportTickets.map(ticket => {
-            const statusColors = {
-                open: 'bg-primary',
-                in_progress: 'bg-warning',
-                resolved: 'bg-success',
-                closed: 'bg-secondary'
+            const statusStyles = {
+                open: { bg: '#dcfce7', color: '#16a34a', label: 'Open' },
+                in_progress: { bg: '#dbeafe', color: '#2563eb', label: 'In Progress' },
+                resolved: { bg: '#fef3c7', color: '#d97706', label: 'Resolved' },
+                closed: { bg: '#fee2e2', color: '#dc2626', label: 'Closed' }
             };
-            const priorityColors = {
-                low: 'bg-info',
-                medium: 'bg-warning',
-                high: 'bg-danger'
-            };
+            const style = statusStyles[ticket.status] || statusStyles.open;
 
             return `
                 <tr>
                     <td>${this.escapeHtml(ticket.subject)}</td>
-                    <td><span class="badge ${statusColors[ticket.status]}">${ticket.status.replace('_', ' ')}</span></td>
-                    <td><span class="badge ${priorityColors[ticket.priority]}">${ticket.priority}</span></td>
+                    <td class="text-center"><span style="background:${style.bg};color:${style.color};font-size:0.75rem;font-weight:600;padding:4px 10px;border-radius:9999px;text-transform:uppercase;">${style.label}</span></td>
                     <td>${new Date(ticket.created_at).toLocaleDateString('en-PH')}</td>
-                    <td>${ticket.updated_at ? new Date(ticket.updated_at).toLocaleDateString('en-PH') : '—'}</td>
                     <td>
-                        ${ticket.unread_count > 0 ? '<i class="bi bi-dot text-danger"></i>' : ''}
-                        <button class="btn btn-sm btn-outline-primary view-ticket-btn" data-id="${ticket.id}">View</button>
+                        <button class="btn btn-sm btn-outline-primary view-ticket-btn" data-id="${ticket.id}">Chat</button>
+                        ${ticket.unread_count > 0 ? '<i class="bi bi-dot text-danger ms-1"></i>' : ''}
                     </td>
                 </tr>
             `;
         }).join('');
 
-        tbody.querySelectorAll('.view-ticket-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.openTicketDetail(btn.dataset.id));
-        });
+        // View button uses delegated listener in setupEventListeners
     }
 
     renderSupportTicketsPagination() {
@@ -7276,7 +8039,7 @@ class FarmerDashboard {
         const priority = document.getElementById('support-ticket-priority').value;
 
         if (!subject || !description) {
-            this.showError('Subject and description are required');
+            this.showMessage('Subject and description are required', 'error');
             return;
         }
 
@@ -7301,176 +8064,18 @@ class FarmerDashboard {
                 this.showMessage('Support ticket created successfully', 'success');
                 this.loadSupportTickets();
             } else {
-                this.showError(data.message || 'Failed to create ticket');
+                this.showMessage(data.message || 'Failed to create ticket', 'error');
             }
         } catch (error) {
             console.error('Submit ticket error:', error);
-            this.showError('Failed to create ticket');
+            this.showMessage('Failed to create ticket', 'error');
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalText;
         }
     }
 
-    async openTicketDetail(ticketId) {
-        this.currentTicketId = ticketId;
-        this.loadTicketDetail(ticketId);
-        new bootstrap.Modal(document.getElementById('ticket-detail-modal')).show();
-        this.startTicketPolling();
-    }
-
-    async loadTicketDetail(ticketId) {
-        try {
-            const response = await fetch(`${this.apiBase}/support-tickets/${ticketId}`, {
-                headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-
-            if (!response.ok) throw new Error('Failed to load ticket');
-
-            const data = await response.json();
-            this.renderTicketDetail(data.ticket, data.messages);
-        } catch (error) {
-            console.error('Load ticket detail error:', error);
-            this.showError('Failed to load ticket');
-        }
-    }
-
-    renderTicketDetail(ticket, messages) {
-        document.getElementById('ticket-detail-subject').textContent = ticket.subject;
-        
-        const statusColors = {
-            open: 'bg-primary',
-            in_progress: 'bg-warning',
-            resolved: 'bg-success',
-            closed: 'bg-secondary'
-        };
-        const priorityColors = {
-            low: 'bg-info',
-            medium: 'bg-warning',
-            high: 'bg-danger'
-        };
-
-        const statusEl = document.getElementById('ticket-detail-status');
-        statusEl.textContent = ticket.status.replace('_', ' ');
-        statusEl.className = `badge ${statusColors[ticket.status]}`;
-
-        const priorityEl = document.getElementById('ticket-detail-priority');
-        priorityEl.textContent = ticket.priority;
-        priorityEl.className = `badge ${priorityColors[ticket.priority]}`;
-
-        document.getElementById('ticket-detail-created').textContent = new Date(ticket.created_at).toLocaleDateString('en-PH');
-
-        this.renderTicketMessages(messages);
-    }
-
-    renderTicketMessages(messages) {
-        const container = document.getElementById('ticket-messages-container');
-        if (!container) return;
-
-        if (messages.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center">No messages yet. Start the conversation.</p>';
-            return;
-        }
-
-        container.innerHTML = messages.map(msg => {
-            const isOwn = msg.sender_id === this.userId;
-            const alignment = isOwn ? 'text-end' : 'text-start';
-            const bgColor = isOwn ? 'bg-primary text-white' : 'bg-white';
-            const senderName = msg.sender_role === 'staff' ? 'Support Staff' : msg.sender_name;
-
-            return `
-                <div class="d-flex ${alignment} mb-2">
-                    <div class="${bgColor} p-2 rounded" style="max-width: 70%;">
-                        <small class="d-block text-muted" style="${isOwn ? 'color: rgba(255,255,255,0.7) !important;' : ''}">${senderName}</small>
-                        <p class="mb-0">${this.escapeHtml(msg.message)}</p>
-                        <small class="d-block" style="${isOwn ? 'color: rgba(255,255,255,0.7) !important;' : 'color: #6c757d;'}">${new Date(msg.created_at).toLocaleString('en-PH')}</small>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        container.scrollTop = container.scrollHeight;
-    }
-
-    startTicketPolling() {
-        this.stopTicketPolling();
-        this.ticketPollFailures = 0;
-        this.ticketPollInterval = setInterval(() => {
-            this.pollTicketMessages();
-        }, 5000);
-    }
-
-    stopTicketPolling() {
-        if (this.ticketPollInterval) {
-            clearInterval(this.ticketPollInterval);
-            this.ticketPollInterval = null;
-        }
-    }
-
-    async pollTicketMessages() {
-        if (!this.currentTicketId) return;
-
-        try {
-            const response = await fetch(`${this.apiBase}/support-tickets/${this.currentTicketId}/messages?page=1&limit=50`, {
-                headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-
-            if (!response.ok) throw new Error('Polling failed');
-
-            const data = await response.json();
-            this.renderTicketMessages(data.messages);
-            this.ticketPollFailures = 0;
-        } catch (error) {
-            console.error('Poll ticket messages error:', error);
-            this.ticketPollFailures++;
-            if (this.ticketPollFailures >= 3) {
-                this.stopTicketPolling();
-                this.showError('Connection lost. Please refresh to see new messages.');
-            }
-        }
-    }
-
-    async sendTicketMessage() {
-        const input = document.getElementById('ticket-message-input');
-        const message = input.value.trim();
-        if (!message) return;
-
-        if (message.length > 500) {
-            this.showError('Message exceeds maximum length of 500 characters');
-            return;
-        }
-
-        const sendBtn = document.getElementById('btn-send-ticket-message');
-        const originalText = sendBtn.innerHTML;
-        sendBtn.disabled = true;
-        sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
-
-        try {
-            const response = await fetch(`${this.apiBase}/support-tickets/${this.currentTicketId}/messages`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.token}`
-                },
-                body: JSON.stringify({ message })
-            });
-
-            if (response.ok) {
-                input.value = '';
-                document.getElementById('ticket-message-char-count').textContent = '0/500 characters';
-                this.loadTicketDetail(this.currentTicketId);
-            } else {
-                const data = await response.json();
-                this.showError(data.message || 'Failed to send message');
-            }
-        } catch (error) {
-            console.error('Send ticket message error:', error);
-            this.showError('Failed to send message');
-        } finally {
-            sendBtn.disabled = false;
-            sendBtn.innerHTML = originalText;
-        }
-    }
+    // Support ticket view now redirects to the chat section — modal removed.
 }
 
 // Initialize farmer dashboard when DOM is loaded
@@ -7496,6 +8101,15 @@ document.addEventListener('DOMContentLoaded', () => {
         resubmitBtn.addEventListener('click', () => farmerDashboard.handleResubmitRequest());
     }
 
-    // Load verification status on page load
-    farmerDashboard.loadVerificationStatus();
+    // Verification history pagination
+    document.addEventListener('click', (e) => {
+        const pageLink = e.target.closest('[data-page]');
+        if (pageLink && pageLink.closest('#verification-history-pagination')) {
+            e.preventDefault();
+            const direction = pageLink.dataset.page;
+            if (farmerDashboard.handleVerificationHistoryPagination) {
+                farmerDashboard.handleVerificationHistoryPagination(direction);
+            }
+        }
+    });
 });

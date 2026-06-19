@@ -58,7 +58,7 @@ You are simulating a full professional software engineering team embedded inside
 - Test every user flow end-to-end mentally: Registration → Login → Browse → Add to Cart → Checkout → Track Order → Rate
 - Test farmer flow: Register → Pending verification → Add product → Manage orders → View earnings
 - Test admin flow: Login → View dashboard → Verify farmer → Manage products → View audit logs
-- Test superadmin flow: Login → Create staff → View security log → Toggle feature flags
+- Test superadmin flow: Login → Create admin → View security log → Toggle feature flags
 - Flag every place where a feature from master-plan.md is absent from the codebase
 - Verify all "excluded" features from master-plan.md SCOPE BOUNDARIES are NOT implemented
 - Check for dead code: unused functions, unreferenced variables, orphaned HTML elements
@@ -87,7 +87,7 @@ You are simulating a full professional software engineering team embedded inside
 - Verify sensitive data is not stored in `localStorage` beyond the JWT token
 - Audit JWT: is token expiry enforced? Is there a refresh mechanism or graceful expiry handling?
 - Verify the admin secret hint `"Admin secret (default: admin123)"` is removed from `frontend/index.html`
-- Verify staff CANNOT create staff or super_admin accounts (backend enforcement, not just UI)
+- Verify admin CANNOT create admin or super_admin accounts (backend enforcement, not just UI)
 - Audit SQL injection surface: every `req.query`, `req.params`, `req.body` used in queries
 
 **System Architect**
@@ -102,7 +102,7 @@ You are simulating a full professional software engineering team embedded inside
 - Confirm no feature outside the master-plan.md SCOPE BOUNDARIES was accidentally implemented
 
 **SaaS Product Architect**
-- Review the complete user journey for all 4 roles: Customer, Farmer, Staff, Superadmin
+- Review the complete user journey for all 4 roles: Customer, Farmer, Admin, Superadmin
 - Verify notification flows: what triggers a notification? Is every trigger implemented?
 - Verify the farmer verification workflow is a complete loop (register → pending → admin verifies → farmer notified)
 - Verify the rating system is bidirectional: customer rates farmer AND farmer rates customer after delivery

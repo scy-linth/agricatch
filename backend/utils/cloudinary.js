@@ -64,6 +64,12 @@ const publicIdForVerificationDocument = (userId) => {
   return `agricatch/verification/${userPart}/document`;
 };
 
+const publicIdForPaymentProof = (farmerId) => {
+  const farmerPart = String(farmerId || 'unknown').trim();
+  // Use timestamp for unique proofs per submission
+  return `agricatch/payment-proofs/${farmerPart}/${manilaTimestamp()}`;
+};
+
 // uploadFile(localPath, options)
 // Supported options mirror Cloudinary uploader options. Most common keys:
 // - folder: target folder path in Cloudinary
@@ -80,6 +86,10 @@ const uploadFile = async (localPath, options = {}) => {
 };
 
 const getMissingCloudinaryEnv = () => {
+  // Accept either CLOUDINARY_URL or individual env vars
+  if (String(process.env.CLOUDINARY_URL || '').trim()) {
+    return [];
+  }
   const required = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
   return required.filter((key) => !String(process.env[key] || '').trim());
 };
@@ -96,6 +106,7 @@ cloudinary.publicIdForCategorizedProduct = publicIdForCategorizedProduct;
 cloudinary.publicIdForProduct = publicIdForProduct;
 cloudinary.publicIdForUserPhoto = publicIdForUserPhoto;
 cloudinary.publicIdForVerificationDocument = publicIdForVerificationDocument;
+cloudinary.publicIdForPaymentProof = publicIdForPaymentProof;
 cloudinary.uploadFile = uploadFile;
 cloudinary.getMissingCloudinaryEnv = getMissingCloudinaryEnv;
 cloudinary.assertConfigured = assertConfigured;

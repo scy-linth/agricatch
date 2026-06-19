@@ -1,14 +1,21 @@
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', 'backend', '.env') });
 
-const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'agricatch',
-  password: 'password',
-  port: 5432,
-});
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+    })
+  : new Pool({
+      user: process.env.DB_USER || 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      database: process.env.DB_NAME || 'agricatch',
+      password: process.env.DB_PASSWORD || 'password',
+      port: process.env.DB_PORT || 5432,
+      ssl: { rejectUnauthorized: false },
+    });
 
 async function createMissingTables() {
   try {

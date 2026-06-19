@@ -274,7 +274,7 @@ router.post('/products/:id/reviews', async (req, res) => {
         // Send notification to admin
         try {
           const adminResult = await pool.query(
-            "SELECT id FROM users WHERE role = 'staff' LIMIT 1"
+            "SELECT id FROM users WHERE role = 'admin' LIMIT 1"
           );
           if (adminResult.rows.length > 0) {
             await pool.query(`

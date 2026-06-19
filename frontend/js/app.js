@@ -40,7 +40,7 @@ class AgricultureMarket {
         this.currentSearch = '';
         this.currentSort = 'latest';
         // Unified auth flow state
-        this.selectedRole = null; // 'farmer', 'customer', or 'staff'
+        this.selectedRole = null; // 'farmer', 'customer', or 'admin'
         this.authMode = null; // 'login' or 'register'
         this.pendingCheckout = false; // Track if auth was triggered from checkout
         this.returnUrl = null; // For deep link preservation
@@ -335,7 +335,7 @@ class AgricultureMarket {
                 this.returnUrl = decodeURIComponent(returnUrl);
             }
             const roleParam = urlParams.get('role');
-            const role = roleParam === 'admin' ? 'staff' : roleParam;
+            const role = roleParam === 'admin' ? 'admin' : roleParam;
             const mode = urlParams.get('mode');
             if (role && mode) {
                 setTimeout(() => {
@@ -2034,7 +2034,7 @@ class AgricultureMarket {
             window.location.replace('/farmer.html');
             return;
         }
-        if (role === 'staff') {
+        if (role === 'admin') {
             window.location.replace('/admin.html');
         }
         // super_admin can access the main site, no redirect
@@ -2240,9 +2240,9 @@ class AgricultureMarket {
                     adminPanelBtn.style.display = 'none';
                 }
 
-                // Show back to admin button for admin users (super_admin and staff)
+                // Show back to admin button for admin users (super_admin and admin)
                 const backToAdminBtn = document.getElementById('back-to-admin-btn');
-                if ((data.user.role === 'super_admin' || data.user.role === 'staff') && backToAdminBtn) {
+                if ((data.user.role === 'super_admin' || data.user.role === 'admin') && backToAdminBtn) {
                     backToAdminBtn.style.display = 'inline-flex';
                 } else if (backToAdminBtn) {
                     backToAdminBtn.style.display = 'none';
@@ -2260,8 +2260,8 @@ class AgricultureMarket {
 
                 // Super admin can access main site via admin panel button (no auto-redirect)
 
-                // Auto-redirect staff users to their dashboard
-                if (data.user.role === 'staff' && (window.location.pathname === '/' || window.location.pathname.includes('index.html'))) {
+                // Auto-redirect admin users to their dashboard
+                if (data.user.role === 'admin' && (window.location.pathname === '/' || window.location.pathname.includes('index.html'))) {
                     window.location.href = '/admin.html';
                     return;
                 }
@@ -2935,8 +2935,8 @@ class AgricultureMarket {
                 this.closeAuthFlow();
 
                 // Redirect / update UI based on server-determined role
-                if (userRole === 'super_admin' || userRole === 'staff') {
-                    this.showMessage('Staff login successful! Redirecting...', 'success');
+                if (userRole === 'super_admin' || userRole === 'admin') {
+                    this.showMessage('Admin login successful! Redirecting...', 'success');
                     setTimeout(() => {
                         window.location.href = '/admin.html';
                     }, 1000);
@@ -3869,8 +3869,8 @@ class AgricultureMarket {
                 this.closeAuthFlow();
                 // Redirect based on created role
                 const role = data.user?.role || 'customer';
-                if (role === 'staff' || role === 'super_admin') {
-                    this.showMessage('Staff registration successful! Redirecting...', 'success');
+                if (role === 'admin' || role === 'super_admin') {
+                    this.showMessage('Admin registration successful! Redirecting...', 'success');
                     setTimeout(() => {
                         window.location.href = '/admin.html';
                     }, 800);
@@ -5457,7 +5457,7 @@ class AgricultureMarket {
         if (!role) {
             role = localStorage.getItem('last_auth_role') || 'customer';
         }
-        if (role === 'admin') role = 'staff';
+        if (role === 'admin') role = 'admin';
         
         if (returnUrl) {
             this.returnUrl = returnUrl;
@@ -5492,7 +5492,7 @@ class AgricultureMarket {
     selectRoleOnForm(role) {
         const mode = this.authMode || 'login';
         // Register only allows farmer/customer
-        if (mode === 'register' && (role === 'staff' || !['farmer', 'customer'].includes(role))) {
+        if (mode === 'register' && (role === 'admin' || !['farmer', 'customer'].includes(role))) {
             return;
         }
         this.selectedRole = role;
@@ -5797,9 +5797,9 @@ class AgricultureMarket {
         }
         
         this.authMode = newMode;
-        // Register only allows farmer/customer; if current role is staff, switch to customer
+        // Register only allows farmer/customer; if current role is admin, switch to customer
         let role = this.selectedRole;
-        if (newMode === 'register' && role === 'staff') role = 'customer';
+        if (newMode === 'register' && role === 'admin') role = 'customer';
         this.selectedRole = role;
         this.openAuthModal(role, newMode);
     }

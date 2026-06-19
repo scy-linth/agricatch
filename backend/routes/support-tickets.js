@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { pool } = require('../db');
+const { pool } = require('../utils/db');
+const { writeAdminAuditLog } = require('../utils/auditLog');
 
 function getUserFromToken(req) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -53,8 +54,8 @@ router.get('/', async (req, res) => {
   try {
     const user = getUserFromToken(req);
     if (!user) return res.status(401).json({ message: 'Authentication required' });
-    if (!['staff', 'super_admin'].includes(user.role)) {
-      return res.status(403).json({ message: 'Staff access required' });
+    if (!['admin', 'staff', 'super_admin'].includes(user.role)) {
+      return res.status(403).json({ message: 'Admin access required' });
     }
 
     const { status, page = 1, limit = 10 } = req.query;
@@ -76,7 +77,7 @@ router.get('/', async (req, res) => {
     );
 
     const result = await pool.query(
-      `SELECT st.*, u.full_name as farmer_name, u.email as farmer_email,
+      `SELECT st.*, u.full_name as farmer_name, u.email as farmer_email, u.role, u.shop_name,
               (SELECT COUNT(*) FROM support_messages sm WHERE sm.ticket_id = st.id) as message_count
        FROM support_tickets st
        JOIN users u ON st.farmer_id = u.id
@@ -151,7 +152,7 @@ router.get('/:id', async (req, res) => {
 
     const ticket = result.rows[0];
 
-    // Check access: farmer can only see own tickets, staff can see all
+    // Check access: farmer can only see own tickets, admin can see all
     if (user.role === 'farmer' && ticket.farmer_id !== user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
@@ -188,8 +189,8 @@ router.put('/:id', async (req, res) => {
   try {
     const user = getUserFromToken(req);
     if (!user) return res.status(401).json({ message: 'Authentication required' });
-    if (!['staff', 'super_admin'].includes(user.role)) {
-      return res.status(403).json({ message: 'Staff access required' });
+    if (!['admin', 'staff', 'super_admin'].includes(user.role)) {
+      return res.status(403).json({ message: 'Admin access required' });
     }
 
     const { id } = req.params;
@@ -199,6 +200,12 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ message: 'Invalid status value' });
     }
 
+    const beforeRes = await pool.query('SELECT * FROM support_tickets WHERE id = $1', [id]);
+    if (beforeRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+    const before = beforeRes.rows[0];
+
     const result = await pool.query(
       'UPDATE support_tickets SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
       [status, id]
@@ -206,6 +213,22 @@ router.put('/:id', async (req, res) => {
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    const after = result.rows[0];
+
+    try {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: user.id,
+        action: 'support_ticket.status.update',
+        entity: 'support_tickets',
+        entity_id: id,
+        before: { status: before.status, subject: before.subject },
+        after: { status: after.status, subject: after.subject },
+        req
+      });
+    } catch (auditErr) {
+      console.error('Audit log error (non-fatal):', auditErr);
     }
 
     res.json({ message: 'Ticket status updated', ticket: result.rows[0] });
@@ -254,13 +277,27 @@ router.post('/:id/messages', async (req, res) => {
       [id]
     );
 
-    // If staff sends message, create notification for farmer
-    if (['staff', 'super_admin'].includes(user.role)) {
+    // If admin sends message, create notification for farmer
+    if (['admin', 'staff', 'super_admin'].includes(user.role)) {
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
          VALUES ($1, 'support_ticket', 'New Support Message', $2, false, CURRENT_TIMESTAMP)`,
-        [ticket.farmer_id, `Staff responded to your support ticket: ${ticket.subject}`]
+        [ticket.farmer_id, `Admin responded to your support ticket: ${ticket.subject}`]
       );
+
+      try {
+        await writeAdminAuditLog(pool, {
+          actor_admin_id: user.id,
+          action: 'support_ticket.message.sent',
+          entity: 'support_tickets',
+          entity_id: id,
+          before: { subject: ticket.subject },
+          after: { message: message.trim() },
+          req
+        });
+      } catch (auditErr) {
+        console.error('Audit log error (non-fatal):', auditErr);
+      }
     }
 
     res.status(201).json({ message: 'Message sent' });

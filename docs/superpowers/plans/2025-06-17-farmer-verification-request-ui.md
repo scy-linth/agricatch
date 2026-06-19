@@ -36,17 +36,11 @@
 ```javascript
 const publicIdForVerificationDocument = (userId) => {
   const userPart = String(userId || 'unknown').trim();
-  return `agricatch/verification/${userPart}/${manilaTimestamp()}`;
+  // Use consistent public_id per farmer for overwrite (no timestamp)
+  return `agricatch/verification/${userPart}/document`;
 };
 
 cloudinary.publicIdForVerificationDocument = publicIdForVerificationDocument;
-```
-
-- [ ] **Step 2: Commit**
-
-```bash
-git add backend/utils/cloudinary.js
-git commit -m "feat: add Cloudinary verification document helper"
 ```
 
 ---
@@ -84,13 +78,6 @@ psql $DATABASE_URL -c "\d verification_requests" | grep document_url
 
 Expected output should show `document_url` column in the table definition.
 
-- [ ] **Step 4: Commit**
-
-```bash
-git add database/migrations/add_verification_document_url.sql
-git commit -m "feat: add document_url field to verification_requests"
-```
-
 ---
 
 ### Task 3: Verify admin API returns document_url
@@ -107,13 +94,6 @@ grep -A 50 "router.get('/verification-requests'" backend/routes/admin.js
 - [ ] **Step 2: Verify document_url is included in SELECT query**
 
 Ensure the query includes `vr.document_url` in the SELECT statement. If not, add it.
-
-- [ ] **Step 3: Commit if changes needed**
-
-```bash
-git add backend/routes/admin.js
-git commit -m "fix: include document_url in verification requests API response"
-```
 
 ---
 
@@ -164,7 +144,7 @@ router.post('/me/verification-request', async (req, res) => {
 
     // Notify admins
     const admins = await pool.query(
-      `SELECT id FROM users WHERE role IN ('staff', 'super_admin')`
+      `SELECT id FROM users WHERE role IN ('admin', 'super_admin')`
     );
 
     for (const admin of admins.rows) {
@@ -188,13 +168,6 @@ router.post('/me/verification-request', async (req, res) => {
     res.status(500).json({ message: 'Server error submitting verification request' });
   }
 });
-```
-
-- [ ] **Step 2: Commit**
-
-```bash
-git add backend/routes/farmers.js
-git commit -m "feat: update verification request endpoint to accept document_url"
 ```
 
 ---
@@ -253,16 +226,9 @@ Add this modal before the closing `</body>` tag:
 </div>
 ```
 
-- [ ] **Step 2: Commit**
-
-```bash
-git add frontend/farmer.html
-git commit -m "feat: add verification request modal to farmer.html"
-```
-
 ---
 
-### Task 5: Add verification banner to farmer.html overview section
+### Task 6: Add verification banner to farmer.html overview section
 
 **Files:**
 - Modify: `frontend/farmer.html`
@@ -285,16 +251,9 @@ Find the overview section and add the banner at the top, after the section openi
   <div class="row g-3 mb-3">
 ```
 
-- [ ] **Step 2: Commit**
-
-```bash
-git add frontend/farmer.html
-git commit -m "feat: add verification banner to overview section"
-```
-
 ---
 
-### Task 6: Check existing Cloudinary upload pattern
+### Task 7: Check existing Cloudinary upload pattern
 
 **Files:**
 - Check: `backend/routes/upload.js`, `frontend/js/farmer.js` (existing patterns)
@@ -311,10 +270,12 @@ grep -r "upload" backend/routes/ --include="*.js" | grep -i cloudinary
 If existing upload endpoint found:
 - Use existing backend upload endpoint
 - Frontend sends file to backend, backend uploads to Cloudinary
+- Use consistent public_id per farmer for overwrite (no accumulation)
 
 If no existing endpoint:
 - Use direct Cloudinary API upload with unsigned preset
 - Configure CLOUDINARY_CLOUD_NAME in frontend
+- Use consistent public_id per farmer for overwrite (no accumulation)
 
 - [ ] **Step 3: Update plan based on findings**
 
@@ -322,7 +283,7 @@ Document the chosen approach in the plan comments.
 
 ---
 
-### Task 7: Add Cloudinary upload function to farmer.js
+### Task 8: Add Cloudinary upload function to farmer.js
 
 **Files:**
 - Modify: `frontend/js/farmer.js`
@@ -337,6 +298,8 @@ async function uploadToCloudinary(file) {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('folder', 'verification');
+  formData.append('public_id', `agricatch/verification/${userId}/document`); // Consistent ID for overwrite
+  formData.append('overwrite', 'true'); // Allow overwrite
   
   try {
     const response = await fetch('/api/upload', {
@@ -365,6 +328,8 @@ async function uploadToCloudinary(file) {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', 'unsigned_preset'); // Configure in Cloudinary dashboard
+  formData.append('public_id', `agricatch/verification/${userId}/document`); // Consistent ID for overwrite
+  formData.append('overwrite', 'true'); // Allow overwrite
   
   try {
     const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
@@ -386,16 +351,9 @@ async function uploadToCloudinary(file) {
 }
 ```
 
-- [ ] **Step 2: Commit**
-
-```bash
-git add frontend/js/farmer.js
-git commit -m "feat: add Cloudinary upload function to farmer.js"
-```
-
 ---
 
-### Task 7: Add verification request logic to farmer.js
+### Task 9: Add verification request logic to farmer.js
 
 **Files:**
 - Modify: `frontend/js/farmer.js`
@@ -620,16 +578,9 @@ Add this to the page initialization:
 loadVerificationStatus();
 ```
 
-- [ ] **Step 4: Commit**
-
-```bash
-git add frontend/js/farmer.js
-git commit -m "feat: add verification request logic to farmer.js"
-```
-
 ---
 
-### Task 8: Add verification request button to farmer dropdown
+### Task 10: Add verification request button to farmer dropdown
 
 **Files:**
 - Modify: `frontend/farmer.html`
@@ -653,16 +604,9 @@ Find the user account dropdown and add the verification request button:
 </div>
 ```
 
-- [ ] **Step 2: Commit**
-
-```bash
-git add frontend/farmer.html
-git commit -m "feat: add verification request button to farmer dropdown"
-```
-
 ---
 
-### Task 9: Add verification requests section to admin.html
+### Task 11: Add verification requests section to admin.html
 
 **Files:**
 - Modify: `frontend/admin.html`
@@ -755,16 +699,9 @@ Add this section before the closing `</main>` tag:
 </div>
 ```
 
-- [ ] **Step 3: Commit**
-
-```bash
-git add frontend/admin.html
-git commit -m "feat: add verification requests section to admin.html"
-```
-
 ---
 
-### Task 10: Add verification requests logic to admin.js
+### Task 12: Add verification requests logic to admin.js
 
 **Files:**
 - Modify: `frontend/js/admin.js`
@@ -990,16 +927,9 @@ if (sectionId === 'verification-requests') {
 }
 ```
 
-- [ ] **Step 4: Commit**
-
-```bash
-git add frontend/js/admin.js
-git commit -m "feat: add verification requests logic to admin.js"
-```
-
 ---
 
-### Task 11: Test farmer verification request flow
+### Task 13: Test farmer verification request flow
 
 **Files:**
 - Test: Manual testing in browser
@@ -1043,7 +973,7 @@ git commit -m "feat: add verification requests logic to admin.js"
 
 ---
 
-### Task 12: Test admin verification request review flow
+### Task 14: Test admin verification request review flow
 
 **Files:**
 - Test: Manual testing in browser
@@ -1087,7 +1017,7 @@ git commit -m "feat: add verification requests logic to admin.js"
 
 ---
 
-### Task 13: End-to-end workflow test
+### Task 15: End-to-end workflow test
 
 **Files:**
 - Test: Manual testing in browser

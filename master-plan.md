@@ -97,7 +97,7 @@ Migration file: `database/migrations/add_name_fields.sql`
 | My Account modal (customer) | `frontend/index.html` | Phase 6 |
 | My Account modal (farmer) | `frontend/farmer.html` | Phase 5 |
 | Admin — user edit modal | `frontend/admin.html` | Phase 3 |
-| Admin — user creation form (staff) | `frontend/admin.html` | Phase 3 |
+| Admin — user creation form (admin) | `frontend/admin.html` | Phase 3 |
 | Superadmin — user creation form | `frontend/superadmin.html` | Phase 4 |
 | Superadmin — user edit modal | `frontend/superadmin.html` | Phase 4 |
 
@@ -132,7 +132,7 @@ Summary modal shows:
 ### New Middleware (`backend/middleware/requireRole.js`)
 ```js
 // requireRole('super_admin') — 403 if user.role !== 'super_admin'
-// requireRole('staff', 'super_admin') — allow either
+// requireRole('admin', 'super_admin') — allow either
 // Used in admin routes to guard super_admin-only endpoints
 ```
 
@@ -154,8 +154,8 @@ Summary modal shows:
 - Migration: `database/migrations/add_audit_log_fields.sql`
 
 ### New `backend/routes/superadmin.js`
-- `GET /api/superadmin/staff` — list all staff users
-- `POST /api/superadmin/users` — create any account (role: staff | farmer | customer), password manually provided, bcrypt-hashed before save, no email sent
+- `GET /api/superadmin/admin` — list all admin users
+- `POST /api/superadmin/users` — create any account (role: admin | farmer | customer), password manually provided, bcrypt-hashed before save, no email sent
 - `PUT /api/superadmin/users/:id` — edit any user (name, email, username, role, password if provided)
 - `DELETE /api/superadmin/users/:id` — disable any user
 - `GET /api/superadmin/settings` — platform settings
@@ -218,7 +218,7 @@ Summary modal shows:
 
 ---
 
-## PHASE 3 — Staff Panel Rebuild (`admin.html` + `admin.js`)
+## PHASE 3 — Admin Panel Rebuild (`admin.html` + `admin.js`)
 
 ### admin.html Structure
 ```
@@ -263,13 +263,13 @@ Summary modal shows:
 
 ### superadmin.html Sections
 1. **Overview** — System health tiles: total users, active farmers, pending verifications, orders today
-2. **Staff Management** — Table of staff accounts: create, edit, disable
+2. **Admin Management** — Table of admin accounts: create, edit, disable
 3. **Platform Settings** — Key-value settings: site name, maintenance mode, max upload size, etc.
 4. **Security Log** — Failed login attempts, role promotions, password resets (from audit log)
 5. **Feature Flags** — Toggle experimental features on/off
 
 ### User Creation — Superadmin
-Form fields: Full Name, Email, Username, Password (plain text input, bcrypt-hashed on save), Role (dropdown: staff | farmer | customer)
+Form fields: Full Name, Email, Username, Password (plain text input, bcrypt-hashed on save), Role (dropdown: admin | farmer | customer)
 - No email sent, no temporary password — password is set directly by superadmin
 - Saved immediately to `users` table with hashed password
 - Password field: show/hide toggle, minimum 8 characters validation
@@ -278,10 +278,10 @@ Form fields: Full Name, Email, Username, Password (plain text input, bcrypt-hash
   - Two buttons: "Confirm & Save" (proceeds to save) and "Cancel" (goes back to form)
   - Account is NOT saved until "Confirm & Save" is clicked
 
-### User Creation — Staff (LIMITED)
+### User Creation — Admin (LIMITED)
 Same form but Role dropdown limited to: **farmer | customer** only
-- Staff CANNOT create staff or super_admin accounts
-- Backend enforces this: `POST /api/admin/users` rejects if `req.user.role === 'staff'` and `body.role` is `staff` or `super_admin`
+- Admin CANNOT create admin or super_admin accounts
+- Backend enforces this: `POST /api/admin/users` rejects if `req.user.role === 'admin'` and `body.role` is `staff` or `super_admin`
 - Same direct-save: bcrypt hash, no email sent
 - **Same confirmation step**: summary modal before saving — Full Name, Email, Username, Role, password masked
 
@@ -457,7 +457,7 @@ database/
 |---|---|---|
 | 1 | Security + Backend (password, JWT, requireRole, pagination, PSGC routes, stats cache) | CRITICAL |
 | 2 | New admin.css design system | HIGH |
-| 3 | Staff panel rebuild (admin.html + admin.js) | HIGH |
+| 3 | Admin panel rebuild (admin.html + admin.js) | HIGH |
 | 4 | Superadmin panel (superadmin.html + superadmin.js) | HIGH |
 | 5 | Farmer dashboard improvements | MEDIUM |
 | 6 | Customer experience (orders, wishlist, addresses, product.html, notifications) | MEDIUM |

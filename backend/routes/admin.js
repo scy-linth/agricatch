@@ -198,7 +198,7 @@ const ensureCategoryAdminSchema = async () => {
   _categorySchemaEnsured = true;
 };
 
-const requireAdmin = requireRole('staff', 'super_admin');
+const requireAdmin = requireRole('admin', 'super_admin');
 
 const buildDisplayName = ({ firstName, middleName, lastName, fullName, fallback }) => {
   const parts = [firstName, middleName, lastName]
@@ -338,8 +338,8 @@ const disableUserHandler = async (req, res, reasonOverride = null) => {
     if (targetUser.role === 'super_admin') {
       return res.status(403).json({ message: 'Cannot disable super admin account' });
     }
-    if (targetUser.role === 'staff' && req.user.role !== 'super_admin') {
-      return res.status(403).json({ message: 'Cannot disable another staff account' });
+    if (targetUser.role === 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Cannot disable another admin account' });
     }
 
     if (targetUser.is_disabled) {
@@ -434,8 +434,8 @@ const enableUserHandler = async (req, res) => {
     if (targetUser.role === 'super_admin') {
       return res.status(403).json({ message: 'Cannot enable super admin account' });
     }
-    if (targetUser.role === 'staff' && req.user.role !== 'super_admin') {
-      return res.status(403).json({ message: 'Cannot enable another staff account' });
+    if (targetUser.role === 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Cannot enable another admin account' });
     }
 
     await updateUserDisabledFields(pool, userId, null, false);
@@ -496,8 +496,8 @@ router.get('/users', requireAdmin, async (req, res) => {
     const status = req.query.status ? String(req.query.status).trim() : null;
     const verification = req.query.verification ? String(req.query.verification).trim() : null;
     const allowedRoles = req.user.role === 'super_admin'
-      ? ['customer', 'farmer', 'staff', 'super_admin']
-      : ['customer', 'farmer', 'staff'];
+      ? ['customer', 'farmer', 'admin', 'super_admin']
+      : ['customer', 'farmer', 'admin'];
 
     const whereParts = [];
     const whereValues = [];
@@ -579,7 +579,7 @@ router.get('/users', requireAdmin, async (req, res) => {
 router.post('/users', requireAdmin, async (req, res) => {
   try {
     const allowedRoles = req.user.role === 'super_admin'
-      ? ['customer', 'farmer', 'staff']
+      ? ['customer', 'farmer', 'admin']
       : ['customer', 'farmer'];
     const normalized = normalizeManagedUserPayload(req.body || {});
 
@@ -670,8 +670,8 @@ router.get('/logs', requireAdmin, async (req, res) => {
     const values = [];
     let idx = 1;
 
-    // Staff can only see their own audit logs
-    if (req.user.role === 'staff') {
+    // Admin can only see their own audit logs
+    if (req.user.role === 'admin') {
       where.push(`actor_admin_id = $${idx++}`);
       values.push(req.user.id);
     }
@@ -747,7 +747,7 @@ router.get('/audit-logs/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// Update user login/profile details (staff) - non-staff targets only
+// Update user login/profile details (admin) - non-admin targets only
 router.put('/users/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -766,9 +766,9 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Regular staff users cannot edit staff users, but super admin can
-    if (req.user.role !== 'super_admin' && targetResult.rows[0].role === 'staff') {
-      return res.status(403).json({ message: 'Cannot edit staff users' });
+    // Regular admin users cannot edit admin users, but super admin can
+    if (req.user.role !== 'super_admin' && targetResult.rows[0].role === 'admin') {
+      return res.status(403).json({ message: 'Cannot edit admin users' });
     }
     if (req.user.role !== 'super_admin' && targetResult.rows[0].role === 'super_admin') {
       return res.status(403).json({ message: 'Cannot edit super admin users' });
@@ -932,9 +932,9 @@ router.put('/users/:id/verify', requireAdmin, async (req, res) => {
     broadcastEvent('admin.audit', { action, entity: 'users', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
 
     // Send notification to farmer about verification status change
-    const message = is_verified 
-      ? 'Your farmer account has been verified. You now have access to all features including unlimited products, priority approval, custom product name requests, and advanced analytics.'
-      : `Your farmer account verification has been revoked. Reason: ${reason}. Some features may be restricted.`;
+    const message = is_verified
+      ? 'Your farmer account has been verified! You can now sell products (up to 10 on the Free tier) and access basic analytics. Upgrade to Premium for unlimited products, priority search ranking, custom product names, and advanced analytics.'
+      : `Your farmer account verification has been revoked. Reason: ${reason}. Product creation and sales features are now disabled.`;
     
     await pool.query(
       `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
@@ -977,19 +977,33 @@ router.get('/verification-requests', requireAdmin, async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
     const offset = (page - 1) * limit;
     const status = req.query.status ? String(req.query.status).trim() : null;
+    const search = req.query.search ? String(req.query.search).trim().toLowerCase() : null;
 
     let whereSql = '';
     const params = [];
     let paramIndex = 1;
 
-    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+    if (status && ['pending', 'approved', 'rejected', 'unverified'].includes(status)) {
       whereSql = `WHERE vr.status = $${paramIndex}`;
       params.push(status);
       paramIndex++;
     }
 
+    if (search) {
+      const searchCondition = ` AND (
+        LOWER(COALESCE(u.username, '')) LIKE $${paramIndex}
+        OR LOWER(COALESCE(u.full_name, '')) LIKE $${paramIndex}
+        OR LOWER(COALESCE(u.email, '')) LIKE $${paramIndex}
+        OR LOWER(COALESCE(u.shop_name, '')) LIKE $${paramIndex}
+      )`;
+      whereSql += searchCondition;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
     const totalRes = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM verification_requests vr ${whereSql}`,
+      `SELECT COUNT(*)::int AS count FROM verification_requests vr
+       JOIN users u ON vr.farmer_id = u.id ${whereSql}`,
       params
     );
 
@@ -1076,7 +1090,7 @@ router.put('/verification-requests/:id/review', requireAdmin, async (req, res) =
         `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
          VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
         [farmerId, 'account_verified', 'Account Verified',
-         'Your farmer account has been verified! You now have access to all features including unlimited products, priority approval, custom product name requests, and advanced analytics.']
+         'Your farmer account has been verified! You can now sell products (up to 10 on the Free tier) and access basic analytics. Upgrade to Premium for unlimited products, priority search ranking, custom product names, and advanced analytics.']
       );
       broadcastEvent('notification.created', { user_id: farmerId });
     }
@@ -1761,7 +1775,7 @@ router.get('/orders', requireAdmin, async (req, res) => {
 // Update user role (super_admin only)
 router.put('/users/:id/role', requireAdmin, async (req, res) => {
   try {
-    // Staff cannot change any user roles
+    // Admin cannot change any user roles
     if (req.user.role !== 'super_admin') {
       return res.status(403).json({ message: 'Only super admins can change user roles' });
     }
@@ -1770,7 +1784,7 @@ router.put('/users/:id/role', requireAdmin, async (req, res) => {
     const { role } = req.body;
     const targetUserId = parseInt(id, 10);
 
-    if (!['customer', 'farmer', 'staff'].includes(role)) {
+    if (!['customer', 'farmer', 'admin'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
@@ -2129,7 +2143,7 @@ router.put('/products/:id/status', requireAdmin, async (req, res) => {
   }
 });
 
-// Category management (staff/super_admin)
+// Category management (admin/super_admin)
 router.get('/categories', requireAdmin, async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page || '1', 10), 1);
@@ -2528,7 +2542,7 @@ router.post('/catalog-names', requireAdmin, async (req, res) => {
 
     const inserted = await pool.query(
       `INSERT INTO product_name_catalog (name, category_id, source, is_approved, reviewed_by, reviewed_at)
-       VALUES ($1, $2, 'staff', true, $3, CURRENT_TIMESTAMP)
+       VALUES ($1, $2, 'admin', true, $3, CURRENT_TIMESTAMP)
        RETURNING id, name, category_id`,
       [name, categoryId, req.user.id || null]
     );
@@ -2661,7 +2675,7 @@ router.delete('/catalog-names/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// Staff review queue for farmer custom product names
+// Admin review queue for farmer custom product names
 router.get('/category-requests', requireAdmin, async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page || '1', 10), 1);
@@ -3854,6 +3868,191 @@ router.put('/featured-products/:id', requireAdmin, async (req, res) => {
     res.json({ message: 'Featured product updated successfully', featured_product: result.rows[0] });
   } catch (error) {
     console.error('Update featured product error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── GET /api/admin/subscriptions ───────────────────────────────────────────
+router.get('/subscriptions', requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    console.log('GET /api/admin/subscriptions - User role:', req.user?.role, 'Query status:', req.query.status);
+    const { status } = req.query;
+    let query = `
+      SELECT s.*, u.full_name, u.email, u.shop_name,
+             pa.name as payment_account_name, pa.account_number as payment_account_number, pa.type as payment_account_type
+      FROM farmer_subscriptions s
+      JOIN users u ON s.farmer_id = u.id
+      LEFT JOIN payment_accounts pa ON pa.id = s.payment_account_id
+    `;
+    const params = [];
+
+    if (status && status !== 'all') {
+      query += ' WHERE s.status = $1';
+      params.push(status);
+    }
+
+    query += ' ORDER BY s.created_at DESC';
+
+    const result = await pool.query(query, params);
+    res.json({ subscriptions: result.rows });
+  } catch (err) {
+    console.error('Admin subscriptions error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── PUT /api/admin/subscriptions/:id/approve ─────────────────────────────
+router.put('/subscriptions/:id/approve', requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user.id;
+    const subRes = await pool.query(
+      'SELECT * FROM farmer_subscriptions WHERE id = $1 AND status = $2',
+      [id, 'pending']
+    );
+    if (subRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Pending subscription not found' });
+    }
+    const sub = subRes.rows[0];
+    const before = { status: sub.status, farmer_id: sub.farmer_id, tier: sub.tier };
+    const months = sub.plan_duration_months;
+    await pool.query(
+      `UPDATE farmer_subscriptions
+       SET status = 'active',
+           starts_at = COALESCE(starts_at, CURRENT_TIMESTAMP),
+           expires_at = GREATEST(COALESCE(expires_at, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP) + ($1 || ' months')::interval,
+           approved_by = $2, approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      [months, adminId, id]
+    );
+    const after = { status: 'active', farmer_id: sub.farmer_id, tier: sub.tier, approved_by: adminId };
+    try {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: adminId,
+        action: 'approved',
+        entity: 'subscription',
+        entity_id: id, // Keep as string (UUID) since subscription IDs are UUIDs
+        before,
+        after,
+        req
+      });
+    } catch (auditErr) {
+      console.error('Audit log error (non-fatal):', auditErr);
+    }
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, 'subscription_approved',
+          'Premium Subscription Approved', $2, false, CURRENT_TIMESTAMP)`,
+        [sub.farmer_id, `Your Premium subscription is active! You now have unlimited products, priority approval, custom product names, and advanced analytics.`]
+      );
+      broadcastEvent('notification.created', { farmer_id: sub.farmer_id });
+    } catch (notifErr) {
+      console.error('Notification error (non-fatal):', notifErr);
+    }
+    res.json({ message: 'Subscription approved' });
+  } catch (err) {
+    console.error('Subscription approve error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── PUT /api/admin/subscriptions/:id/reject ──────────────────────────────────
+router.put('/subscriptions/:id/reject', requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user.id;
+    const subRes = await pool.query(
+      'SELECT * FROM farmer_subscriptions WHERE id = $1 AND status = $2', [id, 'pending']
+    );
+    if (subRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Pending subscription not found' });
+    }
+    const sub = subRes.rows[0];
+    const before = { status: sub.status, farmer_id: sub.farmer_id, tier: sub.tier };
+    await pool.query(
+      `UPDATE farmer_subscriptions SET status = 'rejected', rejection_reason = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [reason || null, id]
+    );
+    const after = { status: 'rejected', farmer_id: sub.farmer_id, tier: sub.tier, rejection_reason: reason };
+    try {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: adminId,
+        action: 'rejected',
+        entity: 'subscription',
+        entity_id: id, // Keep as string (UUID) since subscription IDs are UUIDs
+        before,
+        after,
+        req
+      });
+    } catch (auditErr) {
+      console.error('Audit log error (non-fatal):', auditErr);
+    }
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, 'subscription_rejected',
+          'Premium Subscription Rejected', $2, false, CURRENT_TIMESTAMP)`,
+        [sub.farmer_id, `Your Premium subscription request was rejected.${reason ? ` Reason: ${reason}` : ''}`]
+      );
+      broadcastEvent('notification.created', { farmer_id: sub.farmer_id });
+    } catch (notifErr) {
+      console.error('Notification error (non-fatal):', notifErr);
+    }
+    res.json({ message: 'Subscription rejected' });
+  } catch (err) {
+    console.error('Subscription reject error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── PUT /api/admin/subscriptions/:id/expire ──────────────────────────────────
+router.put('/subscriptions/:id/expire', requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user.id;
+    const subRes = await pool.query(
+      'SELECT * FROM farmer_subscriptions WHERE id = $1 AND status = $2', [id, 'active']
+    );
+    if (subRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Active subscription not found' });
+    }
+    const sub = subRes.rows[0];
+    const before = { status: sub.status, farmer_id: sub.farmer_id, tier: sub.tier, expires_at: sub.expires_at };
+    await pool.query(
+      `UPDATE farmer_subscriptions SET status = 'expired', expires_at = CURRENT_TIMESTAMP, expiry_reason = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [reason || null, id]
+    );
+    const after = { status: 'expired', farmer_id: sub.farmer_id, tier: sub.tier, expires_at: new Date().toISOString(), expiry_reason: reason };
+    try {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: adminId,
+        action: 'expired',
+        entity: 'subscription',
+        entity_id: id, // Keep as string (UUID) since subscription IDs are UUIDs
+        before,
+        after,
+        req
+      });
+    } catch (auditErr) {
+      console.error('Audit log error (non-fatal):', auditErr);
+    }
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, 'subscription_expired',
+          'Premium Subscription Expired', $2, false, CURRENT_TIMESTAMP)`,
+        [sub.farmer_id, `Your Premium subscription has been expired.${reason ? ` Reason: ${reason}` : ''}`]
+      );
+      broadcastEvent('notification.created', { farmer_id: sub.farmer_id });
+    } catch (notifErr) {
+      console.error('Notification error (non-fatal):', notifErr);
+    }
+    res.json({ message: 'Subscription expired' });
+  } catch (err) {
+    console.error('Subscription expire error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

@@ -116,8 +116,8 @@ test.describe('Admin Sidebar Navigation', () => {
       }
     });
 
-    test('Staff navigation', async ({ page }) => {
-      await testSidebarLink(page, 'staff', 'a[data-section="staff"]', 'Staff Management');
+    test('Admin navigation', async ({ page }) => {
+      await testSidebarLink(page, 'admin', 'a[data-section="admin"]', 'Admin Management');
     });
 
     test('All Users navigation', async ({ page }) => {
@@ -153,7 +153,7 @@ test.describe('Admin Sidebar Navigation', () => {
     });
   });
 
-  // Test that staff users cannot access super_admin sections
+  // Test that admin users cannot access super_admin sections
   test.describe('Role-Based Access Control', () => {
     test.beforeEach(async ({ page }) => {
       // Only test if user is NOT super_admin
@@ -162,14 +162,14 @@ test.describe('Admin Sidebar Navigation', () => {
       }
     });
 
-    test('Staff cannot access super_admin sections', async ({ page }) => {
+    test('Admin cannot access super_admin sections', async ({ page }) => {
       // Verify super_admin sections have data-roles attribute
       const superAdminSections = page.locator('.admin-section-card[data-roles="super_admin"]');
       const count = await superAdminSections.count();
       expect(count).toBeGreaterThan(0);
       
       // Try to navigate to a super_admin section directly
-      await page.goto('http://localhost:3000/admin.html#staff');
+      await page.goto('http://localhost:3000/admin.html#admin');
       await page.reload();
       
       // Should be redirected to overview with access denied message

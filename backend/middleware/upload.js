@@ -67,9 +67,18 @@ const avatarUpload = multer({
   fileFilter
 });
 
+const paymentProofStorage = createStorage(path.join(__dirname, '..', '..', 'frontend', 'images', 'uploads', 'payment-proofs'), true);
+
+const paymentProofUpload = multer({
+  storage: paymentProofStorage,
+  limits: { fileSize: MAX_FILE_SIZE },
+  fileFilter
+});
+
 module.exports = {
   productUpload,
   bannerUpload,
   avatarUpload,
+  paymentProofUpload,
   fileFilter
 };

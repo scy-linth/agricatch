@@ -76,8 +76,8 @@ class AdminDashboard {
                 this.openCategoryRequestPanel(Number(btn.dataset.requestId));
             } else if (btn.matches('.farmer-view-btn')) {
                 this.openFarmerDetailModal(Number(btn.dataset.farmerId));
-            } else if (btn.matches('.staff-view-btn')) {
-                this.openStaffDetailModal(Number(btn.dataset.userId));
+            } else if (btn.matches('.admin-view-btn')) {
+                this.openAdminDetailModal(Number(btn.dataset.userId));
             } else if (btn.matches('.all-users-view-btn')) {
                 this.openAllUsersDetailModal(Number(btn.dataset.userId));
             } else if (btn.matches('.toggle-modal-password-btn')) {
@@ -227,6 +227,28 @@ class AdminDashboard {
 
         this.sortableTables[tableId] = new window.simpleDatatables.DataTable(table, dataTableOptions);
         this.sortableTables[tableId]?.wrapperDOM?.classList.add('admin-sortable-wrapper');
+
+        // Save sort state when user clicks a header
+        const wrapper = this.sortableTables[tableId].wrapperDOM;
+        if (wrapper) {
+            const headers = wrapper.querySelectorAll('th');
+            headers.forEach((th, index) => {
+                th.addEventListener('click', () => {
+                    // Toggle direction: if clicking same column, flip direction; otherwise use asc
+                    const currentSort = localStorage.getItem(`adminTableSort_${tableId}`);
+                    let newDirection = 'asc';
+                    if (currentSort) {
+                        try {
+                            const [savedCol, savedDir] = JSON.parse(currentSort);
+                            if (savedCol === index) {
+                                newDirection = savedDir === 'asc' ? 'desc' : 'asc';
+                            }
+                        } catch (_) {}
+                    }
+                    localStorage.setItem(`adminTableSort_${tableId}`, JSON.stringify([index, newDirection]));
+                });
+            });
+        }
     }
 
     destroySortableTable(tableId) {
@@ -346,7 +368,7 @@ class AdminDashboard {
             'top-products': { page: 1, total: 0, limit: 5 },
             'top-farmers': { page: 1, total: 0, limit: 5 },
             'recent-sales': { page: 1, total: 0, limit: 5 },
-            'staff': { page: 1, total: 0, limit: 25 },
+            'admin': { page: 1, total: 0, limit: 25 },
             'all-users': { page: 1, total: 0, limit: 25 },
             'suspicious-patterns': { page: 1, total: 0, limit: 50 },
             'flagged-users': { page: 1, total: 0, limit: 50 },
@@ -363,11 +385,7 @@ class AdminDashboard {
         this._restorePeriods();
 
         this.checkAdminAuth();
-        this.setupNavigation();
         this.loadDashboardStats();
-        this.loadOrders();
-        this.loadProducts();
-        this.loadNotifications();
         this.setupEventListeners();
         this.setupRealtime();
         this.startUnreadPolling();
@@ -597,7 +615,7 @@ class AdminDashboard {
     setupNavigation() {
         // Load saved section or default to overview
         let savedSection = localStorage.getItem('adminActiveSection') || 'overview';
-        // Prevent staff from landing on super_admin-only sections
+        // Prevent admin from landing on super_admin-only sections
         const sectionEl = document.getElementById(savedSection);
         if (sectionEl && sectionEl.getAttribute('data-roles') === 'super_admin' && this.currentUserRole !== 'super_admin') {
             savedSection = 'overview';
@@ -615,9 +633,10 @@ class AdminDashboard {
                     this.showSection(section);
                     document.body.classList.remove('toggle-sidebar');
                     if (filterStatus && section === 'products') {
-                        const statusFilter = document.getElementById('products-status-filter');
-                        if (statusFilter) {
-                            statusFilter.value = filterStatus;
+                        const targetTab = document.querySelector(`.products-tabs .tab-btn[data-status="${filterStatus}"]`);
+                        if (targetTab) {
+                            document.querySelectorAll('.products-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                            targetTab.classList.add('active');
                             this.loadProducts();
                         }
                     }
@@ -668,7 +687,7 @@ class AdminDashboard {
     }
 
     showSection(sectionId) {
-        // Block staff from accessing super_admin-only sections
+        // Block admin from accessing super_admin-only sections
         const sectionEl = document.getElementById(sectionId);
         if (sectionEl && sectionEl.getAttribute('data-roles') === 'super_admin' && this.currentUserRole !== 'super_admin') {
             this.showToast('Access denied: Super Admin only', 'error');
@@ -698,6 +717,19 @@ class AdminDashboard {
             link.classList.toggle('collapsed', !isActive);
         });
 
+        // Expand parent collapse menu if the section is inside one
+        const activeLink = document.querySelector(`.sidebar-link[data-section="${sectionId}"]`);
+        if (activeLink) {
+            const parentCollapse = activeLink.closest('.nav-content.collapse');
+            if (parentCollapse) {
+                const parentToggle = document.querySelector(`[data-bs-target="#${parentCollapse.id}"]`);
+                if (parentToggle) {
+                    parentToggle.classList.remove('collapsed');
+                    parentCollapse.classList.add('show');
+                }
+            }
+        }
+
         // Scroll browser to bottom when chat section becomes active
         if (sectionId === 'chat') {
             setTimeout(() => {
@@ -710,11 +742,71 @@ class AdminDashboard {
         }
 
         if (sectionId === 'subscription-requests') {
-            this.loadSubscriptionRequests('pending');
+            this.loadSubscriptionRequests('all');
         }
 
-        if (sectionId === 'support-tickets') {
-            this.loadSupportTickets('open');
+        if (sectionId === 'chat') {
+            // Unified inbox - no tabs needed
+        }
+
+        // Load data when navigating to sections
+        if (sectionId === 'orders') {
+            this.loadOrders();
+        } else if (sectionId === 'users') {
+            this.loadUsers();
+        } else if (sectionId === 'products') {
+            this.loadProducts();
+        } else if (sectionId === 'categories') {
+            this.loadCategories();
+        } else if (sectionId === 'catalog-products') {
+            this.loadProducts();
+        } else if (sectionId === 'farmers') {
+            this.loadFarmers('all');
+        } else if (sectionId === 'admin') {
+            this.loadAdmin();
+        } else if (sectionId === 'all-users') {
+            this.loadAllUsers();
+        } else if (sectionId === 'suspicious-patterns') {
+            this.loadSuspiciousPatterns();
+        } else if (sectionId === 'flagged-users') {
+            this.loadFlaggedUsers();
+        } else if (sectionId === 'security-log') {
+            this.loadSecurityLog();
+        } else if (sectionId === 'platform-settings') {
+            this.loadPlatformSettings();
+        } else if (sectionId === 'feature-flags') {
+            this.loadFeatureFlags();
+        } else if (sectionId === 'notifications') {
+            this.loadNotifications(1).then(() => {
+                // Apply highlight after notifications are loaded and DOM is updated
+                requestAnimationFrame(() => {
+                    if (this.highlightedNotifId) {
+                        const item = document.querySelector(`.notification-item[data-id="${this.highlightedNotifId}"]`);
+                        if (item) {
+                            item.classList.add('highlighted');
+                            item.style.background = '#fef9c3';
+                            item.style.borderColor = '#facc15';
+                            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // Mark as read
+                            this.markNotifRead(this.highlightedNotifId, null, true);
+
+                            // Transition from yellow highlight to read status after 1 second
+                            setTimeout(() => {
+                                item.style.background = '#fafafa';
+                                item.style.borderColor = '#e5e7eb';
+                                item.style.opacity = '0.7';
+                                this.highlightedNotifId = null;
+                            }, 1000);
+                        }
+                    }
+                });
+            });
+        } else if (sectionId === 'category-requests') {
+            this.loadCategoryRequests();
+        } else if (sectionId === 'product-approvals') {
+            this.loadProductApprovals();
+        } else if (sectionId === 'profile') {
+            this.loadProfileSection();
         }
 
         // Add active state to parent collapse menu for catalog sections
@@ -750,6 +842,8 @@ class AdminDashboard {
 
         const pageTitle = document.querySelector('.page-title');
         if (pageTitle) {
+            // Hide page title for all sections with hero titles (all except overview)
+            pageTitle.style.display = sectionId === 'overview' ? 'block' : 'none';
             const titles = {
                 overview: 'Dashboard Overview',
                 orders: 'Order Management',
@@ -761,9 +855,8 @@ class AdminDashboard {
                 'product-approvals': 'Pending Approvals',
                 'verification-requests': 'Verification Requests',
                 'subscription-requests': 'Subscription Requests',
-                'support-tickets': 'Support Tickets',
                 farmers: 'Farmer Management',
-                staff: 'Staff Management',
+                admin: 'Admin Management',
                 'all-users': 'All Users',
                 logs: 'Audit Logs',
                 chat: 'Chat & Support',
@@ -775,6 +868,8 @@ class AdminDashboard {
                 'security-log': 'Security Log',
                 'platform-settings': 'Platform Settings',
                 'feature-flags': 'Feature Flags',
+                'database-backup': 'Database Data Backup',
+                'image-manager': 'Image Manager',
             };
             pageTitle.textContent = titles[sectionId] || 'Dashboard';
         }
@@ -795,10 +890,10 @@ class AdminDashboard {
                 'subscription-requests': 'Subscription Requests',
                 'support-tickets': 'Support Tickets',
                 farmers: 'Farmers',
-                staff: 'Staff',
+                admin: 'Admin',
                 'all-users': 'All Users',
                 logs: 'Audit Logs',
-                chat: 'Chat & Support',
+                chat: 'Support Center',
                 notifications: 'Notifications',
                 profile: 'My Profile',
                 broadcast: 'Broadcast',
@@ -860,10 +955,10 @@ class AdminDashboard {
         if (sectionId === 'notifications') {
             this.loadNotifications();
         }
-        if (sectionId === 'staff' && !this._loadedSections?.staff) {
+        if (sectionId === 'admin' && !this._loadedSections?.admin) {
             this._loadedSections = this._loadedSections || {};
-            this._loadedSections.staff = true;
-            this.loadStaff();
+            this._loadedSections.admin = true;
+            this.loadAdmin();
         }
         if (sectionId === 'all-users' && !this._loadedSections?.['all-users']) {
             this._loadedSections = this._loadedSections || {};
@@ -926,7 +1021,7 @@ class AdminDashboard {
 
             if (response.ok) {
                 const data = await response.json();
-                if (!['staff', 'super_admin'].includes(data.user.role)) {
+                if (!['admin', 'super_admin'].includes(data.user.role)) {
                     // Access denied -> redirect non-admin away from admin panel
                     if (data.user.role === 'farmer') {
                         window.location.href = '/farmer.html?denied=admin';
@@ -937,7 +1032,7 @@ class AdminDashboard {
                 }
                 this.currentUserRole = data.user.role;
                 this.currentUserId = data.user.id;
-                const fullName = data.user.full_name || data.user.username || 'Staff';
+                const fullName = data.user.full_name || data.user.username || 'Admin';
                 // Extract first name and format as Title Case (capitalize each word)
                 const firstName = fullName.split(' ')[0];
                 const formattedFirstName = firstName.split(' ').map(word => 
@@ -975,12 +1070,18 @@ class AdminDashboard {
                 const visitSiteBtn = document.getElementById('visit-site-btn');
                 if (visitSiteBtn) visitSiteBtn.style.display = this.currentUserRole === 'super_admin' ? 'block' : 'none';
 
-                // Hide super_admin-only sidebar items and sections for staff
+                // Hide super_admin-only sidebar items and sections for admin
                 if (this.currentUserRole !== 'super_admin') {
                     document.querySelectorAll('[data-roles="super_admin"]').forEach(el => {
                         el.style.display = 'none';
                     });
                 }
+
+                // Setup navigation after auth check completes
+                this.setupNavigation();
+
+                // Load initial section data before hiding loading screen
+                this.loadInitialSectionData();
             } else {
                 if (response.status === 401 || response.status === 403) {
                     try { localStorage.removeItem('token'); } catch (_) {}
@@ -1027,20 +1128,26 @@ class AdminDashboard {
         // Verification request status filter tabs (event delegation)
         document.addEventListener('click', (e) => {
             if (e.target.matches('.verification-tabs .tab-btn')) {
-                document.querySelectorAll('.verification-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                const parentTabs = e.target.closest('.verification-tabs');
+                parentTabs.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
-                this.loadVerificationRequests(1, e.target.dataset.status);
+                
+                // Handle different tab types
+                if (parentTabs.classList.contains('verification-tabs') && !parentTabs.classList.contains('order-tabs') && !parentTabs.classList.contains('users-tabs') && !parentTabs.classList.contains('products-tabs') && !parentTabs.classList.contains('categories-tabs') && !parentTabs.classList.contains('catalog-tabs') && !parentTabs.classList.contains('farmers-tabs') && !parentTabs.classList.contains('admin-tabs') && !parentTabs.classList.contains('all-users-tabs') && !parentTabs.classList.contains('product-approval-tabs') && !parentTabs.classList.contains('category-request-tabs') && !parentTabs.classList.contains('subscription-tabs')) {
+                    this.loadVerificationRequests(1, e.target.dataset.status);
+                } else if (parentTabs.classList.contains('product-approval-tabs')) {
+                    this.resetPaginationPage('product-approvals');
+                    this.loadProductApprovals(e.target.dataset.status, undefined, 1);
+                } else if (parentTabs.classList.contains('category-request-tabs')) {
+                    this.resetPaginationPage('category-requests');
+                    this.loadCategoryRequests(e.target.dataset.status, undefined, 1);
+                } else if (parentTabs.classList.contains('subscription-tabs')) {
+                    this.resetPaginationPage('subscription-requests');
+                    this.loadSubscriptions(e.target.dataset.status, undefined, 1);
+                }
             }
         });
 
-        // Support ticket tabs
-        document.addEventListener('click', (e) => {
-            if (e.target.matches('.support-tabs .tab-btn')) {
-                document.querySelectorAll('.support-tabs .tab-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                this.loadSupportTickets(e.target.dataset.status);
-            }
-        });
 
         // Support ticket entries per page
         document.getElementById('support-tickets-entries')?.addEventListener('change', (e) => {
@@ -1058,7 +1165,7 @@ class AdminDashboard {
         document.getElementById('admin-ticket-message-input')?.addEventListener('input', (e) => {
             const count = e.target.value.length;
             const counterEl = document.getElementById('admin-ticket-message-char-count');
-            counterEl.textContent = `${count}/500 characters`;
+            counterEl.textContent = `${count}/500`;
             counterEl.style.color = count > 450 ? 'red' : '';
         });
 
@@ -1150,12 +1257,21 @@ class AdminDashboard {
         });
 
         // Orders in-section filters
-        const statusFilter = document.getElementById('order-status-filter');
         const priceFilter  = document.getElementById('order-price-filter');
         const sortFilter   = document.getElementById('order-sort-filter');
         const orderSearch  = document.getElementById('order-search-btn');
         const orderInput   = document.getElementById('order-search-input');
-        if (statusFilter) statusFilter.addEventListener('change', () => this.loadOrders(1));
+        
+        // Order status tabs
+        document.querySelectorAll('.order-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.order-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.resetPaginationPage('orders');
+                this.loadOrders(1);
+            });
+        });
+        
         if (priceFilter)  priceFilter.addEventListener('change',  () => this.loadOrders(1));
         if (sortFilter)   sortFilter.addEventListener('change',   () => this.loadOrders(1));
         if (orderSearch)  orderSearch.addEventListener('click',   () => this.loadOrders(1));
@@ -1176,29 +1292,56 @@ class AdminDashboard {
         // Users in-section filter - use API search across all pages
         const usersSearchBtn = document.getElementById('users-search-btn');
         const usersSearchInput = document.getElementById('users-search-input');
-        const usersStatusFilter = document.getElementById('users-status-filter');
+        
+        // Users status tabs
+        document.querySelectorAll('.users-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.users-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.resetPaginationPage('users');
+                this.loadUsers(1);
+            });
+        });
+        
         if (usersSearchBtn) usersSearchBtn.addEventListener('click', () => this.loadUsers(1));
         if (usersSearchInput) usersSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadUsers(1); });
-        if (usersStatusFilter) usersStatusFilter.addEventListener('change', () => this.loadUsers(1));
 
         // Products in-section filter - use API search across all pages
         const productsSearchBtn = document.getElementById('products-search-btn');
         const productsSearchInput = document.getElementById('products-search-input');
         const productsCatFilter = document.getElementById('products-category-filter');
-        const productsStatusFilter = document.getElementById('products-status-filter');
+        
+        // Products status tabs
+        document.querySelectorAll('.products-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.products-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.resetPaginationPage('products');
+                this.loadProducts(1);
+            });
+        });
+        
         if (productsSearchBtn) productsSearchBtn.addEventListener('click', () => this.loadProducts(1));
         if (productsSearchInput) productsSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadProducts(1); });
         if (productsCatFilter) productsCatFilter.addEventListener('change', () => this.loadProducts(1));
-        if (productsStatusFilter) productsStatusFilter.addEventListener('change', () => this.loadProducts(1));
 
         // Farmers in-section filter - use API search across all pages
         const farmersSearchBtn = document.getElementById('farmers-search-btn');
         const farmersSearchInput = document.getElementById('farmers-search-input');
-        const farmersStatusFilter = document.getElementById('farmers-status-filter');
         const farmersVerificationFilter = document.getElementById('farmers-verification-filter');
+        
+        // Farmers status tabs
+        document.querySelectorAll('.farmers-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.farmers-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.resetPaginationPage('farmers');
+                this.loadFarmers('all', 1);
+            });
+        });
+        
         if (farmersSearchBtn) farmersSearchBtn.addEventListener('click', () => this.loadFarmers('all', 1));
         if (farmersSearchInput) farmersSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadFarmers('all', 1); });
-        if (farmersStatusFilter) farmersStatusFilter.addEventListener('change', () => this.loadFarmers('all', 1));
         if (farmersVerificationFilter) farmersVerificationFilter.addEventListener('change', () => this.loadFarmers('all', 1));
 
         // Audit logs filters - auto-apply on change
@@ -1217,10 +1360,13 @@ class AdminDashboard {
 
         // ── Clear + Refresh buttons ─────────────────────────────────────────
         document.getElementById('orders-refresh-btn')?.addEventListener('click', () => {
-            ['order-status-filter','order-price-filter','order-sort-filter','order-search-input'].forEach(id => {
+            ['order-price-filter','order-sort-filter','order-search-input'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
             });
+            // Reset order tabs to first tab (All)
+            document.querySelectorAll('.order-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.order-tabs .tab-btn')?.classList.add('active');
             this.loadOrders();
             this.showToast('Orders refreshed', 'success');
         });
@@ -1228,17 +1374,21 @@ class AdminDashboard {
         document.getElementById('products-refresh-btn')?.addEventListener('click', () => {
             const searchInput = document.getElementById('products-search-input');
             const categoryFilter = document.getElementById('products-category-filter');
-            const statusFilter = document.getElementById('products-status-filter');
             if (searchInput) searchInput.value = '';
             if (categoryFilter) categoryFilter.value = '';
-            if (statusFilter) statusFilter.value = 'available';
+            // Reset products tabs to first tab (All)
+            document.querySelectorAll('.products-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            const defaultTab = document.querySelector('.products-tabs .tab-btn[data-status=""]');
+            if (defaultTab) defaultTab.classList.add('active');
             this.loadProducts();
             this.showToast('Listings refreshed', 'success');
         });
 
         document.getElementById('categories-refresh-btn')?.addEventListener('click', () => {
             const s = document.getElementById('category-search-input'); if (s) s.value = '';
-            const f = document.getElementById('category-status-filter'); if (f) f.selectedIndex = 0;
+            // Reset categories tabs to first tab (All)
+            document.querySelectorAll('.categories-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.categories-tabs .tab-btn')?.classList.add('active');
             this.loadCategories();
             this.showToast('Categories refreshed', 'success');
         });
@@ -1246,72 +1396,97 @@ class AdminDashboard {
         document.getElementById('catalog-refresh-btn')?.addEventListener('click', () => {
             const s = document.getElementById('catalog-search-input'); if (s) s.value = '';
             const f = document.getElementById('catalog-category-filter-bar'); if (f) f.selectedIndex = 0;
-            const sf = document.getElementById('catalog-status-filter'); if (sf) sf.selectedIndex = 0;
+            // Reset catalog tabs to first tab (All)
+            document.querySelectorAll('.catalog-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.catalog-tabs .tab-btn')?.classList.add('active');
             this.loadCatalogNames();
             this.showToast('Catalog refreshed', 'success');
         });
 
-        document.getElementById('cat-req-refresh-btn')?.addEventListener('click', () => {
-            const s = document.getElementById('cat-req-search-input'); if (s) s.value = '';
-            const f = document.getElementById('cat-req-status-filter'); if (f) f.value = '';
-            this.loadCategoryRequests();
-            this.showToast('Product name requests refreshed', 'success');
-        });
-
         document.getElementById('users-refresh-btn')?.addEventListener('click', () => {
-            ['users-search-input','users-status-filter'].forEach(id => {
+            ['users-search-input'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
             });
+            // Reset users tabs to first tab (All)
+            document.querySelectorAll('.users-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.users-tabs .tab-btn')?.classList.add('active');
             this.loadUsers();
             this.showToast('Customers refreshed', 'success');
         });
 
-        // Staff in-section filters
-        const staffSearchBtn = document.getElementById('staff-search-btn');
-        const staffSearchInput = document.getElementById('staff-search-input');
-        const staffStatusFilter = document.getElementById('staff-status-filter');
-        const staffVerificationFilter = document.getElementById('staff-verification-filter');
-        if (staffSearchBtn) staffSearchBtn.addEventListener('click', () => this.loadStaff(1));
-        if (staffSearchInput) staffSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadStaff(1); });
-        if (staffStatusFilter) staffStatusFilter.addEventListener('change', () => this.loadStaff(1));
-        if (staffVerificationFilter) staffVerificationFilter.addEventListener('change', () => this.loadStaff(1));
+        // Admin in-section filters
+        const adminSearchBtn = document.getElementById('admin-search-btn');
+        const adminSearchInput = document.getElementById('admin-search-input');
+        const adminVerificationFilter = document.getElementById('admin-verification-filter');
+        
+        // Admin status tabs
+        document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.admin-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.resetPaginationPage('admin');
+                this.loadAdmin(1);
+            });
+        });
+        
+        if (adminSearchBtn) adminSearchBtn.addEventListener('click', () => this.loadAdmin(1));
+        if (adminSearchInput) adminSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadAdmin(1); });
+        if (adminVerificationFilter) adminVerificationFilter.addEventListener('change', () => this.loadAdmin(1));
 
-        document.getElementById('staff-refresh-btn')?.addEventListener('click', () => {
-            ['staff-search-input','staff-status-filter','staff-verification-filter'].forEach(id => {
+        document.getElementById('admin-refresh-btn')?.addEventListener('click', () => {
+            ['admin-search-input','admin-verification-filter'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
             });
-            this.loadStaff();
-            this.showToast('Staff refreshed', 'success');
+            // Reset admin tabs to first tab (All)
+            document.querySelectorAll('.admin-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.admin-tabs .tab-btn')?.classList.add('active');
+            this.loadAdmin();
+            this.showToast('Admin refreshed', 'success');
         });
 
         // All Users in-section filters
         const allUsersSearchBtn = document.getElementById('all-users-search-btn');
         const allUsersSearchInput = document.getElementById('all-users-search-input');
         const allUsersRoleFilter = document.getElementById('all-users-role-filter');
-        const allUsersStatusFilter = document.getElementById('all-users-status-filter');
         const allUsersVerificationFilter = document.getElementById('all-users-verification-filter');
+        
+        // All Users status tabs
+        document.querySelectorAll('.all-users-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.all-users-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.resetPaginationPage('all-users');
+                this.loadAllUsers(1);
+            });
+        });
+        
         if (allUsersSearchBtn) allUsersSearchBtn.addEventListener('click', () => this.loadAllUsers(1));
         if (allUsersSearchInput) allUsersSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadAllUsers(1); });
         if (allUsersRoleFilter) allUsersRoleFilter.addEventListener('change', () => this.loadAllUsers(1));
-        if (allUsersStatusFilter) allUsersStatusFilter.addEventListener('change', () => this.loadAllUsers(1));
         if (allUsersVerificationFilter) allUsersVerificationFilter.addEventListener('change', () => this.loadAllUsers(1));
 
         document.getElementById('all-users-refresh-btn')?.addEventListener('click', () => {
-            ['all-users-search-input','all-users-role-filter','all-users-status-filter','all-users-verification-filter'].forEach(id => {
+            ['all-users-search-input','all-users-role-filter','all-users-verification-filter'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
             });
+            // Reset all-users tabs to first tab (All)
+            document.querySelectorAll('.all-users-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.all-users-tabs .tab-btn')?.classList.add('active');
             this.loadAllUsers();
             this.showToast('All users refreshed', 'success');
         });
 
         document.getElementById('farmers-refresh-btn')?.addEventListener('click', () => {
-            ['farmers-search-input','farmers-status-filter','farmers-verification-filter'].forEach(id => {
+            ['farmers-search-input','farmers-verification-filter'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
             });
+            // Reset farmers tabs to first tab (All)
+            document.querySelectorAll('.farmers-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.farmers-tabs .tab-btn')?.classList.add('active');
             this.loadFarmers();
             this.showToast('Farmers refreshed', 'success');
         });
@@ -1360,7 +1535,7 @@ class AdminDashboard {
 
         document.getElementById('open-create-user-modal')?.addEventListener('click', () => this.openCreateUserModal('customer'));
         document.getElementById('open-create-farmer-modal')?.addEventListener('click', () => this.openCreateUserModal('farmer'));
-        document.getElementById('create-staff-btn')?.addEventListener('click', () => this.openCreateUserModal('staff'));
+        document.getElementById('create-admin-btn')?.addEventListener('click', () => this.openCreateUserModal('admin'));
         document.getElementById('create-any-user-btn')?.addEventListener('click', () => this.openCreateUserModal('customer'));
         document.getElementById('create-user-form')?.addEventListener('submit', (e) => this.submitUserCreate(e));
         const createUserPwToggle = document.getElementById('create-user-pw-toggle');
@@ -1452,9 +1627,16 @@ class AdminDashboard {
                 this.loadCategoryRequests(undefined, undefined, 1);
             }
         });
-        document.getElementById('cat-req-status-filter')?.addEventListener('change', () => {
-            this.resetPaginationPage('category-requests');
-            this.loadCategoryRequests(undefined, undefined, 1);
+        document.getElementById('cat-req-refresh-btn')?.addEventListener('click', () => {
+            const s = document.getElementById('cat-req-search-input'); if (s) s.value = '';
+            // Reset tabs to first tab (All)
+            const tabsContainer = document.querySelector('.category-request-tabs');
+            if (tabsContainer) {
+                tabsContainer.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                tabsContainer.querySelector('.tab-btn[data-status="all"]')?.classList.add('active');
+            }
+            this.loadCategoryRequests();
+            this.showToast('Product name requests refreshed', 'success');
         });
 
         // Product-approvals filter search button
@@ -1468,11 +1650,13 @@ class AdminDashboard {
                 this.loadProductApprovals(undefined, undefined, 1);
             }
         });
-        document.getElementById('product-approval-status-filter')?.addEventListener('change', () => {
-            this.resetPaginationPage('product-approvals');
-            this.loadProductApprovals(undefined, undefined, 1);
-        });
         document.getElementById('product-approval-refresh-btn')?.addEventListener('click', () => {
+            // Reset tabs to first tab (All)
+            const tabsContainer = document.querySelector('.product-approval-tabs');
+            if (tabsContainer) {
+                tabsContainer.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                tabsContainer.querySelector('.tab-btn[data-status="all"]')?.classList.add('active');
+            }
             this.loadProductApprovals();
             this.showToast('Product approvals refreshed', 'success');
         });
@@ -1485,8 +1669,15 @@ class AdminDashboard {
         document.getElementById('category-search-input')?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') document.getElementById('category-search-btn')?.click();
         });
-        document.getElementById('category-status-filter')?.addEventListener('change', () => {
-            document.getElementById('category-search-btn')?.click();
+        
+        // Categories status tabs
+        document.querySelectorAll('.categories-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.categories-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.resetPaginationPage('categories');
+                this.loadCategories(1);
+            });
         });
 
         // Catalog (catalog-products) search + category filter + status filter
@@ -1499,7 +1690,15 @@ class AdminDashboard {
             if (e.key === 'Enter') runCatalogFilter();
         });
         document.getElementById('catalog-category-filter-bar')?.addEventListener('change', runCatalogFilter);
-        document.getElementById('catalog-status-filter')?.addEventListener('change', runCatalogFilter);
+        
+        // Catalog status tabs
+        document.querySelectorAll('.catalog-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.catalog-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                runCatalogFilter();
+            });
+        });
 
         // Superadmin section buttons
         document.getElementById('detect-patterns-btn')?.addEventListener('click', () => this.loadSuspiciousPatterns());
@@ -1538,7 +1737,7 @@ class AdminDashboard {
                 'top-products': () => this.loadTopProducts(this._topProductsPeriod || 'today'),
                 'top-farmers': () => this.loadTopFarmers(this._topFarmersPeriod || 'today'),
                 'recent-sales': () => this.loadRecentSales(this._recentSalesPeriod || 'today'),
-                'staff': () => this.loadStaff(),
+                'admin': () => this.loadAdmin(),
                 'all-users': () => this.loadAllUsers(),
                 'security-log': () => this.loadSecurityLog(),
             };
@@ -1578,8 +1777,8 @@ class AdminDashboard {
     async loadAdminsForLogs() {
         try {
             const params = new URLSearchParams();
-            if (this.currentUserRole === 'staff') {
-                params.set('role', 'staff');
+            if (this.currentUserRole === 'admin') {
+                params.set('role', 'admin');
             }
             const response = await fetch(`${this.apiBase}/admin/users?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -1593,8 +1792,8 @@ class AdminDashboard {
             // Keep the "All admins" option
             select.innerHTML = '<option value="">All admins</option>';
 
-            // Filter to only show staff and super_admin users
-            const admins = users.filter(u => u.role === 'staff' || u.role === 'super_admin');
+            // Filter to only show admin and super_admin users
+            const admins = users.filter(u => u.role === 'admin' || u.role === 'super_admin');
             admins.forEach(admin => {
                 const option = document.createElement('option');
                 option.value = admin.id;
@@ -1645,7 +1844,53 @@ class AdminDashboard {
         const tbody = document.getElementById('logs-tbody');
         if (!tbody) return;
 
-        if (!logs.length) {
+        let sortedLogs = logs || [];
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_logs-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                sortedLogs.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 0: // created_at
+                            valA = new Date(a.created_at || 0).getTime();
+                            valB = new Date(b.created_at || 0).getTime();
+                            break;
+                        case 1: // actor name
+                            valA = (a.actor_admin_name || a.actor_admin_email || '').toLowerCase();
+                            valB = (b.actor_admin_name || b.actor_admin_email || '').toLowerCase();
+                            break;
+                        case 2: // actor email
+                            valA = (a.actor_admin_email || '').toLowerCase();
+                            valB = (b.actor_admin_email || '').toLowerCase();
+                            break;
+                        case 3: // action
+                            valA = (a.action || '').toLowerCase();
+                            valB = (b.action || '').toLowerCase();
+                            break;
+                        case 4: // entity
+                            valA = (a.entity || '').toLowerCase();
+                            valB = (b.entity || '').toLowerCase();
+                            break;
+                        case 5: // entity_id
+                            valA = a.entity_id || 0;
+                            valB = b.entity_id || 0;
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
+
+        if (!sortedLogs.length) {
             tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No logs found.</td></tr>`;
             this.refreshSortableTable('logs-table', { columns: [{ select: 6, sortable: false }] });
             return;
@@ -1668,7 +1913,7 @@ class AdminDashboard {
             return 'secondary';
         };
 
-        tbody.innerHTML = logs.map(log => {
+        tbody.innerHTML = sortedLogs.map(log => {
             const actor = log.actor_admin_name || log.actor_admin_email || `Admin #${log.actor_admin_id}`;
             const email = log.actor_admin_email || '—';
             const color = getColor(log.action || '');
@@ -1686,7 +1931,7 @@ class AdminDashboard {
             </tr>`;
         }).join('');
 
-        this.refreshSortableTable('logs-table', { columns: [{ select: 6, sortable: false }], defaultSort: [0, 'desc'] });
+        this.refreshSortableTable('logs-table', { columns: [{ select: 6, sortable: false }] });
     }
 
     openAuditLogDetailModalById(id) {
@@ -2163,7 +2408,8 @@ class AdminDashboard {
             const pg = this.pagination.users;
             pg.page = page;
             const search = (document.getElementById('users-search-input')?.value || '').trim();
-            const status = (document.getElementById('users-status-filter')?.value || '').trim();
+            const activeTab = document.querySelector('.users-tabs .tab-btn.active');
+            const status = activeTab ? activeTab.getAttribute('data-status') : '';
             const params = new URLSearchParams({
                 page: String(page),
                 limit: String(pg.limit),
@@ -2202,7 +2448,8 @@ class AdminDashboard {
         try {
             const pg = this.pagination?.orders || { page: 1, total: 0, limit: 50 };
             pg.page = page;
-            const status = document.getElementById('order-status-filter')?.value || '';
+            const activeTab = document.querySelector('.order-tabs .tab-btn.active');
+            const status = activeTab ? activeTab.getAttribute('data-status') : '';
             const price = document.getElementById('order-price-filter')?.value || '';
             const sort = document.getElementById('order-sort-filter')?.value || 'date_desc';
             const search = (document.getElementById('order-search-input')?.value || '').trim();
@@ -2244,7 +2491,8 @@ class AdminDashboard {
 
     applyUsersFilter() {
         const q      = (document.getElementById('users-search-input')?.value || '').trim().toLowerCase();
-        const status = (document.getElementById('users-status-filter')?.value || '').trim().toLowerCase();
+        const activeTab = document.querySelector('.users-tabs .tab-btn.active');
+        const status = activeTab ? activeTab.getAttribute('data-status') : '';
 
         let users = [...(this.lastUsers || [])].filter(u => (u.role || '') === 'customer');
         if (q) {
@@ -2264,7 +2512,8 @@ class AdminDashboard {
 
     applyFarmersFilter() {
         const q = (document.getElementById('farmers-search-input')?.value || '').trim().toLowerCase();
-        const status = (document.getElementById('farmers-status-filter')?.value || '').trim().toLowerCase();
+        const activeTab = document.querySelector('.farmers-tabs .tab-btn.active');
+        const status = activeTab ? activeTab.getAttribute('data-status') : '';
         const verification = (document.getElementById('farmers-verification-filter')?.value || '').trim().toLowerCase();
 
         let farmers = [...(this.lastFarmers || [])];
@@ -2290,7 +2539,8 @@ class AdminDashboard {
     applyProductsFilter() {
         const q = (document.getElementById('products-search-input')?.value || '').trim().toLowerCase();
         const catId = document.getElementById('products-category-filter')?.value || '';
-        const status = (document.getElementById('products-status-filter')?.value || '').trim().toLowerCase();
+        const activeTab = document.querySelector('.products-tabs .tab-btn.active');
+        const status = activeTab ? activeTab.getAttribute('data-status') : '';
 
         let products = [...(this.lastProducts || [])];
         
@@ -2319,18 +2569,65 @@ class AdminDashboard {
         this.destroySortableTable('users-table');
         const tbody = document.getElementById('users-tbody');
         if (!tbody) return;
-        if (!users.length) {
+
+        let sortedUsers = users || [];
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_users-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                sortedUsers.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 0: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 1: // full_name
+                            valA = (a.full_name || '').toLowerCase();
+                            valB = (b.full_name || '').toLowerCase();
+                            break;
+                        case 2: // username
+                            valA = (a.username || '').toLowerCase();
+                            valB = (b.username || '').toLowerCase();
+                            break;
+                        case 3: // email
+                            valA = (a.email || '').toLowerCase();
+                            valB = (b.email || '').toLowerCase();
+                            break;
+                        case 4: // status (is_disabled)
+                            valA = a.is_disabled ? 1 : 0;
+                            valB = b.is_disabled ? 1 : 0;
+                            break;
+                        case 5: // created_at
+                            valA = new Date(a.created_at || 0).getTime();
+                            valB = new Date(b.created_at || 0).getTime();
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
+
+        if (!sortedUsers.length) {
             tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No users found</td></tr>`;
             this.refreshSortableTable('users-table', { columns: [{ select: 6, sortable: false }] });
             return;
         }
-        tbody.innerHTML = users.map(user => {
+        tbody.innerHTML = sortedUsers.map(user => {
             const safeRole = 'customer';
             const isSuperAdmin = false;
             const canEditThisUser = true;
             const canToggleDisable = this.currentUserRole === 'super_admin'
                 ? user.id !== this.currentUserId && !isSuperAdmin
-                : user.role !== 'staff' && user.id !== this.currentUserId && !isSuperAdmin;
+                : user.role !== 'admin' && user.id !== this.currentUserId && !isSuperAdmin;
             const isDisabled = !!user.is_disabled;
 
             const statusBadge = isSuperAdmin ? '' :
@@ -2361,25 +2658,26 @@ class AdminDashboard {
             `;
         }).join('');
 
-        this.refreshSortableTable('users-table', { columns: [{ select: 7, sortable: false }], defaultSort: [6, 'desc'] });
+        this.refreshSortableTable('users-table', { columns: [{ select: 6, sortable: false }] });
     }
 
     formatRole(role) {
-        const map = { super_admin: 'Super Admin', staff: 'Staff', farmer: 'Farmer', customer: 'Customer' };
+        const map = { super_admin: 'Super Admin', admin: 'Admin', farmer: 'Farmer', customer: 'Customer' };
         return map[role] || role;
     }
 
-    async loadStaff(page = 1) {
+    async loadAdmin(page = 1) {
         try {
-            const pg = this.pagination.staff;
+            const pg = this.pagination.admin;
             pg.page = page;
-            const search = (document.getElementById('staff-search-input')?.value || '').trim();
-            const status = (document.getElementById('staff-status-filter')?.value || '').trim();
-            const verification = (document.getElementById('staff-verification-filter')?.value || '').trim();
+            const search = (document.getElementById('admin-search-input')?.value || '').trim();
+            const activeTab = document.querySelector('.admin-tabs .tab-btn.active');
+            const status = activeTab ? activeTab.getAttribute('data-status') : '';
+            const verification = (document.getElementById('admin-verification-filter')?.value || '').trim();
             const params = new URLSearchParams({
                 page: String(page),
                 limit: String(pg.limit),
-                role: 'staff'
+                role: 'admin'
             });
             if (search) params.set('search', search);
             if (status) params.set('status', status);
@@ -2392,37 +2690,88 @@ class AdminDashboard {
 
             if (response.ok) {
                 const data = await response.json();
-                this.lastStaff = data.users || [];
+                this.lastAdmin = data.users || [];
                 pg.total = Number(data.total || 0);
-                this.renderStaff(this.lastStaff);
-                this.renderPagination('staff-pagination', pg, (p) => this.loadStaff(p));
+                this.renderAdmin(this.lastAdmin);
+                this.renderPagination('admin-pagination', pg, (p) => this.loadAdmin(p));
             } else {
-                const tbody = document.getElementById('staff-tbody');
-                if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load staff. Please try again.</td></tr>`;
-                this.showMessage('Failed to load staff', 'error');
+                const tbody = document.getElementById('admin-tbody');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load admin. Please try again.</td></tr>`;
+                this.showMessage('Failed to load admin', 'error');
             }
         } catch (error) {
-            console.error('Error loading staff:', error);
-            const tbody = document.getElementById('staff-tbody');
-            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load staff. Please try again.</td></tr>`;
-            this.showMessage('Failed to load staff', 'error');
+            console.error('Error loading admin:', error);
+            const tbody = document.getElementById('admin-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load admin. Please try again.</td></tr>`;
+            this.showMessage('Failed to load admin', 'error');
         }
     }
 
-    renderStaff(users) {
-        this.destroySortableTable('staff-table');
-        const tbody = document.getElementById('staff-tbody');
+    renderAdmin(users) {
+        this.destroySortableTable('admin-table');
+        const tbody = document.getElementById('admin-tbody');
         if (!tbody) return;
-        if (!users.length) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No staff found</td></tr>`;
-            this.refreshSortableTable('staff-table', { columns: [{ select: 7, sortable: false }] });
+
+        let sortedUsers = users || [];
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_admin-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                sortedUsers.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 0: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 1: // full_name
+                            valA = (a.full_name || '').toLowerCase();
+                            valB = (b.full_name || '').toLowerCase();
+                            break;
+                        case 2: // username
+                            valA = (a.username || '').toLowerCase();
+                            valB = (b.username || '').toLowerCase();
+                            break;
+                        case 3: // email
+                            valA = (a.email || '').toLowerCase();
+                            valB = (b.email || '').toLowerCase();
+                            break;
+                        case 4: // role
+                            valA = (a.role || '').toLowerCase();
+                            valB = (b.role || '').toLowerCase();
+                            break;
+                        case 5: // status (is_disabled)
+                            valA = a.is_disabled ? 1 : 0;
+                            valB = b.is_disabled ? 1 : 0;
+                            break;
+                        case 6: // created_at
+                            valA = new Date(a.created_at || 0).getTime();
+                            valB = new Date(b.created_at || 0).getTime();
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
+
+        if (!sortedUsers.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No admin found</td></tr>`;
+            this.refreshSortableTable('admin-table', { columns: [{ select: 7, sortable: false }] });
             return;
         }
-        tbody.innerHTML = users.map(user => {
+        tbody.innerHTML = sortedUsers.map(user => {
             const isDisabled = !!user.is_disabled;
             const statusBadge = this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
 
-            const actions = `<button class="btn btn-sm py-0 px-2 btn-ac-green staff-view-btn" data-user-id="${user.id}">View</button>`;
+            const actions = `<button class="btn btn-sm py-0 px-2 btn-ac-green admin-view-btn" data-user-id="${user.id}">View</button>`;
 
             return `
                 <tr>
@@ -2446,15 +2795,16 @@ class AdminDashboard {
             `;
         }).join('');
 
-        this.refreshSortableTable('staff-table', { columns: [{ select: 7, sortable: false }], defaultSort: [6, 'desc'] });
+        this.refreshSortableTable('admin-table', { columns: [{ select: 7, sortable: false }] });
     }
 
-    applyStaffFilter() {
-        const q = (document.getElementById('staff-search-input')?.value || '').trim().toLowerCase();
-        const status = (document.getElementById('staff-status-filter')?.value || '').trim().toLowerCase();
-        const verification = (document.getElementById('staff-verification-filter')?.value || '').trim().toLowerCase();
+    applyAdminFilter() {
+        const q = (document.getElementById('admin-search-input')?.value || '').trim().toLowerCase();
+        const activeTab = document.querySelector('.admin-tabs .tab-btn.active');
+        const status = activeTab ? activeTab.getAttribute('data-status') : '';
+        const verification = (document.getElementById('admin-verification-filter')?.value || '').trim().toLowerCase();
 
-        let users = [...(this.lastStaff || [])];
+        let users = [...(this.lastAdmin || [])];
         if (q) {
             users = users.filter(u =>
                 String(u.id || '').includes(q) ||
@@ -2468,7 +2818,7 @@ class AdminDashboard {
         if (verification === 'verified') users = users.filter(u => !!u.is_verified);
         else if (verification === 'unverified') users = users.filter(u => !u.is_verified);
 
-        this.renderStaff(users);
+        this.renderAdmin(users);
     }
 
     async loadAllUsers(page = 1) {
@@ -2477,7 +2827,8 @@ class AdminDashboard {
             pg.page = page;
             const search = (document.getElementById('all-users-search-input')?.value || '').trim();
             const role = (document.getElementById('all-users-role-filter')?.value || '').trim();
-            const status = (document.getElementById('all-users-status-filter')?.value || '').trim();
+            const activeTab = document.querySelector('.all-users-tabs .tab-btn.active');
+            const status = activeTab ? activeTab.getAttribute('data-status') : '';
             const verification = (document.getElementById('all-users-verification-filter')?.value || '').trim();
             const params = new URLSearchParams({
                 page: String(page),
@@ -2520,12 +2871,65 @@ class AdminDashboard {
         this.destroySortableTable('all-users-table');
         const tbody = document.getElementById('all-users-tbody');
         if (!tbody) return;
-        if (!users.length) {
+
+        let sortedUsers = users || [];
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_all-users-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                sortedUsers.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 0: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 1: // full_name
+                            valA = (a.full_name || '').toLowerCase();
+                            valB = (b.full_name || '').toLowerCase();
+                            break;
+                        case 2: // username
+                            valA = (a.username || '').toLowerCase();
+                            valB = (b.username || '').toLowerCase();
+                            break;
+                        case 3: // email
+                            valA = (a.email || '').toLowerCase();
+                            valB = (b.email || '').toLowerCase();
+                            break;
+                        case 4: // role
+                            valA = (a.role || '').toLowerCase();
+                            valB = (b.role || '').toLowerCase();
+                            break;
+                        case 5: // status (is_disabled)
+                            valA = a.is_disabled ? 1 : 0;
+                            valB = b.is_disabled ? 1 : 0;
+                            break;
+                        case 6: // created_at
+                            const dateA = new Date(a.created_at || 0);
+                            const dateB = new Date(b.created_at || 0);
+                            valA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
+                            valB = isNaN(dateB.getTime()) ? 0 : dateB.getTime();
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
+
+        if (!sortedUsers.length) {
             tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No users found</td></tr>`;
             this.refreshSortableTable('all-users-table', { columns: [{ select: 7, sortable: false }] });
             return;
         }
-        tbody.innerHTML = users.map(user => {
+        tbody.innerHTML = sortedUsers.map(user => {
             const isSuperAdmin = user.role === 'super_admin';
             const isDisabled = !!user.is_disabled;
             const statusBadge = isSuperAdmin ? '' : this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
@@ -2554,13 +2958,14 @@ class AdminDashboard {
             `;
         }).join('');
 
-        this.refreshSortableTable('all-users-table', { columns: [{ select: 7, sortable: false }], defaultSort: [6, 'desc'] });
+        this.refreshSortableTable('all-users-table', { columns: [{ select: 7, sortable: false }] });
     }
 
     applyAllUsersFilter() {
         const q = (document.getElementById('all-users-search-input')?.value || '').trim().toLowerCase();
         const role = (document.getElementById('all-users-role-filter')?.value || '').trim().toLowerCase();
-        const status = (document.getElementById('all-users-status-filter')?.value || '').trim().toLowerCase();
+        const activeTab = document.querySelector('.all-users-tabs .tab-btn.active');
+        const status = activeTab ? activeTab.getAttribute('data-status') : '';
         const verification = (document.getElementById('all-users-verification-filter')?.value || '').trim().toLowerCase();
 
         let users = [...(this.lastAllUsers || [])];
@@ -2708,13 +3113,67 @@ class AdminDashboard {
         const tbody = document.getElementById('flagged-users-tbody');
         if (!tbody) return;
 
-        if (!users.length) {
+        let sortedUsers = users || [];
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_flagged-users-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                sortedUsers.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 0: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 1: // username
+                            valA = (a.username || '').toLowerCase();
+                            valB = (b.username || '').toLowerCase();
+                            break;
+                        case 2: // email
+                            valA = (a.email || '').toLowerCase();
+                            valB = (b.email || '').toLowerCase();
+                            break;
+                        case 3: // role
+                            valA = (a.role || '').toLowerCase();
+                            valB = (b.role || '').toLowerCase();
+                            break;
+                        case 4: // phone
+                            valA = (a.phone || '').toLowerCase();
+                            valB = (b.phone || '').toLowerCase();
+                            break;
+                        case 5: // flag_reason
+                            valA = (a.flag_reason || '').toLowerCase();
+                            valB = (b.flag_reason || '').toLowerCase();
+                            break;
+                        case 6: // flagged_at
+                            valA = new Date(a.flagged_at || 0).getTime();
+                            valB = new Date(b.flagged_at || 0).getTime();
+                            break;
+                        case 7: // flagged_by_username
+                            valA = (a.flagged_by_username || '').toLowerCase();
+                            valB = (b.flagged_by_username || '').toLowerCase();
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
+
+        if (!sortedUsers.length) {
             tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No flagged users found</td></tr>`;
             this.refreshSortableTable('flagged-users-table');
             return;
         }
 
-        tbody.innerHTML = users.map(user => {
+        tbody.innerHTML = sortedUsers.map(user => {
             const isDisabled = !!user.is_disabled;
             const statusBadge = this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
             return `
@@ -2803,13 +3262,59 @@ class AdminDashboard {
         const tbody = document.getElementById('seclog-tbody');
         if (!tbody) return;
 
-        if (!logs.length) {
+        let sortedLogs = logs || [];
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_seclog-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                sortedLogs.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 0: // created_at
+                            valA = new Date(a.created_at || 0).getTime();
+                            valB = new Date(b.created_at || 0).getTime();
+                            break;
+                        case 1: // actor name
+                            valA = (a.actor_admin_name || a.actor_admin_email || '').toLowerCase();
+                            valB = (b.actor_admin_name || b.actor_admin_email || '').toLowerCase();
+                            break;
+                        case 2: // action
+                            valA = (a.action || '').toLowerCase();
+                            valB = (b.action || '').toLowerCase();
+                            break;
+                        case 3: // entity
+                            valA = (a.entity || '').toLowerCase();
+                            valB = (b.entity || '').toLowerCase();
+                            break;
+                        case 4: // ip_address
+                            valA = (a.ip_address || '').toLowerCase();
+                            valB = (b.ip_address || '').toLowerCase();
+                            break;
+                        case 5: // user_agent
+                            valA = (a.user_agent || '').toLowerCase();
+                            valB = (b.user_agent || '').toLowerCase();
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
+
+        if (!sortedLogs.length) {
             tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No security log entries found</td></tr>`;
             this.refreshSortableTable('seclog-table');
             return;
         }
 
-        tbody.innerHTML = logs.map(log => {
+        tbody.innerHTML = sortedLogs.map(log => {
             return `
                 <tr>
                     <td class="text-muted">${log.created_at ? new Date(log.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</td>
@@ -2822,7 +3327,7 @@ class AdminDashboard {
             `;
         }).join('');
 
-        this.refreshSortableTable('seclog-table', { columns: [{ select: 6, sortable: false }], defaultSort: [1, 'desc'] });
+        this.refreshSortableTable('seclog-table', { columns: [{ select: 6, sortable: false }] });
     }
 
     async loadPlatformSettings() {
@@ -3058,12 +3563,16 @@ class AdminDashboard {
             pg.page = page;
             const search = (document.getElementById('products-search-input')?.value || '').trim();
             const category = (document.getElementById('products-category-filter')?.value || '').trim();
-            const statusFilter = document.getElementById('products-status-filter');
-            let status = (statusFilter?.value || '').trim();
-            // Set default to 'available' if filter is empty on initial load
+            const activeTab = document.querySelector('.products-tabs .tab-btn.active');
+            let status = activeTab ? activeTab.getAttribute('data-status') : '';
+            // Set default to empty string (All) if filter is empty on initial load
             if (!status && page === 1) {
-                status = 'available';
-                if (statusFilter) statusFilter.value = 'available';
+                status = '';
+                const defaultTab = document.querySelector('.products-tabs .tab-btn[data-status=""]');
+                if (defaultTab) {
+                    document.querySelectorAll('.products-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                    defaultTab.classList.add('active');
+                }
             }
             const params = new URLSearchParams({
                 page: String(page),
@@ -3100,12 +3609,69 @@ class AdminDashboard {
         this.destroySortableTable('products-table');
         const tbody = document.getElementById('products-tbody');
         if (!tbody) return;
-        if (!products.length) {
+
+        let sortedProducts = products || [];
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_products-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                sortedProducts.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 1: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 2: // name
+                            valA = (a.name || '').toLowerCase();
+                            valB = (b.name || '').toLowerCase();
+                            break;
+                        case 3: // category_name
+                            valA = (a.category_name || '').toLowerCase();
+                            valB = (b.category_name || '').toLowerCase();
+                            break;
+                        case 4: // price
+                            valA = parseFloat(a.price) || 0;
+                            valB = parseFloat(b.price) || 0;
+                            break;
+                        case 5: // stock_quantity
+                            valA = a.stock_quantity || 0;
+                            valB = b.stock_quantity || 0;
+                            break;
+                        case 6: // farmer name
+                            valA = (a.farmer_shop_name || a.farmer_name || '').toLowerCase();
+                            valB = (b.farmer_shop_name || b.farmer_name || '').toLowerCase();
+                            break;
+                        case 7: // status
+                            const statusA = a.is_admin_disabled ? 'admin_disabled' : a.farmer_is_disabled ? 'farmer_disabled' : (a.is_available ? 'available' : 'unavailable');
+                            const statusB = b.is_admin_disabled ? 'admin_disabled' : b.farmer_is_disabled ? 'farmer_disabled' : (b.is_available ? 'available' : 'unavailable');
+                            valA = statusA;
+                            valB = statusB;
+                            break;
+                        case 8: // created_at
+                            valA = new Date(a.created_at || 0).getTime();
+                            valB = new Date(b.created_at || 0).getTime();
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
+
+        if (!sortedProducts.length) {
             tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No products found</td></tr>`;
             this.refreshSortableTable('products-table', { columns: [{ select: 0, sortable: false }, { select: 9, sortable: false }] });
             return;
         }
-        tbody.innerHTML = products.map(product => {
+        tbody.innerHTML = sortedProducts.map(product => {
             const isAdminDisabled = !!product.is_admin_disabled;
             const isFarmerDisabled = !!product.farmer_is_disabled;
             const statusLabel = isAdminDisabled
@@ -3144,7 +3710,7 @@ class AdminDashboard {
         `;
         }).join('');
 
-        this.refreshSortableTable('products-table', { columns: [{ select: 0, sortable: false }, { select: 9, sortable: false }], defaultSort: [8, 'desc'] });
+        this.refreshSortableTable('products-table', { columns: [{ select: 0, sortable: false }, { select: 9, sortable: false }] });
     }
 
     clearOrdersFromUI() {
@@ -3376,8 +3942,14 @@ class AdminDashboard {
             if (editBtn) editBtn.onclick = () => { this.previousModalId = 'farmer-detail-modal'; this.openUserEdit(farmerId); };
             if (disableBtn) disableBtn.style.display = isDisabled ? 'none' : '';
             if (enableBtn)  enableBtn.style.display  = isDisabled ? '' : 'none';
-            if (verifyBtn) verifyBtn.classList.toggle('d-none', !!farmer.is_verified);
-            if (unverifyBtn) unverifyBtn.classList.toggle('d-none', !farmer.is_verified);
+            // Only show verify/unverify buttons for super_admin
+            if (this.currentUserRole === 'super_admin') {
+                if (verifyBtn) verifyBtn.classList.toggle('d-none', !!farmer.is_verified);
+                if (unverifyBtn) unverifyBtn.classList.toggle('d-none', !farmer.is_verified);
+            } else {
+                if (verifyBtn) verifyBtn.classList.add('d-none');
+                if (unverifyBtn) unverifyBtn.classList.add('d-none');
+            }
 
             if (disableBtn) { disableBtn.onclick = async () => {
                 if (!await this.adminConfirm('Are you sure you want to disable this farmer?', { title: 'Disable Farmer', danger: true })) return;
@@ -3428,24 +4000,14 @@ class AdminDashboard {
                 this.loadFarmers();
             };
             if (unverifyBtn) unverifyBtn.onclick = async () => {
-                if (!await this.adminConfirm('Are you sure you want to unverify this farmer?', { title: 'Unverify Farmer', danger: true })) return;
-                
-                // Show loading state
-                const spinner = document.getElementById('fdt-unverify-spinner');
-                if (unverifyBtn) unverifyBtn.disabled = true;
-                if (spinner) spinner.classList.remove('d-none');
-                
-                await this.toggleFarmerVerification(farmerId, false);
-                
-                // Hide loading state
-                if (unverifyBtn) unverifyBtn.disabled = false;
-                if (spinner) spinner.classList.add('d-none');
-                
-                unverifyBtn.classList.add('d-none');
-                if (verifyBtn) verifyBtn.classList.remove('d-none');
-                const infoEl = document.getElementById('fdt-info-content');
-                if (infoEl) infoEl.innerHTML = infoEl.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Yes<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">No</span>');
-                this.loadFarmers();
+                // Open the unverify modal instead of using prompt
+                this.currentUnverifyFarmerId = farmerId;
+                const modal = document.getElementById('unverify-modal');
+                this.modalZIndex++;
+                modal.style.zIndex = this.modalZIndex;
+                modal.classList.add('open');
+                // Clear previous reason
+                document.getElementById('unverify-reason').value = '';
             };
             if (enableBtn)  enableBtn.onclick  = async () => {
                 if (!await this.adminConfirm('Are you sure you want to enable this farmer?', { title: 'Enable Farmer', danger: false })) return;
@@ -3486,15 +4048,15 @@ class AdminDashboard {
     }
 
     // ────────────────────────────────────────────────────────────
-    //  Staff detail modal
+    //  Admin detail modal
     // ────────────────────────────────────────────────────────────
-    async openStaffDetailModal(userId) {
+    async openAdminDetailModal(userId) {
         try {
-            const user = (this.lastStaff || []).find(u => u.id === Number(userId));
+            const user = (this.lastAdmin || []).find(u => u.id === Number(userId));
             if (!user) {
                 const ov = document.getElementById('sdt-overview-content');
-                if (ov) ov.innerHTML = `<div class="text-center text-danger py-3">Staff not found. Please refresh the list.</div>`;
-                this.showToast('Staff not found', 'error');
+                if (ov) ov.innerHTML = `<div class="text-center text-danger py-3">Admin not found. Please refresh the list.</div>`;
+                this.showToast('Admin not found', 'error');
                 return;
             }
 
@@ -3525,10 +4087,10 @@ class AdminDashboard {
             if (enableBtn)  enableBtn.style.display  = (!isDisabled || !canToggle) ? 'none' : '';
             if (editBtn)    editBtn.style.display    = canToggle ? '' : 'none';
 
-            if (editBtn) { editBtn.onclick = () => { this.previousModalId = 'staff-detail-modal'; this.openUserEdit(userId); }; }
+            if (editBtn) { editBtn.onclick = () => { this.previousModalId = 'admin-detail-modal'; this.openUserEdit(userId); }; }
 
             if (disableBtn) { disableBtn.onclick = async () => {
-                if (!await this.adminConfirm('Are you sure you want to disable this staff member?', { title: 'Disable Staff', danger: true })) return;
+                if (!await this.adminConfirm('Are you sure you want to disable this admin member?', { title: 'Disable Admin', danger: true })) return;
                 const spinner = document.getElementById('sdt-disable-spinner');
                 if (disableBtn) disableBtn.disabled = true;
                 if (spinner) spinner.classList.remove('d-none');
@@ -3540,17 +4102,17 @@ class AdminDashboard {
                 if (disableBtn) disableBtn.disabled = false;
                 if (spinner) spinner.classList.add('d-none');
                 if (r.ok) {
-                    this.showToast('Staff disabled', 'success');
+                    this.showToast('Admin disabled', 'success');
                     disableBtn.style.display = 'none';
                     if (enableBtn) enableBtn.style.display = '';
                     const ov = document.getElementById('sdt-overview-content');
                     if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Active<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Disabled</span>');
-                    this.loadStaff();
+                    this.loadAdmin();
                 }
             }; }
 
             if (enableBtn) { enableBtn.onclick = async () => {
-                if (!await this.adminConfirm('Are you sure you want to enable this staff member?', { title: 'Enable Staff', danger: false })) return;
+                if (!await this.adminConfirm('Are you sure you want to enable this admin member?', { title: 'Enable Admin', danger: false })) return;
                 const spinner = document.getElementById('sdt-enable-spinner');
                 if (enableBtn) enableBtn.disabled = true;
                 if (spinner) spinner.classList.remove('d-none');
@@ -3561,23 +4123,23 @@ class AdminDashboard {
                 if (enableBtn) enableBtn.disabled = false;
                 if (spinner) spinner.classList.add('d-none');
                 if (r.ok) {
-                    this.showToast('Staff enabled', 'success');
+                    this.showToast('Admin enabled', 'success');
                     enableBtn.style.display = 'none';
                     if (disableBtn) disableBtn.style.display = '';
                     const ov = document.getElementById('sdt-overview-content');
                     if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Disabled<\/span>/, '<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Active</span>');
-                    this.loadStaff();
+                    this.loadAdmin();
                 }
             }; }
 
-            const modal = document.getElementById('staff-detail-modal');
+            const modal = document.getElementById('admin-detail-modal');
             if (modal) {
                 this.modalZIndex++;
                 modal.style.zIndex = this.modalZIndex;
                 modal.classList.add('open');
             }
         } catch (err) {
-            console.error('Staff detail error:', err);
+            console.error('Admin detail error:', err);
         }
     }
 
@@ -3708,6 +4270,63 @@ class AdminDashboard {
     // ────────────────────────────────────────────────────────────
     //  Profile section
     // ────────────────────────────────────────────────────────────
+    async loadInitialSectionData() {
+        try {
+            const savedSection = localStorage.getItem('adminActiveSection') || 'overview';
+            const validSections = new Set(['overview', 'orders', 'users', 'products', 'categories', 'catalog-products', 'farmers', 'suspicious-patterns', 'flagged-users', 'logs', 'admin', 'all-users', 'platform-settings', 'security-log', 'feature-flags', 'broadcast', 'database-backup', 'image-manager', 'notifications', 'chat', 'category-requests', 'product-approvals', 'verification-requests', 'subscription-requests', 'profile']);
+            const safeSection = validSections.has(savedSection) ? savedSection : 'overview';
+
+            // Load data based on initial section
+            if (safeSection === 'orders') {
+                await this.loadOrders();
+            } else if (safeSection === 'users') {
+                await this.loadUsers();
+            } else if (safeSection === 'products') {
+                await this.loadProducts();
+            } else if (safeSection === 'categories') {
+                await this.loadCategories();
+            } else if (safeSection === 'catalog-products') {
+                await this.loadProducts();
+            } else if (safeSection === 'farmers') {
+                await this.loadFarmers('all');
+            } else if (safeSection === 'admin') {
+                await this.loadAdmin();
+            } else if (safeSection === 'all-users') {
+                await this.loadAllUsers();
+            } else if (safeSection === 'suspicious-patterns') {
+                await this.loadSuspiciousPatterns();
+            } else if (safeSection === 'flagged-users') {
+                await this.loadFlaggedUsers();
+            } else if (safeSection === 'security-log') {
+                await this.loadSecurityLog();
+            } else if (safeSection === 'platform-settings') {
+                await this.loadPlatformSettings();
+            } else if (safeSection === 'feature-flags') {
+                await this.loadFeatureFlags();
+            } else if (safeSection === 'notifications') {
+                await this.loadNotifications();
+            } else if (safeSection === 'category-requests') {
+                await this.loadCategoryRequests();
+            } else if (safeSection === 'product-approvals') {
+                await this.loadProductApprovals();
+            } else if (safeSection === 'verification-requests') {
+                await this.loadVerificationRequests(1, 'all');
+            } else if (safeSection === 'subscription-requests') {
+                await this.loadSubscriptionRequests('all');
+            } else if (safeSection === 'profile') {
+                await this.loadProfileSection();
+            }
+        } catch (error) {
+            console.error('Error loading initial section data:', error);
+        } finally {
+            // Always hide loading screen, even if there's an error
+            const loadingScreen = document.getElementById('admin-loading-screen');
+            if (loadingScreen) {
+                loadingScreen.classList.add('hidden');
+            }
+        }
+    }
+
     async loadProfileSection() {
         try {
             const res = await fetch(`${this.apiBase}/auth/profile`, {
@@ -3935,12 +4554,12 @@ class AdminDashboard {
     _updateNotifHeaderDropdown(items, error = null) {
         const dropdownList = document.getElementById('notif-list');
         if (!dropdownList) return;
-        
+
         if (error) {
             dropdownList.innerHTML = `<li class="text-center py-2 small text-danger">Failed to load notifications</li>`;
             return;
         }
-        
+
         const recent = items.slice(0, 5);
         if (!recent.length) {
             dropdownList.innerHTML = `<li class="text-center py-2 small text-muted">No notifications</li>`;
@@ -3950,40 +4569,57 @@ class AdminDashboard {
         dropdownList.innerHTML = recent.map(n => {
             const ic = iconMap[n.type] || 'bi-bell text-muted';
             const relTime = this._relativeTime(new Date(n.created_at));
-            const bg = n.is_read ? '' : 'bg-success bg-opacity-10';
+            const readStatus = n.is_read ? 'read' : 'unread';
             return `<li>
-                <a class="dropdown-item d-flex align-items-start ${bg} py-2 notif-header-link"
-                    href="#" data-section="notifications" data-id="${n.id}">
-                    <i class="bi ${ic} me-2 mt-1 flex-shrink-0"></i>
-                    <div>
-                        <div class="small ${n.is_read ? '' : 'fw-semibold'}">${this.escapeHtml(n.title || 'Notification')}</div>
-                        <div style="font-size:.7rem" class="text-muted">${relTime}</div>
+                <a class="dropdown-item notification-item-dropdown ${readStatus} py-2 notif-header-link" href="#" style="border:none;padding:0.75rem 1rem;margin:0.25rem 0.5rem;border-radius:8px;">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="notification-icon-dropdown" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${n.is_read ? '#f3f4f6' : '#ecfdf5'};color:${n.is_read ? '#6b7280' : '#10b981'};font-size:0.875rem;">
+                            <i class="bi ${ic}"></i>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div class="small" style="font-weight:${n.is_read ? '500' : '600'};color:${n.is_read ? '#111827' : '#065f46'};line-height:1.4;">${this.escapeHtml(n.title || 'Notification')}</div>
+                            <div style="font-size:0.75rem;color:#9ca3af;">${relTime}</div>
+                        </div>
+                        ${!n.is_read ? '<div style="width:6px;height:6px;border-radius:50%;background:#10b981;flex-shrink:0;"></div>' : ''}
                     </div>
                 </a>
             </li>`;
         }).join('');
 
-        // Add event listeners for header notification links
-        dropdownList.querySelectorAll('.notif-header-link').forEach(link => {
-            link.addEventListener('click', async (e) => {
+        // Add click handlers to navigate to notifications section and highlight selected notification
+        dropdownList.querySelectorAll('.notif-header-link').forEach((link, index) => {
+            link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const notifId = Number(link.dataset.id);
-                this.selectedNotifId = notifId;
-                if (notifId && !link.classList.contains('is-read')) {
-                    await this.markNotifRead(notifId, null);
-                    link.classList.add('is-read');
+                const notifId = recent[index]?.id;
+                this.showSection('notifications');
+                if (notifId) {
+                    this.highlightNotification(notifId);
                 }
-                const section = link.dataset.section;
-                if (section) this.navigateTo(section);
             });
         });
+    }
 
-        // Mark all as read when dropdown closes
-        const notifDropdown = dropdownList.closest('.dropdown-menu');
-        if (notifDropdown) {
-            notifDropdown.addEventListener('hidden.bs.dropdown', () => {
-                this.markAllNotifsRead();
-            });
+    highlightNotification(notifId) {
+        // Remove any existing highlight
+        document.querySelectorAll('.notification-item.highlighted').forEach(item => {
+            item.classList.remove('highlighted');
+            item.style.background = '';
+            item.style.borderColor = '';
+        });
+
+        // Store highlighted notification ID before navigation
+        this.highlightedNotifId = notifId;
+    }
+
+    clearNotificationHighlight() {
+        if (this.highlightedNotifId) {
+            const item = document.querySelector(`.notification-item[data-id="${this.highlightedNotifId}"]`);
+            if (item) {
+                item.classList.remove('highlighted');
+                item.style.background = '';
+                item.style.borderColor = '';
+            }
+            this.highlightedNotifId = null;
         }
     }
 
@@ -4029,48 +4665,47 @@ class AdminDashboard {
         };
         list.innerHTML = items.map(n => {
             const iconClass  = iconMap[n.type] || 'bi-bell text-muted';
-            const unreadCls  = n.is_read ? '' : 'fw-semibold';
-            const bgCls      = n.is_read ? '' : 'bg-success bg-opacity-10 border-start border-success border-3';
+            const readStatus = n.is_read ? 'read' : 'unread';
             const relTime    = this._relativeTime(new Date(n.created_at));
             const cursorCls  = n.is_read ? '' : 'cursor-pointer';
-            const selectedCls = this.selectedNotifId === n.id ? 'bg-warning bg-opacity-25 border-warning border-3' : '';
             return `
-            <div class="d-flex align-items-start gap-3 py-3 px-3 ${bgCls} ${selectedCls} border-bottom notif-item ${cursorCls}" data-id="${n.id}">
-                <div class="flex-shrink-0 mt-1"><i class="bi ${iconClass} fs-5"></i></div>
-                <div class="flex-grow-1">
-                    <div class="${unreadCls} small">${this.escapeHtml(n.title || 'Notification')}</div>
-                    <div class="text-muted small">${this.escapeHtml(n.message || '')}</div>
-                    <div class="text-muted" style="font-size:.7rem">${relTime}</div>
+            <div class="notification-item ${readStatus} ${cursorCls}" data-id="${n.id}">
+                <div class="notification-icon">
+                    <i class="bi ${iconClass}"></i>
                 </div>
-                ${!n.is_read ? `<button class="btn btn-sm py-0 px-1 text-muted flex-shrink-0 notif-mark-read-btn"
-                    data-id="${n.id}" title="Mark read">
-                    <i class="bi bi-check2"></i></button>` : ''}
+                <div class="notification-content">
+                    <div class="notification-title">${this.escapeHtml(n.title || 'Notification')}</div>
+                    <div class="notification-message">${this.escapeHtml(n.message || '')}</div>
+                    <div class="notification-meta">
+                        <span>${relTime}</span>
+                    </div>
+                </div>
+                ${!n.is_read ? `<div class="notification-actions">
+                    <button class="notification-mark-read-btn" data-id="${n.id}" title="Mark read">
+                        <i class="bi bi-check2"></i>
+                    </button>
+                </div>` : ''}
             </div>`;
         }).join('');
 
-        // Scroll to selected notification and clear selection
-        if (this.selectedNotifId) {
-            const selectedItem = list.querySelector(`[data-id="${this.selectedNotifId}"]`);
-            if (selectedItem) {
-                selectedItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            this.selectedNotifId = null;
-        }
-
-        // Add event listeners for notification items
-        list.querySelectorAll('.notif-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const id = Number(item.dataset.id);
-                this.openNotification(id);
-            });
-        });
-
-        // Add event listeners for mark read buttons
-        list.querySelectorAll('.notif-mark-read-btn').forEach(btn => {
+        // Add click handlers for mark read buttons
+        list.querySelectorAll('.notification-mark-read-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const id = Number(btn.dataset.id);
                 this.markNotifRead(id, btn);
+            });
+        });
+
+        // Add click handlers for notification items
+        list.querySelectorAll('.notification-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = Number(item.dataset.id);
+                const notif = items.find(n => n.id === id);
+                if (notif && !notif.is_read) {
+                    const btn = item.querySelector('.notification-mark-read-btn');
+                    if (btn) this.markNotifRead(id, btn);
+                }
             });
         });
     }
@@ -4084,26 +4719,24 @@ class AdminDashboard {
         return `${Math.floor(diff / 86400)}d ago`;
     }
 
-    async markNotifRead(id, btn) {
+    async markNotifRead(id, btn, skipReload = false) {
         try {
-            await fetch(`${this.apiBase}/notifications/${id}/read`, {
+            const response = await fetch(`${this.apiBase}/notifications/${id}/read`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
-            const item = btn?.closest('.notif-item');
-            if (item) {
-                item.classList.remove('bg-success', 'bg-opacity-10', 'border-start', 'border-success', 'border-3');
-                btn.remove();
-                item.querySelector('.fw-semibold')?.classList.remove('fw-semibold');
-            }
-            const countEl = document.getElementById('notif-count');
-            const badge   = document.getElementById('notif-badge');
-            if (countEl) {
-                const next = Math.max(0, (parseInt(countEl.textContent) || 0) - 1);
-                countEl.textContent = next > 99 ? '99+' : String(next);
-                if (badge) {
-                    badge.textContent = next > 99 ? '99+' : String(next);
-                    badge.style.display = next ? '' : 'none';
+            if (response.ok) {
+                if (btn) {
+                    const actionsDiv = btn.closest('.notification-actions');
+                    if (actionsDiv) actionsDiv.remove();
+                }
+                const item = document.querySelector(`.notification-item[data-id="${id}"]`);
+                if (item && !skipReload) {
+                    item.classList.remove('unread', 'cursor-pointer');
+                    item.classList.add('read');
+                }
+                if (!skipReload) {
+                    this.loadNotifications();
                 }
             }
         } catch (err) {
@@ -4111,11 +4744,6 @@ class AdminDashboard {
         }
     }
 
-    async openNotification(id) {
-        // Mark as read and optionally navigate to related content
-        await this.markNotifRead(id, document.querySelector(`.notif-item[data-id="${id}"] button`));
-        // Future: could navigate to related section based on notification type
-    }
 
     async markAllNotifsRead() {
         const btn = document.getElementById('notif-mark-all-btn');
@@ -4185,7 +4813,8 @@ class AdminDashboard {
                 limit: String(pg.limit)
             });
             const search = document.getElementById('category-search-input')?.value?.trim();
-            const statusFilter = document.getElementById('category-status-filter')?.value || '';
+            const activeTab = document.querySelector('.categories-tabs .tab-btn.active');
+            const statusFilter = activeTab ? activeTab.getAttribute('data-status') : '';
             if (search) params.set('search', search);
             if (statusFilter) params.set('status', statusFilter);
             const response = await fetch(`${this.apiBase}/admin/categories?${params.toString()}`, {
@@ -4240,9 +4869,49 @@ class AdminDashboard {
         const tbody = document.getElementById('categories-tbody');
         if (!tbody) return;
 
-        const filtered = Array.isArray(categories) ? categories : [];
+        let filtered = Array.isArray(categories) ? categories : [];
         this.filteredCategories = filtered;
         const pg = this.pagination.categories || { page: 1, total: 0, limit: 50 };
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_categories-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                filtered.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 0: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 1: // name
+                            valA = (a.name || '').toLowerCase();
+                            valB = (b.name || '').toLowerCase();
+                            break;
+                        case 2: // description
+                            valA = (a.description || '').toLowerCase();
+                            valB = (b.description || '').toLowerCase();
+                            break;
+                        case 3: // product_count
+                            valA = a.product_count || 0;
+                            valB = b.product_count || 0;
+                            break;
+                        case 4: // status (is_disabled)
+                            valA = a.is_disabled ? 1 : 0;
+                            valB = b.is_disabled ? 1 : 0;
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
 
         if (!filtered.length) {
             tbody.innerHTML = `<tr><td colspan="6" class="table-placeholder">No categories found.</td></tr>`;
@@ -4463,7 +5132,8 @@ class AdminDashboard {
             });
             const search = document.getElementById('catalog-search-input')?.value?.trim();
             const catId = document.getElementById('catalog-category-filter-bar')?.value || '';
-            const statusFilter = document.getElementById('catalog-status-filter')?.value || '';
+            const activeTab = document.querySelector('.catalog-tabs .tab-btn.active');
+            const statusFilter = activeTab ? activeTab.getAttribute('data-status') : '';
             if (search) params.set('search', search);
             if (catId) params.set('category', catId);
             if (statusFilter) params.set('status', statusFilter);
@@ -4487,9 +5157,49 @@ class AdminDashboard {
         const tbody = document.getElementById('catalog-names-tbody');
         if (!tbody) return;
 
-        const filtered = Array.isArray(items) ? items : [];
+        let filtered = Array.isArray(items) ? items : [];
         this.filteredCatalogNames = filtered;
         const pg = this.pagination['catalog-products'] || { page: 1, total: 0, limit: 50 };
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_catalog-products-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                filtered.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 0: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 1: // name
+                            valA = (a.name || '').toLowerCase();
+                            valB = (b.name || '').toLowerCase();
+                            break;
+                        case 2: // category_name
+                            valA = (a.category_name || '').toLowerCase();
+                            valB = (b.category_name || '').toLowerCase();
+                            break;
+                        case 3: // product_count
+                            valA = a.product_count || 0;
+                            valB = b.product_count || 0;
+                            break;
+                        case 4: // status (is_disabled)
+                            valA = a.is_disabled ? 1 : 0;
+                            valB = b.is_disabled ? 1 : 0;
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
 
         if (!filtered.length) {
             tbody.innerHTML = `<tr><td colspan="6" style="color:#64748b;">No catalog names yet.</td></tr>`;
@@ -4693,7 +5403,7 @@ class AdminDashboard {
             const pg = this.pagination['category-requests'] || { page: 1, total: 0, limit: 50 };
             pg.page = page;
             const params = new URLSearchParams();
-            const rawStatusVal = status !== undefined ? status : (document.getElementById('cat-req-status-filter')?.value ?? 'pending');
+            const rawStatusVal = status !== undefined ? status : (document.querySelector('.category-request-tabs .tab-btn.active')?.dataset.status ?? 'all');
             const statusVal = rawStatusVal === '' ? 'all' : rawStatusVal;
             if (statusVal) params.set('status', statusVal);
             const searchVal = search !== undefined ? search : (document.getElementById('cat-req-search-input')?.value?.trim() ?? '');
@@ -4710,9 +5420,40 @@ class AdminDashboard {
             this.lastCategoryRequests = data.requests || [];
             pg.total = Number(data.total || 0);
             this.renderCategoryRequests(this.lastCategoryRequests);
+            
+            // Load all requests for stats
+            await this.loadCategoryRequestStats();
         } catch (error) {
             console.error('Error loading category requests:', error);
         }
+    }
+
+    async loadCategoryRequestStats() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/category-requests?status=all&limit=10000`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+
+            const data = await response.json();
+            this.updateCategoryRequestStats(data.requests || []);
+        } catch (error) {
+            console.error('Error loading category request stats:', error);
+        }
+    }
+
+    updateCategoryRequestStats(requests) {
+        const pending = requests.filter(r => r.status === 'pending').length;
+        const approved = requests.filter(r => r.status === 'approved').length;
+        const rejected = requests.filter(r => r.status === 'rejected').length;
+
+        const pendingCount = document.getElementById('category-request-pending-count');
+        const approvedCount = document.getElementById('category-request-approved-count');
+        const rejectedCount = document.getElementById('category-request-rejected-count');
+
+        if (pendingCount) pendingCount.textContent = pending;
+        if (approvedCount) approvedCount.textContent = approved;
+        if (rejectedCount) rejectedCount.textContent = rejected;
     }
 
     async loadProductApprovals(status, search, page = 1) {
@@ -4720,7 +5461,7 @@ class AdminDashboard {
             const pg = this.pagination['product-approvals'] || { page: 1, total: 0, limit: 50 };
             pg.page = page;
             const params = new URLSearchParams();
-            const rawStatusVal = status !== undefined ? status : (document.getElementById('product-approval-status-filter')?.value ?? 'pending');
+            const rawStatusVal = status !== undefined ? status : (document.querySelector('.product-approval-tabs .tab-btn.active')?.dataset.status ?? 'all');
             const statusVal = rawStatusVal === '' ? 'all' : rawStatusVal;
             if (statusVal) params.set('status', statusVal);
             const searchVal = search !== undefined ? search : (document.getElementById('product-approval-search-input')?.value?.trim() ?? '');
@@ -4738,9 +5479,40 @@ class AdminDashboard {
             pg.total = Number(data.total || 0);
             this.renderProductApprovals(this.lastProductApprovals);
             this.updateProductApprovalsBadge();
+            
+            // Load all products for stats
+            await this.loadProductApprovalStats();
         } catch (error) {
             console.error('Error loading product approvals:', error);
         }
+    }
+
+    async loadProductApprovalStats() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/products?status=all&limit=10000`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+
+            const data = await response.json();
+            this.updateProductApprovalStats(data.products || []);
+        } catch (error) {
+            console.error('Error loading product approval stats:', error);
+        }
+    }
+
+    updateProductApprovalStats(products) {
+        const pending = products.filter(p => p.status === 'pending').length;
+        const approved = products.filter(p => p.status === 'approved').length;
+        const rejected = products.filter(p => p.status === 'rejected').length;
+
+        const pendingCount = document.getElementById('product-approval-pending-count');
+        const approvedCount = document.getElementById('product-approval-approved-count');
+        const rejectedCount = document.getElementById('product-approval-rejected-count');
+
+        if (pendingCount) pendingCount.textContent = pending;
+        if (approvedCount) approvedCount.textContent = approved;
+        if (rejectedCount) rejectedCount.textContent = rejected;
     }
 
     renderProductApprovals(products) {
@@ -4748,7 +5520,7 @@ class AdminDashboard {
         const tbody = document.getElementById('product-approvals-tbody');
         if (!tbody) return;
 
-        const filtered = Array.isArray(products) ? products : [];
+        let filtered = Array.isArray(products) ? products : [];
         this.filteredProductApprovals = filtered;
         const pg = this.pagination['product-approvals'] || { page: 1, total: 0, limit: 50 };
 
@@ -4756,6 +5528,62 @@ class AdminDashboard {
             tbody.innerHTML = `<tr><td colspan="9" class="table-placeholder">No products found</td></tr>`;
             this.renderPagination('product-approvals-pagination', pg, (p) => this.loadProductApprovals(undefined, undefined, p));
             return;
+        }
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_product-approvals-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                filtered.sort((a, b) => {
+                    let valA, valB;
+
+                    switch (colIndex) {
+                        case 0: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 1: // name
+                            valA = (a.name || '').toLowerCase();
+                            valB = (b.name || '').toLowerCase();
+                            break;
+                        case 2: // category_name
+                            valA = (a.category_name || '').toLowerCase();
+                            valB = (b.category_name || '').toLowerCase();
+                            break;
+                        case 3: // farmer name
+                            valA = (a.farmer_shop_name || a.farmer_name || '').toLowerCase();
+                            valB = (b.farmer_shop_name || b.farmer_name || '').toLowerCase();
+                            break;
+                        case 4: // price
+                            valA = parseFloat(a.price) || 0;
+                            valB = parseFloat(b.price) || 0;
+                            break;
+                        case 5: // stock
+                            valA = a.stock || 0;
+                            valB = b.stock || 0;
+                            break;
+                        case 6: // status
+                            valA = (a.status || '').toLowerCase();
+                            valB = (b.status || '').toLowerCase();
+                            break;
+                        case 7: // created_at
+                            valA = new Date(a.created_at || 0).getTime();
+                            valB = new Date(b.created_at || 0).getTime();
+                            break;
+                        default:
+                            return 0;
+                    }
+
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {
+                console.error('Failed to apply saved sort:', e);
+            }
         }
 
         tbody.innerHTML = filtered.map(p => `
@@ -4835,7 +5663,7 @@ class AdminDashboard {
             if (!response.ok) return;
             const data = await response.json();
             const count = data.total || 0;
-            const badge = document.getElementById('support-tickets-badge');
+            const badge = document.getElementById('chat-support-badge');
             if (badge) {
                 badge.textContent = count;
                 badge.style.display = count > 0 ? 'inline-block' : 'none';
@@ -4877,24 +5705,19 @@ class AdminDashboard {
         }
 
         tbody.innerHTML = this.supportTickets.map(ticket => {
-            const statusColors = {
-                open: 'bg-primary',
-                in_progress: 'bg-warning',
-                resolved: 'bg-success',
-                closed: 'bg-secondary'
+            const statusStyles = {
+                open: { bg: '#dcfce7', color: '#16a34a', label: 'Open' },
+                in_progress: { bg: '#dbeafe', color: '#2563eb', label: 'In Progress' },
+                resolved: { bg: '#fef3c7', color: '#d97706', label: 'Resolved' },
+                closed: { bg: '#fee2e2', color: '#dc2626', label: 'Closed' }
             };
-            const priorityColors = {
-                low: 'bg-info',
-                medium: 'bg-warning',
-                high: 'bg-danger'
-            };
+            const style = statusStyles[ticket.status] || statusStyles.open;
 
             return `
                 <tr>
                     <td>${this.escapeHtml(ticket.farmer_name || 'Unknown')}</td>
                     <td>${this.escapeHtml(ticket.subject)}</td>
-                    <td><span class="badge ${statusColors[ticket.status]}">${ticket.status.replace('_', ' ')}</span></td>
-                    <td><span class="badge ${priorityColors[ticket.priority]}">${ticket.priority}</span></td>
+                    <td><span style="background:${style.bg};color:${style.color};font-size:0.75rem;font-weight:600;padding:4px 10px;border-radius:9999px;text-transform:uppercase;">${style.label}</span></td>
                     <td>${new Date(ticket.created_at).toLocaleDateString('en-PH')}</td>
                     <td>${ticket.updated_at ? new Date(ticket.updated_at).toLocaleDateString('en-PH') : '—'}</td>
                     <td>
@@ -4962,26 +5785,25 @@ class AdminDashboard {
 
     renderAdminTicketDetail(ticket, messages) {
         document.getElementById('admin-ticket-detail-subject').textContent = ticket.subject;
-        
-        const statusColors = {
-            open: 'bg-primary',
-            in_progress: 'bg-warning',
-            resolved: 'bg-success',
-            closed: 'bg-secondary'
+
+        const statusStyles = {
+            open: { bg: '#dcfce7', color: '#16a34a', label: 'Open' },
+            in_progress: { bg: '#dbeafe', color: '#2563eb', label: 'In Progress' },
+            resolved: { bg: '#fef3c7', color: '#d97706', label: 'Resolved' },
+            closed: { bg: '#fee2e2', color: '#dc2626', label: 'Closed' }
         };
-        const priorityColors = {
-            low: 'bg-info',
-            medium: 'bg-warning',
-            high: 'bg-danger'
-        };
+        const style = statusStyles[ticket.status] || statusStyles.open;
 
         const statusEl = document.getElementById('admin-ticket-detail-status');
-        statusEl.textContent = ticket.status.replace('_', ' ');
-        statusEl.className = `badge ${statusColors[ticket.status]}`;
-
-        const priorityEl = document.getElementById('admin-ticket-detail-priority');
-        priorityEl.textContent = ticket.priority;
-        priorityEl.className = `badge ${priorityColors[ticket.priority]}`;
+        statusEl.textContent = style.label;
+        statusEl.style.background = style.bg;
+        statusEl.style.color = style.color;
+        statusEl.style.fontSize = '0.75rem';
+        statusEl.style.fontWeight = '600';
+        statusEl.style.padding = '4px 10px';
+        statusEl.style.borderRadius = '9999px';
+        statusEl.style.textTransform = 'uppercase';
+        statusEl.className = '';
 
         document.getElementById('admin-ticket-detail-created').textContent = new Date(ticket.created_at).toLocaleDateString('en-PH');
         document.getElementById('admin-ticket-status-select').value = ticket.status;
@@ -4998,23 +5820,74 @@ class AdminDashboard {
             return;
         }
 
-        container.innerHTML = messages.map(msg => {
-            const isOwn = msg.sender_id === this.currentUserId;
-            const alignment = isOwn ? 'text-end' : 'text-start';
-            const bgColor = isOwn ? 'bg-primary text-white' : 'bg-white';
-            const senderName = msg.sender_role === 'staff' ? 'Support Staff' : msg.sender_name;
+        // Sort messages by timestamp
+        const sortedMessages = [...messages].sort((a, b) =>
+            new Date(a.created_at) - new Date(b.created_at)
+        );
 
-            return `
-                <div class="d-flex ${alignment} mb-2">
-                    <div class="${bgColor} p-2 rounded" style="max-width: 70%;">
-                        <small class="d-block text-muted" style="${isOwn ? 'color: rgba(255,255,255,0.7) !important;' : ''}">${senderName}</small>
-                        <p class="mb-0">${this.escapeHtml(msg.message)}</p>
-                        <small class="d-block" style="${isOwn ? 'color: rgba(255,255,255,0.7) !important;' : 'color: #6c757d;'}">${new Date(msg.created_at).toLocaleString('en-PH')}</small>
+        // Group messages: same sender within 5 minutes
+        const groups = [];
+        let currentGroup = null;
+
+        sortedMessages.forEach((msg) => {
+            const isSent = msg.sender_role !== 'farmer';
+            const msgDate = new Date(msg.created_at);
+
+            if (!currentGroup) {
+                currentGroup = {
+                    senderId: msg.sender_id,
+                    lastMessageTime: msgDate,
+                    messages: [msg]
+                };
+            } else {
+                const timeDiff = (msgDate - currentGroup.lastMessageTime) / 60000;
+                const sameSender = msg.sender_id === currentGroup.senderId;
+
+                if (sameSender && timeDiff < 5) {
+                    currentGroup.messages.push(msg);
+                    currentGroup.lastMessageTime = msgDate;
+                } else {
+                    groups.push(currentGroup);
+                    currentGroup = {
+                        senderId: msg.sender_id,
+                        lastMessageTime: msgDate,
+                        messages: [msg]
+                    };
+                }
+            }
+        });
+
+        if (currentGroup) {
+            groups.push(currentGroup);
+        }
+
+        let html = '';
+        const senderName = 'You';
+
+        groups.forEach((group) => {
+            const isSent = group.messages[0].sender_role !== 'farmer';
+            const otherName = group.messages[0].sender_role === 'admin' ? 'Support Admin' : group.messages[0].sender_name;
+
+            html += `<div class="chat-msg-group ${isSent ? 'sent' : 'received'}">`;
+
+            group.messages.forEach((msg) => {
+                const msgIsSent = msg.sender_role !== 'farmer';
+                const displayName = msgIsSent ? senderName : otherName;
+                const exactTime = new Date(msg.created_at).toLocaleString('en-PH');
+
+                html += `
+                    <div class="chat-msg ${msgIsSent ? 'sent' : 'received'}" title="${exactTime}">
+                        <div class="chat-msg-bubble">
+                            <p class="chat-msg-text">${this.escapeHtml(msg.message).replace(/\n/g, '<br>')}</p>
+                        </div>
                     </div>
-                </div>
-            `;
-        }).join('');
+                `;
+            });
 
+            html += `</div>`;
+        });
+
+        container.innerHTML = html;
         container.scrollTop = container.scrollHeight;
     }
 
@@ -5083,7 +5956,7 @@ class AdminDashboard {
 
             if (response.ok) {
                 input.value = '';
-                document.getElementById('admin-ticket-message-char-count').textContent = '0/500 characters';
+                document.getElementById('admin-ticket-message-char-count').textContent = '0/500';
                 this.loadAdminTicketDetail(this.currentTicketId);
             } else {
                 const data = await response.json();
@@ -5230,9 +6103,53 @@ class AdminDashboard {
         const tbody = document.getElementById('category-requests-tbody');
         if (!tbody) return;
 
-        const filtered = Array.isArray(requests) ? requests : [];
+        let filtered = Array.isArray(requests) ? requests : [];
         this.filteredCategoryRequests = filtered;
         const pg = this.pagination['category-requests'] || { page: 1, total: 0, limit: 50 };
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_category-requests-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                filtered.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 0: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 1: // name
+                            valA = (a.name || '').toLowerCase();
+                            valB = (b.name || '').toLowerCase();
+                            break;
+                        case 2: // category_name
+                            valA = (a.category_name || a.requested_category_name || '').toLowerCase();
+                            valB = (b.category_name || b.requested_category_name || '').toLowerCase();
+                            break;
+                        case 3: // requester name
+                            valA = (a.requested_by_shop_name || a.requested_by_full_name || a.requested_by_username || '').toLowerCase();
+                            valB = (b.requested_by_shop_name || b.requested_by_full_name || b.requested_by_username || '').toLowerCase();
+                            break;
+                        case 4: // created_at
+                            valA = new Date(a.created_at || 0).getTime();
+                            valB = new Date(b.created_at || 0).getTime();
+                            break;
+                        case 5: // status
+                            valA = (a.status || '').toLowerCase();
+                            valB = (b.status || '').toLowerCase();
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
 
         if (!filtered.length) {
             tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No requests found.</td></tr>`;
@@ -5268,7 +6185,7 @@ class AdminDashboard {
             this.loadCategoryRequests(undefined, undefined, page);
         });
 
-        this.refreshSortableTable('category-requests-table', { columns: [{ select: 6, sortable: false }], defaultSort: [4, 'desc'] });
+        this.refreshSortableTable('category-requests-table', { columns: [{ select: 6, sortable: false }] });
     }
 
     openCategoryRequestPanel(requestId) {
@@ -6031,12 +6948,12 @@ class AdminDashboard {
         if (roleSel) {
             const roles = [];
             if (this.currentUserRole === 'super_admin') {
-                roles.push({ value: 'staff', label: 'Staff' });
+                roles.push({ value: 'admin', label: 'Admin' });
             }
             roles.push({ value: 'customer', label: 'Customer' });
             roles.push({ value: 'farmer', label: 'Farmer' });
             roleSel.innerHTML = roles.map(r => `<option value="${r.value}">${r.label}</option>`).join('');
-            roleSel.value = ['customer', 'farmer', 'staff'].includes(preferredRole) ? preferredRole : 'customer';
+            roleSel.value = ['customer', 'farmer', 'admin'].includes(preferredRole) ? preferredRole : 'customer';
             
             // Show/hide shop_name field based on role
             const shopNameGroup = document.getElementById('create-user-shop-name-group');
@@ -6067,7 +6984,7 @@ class AdminDashboard {
 
         const user = (this.lastUsers || []).find(u => u.id === userId)
             || (this.lastFarmers || []).find(f => f.id === userId)
-            || (this.lastStaff || []).find(u => u.id === userId)
+            || (this.lastAdmin || []).find(u => u.id === userId)
             || (this.lastAllUsers || []).find(u => u.id === userId);
         if (!user) return;
 
@@ -6211,7 +7128,7 @@ class AdminDashboard {
         // Get user role to determine if shop_name should be included
         const user = (this.lastUsers || []).find(u => u.id === Number(userId))
             || (this.lastFarmers || []).find(f => f.id === Number(userId))
-            || (this.lastStaff || []).find(u => u.id === Number(userId))
+            || (this.lastAdmin || []).find(u => u.id === Number(userId))
             || (this.lastAllUsers || []).find(u => u.id === Number(userId));
         const isFarmer = user?.role === 'farmer';
 
@@ -6255,7 +7172,7 @@ class AdminDashboard {
                 this.showMessage('User updated successfully!', 'success');
                 this.closeModal('edit-user-modal');
                 await this.loadUsers();
-                await this.loadStaff();
+                await this.loadAdmin();
                 await this.loadAllUsers();
                 await this.loadFarmers();
             } else {
@@ -6335,7 +7252,7 @@ class AdminDashboard {
             this.showMessage('User created successfully!', 'success');
             this.closeModal('create-user-modal');
             await this.loadUsers();
-            await this.loadStaff();
+            await this.loadAdmin();
             await this.loadAllUsers();
             if (role === 'farmer') {
                 await this.loadFarmers();
@@ -6595,7 +7512,7 @@ class AdminDashboard {
             if (response.ok) {
                 this.showMessage(`User ${disable ? 'disabled' : 'enabled'} successfully!`, 'success');
                 this.loadUsers();
-                this.loadStaff();
+                this.loadAdmin();
                 this.loadAllUsers();
                 this.loadFarmers();
                 this.loadDashboardStats();
@@ -6745,7 +7662,8 @@ class AdminDashboard {
 
     getFilteredCategories() {
         const search = document.getElementById('category-search-input')?.value?.trim().toLowerCase() || '';
-        const statusFilter = document.getElementById('category-status-filter')?.value || '';
+        const activeTab = document.querySelector('.categories-tabs .tab-btn.active');
+        const statusFilter = activeTab ? activeTab.getAttribute('data-status') : '';
         return (this.lastCategories || []).filter((category) => {
             const nameMatch = !search || (category.name || '').toLowerCase().includes(search);
             const statusMatch = !statusFilter
@@ -6758,7 +7676,8 @@ class AdminDashboard {
     getFilteredCatalogNames() {
         const search = document.getElementById('catalog-search-input')?.value?.trim().toLowerCase() || '';
         const catId = document.getElementById('catalog-category-filter-bar')?.value || '';
-        const statusFilter = document.getElementById('catalog-status-filter')?.value || '';
+        const activeTab = document.querySelector('.catalog-tabs .tab-btn.active');
+        const statusFilter = activeTab ? activeTab.getAttribute('data-status') : '';
         return (this.lastCatalogNames || []).filter((item) => {
             const nameMatch = !search || (item.name || '').toLowerCase().includes(search);
             const catMatch = !catId || String(item.category_id) === catId;
@@ -6881,13 +7800,55 @@ class AdminDashboard {
         const tbody = document.getElementById('orders-tbody');
         if (!tbody) return;
 
-        if (!orders.length) {
+        let sortedOrders = orders || [];
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_orders-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                sortedOrders.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 1: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 2: // customer name
+                            valA = (a.full_name || a.username || '').toLowerCase();
+                            valB = (b.full_name || b.username || '').toLowerCase();
+                            break;
+                        case 3: // total_amount
+                            valA = parseFloat(a.total_amount) || 0;
+                            valB = parseFloat(b.total_amount) || 0;
+                            break;
+                        case 4: // status
+                            valA = (a.status || '').toLowerCase();
+                            valB = (b.status || '').toLowerCase();
+                            break;
+                        case 5: // created_at
+                            valA = new Date(a.created_at || 0).getTime();
+                            valB = new Date(b.created_at || 0).getTime();
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
+
+        if (!sortedOrders.length) {
             tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No orders found</td></tr>`;
             this.refreshSortableTable('orders-table', { columns: [{ select: 6, sortable: false }] });
             return;
         }
 
-        tbody.innerHTML = orders.map(order => {
+        tbody.innerHTML = sortedOrders.map(order => {
             const isDisabled = !!order.is_disabled;
             const statusClass = isDisabled ? 'pending' : this.getStatusClass(order.status);
             const statusLabel = isDisabled ? 'Disabled' : this.formatStatus(order.status);
@@ -6911,7 +7872,7 @@ class AdminDashboard {
         `;
         }).join('');
 
-        this.refreshSortableTable('orders-table', { columns: [{ select: 6, sortable: false }], defaultSort: [5, 'desc'] });
+        this.refreshSortableTable('orders-table', { columns: [{ select: 6, sortable: false }] });
     }
 
     renderRecentSalesTable(orders) {
@@ -6986,7 +7947,8 @@ class AdminDashboard {
             const pg = this.pagination?.farmers || { page: 1, total: 0, limit: 50 };
             pg.page = page;
             const search = (document.getElementById('farmers-search-input')?.value || '').trim();
-            const status = (document.getElementById('farmers-status-filter')?.value || '').trim();
+            const activeTab = document.querySelector('.farmers-tabs .tab-btn.active');
+            const status = activeTab ? activeTab.getAttribute('data-status') : '';
             const verification = (document.getElementById('farmers-verification-filter')?.value || '').trim();
             const params = new URLSearchParams({
                 page: String(page),
@@ -7024,8 +7986,60 @@ class AdminDashboard {
         this.destroySortableTable('farmers-all-table');
 
         // API now handles pagination, so render directly
-        const pagedFarmers = farmers;
+        let pagedFarmers = farmers;
         const pageState = this.pagination?.farmers || { page: 1, total: farmers.length, limit: 50 };
+
+        // Apply saved sort from localStorage
+        const savedSort = localStorage.getItem('adminTableSort_farmers-all-table');
+        if (savedSort) {
+            try {
+                const [colIndex, direction] = JSON.parse(savedSort);
+                const sortMultiplier = direction === 'asc' ? 1 : -1;
+
+                pagedFarmers.sort((a, b) => {
+                    let valA, valB;
+                    switch (colIndex) {
+                        case 0: // id
+                            valA = a.id;
+                            valB = b.id;
+                            break;
+                        case 1: // shop_name
+                            valA = (a.shop_name || '').toLowerCase();
+                            valB = (b.shop_name || '').toLowerCase();
+                            break;
+                        case 2: // owner name
+                            valA = (`${a.first_name || ''} ${a.last_name || ''}`.trim() || a.full_name || '').toLowerCase();
+                            valB = (`${b.first_name || ''} ${b.last_name || ''}`.trim() || b.full_name || '').toLowerCase();
+                            break;
+                        case 3: // username
+                            valA = (a.username || '').toLowerCase();
+                            valB = (b.username || '').toLowerCase();
+                            break;
+                        case 4: // email
+                            valA = (a.email || '').toLowerCase();
+                            valB = (b.email || '').toLowerCase();
+                            break;
+                        case 5: // status (is_disabled)
+                            valA = a.is_disabled ? 1 : 0;
+                            valB = b.is_disabled ? 1 : 0;
+                            break;
+                        case 6: // is_verified
+                            valA = a.is_verified ? 1 : 0;
+                            valB = b.is_verified ? 1 : 0;
+                            break;
+                        case 7: // created_at
+                            valA = new Date(a.created_at || 0).getTime();
+                            valB = new Date(b.created_at || 0).getTime();
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return -1 * sortMultiplier;
+                    if (valA > valB) return 1 * sortMultiplier;
+                    return 0;
+                });
+            } catch (e) {}
+        }
 
         // Helper: build a unified row for any farmer
         const buildRow = (f) => {
@@ -7057,7 +8071,7 @@ class AdminDashboard {
                 : `<tr><td colspan="9" class="text-center text-muted py-4">No farmers found</td></tr>`;
         }
 
-        this.refreshSortableTable('farmers-all-table', { columns: [{ select: 8, sortable: false }], defaultSort: [7, 'desc'] });
+        this.refreshSortableTable('farmers-all-table', { columns: [{ select: 8, sortable: false }] });
 
         this.renderPagination('farmers-pagination', pageState, (page) => {
             this.loadFarmers('all', page);
@@ -7518,13 +8532,41 @@ class AdminDashboard {
         document.getElementById('verification-unverified-count').textContent = unverified;
     }
 
+    async loadSubscriptionStats() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/subscriptions`, {
+                headers: { Authorization: `Bearer ${this.token}` }
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                const allSubscriptions = data.subscriptions || [];
+                this.updateSubscriptionStats(allSubscriptions);
+            }
+        } catch (error) {
+            console.error('Failed to load subscription stats:', error);
+        }
+    }
+
+    updateSubscriptionStats(subscriptions) {
+        const pending = subscriptions.filter(s => s.status === 'pending').length;
+        const active = subscriptions.filter(s => s.status === 'active').length;
+        const rejected = subscriptions.filter(s => s.status === 'rejected').length;
+        const expired = subscriptions.filter(s => s.status === 'expired').length;
+
+        document.getElementById('subscription-pending-count').textContent = pending;
+        document.getElementById('subscription-active-count').textContent = active;
+        document.getElementById('subscription-rejected-count').textContent = rejected;
+        document.getElementById('subscription-expired-count').textContent = expired;
+    }
+
     renderVerificationRequestsTable() {
         const tbody = document.getElementById('verification-requests-tbody');
         if (!tbody) return;
         tbody.innerHTML = '';
 
         if (!this.verificationRequests || this.verificationRequests.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No verification requests found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No verification requests found</td></tr>';
             return;
         }
 
@@ -7545,8 +8587,6 @@ class AdminDashboard {
             row.innerHTML = `
                 <td>${this.escapeHtml(request.full_name || request.username)}</td>
                 <td>${this.escapeHtml(request.shop_name || '—')}</td>
-                <td>${request.product_count || 0}</td>
-                <td>${request.delivered_orders || 0}</td>
                 <td>${docIndicator}</td>
                 <td>${new Date(request.created_at).toLocaleDateString()}</td>
                 <td>${statusBadge}</td>
@@ -7803,14 +8843,50 @@ class AdminDashboard {
     }
 
     async handleUnverifyAction() {
-        if (!this.currentUnverifyRequestId) return;
-
         const reason = document.getElementById('unverify-reason').value.trim();
 
         if (!reason) {
             this.showToast('Reason is required', 'error');
             return;
         }
+
+        // Handle farmer details modal unverify
+        if (this.currentUnverifyFarmerId) {
+            try {
+                const response = await fetch(`${this.apiBase}/admin/users/${this.currentUnverifyFarmerId}/verify`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`
+                    },
+                    body: JSON.stringify({ is_verified: false, reason })
+                });
+
+                if (response.ok) {
+                    this.showToast('Farmer unverified successfully', 'success');
+                    this.closeUnverifyModal();
+                    // Update UI
+                    const unverifyBtn = document.getElementById('fdt-unverify-btn');
+                    const verifyBtn = document.getElementById('fdt-verify-btn');
+                    const infoEl = document.getElementById('fdt-info-content');
+                    if (unverifyBtn) unverifyBtn.classList.add('d-none');
+                    if (verifyBtn) verifyBtn.classList.remove('d-none');
+                    if (infoEl) infoEl.innerHTML = infoEl.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Yes<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">No</span>');
+                    this.loadFarmers();
+                    this.currentUnverifyFarmerId = null;
+                } else {
+                    const data = await response.json().catch(() => ({}));
+                    this.showToast(data.message || 'Failed to unverify farmer', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to unverify farmer:', error);
+                this.showToast('Failed to unverify farmer', 'error');
+            }
+            return;
+        }
+
+        // Handle verification request unverify (original logic)
+        if (!this.currentUnverifyRequestId) return;
 
         try {
             const response = await fetch(`${this.apiBase}/admin/verification-requests/${this.currentUnverifyRequestId}/review`, {
@@ -7890,70 +8966,163 @@ class AdminDashboard {
     // ── Subscription Request Methods ─────────────────────────────────────
     async loadSubscriptionRequests(status = 'pending') {
         try {
-            const res = await fetch(`${this.apiBase}/admin/subscriptions?status=${status}`, {
+            // For 'all' status, don't send status parameter to get all subscriptions
+            const url = status === 'all'
+                ? `${this.apiBase}/admin/subscriptions`
+                : `${this.apiBase}/admin/subscriptions?status=${status}`;
+            const res = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (!res.ok) return;
             const data = await res.json();
+            
+            this.subscriptionCurrentStatus = status;
+            
+            // Load all subscriptions for stats (to show total counts regardless of current tab)
+            await this.loadSubscriptionStats();
+            
             const tbody = document.querySelector('#subscriptions-table tbody');
             if (!tbody) return;
-            tbody.innerHTML = data.subscriptions.map(s => `
+            
+            // Show no data message if no subscriptions
+            if (!data.subscriptions || data.subscriptions.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <i class="bi bi-inbox text-muted" style="font-size: 2rem;"></i>
+                            <p class="text-muted mt-3 mb-0">No ${status === 'all' ? '' : status} subscriptions found</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = data.subscriptions.map(s => {
+                const status = s.status || 'unknown';
+                const statusClass = status === 'active' ? 'success' : status === 'pending' ? 'warning' : status === 'rejected' ? 'danger' : 'secondary';
+                
+                return `
                 <tr>
-                    <td>${this.escapeHtml(s.farm_name || `${s.first_name} ${s.last_name}`)}</td>
+                    <td>${this.escapeHtml(s.full_name || s.shop_name || '—')}</td>
                     <td>${s.plan_duration_months} month${s.plan_duration_months > 1 ? 's' : ''}</td>
                     <td>₱${Number(s.amount_paid || 0).toLocaleString()}</td>
                     <td>${s.payment_account_name ? `<span class="badge bg-${s.payment_account_type === 'gcash' ? 'success' : 'info'}">${s.payment_account_type === 'gcash' ? 'GCash' : 'Bank'}</span> ${this.escapeHtml(s.payment_account_name)}` : '—'}</td>
                     <td>${new Date(s.created_at).toLocaleDateString('en-PH')}</td>
+                    <td><span class="badge bg-${statusClass}">${status}</span></td>
                     <td>${s.payment_proof_url ? `<button class="btn btn-sm btn-outline-success view-proof-btn" data-url="${s.payment_proof_url}"><i class="bi bi-image"></i> View</button>` : '—'}</td>
                     <td>
-                        ${status === 'pending' ? `
-                            <button class="btn btn-sm btn-success approve-sub-btn" data-id="${s.id}">Approve</button>
-                            <button class="btn btn-sm btn-danger reject-sub-btn" data-id="${s.id}">Reject</button>
-                        ` : `<span class="badge bg-${status === 'active' ? 'success' : status === 'rejected' ? 'danger' : 'secondary'}">${status}</span>`}
+                        <button class="btn btn-sm py-0 px-2 btn-ac-green subscription-view-btn" data-id="${s.id}">View</button>
                     </td>
                 </tr>
-            `).join('');
+            `}).join('');
             // Wire buttons
-            tbody.querySelectorAll('.approve-sub-btn').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const id = btn.dataset.id;
-                    if (!confirm('Approve this subscription?')) return;
-                    try {
-                        const res = await fetch(`${this.apiBase}/admin/subscriptions/${id}/approve`, {
-                            method: 'PUT', headers: { 'Authorization': `Bearer ${this.token}` }
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                            this.showToast('Subscription approved', 'success');
-                            this.loadSubscriptionRequests('pending');
-                        } else { this.showToast(data.message || 'Failed to approve', 'error'); }
-                    } catch (e) { this.showToast('Error approving subscription', 'error'); }
-                });
-            });
-            tbody.querySelectorAll('.reject-sub-btn').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const id = btn.dataset.id;
-                    if (!confirm('Reject this subscription?')) return;
-                    try {
-                        const res = await fetch(`${this.apiBase}/admin/subscriptions/${id}/reject`, {
-                            method: 'PUT', headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ reason: '' })
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                            this.showToast('Subscription rejected', 'success');
-                            this.loadSubscriptionRequests('pending');
-                        } else { this.showToast(data.message || 'Failed to reject', 'error'); }
-                    } catch (e) { this.showToast('Error rejecting subscription', 'error'); }
-                });
-            });
             tbody.querySelectorAll('.view-proof-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     document.getElementById('sub-proof-img').src = btn.dataset.url;
                     new bootstrap.Modal(document.getElementById('subscription-proof-modal')).show();
                 });
             });
+            tbody.querySelectorAll('.subscription-view-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.id;
+                    this.showSubscriptionDetails(id);
+                });
+            });
         } catch (e) { console.error('Load subscriptions error:', e); }
+    }
+
+    async showSubscriptionDetails(id) {
+        try {
+            const res = await fetch(`${this.apiBase}/admin/subscriptions`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            const data = await res.json();
+            const subscription = data.subscriptions.find(s => s.id === id);
+            
+            if (!subscription) {
+                this.showToast('Subscription not found', 'error');
+                return;
+            }
+
+            // Populate modal fields
+            document.getElementById('sub-detail-farmer-name').textContent = subscription.full_name || '—';
+            document.getElementById('sub-detail-email').textContent = subscription.email || '—';
+            document.getElementById('sub-detail-shop-name').textContent = subscription.shop_name || '—';
+            document.getElementById('sub-detail-plan').textContent = subscription.tier || '—';
+            document.getElementById('sub-detail-amount').textContent = `₱${Number(subscription.amount_paid || 0).toLocaleString()}`;
+            document.getElementById('sub-detail-duration').textContent = `${subscription.plan_duration_months} month${subscription.plan_duration_months > 1 ? 's' : ''}`;
+            document.getElementById('sub-detail-payment-to').textContent = subscription.payment_account_name || '—';
+            document.getElementById('sub-detail-account-number').textContent = subscription.payment_account_number || '—';
+            
+            // Status badge
+            const statusElement = document.getElementById('sub-detail-status');
+            const statusClass = subscription.status === 'active' ? 'success' :
+                               subscription.status === 'pending' ? 'warning' :
+                               subscription.status === 'rejected' ? 'danger' : 'secondary';
+            statusElement.innerHTML = `<span class="badge bg-${statusClass}">${subscription.status}</span>`;
+
+            // Reason field for rejected/expired subscriptions
+            const reasonContainer = document.getElementById('sub-detail-reason-container');
+            const reasonElement = document.getElementById('sub-detail-reason');
+            if (subscription.status === 'rejected' && subscription.rejection_reason) {
+                reasonContainer.style.display = 'block';
+                reasonElement.textContent = subscription.rejection_reason;
+            } else if (subscription.status === 'expired' && subscription.expiry_reason) {
+                reasonContainer.style.display = 'block';
+                reasonElement.textContent = subscription.expiry_reason;
+            } else {
+                reasonContainer.style.display = 'none';
+            }
+
+            // Dates
+            document.getElementById('sub-detail-created-at').textContent = new Date(subscription.created_at).toLocaleDateString('en-PH');
+            
+            // Show start/expiry dates for active subscriptions
+            if (subscription.status === 'active') {
+                document.getElementById('sub-detail-starts-at-container').style.display = 'block';
+                document.getElementById('sub-detail-expires-at-container').style.display = 'block';
+                document.getElementById('sub-detail-starts-at').textContent = subscription.starts_at ? new Date(subscription.starts_at).toLocaleDateString('en-PH') : '—';
+                document.getElementById('sub-detail-expires-at').textContent = subscription.expires_at ? new Date(subscription.expires_at).toLocaleDateString('en-PH') : '—';
+                // Show expire button for active subscriptions
+                document.getElementById('sub-detail-expire-btn').style.display = 'block';
+                document.getElementById('sub-detail-expire-btn').dataset.id = subscription.id;
+                // Hide approve/reject buttons for active subscriptions
+                document.getElementById('sub-detail-approve-btn').style.display = 'none';
+                document.getElementById('sub-detail-reject-btn').style.display = 'none';
+            } else if (subscription.status === 'pending') {
+                document.getElementById('sub-detail-starts-at-container').style.display = 'none';
+                document.getElementById('sub-detail-expires-at-container').style.display = 'none';
+                // Show approve/reject buttons for pending subscriptions
+                document.getElementById('sub-detail-approve-btn').style.display = 'block';
+                document.getElementById('sub-detail-approve-btn').dataset.id = subscription.id;
+                document.getElementById('sub-detail-reject-btn').style.display = 'block';
+                document.getElementById('sub-detail-reject-btn').dataset.id = subscription.id;
+                // Hide expire button for pending subscriptions
+                document.getElementById('sub-detail-expire-btn').style.display = 'none';
+            } else {
+                document.getElementById('sub-detail-starts-at-container').style.display = 'none';
+                document.getElementById('sub-detail-expires-at-container').style.display = 'none';
+                // Hide all action buttons for non-active, non-pending subscriptions
+                document.getElementById('sub-detail-approve-btn').style.display = 'none';
+                document.getElementById('sub-detail-reject-btn').style.display = 'none';
+                document.getElementById('sub-detail-expire-btn').style.display = 'none';
+            }
+            
+            // Payment proof
+            const proofImg = document.getElementById('sub-detail-proof-img');
+            if (subscription.payment_proof_url) {
+                document.getElementById('sub-detail-proof-container').style.display = 'block';
+                proofImg.src = subscription.payment_proof_url;
+            } else {
+                document.getElementById('sub-detail-proof-container').style.display = 'none';
+            }
+
+            // Show modal
+            new bootstrap.Modal(document.getElementById('subscription-details-modal')).show();
+        } catch (e) {
+            console.error('Error loading subscription details:', e);
+            this.showToast('Error loading subscription details', 'error');
+        }
     }
 
     async handleSubscriptionAction(id, action, data = {}) {
@@ -8039,16 +9208,16 @@ class AdminDashboard {
     }
 
     async saveSubscriptionSettings() {
-        const updates = [
-            { key: 'premium_monthly_price', value: document.getElementById('setting-premium-monthly-price')?.value },
-            { key: 'premium_3month_discount_pct', value: document.getElementById('setting-discount-3m')?.value },
-            { key: 'premium_6month_discount_pct', value: document.getElementById('setting-discount-6m')?.value }
-        ];
+        const updates = {
+            premium_monthly_price: document.getElementById('setting-premium-monthly-price')?.value,
+            premium_3month_discount_pct: document.getElementById('setting-discount-3m')?.value,
+            premium_6month_discount_pct: document.getElementById('setting-discount-6m')?.value
+        };
         try {
             const res = await fetch(`${this.apiBase}/superadmin/settings`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ updates })
+                body: JSON.stringify(updates)
             });
             const data = await res.json();
             if (res.ok) { this.showToast('Pricing saved', 'success'); }
@@ -8057,6 +9226,16 @@ class AdminDashboard {
     }
 
 }
+
+// Global function to open payment proof modal
+window.openPaymentProofModal = function() {
+    const proofImg = document.getElementById('sub-detail-proof-img');
+    const modalImg = document.getElementById('payment-proof-modal-img');
+    if (proofImg && modalImg && proofImg.src) {
+        modalImg.src = proofImg.src;
+        new bootstrap.Modal(document.getElementById('payment-proof-modal')).show();
+    }
+};
 
 // Initialize admin dashboard when DOM is loaded
 let adminDashboard;
@@ -8078,7 +9257,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Verification request refresh (event delegation)
     document.addEventListener('click', (e) => {
         if (e.target.matches('#verification-requests-refresh-btn') || e.target.closest('#verification-requests-refresh-btn')) {
-            adminDashboard.loadVerificationRequests(1, adminDashboard.verificationCurrentStatus || 'all');
+            const searchInput = document.getElementById('verification-requests-search-input');
+            if (searchInput) searchInput.value = '';
+            adminDashboard.loadVerificationRequests(1, 'all');
+            adminDashboard.showToast('Verification requests refreshed', 'success');
         }
     });
 
@@ -8088,6 +9270,156 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.subscription-tabs .tab-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             adminDashboard.loadSubscriptionRequests(e.target.dataset.status);
+        }
+    });
+
+    // Approve subscription button (event delegation)
+    document.addEventListener('click', async (e) => {
+        if (e.target.matches('#sub-detail-approve-btn') || e.target.closest('#sub-detail-approve-btn')) {
+            const btn = e.target.matches('#sub-detail-approve-btn') ? e.target : e.target.closest('#sub-detail-approve-btn');
+            const id = btn.dataset.id;
+            if (!id) return;
+            const confirmed = await adminDashboard.adminConfirm(
+                'Are you sure you want to approve this subscription?',
+                { title: 'Approve Subscription', okLabel: 'Approve', danger: false }
+            );
+            if (!confirmed) return;
+            try {
+                const res = await fetch(`${adminDashboard.apiBase}/admin/subscriptions/${id}/approve`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${adminDashboard.token}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    adminDashboard.showToast('Subscription approved successfully', 'success');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('subscription-details-modal'));
+                    if (modal) modal.hide();
+                    adminDashboard.loadSubscriptionRequests('all');
+                } else {
+                    adminDashboard.showToast(data.message || 'Failed to approve subscription', 'error');
+                }
+            } catch (err) {
+                console.error('Error approving subscription:', err);
+                adminDashboard.showToast('Error approving subscription', 'error');
+            }
+        }
+    });
+
+    // Reject subscription button (event delegation)
+    document.addEventListener('click', async (e) => {
+        if (e.target.matches('#sub-detail-reject-btn') || e.target.closest('#sub-detail-reject-btn')) {
+            const btn = e.target.matches('#sub-detail-reject-btn') ? e.target : e.target.closest('#sub-detail-reject-btn');
+            const id = btn.dataset.id;
+            if (!id) return;
+            // Store the subscription ID for the confirm button
+            document.getElementById('confirm-reject-subscription-btn').dataset.id = id;
+            // Clear previous reason
+            document.getElementById('reject-subscription-reason').value = '';
+            document.getElementById('reject-subscription-reason-count').textContent = '0';
+            // Open the reason modal
+            new bootstrap.Modal(document.getElementById('reject-subscription-modal')).show();
+        }
+    });
+
+    // Confirm reject subscription button
+    document.getElementById('confirm-reject-subscription-btn').addEventListener('click', async () => {
+        const id = document.getElementById('confirm-reject-subscription-btn').dataset.id;
+        const reason = document.getElementById('reject-subscription-reason').value.trim();
+
+        if (!reason) {
+            adminDashboard.showToast('Please provide a reason for rejection', 'error');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${adminDashboard.apiBase}/admin/subscriptions/${id}/reject`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${adminDashboard.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ reason })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                adminDashboard.showToast('Subscription rejected successfully', 'success');
+                // Close both modals
+                bootstrap.Modal.getInstance(document.getElementById('reject-subscription-modal')).hide();
+                const detailsModal = bootstrap.Modal.getInstance(document.getElementById('subscription-details-modal'));
+                if (detailsModal) detailsModal.hide();
+                adminDashboard.loadSubscriptionRequests('all');
+            } else {
+                adminDashboard.showToast(data.message || 'Failed to reject subscription', 'error');
+            }
+        } catch (err) {
+            console.error('Error rejecting subscription:', err);
+            adminDashboard.showToast('Error rejecting subscription', 'error');
+        }
+    });
+
+    // Expire subscription button (event delegation)
+    document.addEventListener('click', async (e) => {
+        if (e.target.matches('#sub-detail-expire-btn') || e.target.closest('#sub-detail-expire-btn')) {
+            const btn = e.target.matches('#sub-detail-expire-btn') ? e.target : e.target.closest('#sub-detail-expire-btn');
+            const id = btn.dataset.id;
+            if (!id) return;
+            // Store the subscription ID for the confirm button
+            document.getElementById('confirm-expire-subscription-btn').dataset.id = id;
+            // Clear previous reason
+            document.getElementById('expire-subscription-reason').value = '';
+            document.getElementById('expire-subscription-reason-count').textContent = '0';
+            // Open the reason modal
+            new bootstrap.Modal(document.getElementById('expire-subscription-modal')).show();
+        }
+    });
+
+    // Character counter for reject subscription reason
+    document.getElementById('reject-subscription-reason').addEventListener('input', (e) => {
+        const count = e.target.value.length;
+        document.getElementById('reject-subscription-reason-count').textContent = count;
+        document.getElementById('reject-subscription-reason-count').style.color = count > 450 ? 'red' : '';
+    });
+
+    // Character counter for expire subscription reason
+    document.getElementById('expire-subscription-reason').addEventListener('input', (e) => {
+        const count = e.target.value.length;
+        document.getElementById('expire-subscription-reason-count').textContent = count;
+        document.getElementById('expire-subscription-reason-count').style.color = count > 450 ? 'red' : '';
+    });
+
+    // Confirm expire subscription button
+    document.getElementById('confirm-expire-subscription-btn').addEventListener('click', async () => {
+        const id = document.getElementById('confirm-expire-subscription-btn').dataset.id;
+        const reason = document.getElementById('expire-subscription-reason').value.trim();
+
+        if (!reason) {
+            adminDashboard.showToast('Please provide a reason for expiry', 'error');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${adminDashboard.apiBase}/admin/subscriptions/${id}/expire`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${adminDashboard.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ reason })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                adminDashboard.showToast('Subscription expired successfully', 'success');
+                // Close both modals
+                bootstrap.Modal.getInstance(document.getElementById('expire-subscription-modal')).hide();
+                const detailsModal = bootstrap.Modal.getInstance(document.getElementById('subscription-details-modal'));
+                if (detailsModal) detailsModal.hide();
+                adminDashboard.loadSubscriptionRequests('all');
+            } else {
+                adminDashboard.showToast(data.message || 'Failed to expire subscription', 'error');
+            }
+        } catch (err) {
+            console.error('Error expiring subscription:', err);
+            adminDashboard.showToast('Error expiring subscription', 'error');
         }
     });
 

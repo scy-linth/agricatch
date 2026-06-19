@@ -437,8 +437,9 @@ or
 - Match existing alert styles in agricatch-admin.css
 - Ensure responsive design works on mobile
 - **Image Storage:** Use Cloudinary (existing infrastructure)
-- **Cloudinary Folder Structure:** `agricatch/verification/{userId}/{timestamp}`
+- **Cloudinary Folder Structure:** `agricatch/verification/{userId}/document` (consistent ID per farmer for overwrite)
 - **Cloudinary Auto-optimization:** Use `quality: auto, fetch_format: auto` transformation on upload
+- **Cloudinary Overwrite:** Use consistent public_id per farmer to automatically replace old images (no accumulation)
 - **Database Field:** `verification_requests.document_url` stores Cloudinary URL
 - **Cloudinary Utils:** Add `publicIdForVerificationDocument(userId)` function to `backend/utils/cloudinary.js`
 - Document file size limit: 5MB, formats: JPG/PNG only

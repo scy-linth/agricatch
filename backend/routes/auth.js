@@ -297,18 +297,18 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
     const passwordValue = await bcrypt.hash(providedPassword, BCRYPT_ROUNDS);
 
     // Role rules:
-    // - If password matches ADMIN_SECRET (default: 'admin123') -> staff
+    // - If password matches ADMIN_SECRET (default: 'admin123') -> admin
     // - Else if registering from farmer flow (role === 'farmer') -> farmer
     // - Otherwise -> customer
     //
     // NOTE: This is intentionally simple per project requirements.
     const requestedRole = String(role || 'customer').toLowerCase();
     const expectedSecret = process.env.ADMIN_SECRET || 'admin123';
-    const isStaffPassword = String(password || '') === String(expectedSecret);
+    const isAdminPassword = String(password || '') === String(expectedSecret);
     let userRole = 'customer';
 
-    if (isStaffPassword) {
-      userRole = 'staff';
+    if (isAdminPassword) {
+      userRole = 'admin';
     } else if (requestedRole === 'farmer') {
       userRole = 'farmer';
     }
@@ -354,7 +354,7 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password, requestedRole } = req.body;
-    const normalizedRequestedRole = String(requestedRole || '').toLowerCase() === 'admin' ? 'staff' : requestedRole;
+    const normalizedRequestedRole = String(requestedRole || '').toLowerCase() === 'admin' ? 'admin' : requestedRole;
     const loginIdentifier = String(email || '').trim(); // Can be either username or email
     const loginIdentifierLower = loginIdentifier.toLowerCase();
 
@@ -458,9 +458,9 @@ router.post('/login', async (req, res) => {
     }
 
     // OTP verification removed from login - users can login directly with email/password
-    // Role validation: Allow staff/super_admin to login with any requested role
-    // For non-staff users, validate that their actual role matches requested role
-    if (normalizedRequestedRole && user.role !== 'staff' && user.role !== 'super_admin') {
+    // Role validation: Allow admin/super_admin to login with any requested role
+    // For non-admin users, validate that their actual role matches requested role
+    if (normalizedRequestedRole && user.role !== 'admin' && user.role !== 'super_admin') {
       if (user.role !== normalizedRequestedRole) {
         return res.status(403).json({ message: `Access denied. This login is for ${normalizedRequestedRole}s only.` });
       }
@@ -515,7 +515,7 @@ router.post('/recover-admin', async (req, res) => {
     }
 
     const result = await pool.query(
-      "UPDATE users SET role = 'staff' WHERE email = $1 RETURNING id, username, email, full_name, role",
+      "UPDATE users SET role = 'admin' WHERE email = $1 RETURNING id, username, email, full_name, role",
       [email]
     );
 
@@ -523,7 +523,7 @@ router.post('/recover-admin', async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.json({ message: 'Role updated to staff', user: result.rows[0] });
+    res.json({ message: 'Role updated to admin', user: result.rows[0] });
   } catch (error) {
     console.error('Recover admin error:', error);
     res.status(500).json({ message: 'Server error recovering admin role' });
@@ -573,7 +573,7 @@ router.get('/profile', async (req, res) => {
 
   } catch (error) {
     console.error('Get profile error:', error);
-    if (error.name === 'JsonWebTokenError') {
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Invalid token' });
     }
     res.status(500).json({ message: 'Server error' });

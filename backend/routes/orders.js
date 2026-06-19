@@ -244,7 +244,7 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
     if (order.is_disabled) {
       return res.status(400).json({ message: 'Order is disabled and cannot be updated' });
     }
-    if (role !== 'staff' && Number(order.farmer_id) !== Number(decoded.id)) {
+    if (role !== 'admin' && Number(order.farmer_id) !== Number(decoded.id)) {
       return res.status(403).json({ message: 'You can only update your own orders' });
     }
 
@@ -695,7 +695,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update order status (for farmers/staff) - alternative endpoint
+// Update order status (for farmers/admin) - alternative endpoint
 router.put('/:id/status', async (req, res) => {
   try {
     const orderId = parseInt(req.params.id, 10);
@@ -712,10 +712,10 @@ router.put('/:id/status', async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if user is staff or farmer who owns the products in the order
+    // Check if user is admin or farmer who owns the products in the order
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
 
-    if (userResult.rows[0].role !== 'staff') {
+    if (userResult.rows[0].role !== 'admin') {
       // Check if user is a farmer who owns the product in this order (per-item order)
       const farmerCheck = await pool.query(`
         SELECT p.farmer_id
@@ -995,7 +995,7 @@ router.put('/:id/cancel-farmer', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
 
-    if (userResult.rows[0].role !== 'staff') {
+    if (userResult.rows[0].role !== 'admin') {
       const farmerCheck = await pool.query(`
         SELECT p.farmer_id
         FROM orders o

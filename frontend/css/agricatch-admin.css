@@ -56,6 +56,53 @@
   --bs-primary-rgb:   45, 122, 58;
 }
 
+/* ─── Ticket Conversation Items ───────────────────────────────────────── */
+.conversation-item--ticket {
+  border-left: 3px solid #6c757d;
+}
+
+.conversation-item--ticket.unread {
+  border-left-color: var(--ac-primary);
+}
+
+.conversation-subject {
+  font-size: 0.85rem;
+  color: var(--ac-text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ticket-status-control {
+  margin-left: auto;
+  min-width: 120px;
+}
+
+.chat-thread-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.chat-thread-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.chat-thread-reason {
+  font-size: 0.85rem;
+  color: var(--ac-text-muted);
+  margin-top: 2px;
+  text-align: center;
+  padding: 4px 8px;
+  background: var(--ac-border-light);
+  border-radius: 4px;
+}
+
 /* ─── 2. Body & Global ──────────────────────────────────────────────── */
 body {
   font-family: 'Inter', 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -281,6 +328,156 @@ a:hover { color: var(--ac-primary-dark); }
 .dropdown-menu.messages .message-item:hover,
 .dropdown-menu.notifications .notification-item:hover {
   background: var(--ac-primary-light);
+}
+
+/* Dropdown notification items */
+.notification-item-dropdown {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.notification-item-dropdown:hover {
+  background: var(--ac-primary-light);
+}
+
+/* Fix dropdown overflow */
+.dropdown-menu.notifications {
+  overflow: hidden;
+}
+
+/* Notification highlight fade animation */
+.notification-item.highlighted {
+  transition: background 0.5s ease, border-color 0.5s ease, opacity 0.5s ease;
+}
+
+.notification-item.highlighted.fading {
+  opacity: 0;
+}
+
+/* Notification items in section */
+.notification-item {
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.notification-item.unread {
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-left: 3px solid #10b981;
+}
+
+.notification-item.unread:hover {
+  background: #e8f5e9;
+  border-color: #c8e6c9;
+}
+
+.notification-item.read {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+  opacity: 0.9;
+}
+
+.notification-item.read:hover {
+  background: #e8f5e9;
+  border-color: #c8e6c9;
+  opacity: 1;
+}
+
+.notification-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #f3f4f6;
+  font-size: 1rem;
+  color: #6b7280;
+}
+
+.notification-item.unread .notification-icon {
+  background: #ecfdf5;
+  color: #10b981;
+}
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-title {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #111827;
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+}
+
+.notification-item.unread .notification-title {
+  color: #065f46;
+  font-weight: 600;
+}
+
+.notification-message {
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.4;
+  margin-bottom: 0.25rem;
+}
+
+.notification-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.notification-item.unread .notification-meta {
+  color: #6b7280;
+}
+
+.notification-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.notification-mark-read-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  font-size: 0.875rem;
+}
+
+.notification-mark-read-btn:hover {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.notification-item.unread .notification-mark-read-btn {
+  color: #10b981;
+}
+
+.notification-item.unread .notification-mark-read-btn:hover {
+  background: #ecfdf5;
+  color: #059669;
 }
 .dropdown-menu .dropdown-footer a {
   font-size: .82rem;
@@ -574,8 +771,8 @@ body.sidebar-collapsed #main.main {
 .sidebar-badge {
   font-size: .65rem;
   font-weight: 700;
-  background: #dc2626;
-  color: #fff;
+  background: var(--ac-primary-light);
+  color: var(--ac-primary);
   padding: 1px 6px;
   border-radius: 10px;
   line-height: 1.4;
@@ -980,7 +1177,7 @@ body.sidebar-collapsed #main.main {
   padding: 2px 8px; border-radius: 6px;
   font-size: .7rem; font-weight: 700;
 }
-.badge-role-staff {
+.badge-role-admin {
   background: #e0f2fe; color: #075985;
   padding: 2px 8px; border-radius: 6px;
   font-size: .7rem; font-weight: 700;
@@ -1382,7 +1579,7 @@ body.sidebar-collapsed #main.main {
 .chat-section-mode {
   position: static !important;
   width: 100% !important;
-  height: calc(100vh - 180px) !important;
+  height: 100% !important;
   max-width: 100% !important;
   transform: none !important;
   box-shadow: none !important;
@@ -1392,34 +1589,55 @@ body.sidebar-collapsed #main.main {
   min-height: 500px;
 }
 /* When section is active, always show the drawer regardless of .active class */
-#chat.admin-section-card.active .admin-chat-drawer {
+#chat.admin-section-card.active .admin-chat-drawer,
+#support-ticket-chat.admin-section-card.active .admin-chat-drawer {
   transform: none;
   display: flex;
 }
 
 /* Prevent body scroll when chat section is active */
-#chat.admin-section-card.active {
+#chat.admin-section-card.active,
+#support-ticket-chat.admin-section-card.active {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 100px);
+  height: calc(100vh - 80px);
   overflow: hidden;
 }
 
-#chat.admin-section-card.active .ac-section-hero {
+#chat.admin-section-card.active .ac-section-hero,
+#support-ticket-chat.admin-section-card.active .ac-section-hero {
   flex-shrink: 0;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
-#chat.admin-section-card.active .admin-chat-drawer {
+#chat.admin-section-card.active .card,
+#support-ticket-chat.admin-section-card.active .card {
+  display: none;
+}
+
+#chat.admin-section-card.active #panel-conversations {
   flex: 1;
-  height: auto !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 800px;
+  min-height: 800px;
+  padding: 0 12px 12px;
+}
+
+#chat.admin-section-card.active .admin-chat-drawer,
+#support-ticket-chat.admin-section-card.active .admin-chat-drawer {
+  flex: 1;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
+  display: flex !important;
 }
 
 /* Conversation sidebar panel */
 .chat-sidebar-panel {
-  width: 280px;
-  min-width: 280px;
+  width: 300px;
+  min-width: 300px;
   border-right: 1px solid var(--ac-border-light);
   display: flex;
   flex-direction: column;
@@ -1427,39 +1645,200 @@ body.sidebar-collapsed #main.main {
   overflow: hidden;
 }
 .chat-sidebar-header {
-  padding: 16px 16px 12px;
+  padding: 12px 12px 0;
   border-bottom: 1px solid var(--ac-border-light);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 8px;
 }
 .chat-sidebar-title {
-  font-size: .9rem;
+  font-size: .85rem;
   font-weight: 700;
   color: var(--ac-heading);
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-family: 'Nunito', sans-serif;
 }
 .chat-sidebar-title i { color: var(--ac-primary); }
+
+/* Support sidebar header row (title + count) */
+.support-sidebar-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.support-conv-count {
+  font-size: .75rem;
+  font-weight: 700;
+  background: var(--ac-primary-light);
+  color: var(--ac-primary);
+  border-radius: 12px;
+  padding: 1px 8px;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* Search bar inside sidebar */
+.support-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.support-search-icon {
+  position: absolute;
+  left: 9px;
+  color: var(--ac-text-muted);
+  font-size: .8rem;
+  pointer-events: none;
+}
+.support-search-input {
+  width: 100%;
+  padding: 6px 10px 6px 28px;
+  border: 1px solid var(--ac-border);
+  border-radius: 8px;
+  font-size: .8rem;
+  background: #f8f9fa;
+  color: var(--ac-text);
+  outline: none;
+  transition: border-color .15s, background .15s;
+}
+.support-search-input:focus {
+  border-color: var(--ac-primary);
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(var(--ac-primary-rgb, 74,124,64), .12);
+}
+
+/* Type tabs inside sidebar */
+.support-type-tabs {
+  display: flex;
+  gap: 4px;
+}
+.support-tab {
+  flex: 1;
+  padding: 4px 0;
+  border: 1px solid var(--ac-border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: .75rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ac-text-muted);
+  transition: background .15s, color .15s, border-color .15s;
+  text-align: center;
+}
+.support-tab:hover { background: var(--ac-bg); color: var(--ac-text); }
+.support-tab.active { background: var(--ac-primary); color: #fff; border-color: var(--ac-primary); }
+
+/* Status tabs — horizontal equal-width row */
+.support-status-tabs {
+  display: flex;
+  gap: 3px;
+}
+.support-status-pill {
+  flex: 1;
+  padding: 5px 2px;
+  border: 1px solid var(--ac-border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: .68rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ac-text-muted);
+  transition: background .15s, color .15s, border-color .15s;
+  white-space: nowrap;
+  text-align: center;
+}
+.support-status-pill:hover { background: var(--ac-bg); color: var(--ac-text); }
+.support-status-pill.active { background: var(--ac-primary); color: #fff; border-color: var(--ac-primary); }
 
 /* Conversation list (chat.js populates) */
 .conversation-list {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 /* Injected by chat.js — basic styling for chat items */
 .conversation-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   cursor: pointer;
   border-bottom: 1px solid var(--ac-border-light);
   transition: background .15s;
+  border-left: 3px solid transparent;
+  min-width: 0;
 }
+.conversation-item[data-type="chat"] { border-left-color: var(--ac-primary); }
+.conversation-item[data-type="ticket"] { border-left-color: #f59e0b; }
 .conversation-item:hover { background: var(--ac-primary-light); }
 .conversation-item.active { background: var(--ac-primary-light); }
+.conversation-name {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--ac-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.conversation-time {
+  font-size: .7rem;
+  color: var(--ac-text-muted);
+  margin-top: 2px;
+}
+
+/* Support Center empty state */
+.support-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  color: var(--ac-text-muted);
+  text-align: center;
+}
+.support-empty-state i { font-size: 2.2rem; opacity: .4; margin-bottom: 10px; }
+.support-empty-state p { font-size: .85rem; font-weight: 600; margin: 0 0 4px; color: var(--ac-text); }
+.support-empty-state span { font-size: .75rem; }
+
+/* Pagination footer */
+.support-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid var(--ac-border-light);
+  flex-shrink: 0;
+  background: #fafcfa;
+}
+.support-page-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--ac-border);
+  border-radius: 6px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ac-text-muted);
+  font-size: .8rem;
+  transition: background .15s, color .15s;
+}
+.support-page-btn:hover:not(:disabled) { background: var(--ac-primary); color: #fff; border-color: var(--ac-primary); }
+.support-page-btn:disabled { opacity: .4; cursor: not-allowed; }
+.support-page-info {
+  font-size: .72rem;
+  color: var(--ac-text-muted);
+  font-weight: 600;
+}
 .conversation-item-avatar {
   width: 36px;
   height: 36px;
@@ -1491,18 +1870,19 @@ body.sidebar-collapsed #main.main {
   margin-top: 1px;
 }
 .conversation-item-unread {
-  background: var(--ac-primary);
+  background: #dc3545;
   color: #fff;
-  font-size: .65rem;
-  font-weight: 700;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
+  font-size: .7rem;
+  font-weight: 600;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 4px;
+  padding: 0 5px;
   flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
 }
 
 /* Chat main panel */
@@ -1513,6 +1893,8 @@ body.sidebar-collapsed #main.main {
   min-width: 0;
   overflow: hidden;
   background: #fff;
+  min-height: 400px;
+  height: 100%;
 }
 
 /* Thread header */
@@ -1529,6 +1911,13 @@ body.sidebar-collapsed #main.main {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.chat-thread-identity > div {
+  min-width: 0;
+  overflow: hidden;
 }
 .chat-thread-avatar {
   width: 36px;
@@ -1542,14 +1931,49 @@ body.sidebar-collapsed #main.main {
   font-size: 1rem;
 }
 .chat-thread-name {
-  font-size: .88rem;
-  font-weight: 600;
+  font-size: .95rem;
+  font-weight: 400;
   color: var(--ac-heading);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.chat-thread-name strong {
+  font-weight: 700;
 }
 .chat-thread-sub {
-  font-size: .74rem;
-  color: var(--ac-text-muted);
-  margin-top: 1px;
+  font-size: .82rem;
+  color: var(--ac-text);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+.chat-thread-ticket-number {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--ac-primary);
+  background: var(--ac-primary-light);
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+.chat-system-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  background: #d1e7dd;
+  color: #0f5132;
+  border-radius: 8px;
+  font-size: .85rem;
+  font-weight: 500;
+}
+.chat-system-message i {
+  font-size: 1rem;
 }
 
 /* Messages feed */
@@ -1561,6 +1985,7 @@ body.sidebar-collapsed #main.main {
   flex-direction: column;
   gap: 12px;
   background: #f9fbf9;
+  min-height: 0;
 }
 
 /* Timestamp separator */
@@ -1748,7 +2173,7 @@ body.sidebar-collapsed #main.main {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,.45);
-  z-index: 1080;
+  z-index: 2000;
   align-items: center;
   justify-content: center;
   padding: 16px;
@@ -2148,8 +2573,8 @@ body.sidebar-collapsed #main.main {
   .admin-detail-panel { width: 100%; }
 
   /* Chat section full height */
-  .chat-section-mode { height: calc(100vh - 140px) !important; }
-  #chat.admin-section-card.active { height: calc(100vh - 80px) !important; }
+  .chat-section-mode { max-height: calc(100vh - 140px) !important; }
+  #chat.admin-section-card.active { max-height: calc(100vh - 80px) !important; }
 
   /* Chat sidebar slides on mobile */
   .chat-sidebar-panel { display: none; }
@@ -2358,11 +2783,11 @@ body.sidebar-collapsed #main.main {
 
 /* ─── 34. Section Filter Bar ────────────────────────────────────────── */
 .section-filter-bar {
-  padding: 12px 14px;
+  padding: 8px 10px;
   background: var(--ac-bg);
   border: 1px solid var(--ac-border-light);
-  border-radius: 8px;
-  margin-bottom: 16px;
+  border-radius: 6px;
+  margin-bottom: 12px;
 }
 
 /* ─── 35. NiceAdmin info-card overrides ──────────────────────────────── */
@@ -2501,6 +2926,23 @@ body.sidebar-collapsed #main.main {
 .admin-sortable-wrapper th button.datatable-sorter {
   width: 100%;
   text-align: center;
+}
+
+/* Fix sorter arrow spacing - add padding to table headers */
+.ac-table thead th {
+  padding-right: 28px !important;
+}
+
+/* Adjust sorter arrow position to have more space from text */
+.datatable-sorter::before,
+.datatable-sorter::after {
+  right: 4px !important;
+}
+
+/* Ensure sorter button doesn't let arrow overlap text */
+.admin-sortable-wrapper th button.datatable-sorter {
+  padding-right: 18px;
+  position: relative;
 }
 
 /* Order detail panel rebuit status area */
@@ -2918,11 +3360,11 @@ body.sidebar-collapsed #main.main {
 }
 
 .verification-tabs .tab-btn {
-    padding: 0.5rem 1rem;
+    padding: 0.25rem 0.75rem;
     border: 1px solid var(--ac-border);
-    border-radius: 8px;
+    border-radius: 6px;
     background: #fff;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
     color: var(--ac-text-muted);

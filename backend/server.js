@@ -126,6 +126,7 @@ if (process.env.PERMISSIVE_CORS === 'true') {
 }
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 app.use(cookieParser());
 app.use(session({
   secret: process.env.SESSION_SECRET,
@@ -250,7 +251,7 @@ app.use(checkMaintenanceMode);
         await safeQuery('users.role backfill', "UPDATE users SET role = user_type WHERE (role IS NULL OR role = '') AND user_type IS NOT NULL");
       }
       await safeQuery('users.role default', "UPDATE users SET role = 'customer' WHERE role IS NULL OR role = ''");
-      await safeQuery('users.role rename admin->staff', "UPDATE users SET role = 'staff' WHERE role = 'admin'");
+      await safeQuery('users.role rename staff->admin', "UPDATE users SET role = 'admin' WHERE role = 'staff'");
       await safeQuery(
         'users.username backfill',
         "UPDATE users SET username = CONCAT(regexp_replace(split_part(email,'@',1),'[^a-zA-Z0-9_]', '_', 'g'), '_', id) WHERE username IS NULL OR username = ''"
@@ -784,6 +785,7 @@ try {
   sendIngest({location:'server.js:51',message:'Products route loaded successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion
 } catch (error) {
+  console.error('❌ Products route failed to load:', error);
   // #region agent log
   sendIngest({location:'server.js:51',message:'Products route failed to load',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
   // #endregion
