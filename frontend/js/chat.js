@@ -35,6 +35,7 @@ class ChatUI {
 
     async init() {
         this.configureBackButton();
+        this.configureCustomerBackButton();
         this.setupTicketDetailModal();
         await this.loadConversations();
         const openedDeepLink = this.handleDeepLink();
@@ -55,6 +56,16 @@ class ChatUI {
             backBtn.setAttribute('href', decodeURIComponent(returnUrl));
         } else {
             backBtn.setAttribute('href', '/#products');
+        }
+    }
+
+    configureCustomerBackButton() {
+        const backBtn = document.querySelector('header a[href="/customer-account.html"]');
+        if (!backBtn) return;
+        const params = new URLSearchParams(window.location.search);
+        const returnUrl = params.get('returnUrl');
+        if (returnUrl) {
+            backBtn.setAttribute('href', decodeURIComponent(returnUrl));
         }
     }
 

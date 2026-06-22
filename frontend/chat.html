@@ -123,5 +123,14 @@
 
     <!-- Scripts -->
     <script src="/js/chat.js"></script>
+    <script>
+        // Hide loading screen when page is fully loaded
+        window.addEventListener('load', function() {
+            const loadingScreen = document.getElementById('admin-loading-screen');
+            if (loadingScreen) {
+                loadingScreen.style.display = 'none';
+            }
+        });
+    </script>
 </body>
 </html>
