@@ -3,87 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat - AgriCatch</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <title>Messages — AgriCatch</title>
+
+    <!-- Google Fonts (match farmer.html exactly) -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+
+    <!-- NiceAdmin base template CSS -->
+    <link rel="stylesheet" href="/css/nicemain.css">
+    <link rel="stylesheet" href="/vendor/simple-datatables/style.css">
+    <!-- AgriCatch SaaS overrides — loaded LAST -->
+    <link rel="stylesheet" href="/css/agricatch-admin.css?v=chat-rebuild-20260622">
 </head>
 <body>
-    <header class="header">
-        <div class="container">
-            <div class="header-content">
-                <div class="logo">
-                    <div class="logo-and-title">
-                        <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
-                        <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
-                    </div>
-                    <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
-                </div>
-                <div class="header-actions">
-                    <a href="/#products" id="back-to-shop-btn" class="btn btn-secondary">Back</a>
-                </div>
+    <!-- Loading Screen -->
+    <div id="admin-loading-screen" class="admin-loading-screen">
+        <div class="loading-content">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
+            <p class="loading-text">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Mobile sidebar overlay -->
+    <div id="sidebar-overlay"></div>
+
+    <!-- Header -->
+    <header id="header" class="header fixed-top d-flex align-items-center">
+        <div class="d-flex align-items-center justify-content-between w-100 px-3">
+            <a href="/" class="logo d-flex align-items-center" style="gap:4px;">
+                <img src="/images/logo.png" alt="AgriCatch">
+                <span>AgriCatch</span>
+            </a>
+            <a href="/customer-account.html" class="btn btn-sm btn-secondary">Back to Account</a>
         </div>
     </header>
 
-    <main class="chat-page">
-        <div class="container">
-            <h2 class="chat-page-title">Chat with Farmers</h2>
-            <div class="chat-layout">
-                <div class="conversation-sidebar">
-                    <div class="conversation-sidebar-header">
-                        <h3>Conversations</h3>
+    <!-- Main Content -->
+    <main id="main" class="main admin-main">
+        <div class="pagetitle">
+            <nav>
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">Home</li>
+                    <li class="breadcrumb-item active">Messages</li>
+                </ol>
+            </nav>
+        </div>
+
+        <!-- CHAT / MESSAGES SECTION -->
+        <section id="chat" class="admin-section-card">
+            <div class="ac-section-hero ac-section-hero--primary mb-4">
+                <div class="ac-section-hero__icon"><i class="bi bi-chat-dots"></i></div>
+                <div class="ac-section-hero__body">
+                    <h4 class="ac-section-hero__title">Messages</h4>
+                    <p class="ac-section-hero__sub">Chat with farmers about products and orders.</p>
+                </div>
+            </div>
+
+            <div id="admin-chat-drawer" class="admin-chat-drawer chat-section-mode">
+                <div class="chat-sidebar-panel">
+                    <div class="chat-sidebar-header">
+                        <h3 class="chat-sidebar-title">
+                            <i class="bi bi-chat-dots"></i>
+                            Conversations
+                        </h3>
                     </div>
                     <div id="conversation-list" class="conversation-list"></div>
+                    <div id="chat-empty-state" class="text-center py-5" style="display:none">
+                        <i class="bi bi-chat-dots text-muted" style="font-size: 3rem;"></i>
+                        <p class="text-muted mt-3">No conversations yet</p>
+                        <p class="text-muted small">Messages from farmers will appear here</p>
+                    </div>
                 </div>
-                <div class="chat-window">
-                    <div id="chat-header" class="chat-header">
-                        <div class="chat-header-info">
-                            <div class="chat-header-title" id="chat-header-title">Select a conversation</div>
-                            <div class="chat-header-subtitle" id="chat-header-subtitle"></div>
+
+                <div class="chat-main-panel">
+                    <div id="chat-header" class="chat-thread-header">
+                        <div class="chat-thread-identity">
+                            <div class="chat-thread-avatar">
+                                <i class="bi bi-person"></i>
+                            </div>
+                            <div>
+                                <div id="chat-header-title" class="chat-thread-name">
+                                    Select a conversation
+                                </div>
+                                <div id="chat-header-subtitle" class="chat-thread-sub"></div>
+                            </div>
                         </div>
                     </div>
-                    <div id="chat-messages" class="chat-messages"></div>
-                    <form id="chat-form" class="chat-form" style="position:relative;">
-                        <input type="text" id="chat-input" placeholder="Type a message..." maxlength="500" required style="padding-right:40px;flex:1;">
-                        <span id="chat-char-counter" style="position:absolute;right:80px;top:50%;transform:translateY(-50%);font-size:0.7rem;color:#9ca3af;pointer-events:none;">500</span>
-                        <button type="submit" class="btn btn-primary btn-small">Send</button>
+
+                    <div id="chat-messages" class="chat-messages-feed"></div>
+
+                    <form id="chat-form" class="chat-compose-bar">
+                        <div class="chat-input-wrap" style="flex:1;position:relative;">
+                            <input id="chat-input"
+                                   class="chat-compose-input"
+                                   type="text"
+                                   placeholder="Type a message…"
+                                   autocomplete="off"
+                                   maxlength="500"
+                                   required>
+                            <span id="chat-char-counter" class="char-counter">500</span>
+                        </div>
+                        <button type="submit" class="btn btn-primary chat-send-btn">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
                     </form>
                 </div>
             </div>
-        </div>
+        </section>
     </main>
 
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h3>AgriCatch</h3>
-                    <p>Freshly Harvested! Pre-ordered for you! Your trusted source for fresh farm products.</p>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2024 AgriCatch. All rights reserved.</p>
-            </div>
-        </div>
-    </footer>
-
+    <!-- Scripts -->
     <script src="/js/chat.js"></script>
-    <script>
-        // Mobile chat sidebar toggle
-        const conversationSidebar = document.querySelector('.conversation-sidebar');
-        if (conversationSidebar && window.innerWidth <= 768) {
-            const chatToggle = document.createElement('button');
-            chatToggle.className = 'btn btn-primary btn-small';
-            chatToggle.innerHTML = '<i class="fas fa-comments"></i> Conversations';
-            chatToggle.style.marginBottom = '1rem';
-            chatToggle.addEventListener('click', () => {
-                conversationSidebar.classList.toggle('open');
-            });
-            const chatPageTitle = document.querySelector('.chat-page-title');
-            if (chatPageTitle) {
-                chatPageTitle.parentNode.insertBefore(chatToggle, chatPageTitle.nextSibling);
-            }
-        }
-    </script>
 </body>
 </html>

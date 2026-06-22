@@ -487,8 +487,10 @@ class FarmerDashboard {
         this._topProductsPeriod = 'month';
         // Load saved periods from localStorage
         this._loadPeriods();
-        // Force reset to 'month' for verified users to ensure correct default
-        if (this.isVerified()) {
+        // Force reset to 'month' for verified users only if no saved periods exist (first-time load)
+        // This allows premium users to keep their saved "all time" preference
+        const hasSavedPeriods = localStorage.getItem('farmerDashboardPeriods');
+        if (this.isVerified() && !hasSavedPeriods) {
             this._kpiPeriods = { 'kpi-products': 'all', 'kpi-orders': 'month', 'kpi-sold': 'month', 'kpi-revenue': 'month' };
             this._reportPeriod = 'month';
             this._statusPeriod = 'month';
@@ -1124,9 +1126,9 @@ class FarmerDashboard {
                 this.loadMyProducts();
                 this.loadMyOrders();
                 this.loadShopProfile();
+                await this.loadSubscription();
                 this.loadOverviewMetrics({ force: true });
                 this.loadAnnouncements();
-                this.loadSubscription();
                 this.loadSupportTicketsBadge();
             } else {
                 // Never bounce farmer users to home on transient backend errors (causes redirect loop).
@@ -1821,12 +1823,6 @@ class FarmerDashboard {
         document.getElementById('product-status-filter')?.addEventListener('change', () => this.filterProducts());
         document.getElementById('products-search-btn')?.addEventListener('click', () => this.filterProducts());
         document.getElementById('products-refresh-btn')?.addEventListener('click', () => this.loadMyProducts());
-        
-        // Optional refresh buttons (check if they exist)
-        const refreshOrdersBtn = document.getElementById('refresh-orders-btn');
-        if (refreshOrdersBtn) {
-            refreshOrdersBtn.addEventListener('click', () => this.loadMyOrders());
-        }
         
         const cancelEditBtn = document.getElementById('cancel-edit-btn');
         if (cancelEditBtn) {
@@ -2576,6 +2572,19 @@ class FarmerDashboard {
     }
 
     setupSidebarNavigation() {
+        // Prevent hash from appearing in URL - clear any hash immediately
+        const clearHash = () => {
+            if (window.location.hash) {
+                window.history.replaceState({}, '', window.location.pathname + window.location.search);
+            }
+        };
+
+        // Clear hash on page load
+        clearHash();
+
+        // Clear hash on hashchange
+        window.addEventListener('hashchange', clearHash);
+
         const links = document.querySelectorAll('.admin-sidebar .sidebar-link[data-section]');
         links.forEach(link => {
             link.addEventListener('click', (e) => {
@@ -2584,6 +2593,10 @@ class FarmerDashboard {
                 if (!section) return;
                 this.showSection(section);
                 document.body.classList.remove('toggle-sidebar');
+                // Clear hash immediately
+                if (window.location.hash) {
+                    window.history.replaceState({}, '', window.location.pathname + window.location.search);
+                }
             });
         });
 
@@ -2598,6 +2611,11 @@ class FarmerDashboard {
             : (validSections.has(hash) ? hash : 'overview');
 
         this.showSection(initialSection);
+
+        // Clear hash from URL after using it for initial section
+        if (window.location.hash) {
+            window.history.replaceState({}, '', window.location.pathname + window.location.search);
+        }
 
         // Load profile data immediately if profile section is active
         if (initialSection === 'profile') {
@@ -2707,7 +2725,7 @@ class FarmerDashboard {
         return true;
     }
 
-    showSection(section, tab = null) {
+    async showSection(section, tab = null) {
         const validSections = new Set(['overview', 'products', 'orders', 'chat', 'shop', 'reviews', 'profile', 'notifications', 'subscription', 'support-tickets', 'support-ticket-chat']);
         const normalized = String(section || '').trim();
         const safeSection = validSections.has(normalized) ? normalized : 'overview';
@@ -2720,6 +2738,13 @@ class FarmerDashboard {
         this.activeSection = safeSection;
         // Save current section to localStorage
         localStorage.setItem('farmerActiveSection', safeSection);
+
+        // Clear hash from URL when navigating - use setTimeout to ensure it runs after all event handlers
+        setTimeout(() => {
+            if (window.location.hash) {
+                window.history.replaceState({}, '', window.location.pathname + window.location.search);
+            }
+        }, 0);
 
         document.querySelectorAll('.admin-sidebar .sidebar-link[data-section]').forEach(a => {
             a.classList.toggle('active', a.getAttribute('data-section') === safeSection);
@@ -2798,8 +2823,14 @@ class FarmerDashboard {
         } else if (safeSection === 'subscription') {
             this.loadSubscription();
         } else if (safeSection === 'overview') {
-            // Clear KPI values to N/A immediately to prevent visual flash for unverified farmers
-            this.clearKpiValues();
+            // Ensure subscription data is loaded before checking premium status
+            if (!this.subscriptionData) {
+                await this.loadSubscription();
+            }
+            // Clear KPI values to N/A immediately only for unverified farmers to prevent visual flash
+            if (!this.isVerified()) {
+                this.clearKpiValues();
+            }
             this.loadOverviewMetrics();
         }
 
@@ -2984,6 +3015,13 @@ class FarmerDashboard {
                     dropdownChatBadge.textContent = this.fmtNumber(unread);
                     dropdownChatBadge.style.display = Number(unread) > 0 ? 'inline-block' : 'none';
                 }
+
+                // Also update topbar chat badge
+                const topbarChatBadge = document.getElementById('chat-topbar-badge');
+                if (topbarChatBadge) {
+                    topbarChatBadge.textContent = this.fmtNumber(unread);
+                    topbarChatBadge.style.display = Number(unread) > 0 ? 'inline-block' : 'none';
+                }
             }
 
         } catch (error) {
@@ -3147,6 +3185,22 @@ class FarmerDashboard {
                 if (peFirstname) peFirstname.value = user.first_name || '';
                 if (peMiddlename) peMiddlename.value = user.middle_name || '';
                 if (peLastname) peLastname.value = user.last_name || '';
+
+                // Disable name fields if verified
+                const isVerified = this.currentVerificationRequest?.status === 'approved' || user.is_verified === true;
+                const nameInputs = [peFirstname, peMiddlename, peLastname];
+                const verifiedHint = document.getElementById('pe-name-verified-hint');
+
+                nameInputs.forEach(el => {
+                    if (el) {
+                        el.disabled = isVerified;
+                    }
+                });
+
+                if (verifiedHint) {
+                    verifiedHint.style.display = isVerified ? 'block' : 'none';
+                }
+
                 if (pePhone) {
                     // Format phone with spaces (9XX XXX XXXX)
                     const phoneDigits = String(user.phone || '').replace(/\D/g, '');
@@ -3611,6 +3665,15 @@ class FarmerDashboard {
         if (!firstname || !lastname) {
             this.showMessage('First name and last name are required', 'error');
             return;
+        }
+        if (firstname.length > 40) {
+            this.showMessage('First name must be 40 characters or less', 'error'); return;
+        }
+        if (middlename.length > 40) {
+            this.showMessage('Middle name must be 40 characters or less', 'error'); return;
+        }
+        if (lastname.length > 40) {
+            this.showMessage('Last name must be 40 characters or less', 'error'); return;
         }
 
         // Validate phone format (remove spaces for validation)
@@ -4205,13 +4268,26 @@ class FarmerDashboard {
                 this.showMessage('First name and last name are required.', 'error');
                 return;
             }
+            if (firstName.length > 40) {
+                this.showMessage('First name must be 40 characters or less.', 'error'); return;
+            }
+            if (middleName.length > 40) {
+                this.showMessage('Middle name must be 40 characters or less.', 'error'); return;
+            }
+            if (lastName.length > 40) {
+                this.showMessage('Last name must be 40 characters or less.', 'error'); return;
+            }
             payload.first_name = firstName;
             payload.middle_name = middleName || null;
             payload.last_name = lastName;
         }
-        
+
         if (shopNameInput && shopNameInput.value.trim()) {
-            payload.shop_name = shopNameInput.value.trim();
+            const shopName = shopNameInput.value.trim();
+            if (shopName.length > 40) {
+                this.showMessage('Shop name must be 40 characters or less.', 'error'); return;
+            }
+            payload.shop_name = shopName;
         }
         
         if (composedAddress) {
@@ -4421,7 +4497,7 @@ class FarmerDashboard {
             if (!document.getElementById('reportsChart')) return;
 
             // Check if user has premium subscription for advanced analytics access
-            const hasPremium = this.currentSubscription && this.currentSubscription.status === 'active';
+            const hasPremium = this.subscriptionData && this.subscriptionData.status === 'active';
 
             // Show analytics access warning for non-premium farmers
             const analyticsWarningEl = document.getElementById('analytics-access-warning');
@@ -4483,7 +4559,12 @@ class FarmerDashboard {
                 .then((metrics) => {
                     if (!metrics) return;
                     this.overviewMetrics = metrics;
-                    this.renderOverview(metrics);
+                    // Use basic metrics view for non-premium users
+                    if (isNonPremium) {
+                        this.renderBasicMetricsOnly();
+                    } else {
+                        this.renderOverview(metrics);
+                    }
                 })
                 .catch((err) => {
                     const el = document.getElementById('overview-last-updated');
@@ -4508,17 +4589,7 @@ class FarmerDashboard {
         // Hide/show metrics sections based on verification status
         const isVerified = this.isVerified();
         const isPremium = this.isPremium();
-        
-        // Reset periods to 'month' for verified users if they're not already set correctly
-        // This handles the case where localStorage overrides happened before verification data loaded
-        if (isVerified && this._reportPeriod !== 'month') {
-            this._kpiPeriods = { 'kpi-products': 'all', 'kpi-orders': 'month', 'kpi-sold': 'month', 'kpi-revenue': 'month' };
-            this._reportPeriod = 'month';
-            this._statusPeriod = 'month';
-            this._recentOrdersPeriod = 'month';
-            this._topProductsPeriod = 'month';
-            this._savePeriods();
-        }
+
         const metricsCards = ['my-products-card', 'total-orders-card', 'items-sold-card', 'total-revenue-card', 'recent-orders-card', 'top-products-card'];
         metricsCards.forEach(cardId => {
             const card = document.getElementById(cardId);
@@ -4681,6 +4752,9 @@ class FarmerDashboard {
         // Check if farmer is verified (verified users can see metrics)
         const isVerified = this.isVerified();
 
+        // Calculate status counts once for use across multiple KPI cards
+        const statusCounts = this.getOverviewStatusCounts(metrics);
+
         // For orders, sold, revenue — derive from the metrics data.
         // Since /farmers/me/metrics returns data for a single period,
         // all KPIs share the same data. If period differs from _reportPeriod,
@@ -4698,7 +4772,6 @@ class FarmerDashboard {
                 }
                 return;
             }
-            const statusCounts = this.getOverviewStatusCounts(metrics);
             const totalOrders = Object.values(statusCounts).reduce((sum, v) => sum + Number(v || 0), 0);
             if (el) el.textContent = this.fmtNumber(totalOrders);
             this.updateKpiChange('total-orders-change', 'total-orders-change-label', metrics?.ordersChange, period);
@@ -5149,6 +5222,7 @@ class FarmerDashboard {
         tbody.innerHTML = pageItems.map(o => {
             const statusLabel = this.formatStatusLabel(o.status);
             const customerName = o.customer_name || 'Customer';
+            const customerVerified = o.customer_is_verified === true;
             const productImage = o.product_image || '/images/placeholder-product.jpg';
             const price = this.fmtCurrency(o.price || 0);
             const sold = o.quantity || 1;
@@ -5156,7 +5230,7 @@ class FarmerDashboard {
             return `
             <tr>
                 <td class="text-center"><img src="${this.escapeHtml(productImage)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;"></td>
-                <td class="small">${this.escapeHtml(customerName)}</td>
+                <td class="small">${this.escapeHtml(customerName)}${customerVerified ? ' <i class="bi bi-check-circle-fill text-success" style="font-size:0.75rem;margin-left:4px;" title="Verified Customer"></i>' : ''}</td>
                 <td class="small">
                     <div>${this.escapeHtml(o.product_name || '—')}</div>
                     <div class="text-muted" style="font-size:0.7rem">#${o.id}</div>
@@ -5591,10 +5665,11 @@ class FarmerDashboard {
                             const customerName = r.first_name
                                 ? `${r.first_name} ${r.last_name || ''}`.trim()
                                 : (r.customer_name || 'Anonymous');
+                            const customerVerified = r.customer_is_verified === true;
                             const date = r.created_at ? new Date(r.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';
                             return `
                                 <tr>
-                                    <td>${this.escapeHtml(customerName)}</td>
+                                    <td>${this.escapeHtml(customerName)}${customerVerified ? ' <i class="bi bi-check-circle-fill text-primary" style="font-size:0.75rem;margin-left:4px;" title="Verified Customer"></i>' : ''}</td>
                                     <td>${this.escapeHtml(r.product_name || '—')}</td>
                                     <td style="white-space:nowrap;">${starsHtml} (${r.rating})</td>
                                     <td style="max-width:260px;">${this.escapeHtml(r.comment || '—')}</td>
@@ -5684,7 +5759,11 @@ class FarmerDashboard {
                         <div><strong>Expected Harvest Date:</strong> ${this.escapeHtml(harvestDate)}</div>
                         <div><strong>Best Before:</strong> ${this.escapeHtml(expiryDate)}</div>
                         <div><strong>Reviews:</strong> ${reviewCount} (${avgRating}★)</div>
-                        <div><strong>Location:</strong> ${this.escapeHtml(product.location || 'Not specified')}</div>
+                        <div><strong>Location:</strong> ${this.escapeHtml(
+                            product.province 
+                                ? (product.city ? `${product.city}, ${product.province}` : product.province)
+                                : product.location || 'Not specified'
+                        )}</div>
                         <div><strong>Description:</strong> ${this.escapeHtml(product.description || 'No description provided.')}</div>
                     </div>
                     <div class="product-preview-actions" style="display:flex;gap:0.55rem;flex-wrap:wrap;margin-top:1rem;">
@@ -6319,15 +6398,15 @@ class FarmerDashboard {
                 <div class="form-row">
                     <div class="form-group">
                         <label for="account-first-name">First Name</label>
-                        <input type="text" id="account-first-name" class="editable-field" value="${this.escapeAttr(personalName.firstName)}" placeholder="First name">
+                        <input type="text" id="account-first-name" class="editable-field" value="${this.escapeAttr(personalName.firstName)}" placeholder="First name" maxlength="40">
                     </div>
                     <div class="form-group">
                         <label for="account-middle-name">Middle Name</label>
-                        <input type="text" id="account-middle-name" class="editable-field" value="${this.escapeAttr(personalName.middleName)}" placeholder="Optional">
+                        <input type="text" id="account-middle-name" class="editable-field" value="${this.escapeAttr(personalName.middleName)}" placeholder="Optional" maxlength="40">
                     </div>
                     <div class="form-group">
                         <label for="account-last-name">Last Name</label>
-                        <input type="text" id="account-last-name" class="editable-field" value="${this.escapeAttr(personalName.lastName)}" placeholder="Last name">
+                        <input type="text" id="account-last-name" class="editable-field" value="${this.escapeAttr(personalName.lastName)}" placeholder="Last name" maxlength="40">
                     </div>
                 </div>
             </div>
@@ -6337,7 +6416,7 @@ class FarmerDashboard {
                 <form id="account-shop-form" class="product-form">
                     <div class="form-group">
                         <label for="shop-name-input">Farm Name</label>
-                        <input type="text" id="shop-name-input" class="editable-field" value="${this.escapeAttr(name)}" placeholder="My Farm Shop">
+                        <input type="text" id="shop-name-input" class="editable-field" value="${this.escapeAttr(name)}" placeholder="My Farm Shop" maxlength="40">
                     </div>
                     <div class="form-group">
                         <label for="shop-zone-input"><i class="fas fa-location-dot"></i> Farm Location — Zone</label>
@@ -6876,6 +6955,7 @@ class FarmerDashboard {
             const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : 'Not specified';
             const specialInstructions = String(order.special_instructions || '').trim();
             const customerName = String(order.customer_name || '—').trim();
+            const customerVerified = order.customer_is_verified === true;
             const customerRating = Number(order.customer_average_rating || 0);
             const customerTotalRatings = Number(order.customer_total_ratings || 0);
             const searchText = `${String(orderId)} ${productName} ${customerName}`.toLowerCase();
@@ -6884,7 +6964,7 @@ class FarmerDashboard {
                 : '—';
             
             return `
-            <div class="order-card" data-order-id="${orderId}" style="cursor:pointer;">
+            <div class="order-card" data-order-id="${orderId}" data-search-text="${this.escapeAttr(searchText)}" style="cursor:pointer;">
                 <div class="order-card-header">
                     <div>
                         <div class="order-card-id">#${orderId}</div>
@@ -6899,7 +6979,7 @@ class FarmerDashboard {
                     <div class="order-card-product-qty">Qty: ${quantity}</div>
                 </div>
                 <div class="order-card-customer">
-                    <div class="order-card-customer-name">${this.escapeHtml(customerName)}</div>
+                    <div class="order-card-customer-name">${this.escapeHtml(customerName)}${customerVerified ? ' <i class="bi bi-check-circle-fill text-primary" style="font-size:0.75rem;margin-left:4px;" title="Verified Customer"></i>' : ''}</div>
                     <div class="order-card-customer-location">${this.escapeHtml(deliveryAddress || '—')}</div>
                 </div>
                 <div class="order-card-pricing">
@@ -6968,7 +7048,7 @@ class FarmerDashboard {
                     <table class="table table-sm table-borderless">
                         <tr>
                             <td class="text-muted pe-2" style="white-space:nowrap">Name:</td>
-                            <td>${this.escapeHtml(customerName)}</td>
+                            <td>${this.escapeHtml(customerName)}${customerVerified ? ' <i class="bi bi-check-circle-fill text-primary" style="font-size:0.75rem;margin-left:4px;" title="Verified Customer"></i>' : ''}</td>
                         </tr>
                         <tr>
                             <td class="text-muted pe-2" style="white-space:nowrap">Email:</td>
@@ -7063,7 +7143,7 @@ class FarmerDashboard {
 
         if (!q) {
             // reset simple visibility for common lists
-            document.querySelectorAll('.orders-list .order-card').forEach(el => (el.style.display = ''));
+            document.querySelectorAll('#orders-grid .order-card').forEach(el => (el.style.display = ''));
             document.querySelectorAll('#conversation-list .conversation-item').forEach(el => (el.style.display = ''));
             document.querySelectorAll('#overview .overview-row').forEach(el => (el.style.display = ''));
             this.updateOrdersSearchEmptyState();
@@ -7071,7 +7151,7 @@ class FarmerDashboard {
         }
 
         if (this.activeSection === 'orders') {
-            document.querySelectorAll('.orders-list .order-card').forEach(card => {
+            document.querySelectorAll('#orders-grid .order-card').forEach(card => {
                 const text = (card.textContent || '').toLowerCase();
                 card.style.display = text.includes(q) ? '' : 'none';
             });
@@ -7091,7 +7171,7 @@ class FarmerDashboard {
 
     applyOrdersSearch() {
         const q = (document.getElementById('orders-search-input')?.value || '').trim().toLowerCase();
-        const cards = document.querySelectorAll('.orders-list .order-card');
+        const cards = document.querySelectorAll('#orders-grid .order-card');
 
         cards.forEach((card) => {
             if (!q) {
@@ -7117,7 +7197,7 @@ class FarmerDashboard {
 
         const cards = activeSection.querySelectorAll('.order-card');
         const q = (document.getElementById('orders-search-input')?.value || '').trim().toLowerCase();
-        const allCards = document.querySelectorAll('.orders-list .order-card');
+        const allCards = document.querySelectorAll('#orders-grid .order-card');
         if (!cards.length) {
             emptyEl.style.display = 'none';
             return;
@@ -7571,19 +7651,19 @@ class FarmerDashboard {
         if (this.authProfile?.is_disabled) {
             bannerEl.style.display = '';
             bannerEl.style.cssText += ';background:#fee2e2;color:#7f1d1d;border:1px solid #fecaca;';
-            bannerEl.innerHTML = '<i class="fas fa-ban"></i> Your account has been disabled. Please contact support.';
+            bannerEl.innerHTML = '<i class="fas fa-ban"></i> Your account has been disabled. Please contact support. <button onclick="this.parentElement.style.display=\'none\'" style="margin-left:auto;padding:4px 8px;background:transparent;color:inherit;border:none;border-radius:4px;cursor:pointer;font-size:16px;font-weight:bold;">✕</button>';
         } else if (!this.currentVerificationRequest || this.currentVerificationRequest.status === 'unverified') {
             bannerEl.style.display = '';
             bannerEl.style.cssText += ';background:#fef9c3;color:#713f12;border:1px solid #fde047;';
-            bannerEl.innerHTML = '<i class="fas fa-info-circle"></i> Your account is unverified. Submit a verification request to unlock unlimited products (up to 10 products without verification). <button onclick="farmerDashboard.openVerificationSection()" style="margin-left:10px;padding:6px 12px;background:#2d7a3a;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Verify Now</button>';
+            bannerEl.innerHTML = '<i class="fas fa-info-circle"></i> Your account is unverified. Submit a verification request to unlock unlimited products (up to 10 products without verification). <button onclick="farmerDashboard.openVerificationSection()" style="margin-left:10px;padding:6px 12px;background:#2d7a3a;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Verify Now</button> <button onclick="this.parentElement.style.display=\'none\'" style="margin-left:auto;padding:4px 8px;background:transparent;color:inherit;border:none;border-radius:4px;cursor:pointer;font-size:16px;font-weight:bold;">✕</button>';
         } else if (this.currentVerificationRequest.status === 'pending') {
             bannerEl.style.display = '';
             bannerEl.style.cssText += ';background:#fef9c3;color:#713f12;border:1px solid #fde047;';
-            bannerEl.innerHTML = '<i class="fas fa-clock"></i> Verification Request Pending - Your request is under review.';
+            bannerEl.innerHTML = '<i class="fas fa-clock"></i> Verification Request Pending - Your request is under review. <button onclick="this.parentElement.style.display=\'none\'" style="margin-left:auto;padding:4px 8px;background:transparent;color:inherit;border:none;border-radius:4px;cursor:pointer;font-size:16px;font-weight:bold;">✕</button>';
         } else if (this.currentVerificationRequest.status === 'rejected') {
             bannerEl.style.display = '';
             bannerEl.style.cssText += ';background:#fee2e2;color:#7f1d1d;border:1px solid #fecaca;';
-            bannerEl.innerHTML = '<i class="fas fa-times-circle"></i> Verification Request Rejected. Submit new request after addressing feedback.';
+            bannerEl.innerHTML = '<i class="fas fa-times-circle"></i> Verification Request Rejected. Submit new request after addressing feedback. <button onclick="farmerDashboard.openVerificationSection()" style="margin-left:10px;padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Resubmit Request</button> <button onclick="this.parentElement.style.display=\'none\'" style="margin-left:auto;padding:4px 8px;background:transparent;color:inherit;border:none;border-radius:4px;cursor:pointer;font-size:16px;font-weight:bold;">✕</button>';
         } else {
             bannerEl.style.display = 'none';
         }
@@ -7593,6 +7673,22 @@ class FarmerDashboard {
         const btn = document.getElementById('verification-request-btn');
         const menuText = document.getElementById('verification-menu-text');
         const icon = btn?.querySelector('i');
+
+        // Update name field states based on verification status
+        const isVerified = this.currentVerificationRequest?.status === 'approved' || this.authProfile?.is_verified === true;
+        const nameInputs = ['pe-firstname', 'pe-middlename', 'pe-lastname'];
+        const verifiedHint = document.getElementById('pe-name-verified-hint');
+
+        nameInputs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.disabled = isVerified;
+            }
+        });
+
+        if (verifiedHint) {
+            verifiedHint.style.display = isVerified ? 'block' : 'none';
+        }
 
         if (!this.currentVerificationRequest) {
             // No request - show button
@@ -7673,7 +7769,7 @@ class FarmerDashboard {
             const status = this.currentVerificationRequest.status;
             if (status === 'pending') {
                 statusBadge.className = 'alert alert-warning';
-                statusText.textContent = 'Pending Review';
+                statusText.textContent = 'Verification request is pending review.';
                 statusDesc.textContent = 'Your verification request is being reviewed by our team.';
                 benefitsSection.style.display = 'none';
                 formSection.style.display = 'none';
@@ -7681,14 +7777,14 @@ class FarmerDashboard {
                 this.renderStatusDisplay();
             } else if (status === 'rejected') {
                 statusBadge.className = 'alert alert-danger';
-                statusText.textContent = 'Verification Rejected';
+                statusText.textContent = 'Verification request was rejected.';
                 statusDesc.textContent = this.currentVerificationRequest.admin_notes || 'Please resubmit with additional information.';
                 benefitsSection.style.display = 'block';
                 formSection.style.display = 'block';
                 statusSection.style.display = 'none';
             } else if (status === 'approved') {
                 statusBadge.className = 'alert alert-success';
-                statusText.textContent = 'Verified';
+                statusText.textContent = 'Your account is verified.';
                 statusDesc.textContent = 'Your account is verified. Enjoy all benefits!';
                 benefitsSection.style.display = 'none';
                 formSection.style.display = 'none';
@@ -7711,7 +7807,13 @@ class FarmerDashboard {
     renderStatusDisplay() {
         if (!this.currentVerificationRequest) return;
 
-        document.getElementById('display-status').textContent = this.currentVerificationRequest.status;
+        const statusStyles = {
+            pending: { bg: '#fef3c7', color: '#92400e', label: 'Pending' },
+            approved: { bg: '#d1fae5', color: '#065f46', label: 'Approved' },
+            rejected: { bg: '#fee2e2', color: '#991b1b', label: 'Rejected' }
+        };
+        const style = statusStyles[this.currentVerificationRequest.status] || statusStyles.pending;
+        document.getElementById('display-status').innerHTML = `<span style="background:${style.bg};color:${style.color};font-size:0.75rem;font-weight:600;padding:4px 10px;border-radius:9999px;text-transform:uppercase;">${style.label}</span>`;
         document.getElementById('display-submitted-date').textContent = new Date(this.currentVerificationRequest.created_at).toLocaleDateString();
         document.getElementById('display-estimated-time').textContent = '1-2 business days';
 
@@ -7934,13 +8036,12 @@ class FarmerDashboard {
             const data = await response.json();
             const tickets = data.tickets || [];
             const unreadCount = tickets.reduce((sum, ticket) => sum + Number(ticket.unread_count || 0), 0);
+            
+            // Update sidebar badge
             const badge = document.getElementById('support-tickets-dropdown-badge');
             if (badge) {
-                const displayValue = unreadCount > 99 ? '99+' : String(unreadCount);
-                badge.textContent = displayValue;
+                badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
                 badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
-                badge.style.minWidth = 'unset';
-                badge.style.width = 'auto';
             }
         } catch (error) {
             console.error('Load support tickets badge error:', error);
@@ -8036,7 +8137,6 @@ class FarmerDashboard {
     async submitSupportTicket() {
         const subject = document.getElementById('support-ticket-subject').value.trim();
         const description = document.getElementById('support-ticket-description').value.trim();
-        const priority = document.getElementById('support-ticket-priority').value;
 
         if (!subject || !description) {
             this.showMessage('Subject and description are required', 'error');
@@ -8055,7 +8155,7 @@ class FarmerDashboard {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify({ subject, description, priority })
+                body: JSON.stringify({ subject, description })
             });
 
             const data = await response.json();
