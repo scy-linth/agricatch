@@ -25,6 +25,13 @@
 <body>
 <style>
 /* CHAT PAGE — PAGE-SCOPED OVERRIDES (complement agricatch-admin.css) */
+/* No sidebar on chat page — remove the sidebar margin offset */
+#main.main { margin-left: 0 !important; }
+/* Ensure chat section fills the viewport height properly */
+#chat.admin-section-card.active {
+  height: calc(100vh - 60px) !important;
+  max-height: calc(100vh - 60px) !important;
+}
 /* Modal styles for any modals that might be needed */
 .modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(15,23,42,.55); align-items:flex-start; justify-content:center; padding:1.5rem 1rem; overflow-y:auto; }
 .modal.open { display:flex; }
@@ -83,7 +90,7 @@
         </div>
 
         <!-- CHAT / MESSAGES SECTION -->
-        <section id="chat" class="admin-section-card">
+        <section id="chat" class="admin-section-card active">
             <div class="ac-section-hero ac-section-hero--primary mb-4">
                 <div class="ac-section-hero__icon"><i class="bi bi-chat-dots"></i></div>
                 <div class="ac-section-hero__body">
