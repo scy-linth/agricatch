@@ -1328,6 +1328,8 @@ class ChatUI {
             if (subtitleText) {
                 window.__chatContext = { subtitle: subtitleText };
             }
+            // Create conversation if it doesn't exist by sending an initial message
+            this.createConversationIfNotExists(parseInt(farmerIdParam, 10), conversationId, subtitleText);
             this.openConversation(conversationId);
             return true;
         } else if (customerIdParam && this.currentUserId) {
@@ -1340,6 +1342,36 @@ class ChatUI {
             return true;
         }
         return false;
+    }
+
+    async createConversationIfNotExists(farmerId, conversationId, contextText = '') {
+        try {
+            // Check if conversation already exists
+            const response = await fetch(`${this.apiBase}/messages/conversation/${conversationId}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                // Conversation exists, no need to create
+                return;
+            }
+
+            // Conversation doesn't exist, create it with an initial message
+            const initialMessage = contextText ? `I'm interested in: ${contextText}` : 'Hello, I would like to inquire about your products.';
+            await fetch(`${this.apiBase}/messages/send`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    receiver_id: farmerId,
+                    message: initialMessage
+                })
+            });
+        } catch (error) {
+            console.error('Create conversation error:', error);
+        }
     }
 
     ensureConversationMeta(conversationId, otherId, otherName = 'User') {
