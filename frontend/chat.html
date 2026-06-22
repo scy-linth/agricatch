@@ -58,6 +58,26 @@
   min-width: 0;
   overflow: hidden;
 }
+/* Chat character counter (must match farmer.html exactly) */
+.char-counter {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  color: #9ca3af;
+  pointer-events: none;
+  user-select: none;
+}
+.char-counter-warning {
+  color: #dc2626;
+  font-weight: 600;
+}
+#chat .chat-input-wrap .chat-compose-input {
+  padding-right: 40px;
+  width: 100%;
+  box-sizing: border-box;
+}
 /* Modal styles for any modals that might be needed */
 .modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(15,23,42,.55); align-items:flex-start; justify-content:center; padding:1.5rem 1rem; overflow-y:auto; }
 .modal.open { display:flex; }
