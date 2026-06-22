@@ -778,6 +778,12 @@ class ChatUI {
         // Load ticket messages
         await this.loadTicketMessages(ticketId);
 
+        // Refresh badge after opening ticket (messages marked as read by backend)
+        const isAdminPage = document.getElementById('admin-sidebar-toggle') !== null;
+        if (isAdminPage && typeof adminDashboard !== 'undefined' && adminDashboard.loadSupportTicketsBadge) {
+            adminDashboard.loadSupportTicketsBadge();
+        }
+
         // Don't auto-scroll on open to avoid page scroll issues
         // User can manually scroll if needed
 
@@ -787,17 +793,17 @@ class ChatUI {
         }
         this.pollInterval = setInterval(() => {
             if (this.currentConversation === ticketId && this.currentItemType === 'ticket') {
-                this.loadTicketMessages(ticketId, false);
+                this.loadTicketMessages(ticketId, false, false);
             }
         }, 3000);
     }
 
-    async loadTicketMessages(ticketId, forceScroll = false) {
+    async loadTicketMessages(ticketId, forceScroll = false, markRead = true) {
         if (!ticketId) return;
 
         try {
             // First get total count to calculate last page
-            const url = `${this.apiBase}/support-tickets/${ticketId}/messages?page=1&limit=1`;
+            const url = `${this.apiBase}/support-tickets/${ticketId}/messages?page=1&limit=1&mark_read=${markRead}`;
             const response = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
@@ -812,7 +818,7 @@ class ChatUI {
             const lastPage = Math.ceil(total / limit) || 1;
 
             // Load last page to get most recent messages
-            const messagesUrl = `${this.apiBase}/support-tickets/${ticketId}/messages?page=${lastPage}&limit=${limit}`;
+            const messagesUrl = `${this.apiBase}/support-tickets/${ticketId}/messages?page=${lastPage}&limit=${limit}&mark_read=${markRead}`;
             const messagesResponse = await fetch(messagesUrl, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
@@ -1037,6 +1043,14 @@ class ChatUI {
             if (window.farmerDashboard && typeof window.farmerDashboard.loadFarmerStats === 'function') {
                 window.farmerDashboard.loadFarmerStats({ skipProducts: true });
             }
+
+            // Refresh customer messages badge if on index.html
+            if (window.AgricultureMarket && typeof window.AgricultureMarket.loadCustomerMessagesBadge === 'function') {
+                window.AgricultureMarket.loadCustomerMessagesBadge();
+            }
+
+            // Trigger cross-tab sync via localStorage
+            localStorage.setItem('messagesBadgeUpdate', Date.now().toString());
         } catch (_) {
             // ignore
         }
@@ -1267,8 +1281,8 @@ class ChatUI {
                 throw new Error(errorData.message || 'Failed to send message');
             }
 
-            // Reload ticket messages immediately with forceScroll
-            await this.loadTicketMessages(this.currentConversation, true);
+            // Reload ticket messages immediately with forceScroll (don't mark as read, admin just sent message)
+            await this.loadTicketMessages(this.currentConversation, true, false);
 
             // Reload support tickets to update last message time
             await this.loadSupportTickets();

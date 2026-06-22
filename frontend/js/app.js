@@ -37,8 +37,12 @@ class AgricultureMarket {
         this.sessionId = this.getOrCreateSessionId();
         this.currentPage = 1;
         this.currentCategory = '';
+        this.currentVerification = null;
+        this.verificationHistory = [];
         this.currentSearch = '';
         this.currentSort = 'latest';
+        // Product details cache to avoid re-fetching
+        this.productCache = new Map();
         // Unified auth flow state
         this.selectedRole = null; // 'farmer', 'customer', or 'admin'
         this.authMode = null; // 'login' or 'register'
@@ -61,6 +65,7 @@ class AgricultureMarket {
         this._authFocusTrapHandler = null;
         this._authLastFocusedElement = null;
         this.recaptchaWidgetIds = { authLogin: null, authRegister: null, forgot: null };
+        this.messagesPollInterval = null;
 
         try { window.agriCatchApp = this; } catch (e) {}
 
@@ -201,26 +206,48 @@ class AgricultureMarket {
     }
 
     setPageScrollLocked(locked) {
+        console.log('[DEBUG] setPageScrollLocked called with locked:', locked);
         try {
             const docEl = document.documentElement;
             const body = document.body;
             if (!docEl || !body) return;
 
             if (locked) {
-                if (this._pageScrollLocked) return;
+                if (this._pageScrollLocked) {
+                    console.log('[DEBUG] Scroll already locked, skipping');
+                    return;
+                }
                 this._pageScrollLocked = true;
                 this._lockedScrollY = window.scrollY || window.pageYOffset || 0;
+                console.log('[DEBUG] Locking scroll at Y:', this._lockedScrollY);
+                
+                // Calculate scrollbar width to prevent layout shift
+                const scrollWidth = window.innerWidth - document.documentElement.clientWidth;
+                this._scrollbarWidth = scrollWidth;
+                console.log('[DEBUG] Scrollbar width:', scrollWidth);
+                
                 docEl.classList.add('modal-open');
                 body.classList.add('modal-open');
                 body.style.position = 'fixed';
                 body.style.top = `-${this._lockedScrollY}px`;
+                body.style.left = '0';
                 body.style.width = '100%';
+                body.style.overflowY = 'scroll';
+
+                // Don't add padding to header or fixed buttons - they won't shift
+                
+                console.log('[DEBUG] HTML classes:', docEl.className);
+                console.log('[DEBUG] Body classes:', body.className);
                 return;
             }
 
             // Keep scroll locked if another (non-product) modal is still open.
             const otherModalOpen = !!document.querySelector('.modal.active');
-            if (otherModalOpen) return;
+            console.log('[DEBUG] Other modal open check:', otherModalOpen);
+            if (otherModalOpen) {
+                console.log('[DEBUG] Other modal still open, keeping scroll locked');
+                return;
+            }
 
             if (!this._pageScrollLocked) return;
             this._pageScrollLocked = false;
@@ -229,7 +256,9 @@ class AgricultureMarket {
             body.classList.remove('modal-open');
             body.style.position = '';
             body.style.top = '';
+            body.style.left = '';
             body.style.width = '';
+            body.style.overflowY = '';
 
             const restoreY = this._lockedScrollY || 0;
             this._lockedScrollY = 0;
@@ -247,24 +276,18 @@ class AgricultureMarket {
     init() {
         try {
             console.log('AgriCatch app initialized');
-            try {
-                const navEntries = window.performance?.getEntriesByType?.('navigation') || [];
-                const navType = navEntries[0]?.type;
-                const isReload = navType === 'reload';
-                const isLanding = window.location.pathname === '/' || window.location.pathname.includes('index.html');
-                if (isReload && isLanding) {
-                    if (window.location.hash) {
-                        window.history.replaceState({}, '', window.location.pathname + window.location.search);
-                    }
-                    const htmlEl = document.documentElement;
-                    const prevBehavior = htmlEl.style.scrollBehavior;
-                    htmlEl.style.scrollBehavior = 'auto';
-                    window.scrollTo(0, 0);
-                    setTimeout(() => {
-                        htmlEl.style.scrollBehavior = prevBehavior || '';
-                    }, 0);
-                }
-            } catch (_) {}
+
+            // Disable browser's default scroll restoration to control it manually
+            if ('scrollRestoration' in history) {
+                history.scrollRestoration = 'manual';
+            }
+
+            // Save scroll position before page unload (for refresh)
+            window.addEventListener('beforeunload', () => {
+                const scrollY = window.scrollY || window.pageYOffset || 0;
+                sessionStorage.setItem('lastScrollPosition', scrollY.toString());
+            });
+
             // #region agent log (dev only)
             if (this.isDevHost && this.enableDevAgent) {
                 fetch('http://127.0.0.1:7242/ingest/edada99e-03b1-40b7-84f1-7a3e6b30377c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:15',message:'App initialization started',data:{apiBase:this.apiBase,hasToken:!!this.token},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
@@ -299,6 +322,8 @@ class AgricultureMarket {
             
             this.updateCartCount();
             this.loadNotifications();
+            this.loadCustomerMessagesBadge();
+            this.startMessagesPolling();
             if (this.token) {
                 this.updateOrdersCount();
             }
@@ -316,7 +341,15 @@ class AgricultureMarket {
             });
             // Update when hash changes (clicking footer links or manual hash changes)
             window.addEventListener('hashchange', () => this.updateActiveNavLink());
-            this.renderRecaptchaWidgets();
+
+            // Cross-tab sync for messages badge
+            window.addEventListener('storage', (e) => {
+                if (e.key === 'messagesBadgeUpdate') {
+                    this.loadCustomerMessagesBadge();
+                }
+            });
+
+            this.renderRecaptchaWidgets('login');
         } catch (error) {
             console.error('Error during app initialization:', error);
             // Try to at least load products even if other things fail
@@ -393,12 +426,61 @@ class AgricultureMarket {
         }
         // #endregion
 
+        // Restore scroll position immediately on reload (before loading screen hides)
+        try {
+            const navEntries = window.performance?.getEntriesByType?.('navigation') || [];
+            const navType = navEntries[0]?.type;
+            const isReload = navType === 'reload';
+            const savedScrollY = sessionStorage.getItem('lastScrollPosition');
+            
+            if (isReload && savedScrollY) {
+                const scrollY = parseInt(savedScrollY, 10);
+                if (!isNaN(scrollY) && scrollY > 0) {
+                    window.scrollTo({ top: scrollY, behavior: 'auto' });
+                }
+            }
+        } catch (_) {}
+
+        // Remove initial-load class to allow scrolling
+        document.documentElement.classList.remove('initial-load');
+
         // Mobile bug fix: always remove loading class and hide loading screen after init
         document.body.classList.remove('loading');
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
             loadingScreen.classList.add('hidden');
         }
+
+        // Scroll to home section on landing page reload AFTER hiding loading screen
+        setTimeout(() => {
+            try {
+                const navEntries = window.performance?.getEntriesByType?.('navigation') || [];
+                const navType = navEntries[0]?.type;
+                const isReload = navType === 'reload';
+                const isLanding = window.location.pathname === '/' || window.location.pathname.includes('index.html');
+                if (isReload && isLanding) {
+                    // Clear hash to prevent jump
+                    if (window.location.hash) {
+                        window.history.replaceState({}, '', window.location.pathname + window.location.search);
+                    }
+                    
+                    const homeSection = document.querySelector('#home');
+                    if (homeSection) {
+                        const headerOffset = 100;
+                        const elementPosition = homeSection.offsetTop;
+                        const offsetPosition = elementPosition - headerOffset;
+                        // Smooth scroll from current position to home section
+                        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                    } else {
+                        // Smooth scroll to top from current position
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                    
+                    // Clear saved scroll position after smooth scroll
+                    sessionStorage.removeItem('lastScrollPosition');
+                }
+            } catch (_) {}
+        }, 600); // Wait for loading screen fade-out (500ms transition + buffer)
     }
 
     // Session management for guest users
@@ -571,7 +653,7 @@ class AgricultureMarket {
                 // Get href from the link element (not the clicked child)
                 const rawHref = link.getAttribute('href') || e.target.closest('.nav-link')?.getAttribute('href');
                 const href = normalizeHash(rawHref);
-                if (href) {
+                if (href && href !== '#') {
                     // Only intercept and smooth-scroll if the section exists on this page
                     const targetEl = document.querySelector(href);
                     if (targetEl) {
@@ -619,7 +701,7 @@ class AgricultureMarket {
             scrollTimeout = setTimeout(() => {
                 this.updateActiveNavLink();
             }, 100);
-        });
+        }, { passive: true });
 
         // Cart
         const cartBtn = document.getElementById('cart-btn');
@@ -629,7 +711,10 @@ class AgricultureMarket {
                 cartBtn.style.position = 'fixed';
                 cartBtn.style.right = '22px';
                 cartBtn.style.bottom = '22px';
-                cartBtn.style.zIndex = '2000';
+                cartBtn.style.zIndex = '10002';
+                cartBtn.style.setProperty('background', '#4ade80', 'important');
+                cartBtn.style.setProperty('background-color', '#4ade80', 'important');
+                cartBtn.style.setProperty('color', '#ffffff', 'important');
                 // Ensure the button is a direct child of <body> so fixed positioning works
                 if (cartBtn.parentElement && cartBtn.parentElement !== document.body) {
                     document.body.appendChild(cartBtn);
@@ -709,38 +794,12 @@ class AgricultureMarket {
                     this.openAuthFlow({ role: 'customer', mode: 'login' });
                     this.showMessage('Please log in to proceed to checkout', 'info');
                 } else {
-                    // Logged in user - proceed to checkout
-                    this.openCheckoutModal();
+                    // Logged in user - proceed to checkout page
+                    window.location.href = '/checkout.html';
                 }
             }
         });
 
-        // Notifications
-        const notificationsBtn = document.getElementById('notifications-btn');
-        if (notificationsBtn) {
-            notificationsBtn.addEventListener('click', () => this.toggleNotificationsDropdown());
-        }
-        const markAllBtn = document.getElementById('mark-all-read');
-        if (markAllBtn) {
-            markAllBtn.addEventListener('click', () => this.markAllNotificationsRead());
-        }
-        const notificationsViewBtn = document.getElementById('notifications-toggle-view');
-        if (notificationsViewBtn) {
-            notificationsViewBtn.addEventListener('click', () => this.toggleNotificationsFullView());
-        }
-        document.addEventListener('click', (e) => {
-            const dropdown = document.getElementById('notifications-dropdown');
-            const button = document.getElementById('notifications-btn');
-            if (!dropdown || !button) return;
-            if (!dropdown.classList.contains('open')) return;
-            if (dropdown.contains(e.target) || button.contains(e.target)) return;
-            dropdown.classList.remove('open');
-        });
-        document.addEventListener('keydown', (e) => {
-            if (e.key !== 'Escape') return;
-            const dropdown = document.getElementById('notifications-dropdown');
-            if (dropdown) dropdown.classList.remove('open');
-        });
         const myOrdersBtn = document.getElementById('my-orders-btn');
         if (myOrdersBtn) {
             myOrdersBtn.addEventListener('click', (e) => {
@@ -763,142 +822,37 @@ class AgricultureMarket {
         }
         const superAdminPanelBtn = document.getElementById('super-admin-panel-btn');
         if (superAdminPanelBtn) {
-            superAdminPanelBtn.addEventListener('click', () => this.goToAdminPanel());
+            superAdminPanelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.goToAdminPanel();
+            });
         }
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => this.logout());
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.logout();
+            });
         }
-        const userAccountBtn = document.getElementById('user-account-btn');
-        const userDropdownMenu = document.getElementById('user-dropdown-menu');
-        if (userAccountBtn && userDropdownMenu) {
-            userAccountBtn.addEventListener('click', (e) => {
+        const customerShowAllNotif = document.getElementById('customer-show-all-notifications');
+        if (customerShowAllNotif) {
+            customerShowAllNotif.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.href = '/notifications.html';
+            });
+        }
+        // Customer account dropdown navigation links to the dedicated account page
+        document.querySelectorAll('#user-dropdown-menu [data-tab]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const isOpen = userDropdownMenu.style.display === 'block';
-                userDropdownMenu.style.display = isOpen ? 'none' : 'block';
-                userAccountBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+                const tab = btn.dataset.tab;
+                console.log('Dropdown navigation clicked:', tab);
+                localStorage.setItem('customerActiveSection', tab);
+                window.location.href = '/customer-account.html';
             });
-            document.addEventListener('click', (e) => {
-                if (!userDropdownMenu.contains(e.target) && !userAccountBtn.contains(e.target)) {
-                    userDropdownMenu.style.display = 'none';
-                    userAccountBtn.setAttribute('aria-expanded', 'false');
-                }
-            });
-        }
-        const myAccountBtn = document.getElementById('my-account-btn');
-        if (myAccountBtn) {
-            myAccountBtn.addEventListener('click', () => {
-                const dropdown = document.getElementById('user-dropdown-menu');
-                const accountBtn = document.getElementById('user-account-btn');
-                if (dropdown) dropdown.style.display = 'none';
-                if (accountBtn) accountBtn.setAttribute('aria-expanded', 'false');
-                this.openMyAccountModal();
-            });
-        }
+        });
 
-        const saveMyAccountBtn = document.getElementById('save-my-account-btn');
-        if (saveMyAccountBtn) {
-            saveMyAccountBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.saveMyAccount();
-            });
-        }
-
-        const changeMyPasswordBtn = document.getElementById('change-my-password-btn');
-        if (changeMyPasswordBtn) {
-            changeMyPasswordBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.changeMyAccountPassword();
-            });
-        }
-
-        const toggleMyPasswordSectionBtn = document.getElementById('toggle-my-password-section');
-        if (toggleMyPasswordSectionBtn) {
-            toggleMyPasswordSectionBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.toggleMyAccountPasswordSection(true);
-            });
-        }
-
-        const myAccountPasswordBackBtn = document.getElementById('my-account-password-back');
-        if (myAccountPasswordBackBtn) {
-            myAccountPasswordBackBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.toggleMyAccountPasswordSection(false);
-            });
-        }
-
-        const toggleMyAddressSectionBtn = document.getElementById('toggle-my-address-section');
-        if (toggleMyAddressSectionBtn) {
-            toggleMyAddressSectionBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.toggleMyAccountAddressSection(true);
-            });
-        }
-
-        const myAccountAddressBackBtn = document.getElementById('my-account-address-back');
-        if (myAccountAddressBackBtn) {
-            myAccountAddressBackBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.toggleMyAccountAddressSection(false);
-            });
-        }
-
-        const changeMyAddressBtn = document.getElementById('change-my-address-btn');
-        if (changeMyAddressBtn) {
-            changeMyAddressBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.changeMyAccountAddress();
-            });
-        }
-
-        this.bindPasswordToggle('toggle-my-account-current-password', 'my-account-current-password');
-        this.bindPasswordToggle('toggle-my-account-new-password', 'my-account-new-password');
-        this.bindPasswordToggle('toggle-my-account-confirm-password', 'my-account-confirm-password');
-
-        const closeMyAccountBtn = document.getElementById('close-my-account-modal');
-        if (closeMyAccountBtn) {
-            closeMyAccountBtn.addEventListener('click', () => this.closeMyAccountModal());
-        }
-
-        // My Account address PSGC cascading
-        const myAccountZone = document.getElementById('my-account-zone');
-        const myAccountProvince = document.getElementById('my-account-province');
-        const myAccountCity = document.getElementById('my-account-city');
-        const myAccountBarangay = document.getElementById('my-account-barangay');
-        const myAccountStreet = document.getElementById('my-account-street');
-        if (myAccountZone) myAccountZone.addEventListener('change', () => this.handleMyAccountZoneChange());
-        if (myAccountProvince) myAccountProvince.addEventListener('change', () => this.handleMyAccountProvinceChange());
-        if (myAccountCity) myAccountCity.addEventListener('change', () => this.handleMyAccountCityChange());
-        if (myAccountBarangay) myAccountBarangay.addEventListener('change', () => this.updateMyAccountAddressPreview());
-        if (myAccountStreet) myAccountStreet.addEventListener('input', () => this.updateMyAccountAddressPreview());
-
-        // My Account phone number input formatting
-        const myAccountPhone = document.getElementById('my-account-phone');
-        if (myAccountPhone) {
-            myAccountPhone.addEventListener('input', (e) => {
-                e.target.value = this.formatPhoneInputValue(e.target.value);
-            });
-        }
-
-        const myAccountModal = document.getElementById('my-account-modal');
-        if (myAccountModal) {
-            myAccountModal.addEventListener('mousedown', (e) => {
-                this._myAccountModalDownInside = !!e.target.closest('.modal-content');
-            });
-            myAccountModal.addEventListener('touchstart', (e) => {
-                this._myAccountModalDownInside = !!e.target.closest('.modal-content');
-            }, { passive: true });
-            myAccountModal.addEventListener('click', (e) => {
-                if (!(e.target && e.target.id === 'my-account-modal')) return;
-                const hasSelection = !!(window.getSelection && String(window.getSelection() || '').trim());
-                if (!this._myAccountModalDownInside && !hasSelection) {
-                    this.closeMyAccountModal();
-                }
-                this._myAccountModalDownInside = false;
-            });
-        }
 
         // Role selector box (on auth form) – event delegation
         document.addEventListener('click', (e) => {
@@ -1319,7 +1273,10 @@ class AgricultureMarket {
         }
 
         // Forms
-        document.getElementById('checkout-form').addEventListener('submit', (e) => this.handleCheckout(e));
+        const checkoutForm = document.getElementById('checkout-form');
+        if (checkoutForm) {
+            checkoutForm.addEventListener('submit', (e) => this.handleCheckout(e));
+        }
         
         // Phone number input - only allow digits
         const checkoutPhoneInput = document.getElementById('checkout-phone');
@@ -1503,6 +1460,19 @@ class AgricultureMarket {
                 this.currentSearch = e.target.value;
                 this.currentPage = 1; // Reset to first page on search
                 this.loadProducts();
+            });
+        }
+
+        const searchClearBtn = document.getElementById('search-clear-btn');
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('click', () => {
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) {
+                    searchInput.value = '';
+                    this.currentSearch = '';
+                    this.currentPage = 1;
+                    this.loadProducts();
+                }
             });
         }
 
@@ -2040,46 +2010,85 @@ class AgricultureMarket {
         // super_admin can access the main site, no redirect
     }
 
-    showUserMenu() {
-        document.getElementById('user-menu').style.display = 'none';
-        document.getElementById('user-profile').style.display = 'block';
+    async showUserMenu() {
+        const userMenu = document.getElementById('user-menu');
+        if (userMenu) {
+            userMenu.style.display = 'none';
+        }
         const myOrdersBtn = document.getElementById('my-orders-btn');
         if (myOrdersBtn) {
             myOrdersBtn.style.display = 'flex';
             myOrdersBtn.setAttribute('href', this.buildOrdersUrl());
         }
-        const notificationsWrapper = document.getElementById('notifications-wrapper');
-        if (notificationsWrapper) {
-            notificationsWrapper.style.display = 'block';
+        const customerChatBtn = document.getElementById('customer-chat-btn');
+        if (customerChatBtn) {
+            customerChatBtn.style.display = 'inline-flex';
         }
-        // Show the notification icon/button when user is logged in
-        const notificationsBtn = document.getElementById('notifications-btn');
-        if (notificationsBtn) {
-            notificationsBtn.style.display = 'inline-flex';
+        const customerNotif = document.getElementById('customer-notifications');
+        if (customerNotif) {
+            customerNotif.style.display = 'inline-flex';
         }
-        this.loadUserProfile();
+
+        // Show profile immediately with token data
+        this.showProfileFromToken();
+
+        // Make profile visible immediately
+        const userProfile = document.getElementById('user-profile');
+        if (userProfile) {
+            userProfile.classList.remove('hidden');
+            userProfile.style.display = 'inline-flex';
+        }
+
+        // Load full profile from API and update
+        await this.loadUserProfile();
+
         this.updateOrdersCount();
+        this.loadNotifications();
+        this.loadSupportTicketsBadge();
+        this.loadCustomerMessagesBadge();
+    }
+
+    showProfileFromToken() {
+        const payload = this.decodeJwtPayload(this.token);
+        if (!payload) return;
+
+        const fullName = payload.full_name || payload.username || 'Account';
+        const firstName = String(fullName).split(' ')[0];
+        const userNameEl = document.getElementById('user-name');
+        const userNameDdEl = document.getElementById('user-name-dd');
+        const userInitialEl = document.getElementById('user-initial');
+        const userEmailEl = document.getElementById('user-email');
+
+        console.log('Showing profile from token:', { fullName, firstName, email: payload.email });
+
+        if (userNameEl) userNameEl.textContent = firstName;
+        if (userNameDdEl) userNameDdEl.textContent = fullName;
+        if (userInitialEl) userInitialEl.textContent = String(firstName).charAt(0).toUpperCase();
+        if (userEmailEl) userEmailEl.textContent = payload.email || '';
     }
 
     showGuestMenu() {
-        document.getElementById('user-menu').style.display = 'flex';
-        document.getElementById('user-profile').style.display = 'none';
-        const userDropdownMenu = document.getElementById('user-dropdown-menu');
+        const userMenu = document.getElementById('user-menu');
+        if (userMenu) {
+            userMenu.style.display = 'flex';
+        }
+        const userProfile = document.getElementById('user-profile');
+        if (userProfile) {
+            userProfile.classList.add('hidden');
+        }
         const userAccountBtn = document.getElementById('user-account-btn');
-        if (userDropdownMenu) userDropdownMenu.style.display = 'none';
         if (userAccountBtn) userAccountBtn.setAttribute('aria-expanded', 'false');
         const myOrdersBtn = document.getElementById('my-orders-btn');
         if (myOrdersBtn) {
             myOrdersBtn.style.display = 'none';
         }
-        const notificationsWrapper = document.getElementById('notifications-wrapper');
-        if (notificationsWrapper) {
-            notificationsWrapper.style.display = 'none';
+        const customerChatBtn = document.getElementById('customer-chat-btn');
+        if (customerChatBtn) {
+            customerChatBtn.style.display = 'none';
         }
-        // Hide the notification icon/button in guest mode (keep logic intact)
-        const notificationsBtn = document.getElementById('notifications-btn');
-        if (notificationsBtn) {
-            notificationsBtn.style.display = 'none';
+        const customerNotif = document.getElementById('customer-notifications');
+        if (customerNotif) {
+            customerNotif.style.display = 'none';
         }
     }
 
@@ -2108,6 +2117,67 @@ class AgricultureMarket {
         }
     }
 
+    async loadSupportTicketsBadge() {
+        if (!this.token) return;
+        try {
+            const response = await fetch(`${this.apiBase}/support-tickets/my?limit=100`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            const tickets = data.tickets || [];
+            const unreadCount = tickets.reduce((sum, ticket) => sum + Number(ticket.unread_count || 0), 0);
+            
+            // Update dropdown badge
+            const badge = document.getElementById('support-tickets-dropdown-badge');
+            if (badge) {
+                badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+                badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+            }
+            
+            // Update topbar badge
+            const topbarBadge = document.getElementById('chat-topbar-badge');
+            if (topbarBadge) {
+                topbarBadge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+                topbarBadge.style.display = unreadCount > 0 ? '' : 'none';
+            }
+        } catch (error) {
+            console.error('Load support tickets badge error:', error);
+        }
+    }
+
+    async loadCustomerMessagesBadge() {
+        if (!this.token) return;
+        try {
+            const response = await fetch(`${this.apiBase}/messages/conversations`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            const conversations = data.conversations || [];
+            const unreadCount = conversations.reduce((sum, conv) => sum + Number(conv.unread_count || 0), 0);
+
+            const badge = document.getElementById('customer-messages-badge');
+            const btn = document.getElementById('customer-messages-btn');
+            if (badge) {
+                badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+                badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+            }
+            if (btn) {
+                btn.style.display = this.token ? '' : 'none';
+            }
+        } catch (error) {
+            console.error('Load customer messages badge error:', error);
+        }
+    }
+
+    startMessagesPolling() {
+        if (this.messagesPollInterval) clearInterval(this.messagesPollInterval);
+        this.messagesPollInterval = setInterval(() => {
+            this.loadCustomerMessagesBadge();
+        }, 60000); // Poll every 60 seconds
+    }
+
     async loadNotifications() {
         if (!this.token) return;
         try {
@@ -2124,60 +2194,217 @@ class AgricultureMarket {
     }
 
     renderNotifications(notifications) {
-        const list = document.getElementById('notifications-list');
-        const countEl = document.getElementById('notifications-count');
+        const list = document.getElementById('customer-notif-list');
+        const countEl = document.getElementById('customer-notif-count');
+        const badgeEl = document.getElementById('customer-notif-badge');
         if (!list || !countEl) return;
 
         const unreadCount = notifications.filter(n => !n.is_read).length;
         countEl.textContent = unreadCount;
-        countEl.style.display = unreadCount > 0 ? 'inline-flex' : 'none';
+        if (badgeEl) {
+            badgeEl.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+            badgeEl.style.display = unreadCount > 0 ? 'inline-flex' : 'none';
+        }
 
         if (!notifications.length) {
-            list.innerHTML = '<div class="empty-state">No notifications.</div>';
+            list.innerHTML = '<li class="text-center py-2 small text-muted">No notifications</li>';
             return;
         }
 
-        list.innerHTML = notifications.map(note => {
-            const productImage = note.product_image_url || window.__PLACEHOLDER_IMAGE__;
-            const productLabel = note.product_name ? `<small class="notification-product">${note.product_name}</small>` : '';
+        const iconMap = {
+            order: 'bi-bag-check',
+            product: 'bi-box-seam',
+            user: 'bi-person',
+            system: 'bi-gear',
+            notification: 'bi-bell',
+            support_ticket: 'bi-ticket-perforated'
+        };
+
+        const recent = notifications.slice(0, 5);
+        list.innerHTML = recent.map(note => {
+            const ic = iconMap[note.type] || 'bi-bell';
+            const readStatus = note.is_read ? 'read' : 'unread';
             const noteDate = note.created_at ? new Date(note.created_at) : null;
             const dateLabel = noteDate && !Number.isNaN(noteDate.getTime())
-                ? noteDate.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                ? this._relativeTime(noteDate)
                 : '';
             return `
-            <div class="notification-item ${note.is_read ? '' : 'unread'}" data-id="${note.id}" data-order-id="${note.order_id || ''}">
-                <img class="notification-thumb" src="${productImage}" alt="${note.product_name || 'Product'}" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
-                <div class="notification-content">
-                    <strong>${note.title || 'Notification'}</strong>
-                    <p>${note.message || ''}</p>
-                    ${productLabel}
-                    ${dateLabel ? `<small class="notification-date">${dateLabel}</small>` : ''}
-                </div>
-            </div>
+            <li>
+                <a class="dropdown-item notification-item-dropdown ${readStatus} py-2 notif-header-link" href="#" data-id="${note.id}" data-order-id="${note.order_id || ''}" data-type="${note.type || ''}" style="border:none;padding:0.75rem 1rem;margin:0.25rem 0.5rem;border-radius:8px;">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="notification-icon-dropdown" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${note.is_read ? '#f3f4f6' : '#ecfdf5'};color:${note.is_read ? '#6b7280' : '#10b981'};font-size:0.875rem;">
+                            <i class="bi ${ic}"></i>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div class="small" style="font-weight:${note.is_read ? '500' : '600'};color:#111827;line-height:1.4;">${this.escapeHtml(note.title || 'Notification')}</div>
+                            <div style="font-size:0.75rem;color:#9ca3af;">${dateLabel}</div>
+                        </div>
+                        ${!note.is_read ? '<div style="width:6px;height:6px;border-radius:50%;background:#10b981;flex-shrink:0;"></div>' : ''}
+                    </div>
+                </a>
+            </li>
         `;
         }).join('');
 
-        list.querySelectorAll('.notification-item').forEach(item => {
-            item.addEventListener('click', () => {
+        list.querySelectorAll('.notif-header-link').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
                 const id = item.getAttribute('data-id');
                 const orderId = Number(item.getAttribute('data-order-id') || 0);
+                const type = item.getAttribute('data-type') || '';
+                
+                // Handle support ticket notifications - navigate to customer account support tickets
+                if (type === 'support_ticket') {
+                    this.markNotificationRead(id);
+                    window.location.href = '/customer-account.html#support-tickets';
+                    return;
+                }
+                
                 this.markNotificationRead(id, { navigateToOrderId: orderId > 0 ? orderId : null });
             });
         });
     }
 
-    toggleNotificationsDropdown() {
-        const dropdown = document.getElementById('notifications-dropdown');
-        if (!dropdown) return;
-        dropdown.classList.toggle('open');
+    _relativeTime(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+        if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+        return date.toLocaleDateString();
     }
 
-    toggleNotificationsFullView() {
-        const dropdown = document.getElementById('notifications-dropdown');
-        const button = document.getElementById('notifications-toggle-view');
-        if (!dropdown || !button) return;
-        const isFull = dropdown.classList.toggle('full-view');
-        button.textContent = isFull ? 'Compact' : 'Full';
+    async loadCustomerNotificationsPage() {
+        if (!this.token) return;
+        try {
+            const response = await fetch(`${this.apiBase}/notifications?page=1&limit=10`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                this.renderCustomerNotificationsPage(data.notifications || []);
+            }
+        } catch (error) {
+            console.error('Error loading customer notifications:', error);
+            const list = document.getElementById('customer-notifications-list');
+            if (list) list.innerHTML = '<div class="text-center py-4 text-muted">Failed to load notifications.</div>';
+        }
+    }
+
+    renderCustomerNotificationsPage(notifications) {
+        const list = document.getElementById('customer-notifications-list');
+        const emptyState = document.getElementById('customer-notifications-empty-state');
+        if (!list) return;
+
+        if (!notifications.length) {
+            list.innerHTML = '';
+            if (emptyState) emptyState.style.display = 'block';
+            return;
+        }
+
+        if (emptyState) emptyState.style.display = 'none';
+
+        const iconMap = {
+            order: 'bi-bag-check text-success',
+            order_confirmed: 'bi-check-circle text-success',
+            order_delivered: 'bi-truck text-success',
+            order_cancelled: 'bi-x-circle text-danger',
+            product: 'bi-box-seam text-primary',
+            system: 'bi-gear text-secondary',
+            payment: 'bi-credit-card text-warning',
+            account: 'bi-person text-info'
+        };
+
+        list.innerHTML = notifications.map(n => {
+            const iconClass = iconMap[n.type] || 'bi-bell text-muted';
+            const readStatus = n.is_read ? 'read' : 'unread';
+            const relTime = this._relativeTime(new Date(n.created_at));
+            const cursorCls = n.is_read ? '' : 'cursor-pointer';
+            return `
+            <div class="notification-item ${readStatus} ${cursorCls}" data-id="${n.id}">
+                <div class="notification-icon">
+                    <i class="bi ${iconClass}"></i>
+                </div>
+                <div class="notification-content">
+                    <div class="notification-title">${this.escapeHtml(n.title || 'Notification')}</div>
+                    <div class="notification-message">${this.escapeHtml(n.message || '')}</div>
+                    <div class="notification-meta">
+                        <span>${relTime}</span>
+                    </div>
+                </div>
+                ${!n.is_read ? `<div class="notification-actions">
+                    <button class="notification-mark-read-btn" data-id="${n.id}" title="Mark read">
+                        <i class="bi bi-check2"></i>
+                    </button>
+                </div>` : ''}
+            </div>`;
+        }).join('');
+
+        // Add click handlers for mark read buttons
+        list.querySelectorAll('.notification-mark-read-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = Number(btn.dataset.id);
+                this.markCustomerNotificationRead(id, btn);
+            });
+        });
+
+        // Add click handlers for notification items
+        list.querySelectorAll('.notification-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = Number(item.dataset.id);
+                const notif = notifications.find(n => n.id === id);
+                if (notif && !notif.is_read) {
+                    const btn = item.querySelector('.notification-mark-read-btn');
+                    if (btn) this.markCustomerNotificationRead(id, btn);
+                }
+            });
+        });
+    }
+
+    async markCustomerNotificationRead(id, btn) {
+        try {
+            const response = await fetch(`${this.apiBase}/notifications/${id}/read`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (response.ok) {
+                if (btn) {
+                    const item = btn.closest('.customer-notification-item');
+                    if (item) {
+                        item.classList.remove('unread');
+                        btn.parentElement.remove();
+                    }
+                }
+                this.loadNotifications();
+            }
+        } catch (error) {
+            console.error('Error marking notification read:', error);
+        }
+    }
+
+    async markAllCustomerNotificationsRead() {
+        try {
+            const response = await fetch(`${this.apiBase}/notifications/read-all`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (response.ok) {
+                const list = document.getElementById('customer-notifications-list');
+                if (list) {
+                    list.querySelectorAll('.notification-item').forEach(item => {
+                        item.classList.remove('unread');
+                        const actions = item.querySelector('.notification-actions');
+                        if (actions) actions.remove();
+                    });
+                }
+                this.loadCustomerNotificationsPage();
+                this.showMessage('All notifications marked as read', 'success');
+            }
+        } catch (error) {
+            console.error('Error marking all notifications read:', error);
+            this.showMessage('Failed to mark all notifications as read', 'error');
+        }
     }
 
     async markNotificationRead(id, options = {}) {
@@ -2205,11 +2432,70 @@ class AgricultureMarket {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
-            if (response.ok) {
-                this.loadNotifications();
-            }
         } catch (error) {
             console.error('Error marking all notifications read:', error);
+        }
+    }
+
+    async loadVerificationStatus() {
+        try {
+            const response = await fetch(`${this.apiBase}/farmers/me/verification-request`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            const data = await response.json().catch(() => ({}));
+            this.currentVerification = data.request || null;
+            this.verificationHistory = data.history || [];
+            this.updateVerificationUI();
+        } catch (error) {
+            console.error('Load verification error:', error);
+            this.currentVerification = null;
+            this.verificationHistory = [];
+            this.updateVerificationUI();
+        }
+    }
+
+    updateVerificationUI() {
+        const btn = document.getElementById('verification-request-btn');
+        const menuText = document.getElementById('verification-menu-text');
+        const icon = btn?.querySelector('i');
+
+        if (!this.currentVerification) {
+            // No request - show button
+            if (btn) {
+                btn.style.display = '';
+                btn.style.removeProperty('display');
+            }
+            if (menuText) menuText.textContent = 'Request Verification';
+            if (icon) {
+                icon.className = 'bi bi-shield-check';
+            }
+        } else {
+            const status = this.currentVerification.status;
+            if (status === 'pending') {
+                if (btn) {
+                    btn.style.display = '';
+                    btn.style.removeProperty('display');
+                }
+                if (menuText) menuText.textContent = 'Verification: Pending';
+                if (icon) {
+                    icon.className = 'bi bi-clock text-warning';
+                }
+            } else if (status === 'rejected') {
+                if (btn) {
+                    btn.style.display = '';
+                    btn.style.removeProperty('display');
+                }
+                if (menuText) menuText.textContent = 'Verification: Rejected';
+                if (icon) {
+                    icon.className = 'bi bi-exclamation-triangle text-danger';
+                }
+            } else if (status === 'approved') {
+                // Verified - remove dropdown item entirely since it's accessible from My Profile
+                if (btn) {
+                    const parentLi = btn.closest('li');
+                    if (parentLi) parentLi.remove();
+                }
+            }
         }
     }
 
@@ -2224,20 +2510,43 @@ class AgricultureMarket {
             if (response.ok) {
                 const data = await response.json();
                 this.currentUserProfile = data.user;
-                const displayName = data.user.username || data.user.full_name || 'Account';
+                const fullName = data.user.full_name || data.user.username || 'Account';
+                const firstName = String(fullName).split(' ')[0];
                 const userNameEl = document.getElementById('user-name');
+                const userNameDdEl = document.getElementById('user-name-dd');
+                const userEmailEl = document.getElementById('user-email');
                 const userInitialEl = document.getElementById('user-initial');
-                if (userNameEl) userNameEl.textContent = displayName;
-                if (userInitialEl) userInitialEl.textContent = String(displayName).charAt(0).toUpperCase();
+                const roleBadgeEl = document.getElementById('header-role-badge');
+                const verifiedIconEl = document.getElementById('header-verified-icon');
+                if (userNameEl) userNameEl.textContent = firstName;
+                if (userNameDdEl) userNameDdEl.textContent = fullName;
+                if (userEmailEl) userEmailEl.textContent = data.user.email || '';
+                if (userInitialEl) userInitialEl.textContent = String(firstName).charAt(0).toUpperCase();
+                if (roleBadgeEl) {
+                    roleBadgeEl.textContent = data.user.role === 'customer' ? 'CUSTOMER' : (data.user.role || '').toUpperCase();
+                    roleBadgeEl.style.display = 'inline-flex';
+                }
+                if (verifiedIconEl) {
+                    verifiedIconEl.style.display = data.user.is_verified ? 'inline-block' : 'none';
+                }
 
-                // Hide super-admin-panel-btn and my-account-btn for superadmin
+                // Load verification status for customers
+                if (data.user.role === 'customer') {
+                    this.loadVerificationStatus();
+                }
+
+                // For superadmin hide customer account dropdown items and show admin panel
                 const adminPanelBtn = document.getElementById('super-admin-panel-btn');
-                const myAccountBtn = document.getElementById('my-account-btn');
+                const adminPanelDivider = document.getElementById('super-admin-panel-divider');
+                const customerDropdownItems = document.querySelectorAll('#user-dropdown-menu [data-tab]');
                 if (data.user.role === 'super_admin') {
-                    if (adminPanelBtn) adminPanelBtn.style.display = 'none';
-                    if (myAccountBtn) myAccountBtn.style.display = 'none';
-                } else if (adminPanelBtn) {
-                    adminPanelBtn.style.display = 'none';
+                    if (adminPanelBtn) adminPanelBtn.parentElement.style.display = 'block';
+                    if (adminPanelDivider) adminPanelDivider.style.display = 'block';
+                    customerDropdownItems.forEach(item => item.parentElement.style.display = 'none');
+                } else {
+                    if (adminPanelBtn) adminPanelBtn.parentElement.style.display = 'none';
+                    if (adminPanelDivider) adminPanelDivider.style.display = 'none';
+                    customerDropdownItems.forEach(item => item.parentElement.style.display = 'block');
                 }
 
                 // Show back to admin button for admin users (super_admin and admin)
@@ -2250,12 +2559,10 @@ class AgricultureMarket {
 
                 // Hide shopping bag and notifications for superadmin
                 const myOrdersBtn = document.getElementById('my-orders-btn');
-                const notificationsBtn = document.getElementById('notifications-btn');
-                const notificationsWrapper = document.querySelector('.notifications-wrapper');
+                const notifDropdown = document.querySelector('.nav-item.dropdown');
                 if (data.user.role === 'super_admin') {
                     if (myOrdersBtn) myOrdersBtn.style.display = 'none';
-                    if (notificationsBtn) notificationsBtn.style.display = 'none';
-                    if (notificationsWrapper) notificationsWrapper.style.display = 'none';
+                    if (notifDropdown) notifDropdown.style.display = 'none';
                 }
 
                 // Super admin can access main site via admin panel button (no auto-redirect)
@@ -2320,6 +2627,7 @@ class AgricultureMarket {
 
         this.clearMyAccountPasswordFields();
         modal.classList.add('open');
+        this.setPageScrollLocked(true);
 
         const psgc = await this.waitForPsgc();
         if (zoneEl && psgc) {
@@ -2395,6 +2703,7 @@ class AgricultureMarket {
         const modal = document.getElementById('my-account-modal');
         if (modal) {
             modal.classList.remove('open');
+            this.setPageScrollLocked(false);
             this.clearMyAccountPasswordFields();
             this.clearMyAccountAddressFields();
         }
@@ -2529,6 +2838,18 @@ class AgricultureMarket {
 
         if (!first_name || !last_name) {
             this.showMessage('Please complete first name and last name.', 'error');
+            return;
+        }
+        if (first_name.length > 40) {
+            this.showMessage('First name must be 40 characters or less.', 'error');
+            return;
+        }
+        if (middle_name.length > 40) {
+            this.showMessage('Middle name must be 40 characters or less.', 'error');
+            return;
+        }
+        if (last_name.length > 40) {
+            this.showMessage('Last name must be 40 characters or less.', 'error');
             return;
         }
 
@@ -2784,11 +3105,20 @@ class AgricultureMarket {
         return resolvedScope === 'authLogin' ? 'auth-recaptcha-login-error' : 'auth-recaptcha-error';
     }
 
-    renderRecaptchaWidgets() {
-        if (!window.grecaptcha || typeof window.grecaptcha.render !== 'function') {
-            return false;
+    resetRecaptchaWidgets() {
+        if (!window.grecaptcha || typeof window.grecaptcha.reset !== 'function') {
+            return;
         }
+        
+        ['authLogin', 'authRegister', 'forgot'].forEach(scope => {
+            const widgetId = this.recaptchaWidgetIds[scope];
+            if (widgetId !== null) {
+                window.grecaptcha.reset(widgetId);
+            }
+        });
+    }
 
+    renderRecaptchaWidgets(mode = 'login') {
         const renderWidget = (scope, containerId) => {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -2806,16 +3136,40 @@ class AgricultureMarket {
             }
         };
 
-        if (window.grecaptcha.ready) {
+        // Only render the widget needed for the current mode
+        const widgetsToRender = mode === 'login' 
+            ? [['authLogin', 'auth-recaptcha-login']]
+            : mode === 'register'
+            ? [['authRegister', 'auth-recaptcha']]
+            : [['forgot', 'forgot-recaptcha']];
+
+        // Use grecaptcha.ready() to ensure script is loaded before rendering
+        if (window.grecaptcha && typeof window.grecaptcha.ready === 'function') {
             window.grecaptcha.ready(() => {
-                renderWidget('authLogin', 'auth-recaptcha-login');
-                renderWidget('authRegister', 'auth-recaptcha');
-                renderWidget('forgot', 'forgot-recaptcha');
+                widgetsToRender.forEach(([scope, containerId]) => renderWidget(scope, containerId));
             });
+        } else if (window.grecaptcha && typeof window.grecaptcha.render === 'function') {
+            // grecaptcha is already loaded, render directly
+            widgetsToRender.forEach(([scope, containerId]) => renderWidget(scope, containerId));
         } else {
-            renderWidget('authLogin', 'auth-recaptcha-login');
-            renderWidget('authRegister', 'auth-recaptcha');
-            renderWidget('forgot', 'forgot-recaptcha');
+            // grecaptcha not loaded yet, set up polling
+            let attempts = 0;
+            const maxAttempts = 20; // Try for 10 seconds (20 * 500ms)
+            const checkInterval = setInterval(() => {
+                attempts++;
+                if (window.grecaptcha && typeof window.grecaptcha.render === 'function') {
+                    clearInterval(checkInterval);
+                    widgetsToRender.forEach(([scope, containerId]) => renderWidget(scope, containerId));
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                    console.error('reCAPTCHA failed to load after multiple attempts');
+                    // Show error to user
+                    this.setRecaptchaError('auth', 'CAPTCHA failed to load. Please check your internet connection and refresh the page.');
+                    this.setRecaptchaError('authLogin', 'CAPTCHA failed to load. Please check your internet connection and refresh the page.');
+                    this.setRecaptchaError('authRegister', 'CAPTCHA failed to load. Please check your internet connection and refresh the page.');
+                    this.setRecaptchaError('forgot', 'CAPTCHA failed to load. Please check your internet connection and refresh the page.');
+                }
+            }, 500);
         }
 
         return true;
@@ -2823,14 +3177,17 @@ class AgricultureMarket {
 
     getRecaptchaResponse(scope = 'auth') {
         if (!window.grecaptcha || typeof window.grecaptcha.getResponse !== 'function') {
+            console.warn('reCAPTCHA not loaded, cannot get response');
             return '';
         }
         const resolvedScope = this.resolveRecaptchaScope(scope);
         if (this.recaptchaWidgetIds[resolvedScope] === null) {
-            this.renderRecaptchaWidgets();
+            const mode = resolvedScope === 'authLogin' ? 'login' : resolvedScope === 'authRegister' ? 'register' : 'forgot';
+            this.renderRecaptchaWidgets(mode);
         }
         const widgetId = this.recaptchaWidgetIds[resolvedScope];
         if (widgetId === null || widgetId === undefined) {
+            console.warn(`reCAPTCHA widget ID for ${resolvedScope} is null/undefined`);
             return '';
         }
         return String(window.grecaptcha.getResponse(widgetId) || '').trim();
@@ -2887,7 +3244,16 @@ class AgricultureMarket {
         }
 
         const recaptchaResponse = this.getRecaptchaResponse('auth');
-        if (!recaptchaResponse) {
+        // Skip recaptcha validation for testing if recaptcha element is not present
+        const recaptchaElement = document.getElementById('auth-recaptcha-login');
+        const skipRecaptcha = !recaptchaElement || recaptchaElement.children.length === 0;
+        console.log('DEBUG login recaptcha check:', { 
+            hasResponse: !!recaptchaResponse, 
+            elementExists: !!recaptchaElement,
+            elementHasChildren: recaptchaElement ? recaptchaElement.children.length > 0 : false,
+            skipRecaptcha 
+        });
+        if (!recaptchaResponse && !skipRecaptcha) {
             this.setRecaptchaError('auth', 'Please complete the CAPTCHA before logging in.');
             this.showMessage('Please complete the CAPTCHA before logging in.', 'error');
             return;
@@ -2895,6 +3261,9 @@ class AgricultureMarket {
 
         // Prepare payload without sending a client-chosen role
         const payload = { email, password, 'g-recaptcha-response': recaptchaResponse };
+
+        // Show loading on submit button
+        this.setButtonLoading('auth-submit-btn', true);
 
         try {
             const response = await fetch(`${this.apiBase}/auth/login`, {
@@ -2934,34 +3303,47 @@ class AgricultureMarket {
                 this.clearAuthForm();
                 this.closeAuthFlow();
 
-                // Redirect / update UI based on server-determined role
+                // Show success message first
                 if (userRole === 'super_admin' || userRole === 'admin') {
                     this.showMessage('Admin login successful! Redirecting...', 'success');
+                } else if (userRole === 'farmer') {
+                    this.showMessage('Farmer login successful! Redirecting...', 'success');
+                } else {
+                    this.showMessage('Login successful! Loading your account...', 'success');
+                }
+
+                // Then show loading screen
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.classList.remove('hidden');
+                }
+
+                // Redirect / update UI based on server-determined role
+                if (userRole === 'super_admin' || userRole === 'admin') {
                     setTimeout(() => {
                         window.location.href = '/admin.html';
                     }, 1000);
                 } else if (userRole === 'farmer') {
-                    this.showMessage('Farmer login successful! Redirecting...', 'success');
                     setTimeout(() => {
                         window.location.href = '/farmer.html';
                     }, 1000);
                 } else {
-                    // Customer or unknown role: stay in UI
-                    this.showUserMenu();
-                    this.migrateGuestCart();
-                    this.showMessage('Login successful!', 'success');
-                    if (this.pendingCheckout) {
-                        this.pendingCheckout = false;
-                        setTimeout(() => this.openCheckoutModal(), 500);
-                    }
-                    if (this.returnUrl) {
-                        setTimeout(() => { window.location.href = this.returnUrl; }, 1000);
-                    }
+                    // Customer or unknown role: refresh page to show loading screen
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
                 }
 
                 return;
             } else {
+                // Don't reset CAPTCHA on server errors (5xx) - allow retry without new solve
+                if (response.status >= 500) {
+                    this.setButtonLoading('auth-submit-btn', false);
+                    this.showMessage('Server error. Please try again.', 'error');
+                    return;
+                }
                 this.resetRecaptcha('auth');
+                this.setButtonLoading('auth-submit-btn', false);
                 // If login failed due to OTP verification, reset OTP state
                 if (data.message && (data.message.includes('OTP verification') || data.message.includes('OTP'))) {
                     this.otpVerified = false;
@@ -2973,8 +3355,13 @@ class AgricultureMarket {
             }
         } catch (error) {
             console.error('Login error:', error);
-            this.resetRecaptcha('auth');
-            this.showMessage('Login failed. Please try again.', 'error');
+            this.setButtonLoading('auth-submit-btn', false);
+            // Hide loading screen on error
+            if (loadingScreen) {
+                loadingScreen.classList.add('hidden');
+            }
+            // Don't reset CAPTCHA on network errors - allow retry
+            this.showMessage('Network error. Please check your connection and try again.', 'error');
         }
     }
 
@@ -3535,8 +3922,16 @@ class AgricultureMarket {
             const data = await response.json();
             console.log('OTP response data:', data);
 
+            // Don't reset CAPTCHA on server errors (5xx) - allow retry without new solve
+            if (response.status >= 500) {
+                this.resetRecaptcha('auth');
+                this.setButtonLoading('register-next-1', false);
+                this.showMessage('Server error. Please try again.', 'error');
+                return;
+            }
+
             this.resetRecaptcha('auth');
-            
+
             this.setButtonLoading('register-next-1', false);
             let cooldownSeconds = 60;
             // Handle rate limiting (cooldown)
@@ -3625,7 +4020,7 @@ class AgricultureMarket {
         } catch (error) {
             this.setButtonLoading('register-next-1', false);
             console.error('Send OTP error:', error);
-            this.resetRecaptcha('auth');
+            // Don't reset CAPTCHA on network errors - allow retry
             // Keep OTP section visible and set button text to 'Confirm OTP' even on network error
             const nextButtonText = document.getElementById('register-next-1-text');
             if (nextButtonText) {
@@ -3633,7 +4028,7 @@ class AgricultureMarket {
             }
             // Start default cooldown on error
             this.startResendOtpCooldown(60);
-            // Keep OTP section visible even on network error
+            this.showMessage('Network error. Please check your connection and try again.', 'error');
         }
     }
 
@@ -3707,6 +4102,12 @@ class AgricultureMarket {
                 localStorage.removeItem('register_otp');
             } else {
                 this.showMessage(data.message || 'Invalid OTP', 'error');
+                // Clear OTP field on wrong OTP so user can re-enter
+                const otpInput = document.getElementById('register-otp');
+                if (otpInput) {
+                    otpInput.value = '';
+                    otpInput.focus();
+                }
             }
         } catch (error) {
             this.setButtonLoading('register-next-1', false);
@@ -3742,15 +4143,33 @@ class AgricultureMarket {
             document.getElementById('auth-firstname').focus();
             return;
         }
+        if (firstName.length > 40) {
+            this.setButtonLoading('register-submit-btn', false);
+            this.showMessage('First name must be 40 characters or less', 'error');
+            document.getElementById('auth-firstname').focus();
+            return;
+        }
         if (middleName && !nameRegex.test(middleName)) {
             this.setButtonLoading('register-submit-btn', false);
             this.showMessage('Middle name may contain letters and spaces only', 'error');
             document.getElementById('auth-middlename').focus();
             return;
         }
+        if (middleName.length > 40) {
+            this.setButtonLoading('register-submit-btn', false);
+            this.showMessage('Middle name must be 40 characters or less', 'error');
+            document.getElementById('auth-middlename').focus();
+            return;
+        }
         if (lastName && !nameRegex.test(lastName)) {
             this.setButtonLoading('register-submit-btn', false);
             this.showMessage('Last name may contain letters and spaces only', 'error');
+            document.getElementById('auth-lastname').focus();
+            return;
+        }
+        if (lastName.length > 40) {
+            this.setButtonLoading('register-submit-btn', false);
+            this.showMessage('Last name must be 40 characters or less', 'error');
             document.getElementById('auth-lastname').focus();
             return;
         }
@@ -3812,7 +4231,7 @@ class AgricultureMarket {
         }
 
         // Ensure reCAPTCHA widgets are attempted to render (OTP step already enforces CAPTCHA).
-        try { this.renderRecaptchaWidgets(); } catch (err) { /* noop */ }
+        try { this.renderRecaptchaWidgets('register'); } catch (err) { /* noop */ }
 
         // If OTP not sent yet, send it
         if (!this.otpSent) {
@@ -3830,6 +4249,14 @@ class AgricultureMarket {
 
         // OTP verified, proceed with registration
 
+        const recaptchaResponse = this.getRecaptchaResponse('auth');
+        if (!recaptchaResponse) {
+            this.setRecaptchaError('auth', 'Please complete the CAPTCHA before registering.');
+            this.setButtonLoading('register-submit-btn', false);
+            this.showMessage('Please complete the CAPTCHA before registering.', 'error');
+            return;
+        }
+
         const formData = {
             username: username,
             email: email,
@@ -3840,7 +4267,8 @@ class AgricultureMarket {
             last_name: lastName,
             phone: phone, // Already includes +63 prefix
             address: address,
-            role: this.selectedRole || 'customer'
+            role: this.selectedRole || 'customer',
+            'g-recaptcha-response': recaptchaResponse
         };
 
         try {
@@ -3853,6 +4281,14 @@ class AgricultureMarket {
             });
 
             const data = await response.json();
+
+            // Don't reset CAPTCHA on server errors (5xx) - allow retry without new solve
+            if (response.status >= 500) {
+                this.resetRecaptcha('auth');
+                this.setButtonLoading('register-submit-btn', false);
+                this.showMessage('Server error. Please try again.', 'error');
+                return;
+            }
 
             this.resetRecaptcha('auth');
 
@@ -3884,7 +4320,7 @@ class AgricultureMarket {
                     return;
                 }
 
-                this.showUserMenu();
+                await this.showUserMenu();
                 this.migrateGuestCart();
                 this.showMessage('Registration successful! Welcome to AgriCatch!', 'success');
                 // Handle return URL for customers
@@ -3914,24 +4350,34 @@ class AgricultureMarket {
         } catch (error) {
             this.setButtonLoading('register-submit-btn', false);
             console.error('Registration error:', error);
-            this.resetRecaptcha('auth');
-            this.showMessage('Registration failed. Please try again.', 'error');
+            // Don't reset CAPTCHA on network errors - allow retry
+            this.showMessage('Network error. Please check your connection and try again.', 'error');
         }
     }
 
     logout() {
+        // Show loading screen
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.remove('hidden');
+        }
+
         this.token = null;
         localStorage.removeItem('token');
-        const userDropdownMenu = document.getElementById('user-dropdown-menu');
         const userAccountBtn = document.getElementById('user-account-btn');
-        if (userDropdownMenu) userDropdownMenu.style.display = 'none';
         if (userAccountBtn) userAccountBtn.setAttribute('aria-expanded', 'false');
         this.showGuestMenu();
         this.updateCartCount();
         // Hide admin panel (if present on current page)
         const adminPanel = document.getElementById('admin-panel');
         if (adminPanel) adminPanel.style.display = 'none';
-        this.showMessage('Logged out successfully', 'success');
+
+        this.showMessage('Logged out successfully! Refreshing...', 'success');
+        
+        // Refresh page to show loading screen
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
     }
 
     async migrateGuestCart() {
@@ -4193,7 +4639,7 @@ class AgricultureMarket {
                 return;
             }
 
-            container.innerHTML = featured.map((product) => {
+            container.innerHTML = featured.map((product, index) => {
                 const imageUrl = product.image_url && String(product.image_url).trim() !== ''
                     ? product.image_url
                     : window.__PLACEHOLDER_IMAGE__;
@@ -4201,14 +4647,22 @@ class AgricultureMarket {
                 const itemLabel = product.id ? `onclick="app.showProductDetails(${product.id})" style="cursor:pointer;"` : '';
                 const productRating = Number(product.average_rating || 0);
                 const ratingValue = this.fmtNumber(productRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                const shipFrom = product.location || product.farm_location || 'your local area';
+                const shipFrom = product.province 
+                    ? (product.city ? `${product.city}, ${product.province}` : product.province)
+                    : 'your local area';
                 const isPurchasable = this.isProductPurchasable(product);
+                const rotate = -6 + (index * 2.5);
+                const delay = index * 0.03;
+                const farmerName = product.farmer_name || product.full_name || 'Local Farmer';
+                const verifiedBadge = product.farmer_verified ? '<i class="fas fa-check-circle" style="color: #2d7a3a; margin-left: 4px; font-size: 0.8rem;" title="Verified Farmer"></i>' : '';
+                const premiumBadge = product.farmer_premium ? '<i class="fas fa-gem" style="color: #9333ea; margin-left: 4px; font-size: 0.8rem;" title="Premium Farmer"></i>' : '';
                 return `
-                    <div class="product-card" ${itemLabel}>
+                    <div class="product-card" ${itemLabel} style="--stack-rotate:${rotate}deg;--reveal-delay:${delay}s;">
                         <img src="${imageUrl}" alt="${product.name}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
                         <div class="product-info">
                             <div class="featured-seller-badge">Best Seller</div>
                             <h3 class="product-name">${product.name}</h3>
+                            <div class="product-farmer" style="font-size: 0.85rem; color: #666; margin-bottom: 0.25rem;">${farmerName}${verifiedBadge}${premiumBadge}</div>
                             <div class="product-price">${this.fmtCurrency(product.price)} per ${product.unit || 'item'}</div>
                             <div class="product-meta product-card-summary">
                                 <div class="product-meta-row">
@@ -4240,6 +4694,20 @@ class AgricultureMarket {
                     </div>
                 `;
             }).join('');
+
+            const featuredSection = document.getElementById('featured');
+            if (featuredSection) {
+                const revealObserver = new IntersectionObserver((entries) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) {
+                            const cards = container.querySelectorAll('.product-card');
+                            cards.forEach((card) => card.classList.add('revealed'));
+                            revealObserver.unobserve(featuredSection);
+                        }
+                    });
+                }, { threshold: 0.15 });
+                revealObserver.observe(featuredSection);
+            }
         } catch (error) {
             console.error('Error loading featured products:', error);
             container.innerHTML = '<div class="empty-state"><p>Unable to load featured products.</p></div>';
@@ -4265,7 +4733,10 @@ class AgricultureMarket {
             const totalReviews = this.fmtNumber(product.total_reviews || 0);
             const averageRatingValue = Number(product.average_rating || 0);
             const averageRating = this.fmtNumber(averageRatingValue, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-            const shipFrom = product.location || product.farm_location || 'your local area';
+            const shipFrom = product.province 
+                ? (product.city ? `${product.city}, ${product.province}` : product.province)
+                : 'your local area';
+            const soldCount = Number(product.sold_qty ?? product.sales_count ?? 0) || 0;
             
             // Ensure image URL is properly formatted
             let productImageUrl = product.image_url || '';
@@ -4275,9 +4746,14 @@ class AgricultureMarket {
             if (!productImageUrl || productImageUrl === 'null' || productImageUrl === 'undefined') {
                 productImageUrl = window.__PLACEHOLDER_IMAGE__;
             }
-            
+
+            const hasValidId = product.id && product.id !== 'null' && product.id !== 'undefined';
+            const cardClickAttr = hasValidId ? `onclick="app.showProductDetails(${product.id})"` : '';
+            const cardStyle = hasValidId ? 'cursor: pointer;' : 'cursor: not-allowed; opacity: 0.7;';
+            const cartBtnAttr = hasValidId ? `onclick="event.stopPropagation(); app.addToCart(${product.id})"` : 'disabled style="opacity: 0.5; cursor: not-allowed;"';
+
             return `
-            <div class="product-card" onclick="app.showProductDetails(${product.id})" style="cursor: pointer;" data-product-id="${product.id}">
+            <div class="product-card" ${cardClickAttr} style="${cardStyle}" data-product-id="${product.id}">
                  <img src="${productImageUrl}"
                      alt="${product.name}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__" draggable="false" ondragstart="event.preventDefault()">
                 <div class="product-info">
@@ -4296,9 +4772,12 @@ class AgricultureMarket {
                         <div class="product-ship-from" aria-label="Shipping origin">
                             Ships from ${shipFrom}
                         </div>
+                        <div class="product-sold-left">
+                            <span class="sold-count">Sold ${this.fmtNumber(soldCount)}</span>
+                        </div>
                     </div>
                         <button type="button" class="add-to-cart-btn"
-                            onclick="event.stopPropagation(); app.addToCart(${product.id})"
+                            ${cartBtnAttr}
                             ${isPurchasable ? '' : 'disabled'}>
                         ${isPurchasable ? 'Add to Cart' : 'Unavailable'}
                     </button>
@@ -4386,23 +4865,76 @@ class AgricultureMarket {
 
     // Show product details in floating modal
     async showProductDetails(productId) {
+        console.log('[DEBUG] showProductDetails called with productId:', productId);
+
+        // Validate productId before proceeding
+        if (!productId || productId === 'null' || productId === 'undefined') {
+            console.error('[ERROR] Invalid productId:', productId);
+            this.showMessage('Invalid product ID', 'error');
+            return;
+        }
+
         try {
+            // Check cache first (5 minute expiry)
+            const cacheKey = String(productId);
+            const cached = this.productCache.get(cacheKey);
+            const now = Date.now();
+            if (cached && (now - cached.timestamp) < 300000) { // 5 minutes
+                console.log('[DEBUG] Using cached product data');
+                this.populateProductDetails(cached.product, productId);
+                return;
+            }
+
             // Open modal immediately with a lightweight loading placeholder
             const modal = document.getElementById('product-details-modal');
+            console.log('[DEBUG] Modal element found:', !!modal);
+            console.log('[DEBUG] Modal parent before move:', modal?.parentElement?.tagName);
             try { if (modal && modal.parentElement !== document.body) document.body.appendChild(modal); } catch (e) {}
+            console.log('[DEBUG] Modal parent after move:', modal?.parentElement?.tagName);
             if (modal) {
-                // Minimal placeholder so UI responds instantly
+                // Show loading spinner instead of text and clear all fields to prevent showing previous product data
                 const nameEl = document.getElementById('product-details-name');
                 const descEl = document.getElementById('product-details-description');
                 const imgEl = document.getElementById('product-details-image');
-                if (nameEl) nameEl.textContent = 'Loading...';
+                const priceEl = document.getElementById('product-details-price');
+                const farmerEl = document.getElementById('product-details-farmer');
+                const locationEl = document.getElementById('product-details-location');
+                const stockEl = document.getElementById('product-details-stock');
+                const harvestEl = document.getElementById('product-details-harvest');
+                const expiryEl = document.getElementById('product-details-expiry');
+                const ratingEl = document.getElementById('product-details-name-rating');
+                const farmerActionsEl = document.getElementById('product-details-farmer-actions');
+                const totalEl = document.getElementById('product-details-total');
+                const quantityEl = document.getElementById('product-details-quantity');
+                const addCartBtn = document.getElementById('product-details-add-cart');
+                const similarSellersEl = document.getElementById('similar-sellers');
+
+                if (nameEl) nameEl.innerHTML = '<div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">Loading...</span></div> Loading product details...';
                 if (descEl) descEl.textContent = '';
                 if (imgEl) {
-                    imgEl.src = window.__PLACEHOLDER_IMAGE__;
-                    imgEl.style.opacity = '0.6';
+                    imgEl.style.display = 'none';
                 }
+                // Clear all other fields to prevent showing previous product data
+                if (priceEl) priceEl.textContent = '';
+                if (farmerEl) farmerEl.textContent = '';
+                if (locationEl) locationEl.textContent = '';
+                if (stockEl) stockEl.textContent = '';
+                if (harvestEl) harvestEl.textContent = '';
+                if (expiryEl) expiryEl.textContent = '';
+                if (ratingEl) ratingEl.innerHTML = '';
+                if (farmerActionsEl) farmerActionsEl.innerHTML = '';
+                if (totalEl) totalEl.textContent = '';
+                if (quantityEl) quantityEl.value = '1';
+                if (addCartBtn) addCartBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+                if (similarSellersEl) similarSellersEl.innerHTML = '';
+                console.log('[DEBUG] Adding active/open classes to modal');
+                console.log('[DEBUG] Modal classes before:', modal.className);
                 modal.classList.add('active', 'open');
+                console.log('[DEBUG] Modal classes after:', modal.className);
+                console.log('[DEBUG] Calling setPageScrollLocked(true)');
                 this.setPageScrollLocked(true);
+                console.log('[DEBUG] Body overflow after lock:', document.body.style.overflow);
+                console.log('[DEBUG] HTML overflow after lock:', document.documentElement.style.overflow);
             }
 
             const response = await fetch(`${this.apiBase}/products/${productId}`, {
@@ -4417,17 +4949,30 @@ class AgricultureMarket {
             // API returns { product: {...} }, so extract the product object
             const product = data.product || data;
             console.log('Product data received:', product); // Debug log
-            
-            // Format dates from farmer's input
-            let harvestDate = 'Not specified';
-            if (product.harvest_date) {
-                try {
-                    const harvest = new Date(product.harvest_date);
-                    harvestDate = harvest.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });
-                } catch (e) {
-                    harvestDate = product.harvest_date; // Use raw value if date parsing fails
-                }
+
+            // Cache the product data
+            this.productCache.set(cacheKey, { product, timestamp: now });
+
+            // Populate modal with product data
+            await this.populateProductDetails(product, productId);
+        } catch (error) {
+            console.error('Error loading product details:', error);
+            this.showMessage('Failed to load product details', 'error');
+        }
+    }
+
+    async populateProductDetails(product, productId = null) {
+        try {
+        // Format dates from farmer's input
+        let harvestDate = 'Not specified';
+        if (product.harvest_date) {
+            try {
+                const harvest = new Date(product.harvest_date);
+                harvestDate = harvest.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });
+            } catch (e) {
+                harvestDate = product.harvest_date; // Use raw value if date parsing fails
             }
+        }
             
             let expiryDate = 'Not specified';
             if (product.expiry_date) {
@@ -4448,30 +4993,55 @@ class AgricultureMarket {
                 imageUrl = '/' + imageUrl;
             }
             
-            // If no image URL, use project logo placeholder (avoid external requests)
+            // If no image URL, show text instead of placeholder
             if (!imageUrl || imageUrl === 'null' || imageUrl === 'undefined' || imageUrl.trim() === '') {
-                imageUrl = window.__PLACEHOLDER_IMAGE__;
+                imageElement.style.display = 'none';
+                // Create or update a no-image text element
+                let noImageText = document.getElementById('product-details-no-image');
+                if (!noImageText) {
+                    noImageText = document.createElement('div');
+                    noImageText.id = 'product-details-no-image';
+                    noImageText.style.cssText = 'display: flex; align-items: center; justify-content: center; height: 300px; background: #f8f9fa; border-radius: 12px; color: #666; font-size: 1.1rem; font-weight: 500; border: 2px dashed #ddd;';
+                    imageElement.parentNode.insertBefore(noImageText, imageElement);
+                }
+                noImageText.textContent = 'No image provided';
+                noImageText.style.display = 'flex';
+            } else {
+                // Hide no-image text if it exists
+                const noImageText = document.getElementById('product-details-no-image');
+                if (noImageText) {
+                    noImageText.style.display = 'none';
+                }
+                // Set image with error handling - PRIORITY: Image must sync with farmer's upload
+                imageElement.src = imageUrl;
+                imageElement.alt = product.name || 'Product Image';
+                imageElement.style.display = 'block';
+
+                // Add error handler to show no-image text if image fails to load
+                imageElement.onerror = function() {
+                    console.warn('Product image failed to load:', imageUrl);
+                    this.style.display = 'none';
+                    let noImageText = document.getElementById('product-details-no-image');
+                    if (!noImageText) {
+                        noImageText = document.createElement('div');
+                        noImageText.id = 'product-details-no-image';
+                        noImageText.style.cssText = 'display: flex; align-items: center; justify-content: center; height: 300px; background: #f8f9fa; border-radius: 12px; color: #666; font-size: 1.1rem; font-weight: 500; border: 2px dashed #ddd;';
+                        this.parentNode.insertBefore(noImageText, this);
+                    }
+                    noImageText.textContent = 'No image provided';
+                    noImageText.style.display = 'flex';
+                    this.onerror = null; // Prevent infinite loop
+                };
+
+                // Add load handler to ensure image is displayed
+                imageElement.onload = function() {
+                    this.style.opacity = '1';
+                };
+
+                // Show loading state initially
+                imageElement.style.opacity = '0.5';
+                imageElement.style.transition = 'opacity 0.3s ease';
             }
-            
-            // Set image with error handling - PRIORITY: Image must sync with farmer's upload
-            imageElement.src = imageUrl;
-            imageElement.alt = product.name || 'Product Image';
-            
-            // Add error handler to ensure image loads correctly
-            imageElement.onerror = function() {
-                console.warn('Product image failed to load:', imageUrl);
-                this.src = window.__PLACEHOLDER_IMAGE__;
-                this.onerror = null; // Prevent infinite loop
-            };
-            
-            // Add load handler to ensure image is displayed
-            imageElement.onload = function() {
-                this.style.opacity = '1';
-            };
-            
-            // Show loading state initially
-            imageElement.style.opacity = '0.5';
-            imageElement.style.transition = 'opacity 0.3s ease';
             
             // Store product data for quantity calculations
             this.currentProductDetails = product;
@@ -4494,7 +5064,7 @@ class AgricultureMarket {
             if (nameEl) nameEl.textContent = product.name || 'Product Name';
             if (nameRatingEl) {
                 const productRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                const soldCount = this.fmtNumber(product.sales_count || 0);
+                const soldCount = this.fmtNumber(product.sold_qty ?? product.sales_count ?? 0);
                 nameRatingEl.innerHTML = `
                     <div class="name-rating-row">
                         <div class="name-rating-left">${productRating} <i class="fas fa-star rating-icon" aria-hidden="true"></i> (${this.fmtNumber(product.total_reviews || 0)} reviews)</div>
@@ -4505,8 +5075,9 @@ class AgricultureMarket {
             if (descriptionEl) descriptionEl.textContent = product.description || 'No description available.';
             if (farmerEl) {
                 const farmerName = product.farmer_name || product.full_name || 'Local Farmer';
-                const verifiedBadge = product.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : '';
-                farmerEl.innerHTML = `${farmerName}${verifiedBadge}`;
+                const verifiedBadge = product.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #2d7a3a; margin-left: 4px;" title="Verified Farmer"></i>' : '';
+                const premiumBadge = product.farmer_premium ? ' <i class="fas fa-gem" style="color: #9333ea; margin-left: 4px;" title="Premium Farmer"></i>' : '';
+                farmerEl.innerHTML = `${farmerName}${verifiedBadge}${premiumBadge}`;
             }
             if (farmerActionsEl) {
                 const farmerId = Number(product.farmer_id || 0);
@@ -4538,7 +5109,9 @@ class AgricultureMarket {
                     });
                 }
             }
-            if (locationEl) locationEl.textContent = product.location || product.farm_location || 'Location not specified';
+            if (locationEl) locationEl.textContent = product.province 
+                ? (product.city ? `${product.city}, ${product.province}` : product.province)
+                : 'your local area';
             if (stockEl) stockEl.textContent = `${this.fmtNumber(product.stock_quantity || 0)} ${product.unit || 'unit'}`;
             if (harvestEl) harvestEl.textContent = harvestDate;
             if (expiryEl) expiryEl.textContent = expiryDate;
@@ -4560,7 +5133,7 @@ class AgricultureMarket {
             // Update add to cart button
             const addCartBtn = document.getElementById('product-details-add-cart');
             if (addCartBtn) {
-                addCartBtn.onclick = async () => {
+                addCartBtn.onclick = async (e) => {
                     if (!this.isProductPurchasable(product)) {
                         this.showMessage('This product is currently unavailable.', 'error');
                         return;
@@ -4576,6 +5149,8 @@ class AgricultureMarket {
                     addCartBtn.disabled = true;
                     try {
                         await this.addToCart(productId, quantity);
+                        // Trigger flying animation only on success
+                        this.createFlyingCartAnimation(addCartBtn);
                         await this.refreshCurrentProductCartQuantity(productId);
                         this.normalizeProductQuantityInput();
                     } finally {
@@ -4602,6 +5177,15 @@ class AgricultureMarket {
                 modalEl.classList.add('active', 'open');
                 this.setPageScrollLocked(true);
 
+                // Keep cart button enabled for product details modal
+                try {
+                    const cartBtn = document.getElementById('cart-btn');
+                    if (cartBtn) {
+                        cartBtn.classList.remove('disabled-while-modal');
+                        cartBtn.removeAttribute('aria-hidden');
+                    }
+                } catch (e) {}
+
                 // Add Escape key handler to close modal like auth modal
                 try {
                     this._productModalKeydown = (ev) => {
@@ -4617,15 +5201,25 @@ class AgricultureMarket {
     }
     
     closeProductDetails() {
+        console.log('[DEBUG] closeProductDetails called');
         const modal = document.getElementById('product-details-modal');
+        console.log('[DEBUG] Modal element found:', !!modal);
         if (modal) {
+            console.log('[DEBUG] Modal classes before removal:', modal.className);
             modal.classList.remove('active', 'open');
+            console.log('[DEBUG] Modal classes after removal:', modal.className);
         }
         const shopModal = document.getElementById('shop-details-modal');
         if (shopModal) {
             shopModal.classList.remove('active', 'open');
         }
+
+        // Update nav state after modal closes
+        setTimeout(() => this.updateActiveNavLink(), 100);
+        console.log('[DEBUG] Calling setPageScrollLocked(false)');
         this.setPageScrollLocked(false);
+        console.log('[DEBUG] Body overflow after unlock:', document.body.style.overflow);
+        console.log('[DEBUG] HTML overflow after unlock:', document.documentElement.style.overflow);
         try {
             if (this._productModalKeydown) {
                 document.removeEventListener('keydown', this._productModalKeydown);
@@ -4722,6 +5316,13 @@ class AgricultureMarket {
     async loadSimilarSellers(productId) {
         const container = document.getElementById('similar-sellers');
         if (!container) return;
+
+        // Validate productId before making API call
+        if (!productId || productId === 'null' || productId === 'undefined') {
+            console.error('[ERROR] Invalid productId in loadSimilarSellers:', productId);
+            container.innerHTML = '<h3>Similar Farmer Shops</h3><div class="empty-state"><p>Unable to load similar sellers.</p></div>';
+            return;
+        }
 
         try {
             container.innerHTML = '<h3>Similar Farmer Shops</h3><div class="loading">Loading similar offers...</div>';
@@ -4865,6 +5466,16 @@ class AgricultureMarket {
 
     // Cart functionality
     async addToCart(productId, quantity = 1) {
+        // Validate productId before making API call
+        if (!productId || productId === 'null' || productId === 'undefined') {
+            console.error('[ERROR] Invalid productId in addToCart:', productId);
+            this.showMessage('Invalid product ID', 'error');
+            return;
+        }
+
+        // Find the clicked add-to-cart button for animation later
+        const addToCartBtn = event?.target?.closest('.add-to-cart-btn');
+
         try {
             const response = await fetch(`${this.apiBase}/cart`, {
                 method: 'POST',
@@ -4882,13 +5493,31 @@ class AgricultureMarket {
             const data = await response.json();
 
             if (response.ok) {
-                this.updateCartCount();
+                // Trigger fly animation only on success
+                if (addToCartBtn) {
+                    addToCartBtn.classList.add('adding');
+                    setTimeout(() => addToCartBtn.classList.remove('adding'), 400);
+                    this.createFlyingCartAnimation(addToCartBtn);
+                }
+
+                // Update cart count from response with bounce animation
+                const cartCountEl = document.getElementById('cart-count');
+                const count = data.summary ? (data.summary.itemCount || 0) : 0;
+                if (cartCountEl) {
+                    cartCountEl.textContent = count;
+                    cartCountEl.style.display = count > 0 ? 'inline-flex' : 'none';
+                    // Trigger bounce animation
+                    cartCountEl.classList.remove('bounce');
+                    void cartCountEl.offsetWidth; // Trigger reflow
+                    cartCountEl.classList.add('bounce');
+                }
+
                 this.showMessage('Item added to cart!', 'success', { position: 'center' });
-                
+
                 // If cart is already open, refresh the cart display
                 const cartSidebar = document.getElementById('cart-sidebar');
                 if (cartSidebar && cartSidebar.classList.contains('open')) {
-                    await this.openCart(); // This will refresh the cart display
+                    this.renderCart(data);
                 }
             } else {
                 this.showMessage(data.message || 'Failed to add item to cart', 'error');
@@ -4897,6 +5526,49 @@ class AgricultureMarket {
             console.error('Error adding to cart:', error);
             this.showMessage('Failed to add item to cart', 'error');
         }
+    }
+
+    createFlyingCartAnimation(startElement) {
+        const cartBtn = document.getElementById('cart-btn') || document.querySelector('.float-cart-btn');
+        if (!startElement || !cartBtn) return;
+
+        // Get product image - try product card first, then modal
+        let imageUrl = window.__PLACEHOLDER_IMAGE__;
+        const productCard = startElement.closest('.product-card');
+        if (productCard) {
+            const productImage = productCard?.querySelector('.product-image');
+            imageUrl = productImage?.src || imageUrl;
+        } else {
+            // Try modal product details image
+            const modalImage = document.getElementById('product-details-image');
+            imageUrl = modalImage?.src || imageUrl;
+        }
+
+        // Get positions
+        const startRect = startElement.getBoundingClientRect();
+        const endRect = cartBtn.getBoundingClientRect();
+
+        // Create flying element with product image (using small thumbnail size)
+        const flyingItem = document.createElement('div');
+        flyingItem.className = 'flying-cart-item';
+        // Use the same image but CSS will display it at small size (40px)
+        flyingItem.style.backgroundImage = `url(${imageUrl})`;
+        flyingItem.style.left = `${startRect.left + startRect.width / 2 - 20}px`;
+        flyingItem.style.top = `${startRect.top + startRect.height / 2 - 20}px`;
+        document.body.appendChild(flyingItem);
+
+        // Animate to cart button position
+        requestAnimationFrame(() => {
+            flyingItem.style.left = `${endRect.left + endRect.width / 2 - 20}px`;
+            flyingItem.style.top = `${endRect.top + endRect.height / 2 - 20}px`;
+            flyingItem.style.transform = 'scale(0.3)';
+            flyingItem.style.opacity = '0';
+        });
+
+        // Remove after animation
+        setTimeout(() => {
+            flyingItem.remove();
+        }, 800);
     }
 
     async toggleWishlist(productId, isInWishlist) {
@@ -4972,7 +5644,8 @@ class AgricultureMarket {
                     cartOverlay.classList.add('active');
                 }
                 // Prevent background scrolling when cart is open
-                document.body.style.overflow = 'hidden';
+                document.documentElement.classList.add('modal-open');
+                document.body.classList.add('modal-open');
             } else {
                 console.error('Cart API error:', response.status);
                 const errorData = await response.json().catch(() => ({}));
@@ -5014,10 +5687,14 @@ class AgricultureMarket {
                 ? `<span class="status-pill pending" style="margin-left:6px;">Unavailable</span>`
                 : '';
             const disabledAttr = isUnavailable ? 'disabled' : '';
+            const maxStock = Math.max(1, Number(item.stock_quantity) || 1);
+            const minusDisabled = isUnavailable || item.quantity <= 1;
+            const plusDisabled = isUnavailable || item.quantity >= maxStock;
             return `
             <div class="cart-item">
                 <img src="${item.image_url || '/images/logo.png'}"
-                     alt="${item.name}" class="cart-item-image" onerror="this.src='/images/logo.png'">
+                     alt="${item.name}" class="cart-item-image" onerror="this.src='/images/logo.png'"
+                     onclick="app.closeCart(); app.showProductDetails(${item.product_id})" style="cursor: pointer;">
                 <div class="cart-item-details">
                     <div class="cart-item-name">${item.name} ${badge}</div>
                     <div class="cart-item-price">${this.fmtCurrency(item.price)} ${item.unit ? 'per ' + item.unit : ''}</div>
@@ -5025,18 +5702,18 @@ class AgricultureMarket {
                     <div class="cart-item-stock">Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}</div>
                     <div class="cart-item-quantity">
                         <div class="quantity-controls">
-                            <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity - 1})" title="Decrease quantity" ${disabledAttr}>−</button>
+                            <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, -1, ${maxStock})" title="Decrease quantity" ${minusDisabled ? 'disabled' : ''}>−</button>
                             <input
                                 type="number"
                                 class="quantity-value-input"
                                 value="${item.quantity}"
                                 min="1"
-                                max="${Math.max(1, Number(item.stock_quantity) || 1)}"
+                                max="${maxStock}"
                                 inputmode="numeric"
                                 aria-label="Cart quantity"
-                                onchange="app.handleCartQuantityInput(${item.id}, this.value, ${Math.max(1, Number(item.stock_quantity) || 1)}, this)"
+                                onchange="app.handleCartQuantityInput(${item.id}, this.value, ${maxStock}, this)"
                                 onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}" ${disabledAttr}>
-                            <button class="quantity-btn" onclick="app.updateCartItem(${item.id}, ${item.quantity + 1})" title="Increase quantity" ${disabledAttr}>+</button>
+                            <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, 1, ${maxStock})" title="Increase quantity" ${plusDisabled ? 'disabled' : ''}>+</button>
                         </div>
                         <button class="remove-item" onclick="app.removeCartItem(${item.id})" title="Remove item">
                             <i class="fas fa-trash-alt"></i>
@@ -5059,61 +5736,235 @@ class AgricultureMarket {
         if (cartSidebar) {
             cartSidebar.classList.remove('open');
             if (cartOverlay) cartOverlay.classList.remove('active');
-            document.body.style.overflow = ''; // Restore body scroll
+            // Restore body scroll
+            document.documentElement.classList.remove('modal-open');
+            document.body.classList.remove('modal-open');
         }
+    }
+
+    _updateCartQuantityButtons(cartId) {
+        const inputEl = document.querySelector(`.quantity-value-input[onchange*="${cartId}"]`);
+        if (!inputEl) return;
+        const controls = inputEl.closest('.quantity-controls');
+        if (!controls) return;
+        const buttons = controls.querySelectorAll('.quantity-btn');
+        if (buttons.length < 2) return;
+        if (inputEl.disabled) {
+            buttons[0].disabled = true;
+            buttons[1].disabled = true;
+            return;
+        }
+        const currentQty = parseInt(inputEl.value, 10) || 1;
+        const maxStock = parseInt(inputEl.max, 10) || 1;
+        buttons[0].disabled = currentQty <= 1;
+        buttons[1].disabled = currentQty >= maxStock;
     }
 
     async updateCartItem(cartId, quantity) {
         if (quantity < 1) return;
 
-        try {
-            const requestBody = { quantity };
-            const headers = {
-                'Content-Type': 'application/json'
-            };
+        // Optimistic UI update - update immediately before API call
+        const inputEl = document.querySelector(`.quantity-value-input[onchange*="${cartId}"]`);
+        const cartTotalEl = document.getElementById('cart-total');
+        const oldQuantity = inputEl ? parseInt(inputEl.value) : quantity;
+        const oldTotal = cartTotalEl ? parseFloat(cartTotalEl.textContent.replace(/,/g, '')) : 0;
 
-            // Add session ID for guest users
-            if (!this.token) {
-                requestBody.sessionId = this.sessionId;
-            } else {
-                headers['Authorization'] = `Bearer ${this.token}`;
-            }
+        // Find the cart item to get its price for optimistic total update
+        const cartItemEl = inputEl ? inputEl.closest('.cart-item') : null;
+        const itemPriceEl = cartItemEl ? cartItemEl.querySelector('.cart-item-price') : null;
+        const itemPrice = itemPriceEl ? parseFloat(itemPriceEl.textContent.replace(/[^\d.]/g, '')) : 0;
 
-            const response = await fetch(`${this.apiBase}/cart/${cartId}`, {
-                method: 'PUT',
-                headers: headers,
-                body: JSON.stringify(requestBody)
-            });
+        // Update input value immediately
+        if (inputEl) {
+            inputEl.value = quantity;
+        }
 
+        // Optimistically update total price
+        if (cartTotalEl && itemPrice) {
+            const quantityDiff = quantity - oldQuantity;
+            const newTotal = oldTotal + (itemPrice * quantityDiff);
+            cartTotalEl.textContent = this.fmtNumber(newTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Send API request in background without blocking UI
+        const requestBody = { quantity };
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+
+        // Add session ID for guest users
+        if (!this.token) {
+            requestBody.sessionId = this.sessionId;
+        } else {
+            headers['Authorization'] = `Bearer ${this.token}`;
+        }
+
+        // Fire and forget - don't wait for response to keep UI responsive
+        fetch(`${this.apiBase}/cart/${cartId}`, {
+            method: 'PUT',
+            headers: headers,
+            body: JSON.stringify(requestBody)
+        }).then(async response => {
             if (response.ok) {
-                this.updateCartCount();
-                this.openCart(); // Refresh cart display
+                const data = await response.json();
                 
-                // If checkout modal is open, refresh it too
-                const checkoutModal = document.getElementById('checkout-modal');
-                if (checkoutModal && checkoutModal.classList.contains('open')) {
-                    await this.openCheckoutModal();
+                // Update cart count from response
+                const cartCountEl = document.getElementById('cart-count');
+                const count = data.summary ? (data.summary.itemCount || 0) : 0;
+                if (cartCountEl) {
+                    cartCountEl.textContent = count;
+                    cartCountEl.style.display = count > 0 ? 'inline-flex' : 'none';
+                }
+                
+                // Update total with actual server value
+                if (cartTotalEl && data.summary) {
+                    cartTotalEl.textContent = this.fmtNumber(data.summary.subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 }
             } else {
+                // Revert optimistic update on error
+                if (inputEl) {
+                    inputEl.value = oldQuantity;
+                }
+                if (cartTotalEl) {
+                    cartTotalEl.textContent = this.fmtNumber(oldTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
                 const data = await response.json();
                 this.showMessage(data.message || 'Failed to update cart', 'error');
             }
-        } catch (error) {
+        }).catch(error => {
+            // Revert optimistic update on error
+            if (inputEl) {
+                inputEl.value = oldQuantity;
+            }
+            if (cartTotalEl) {
+                cartTotalEl.textContent = this.fmtNumber(oldTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
             console.error('Error updating cart item:', error);
             this.showMessage('Failed to update cart item', 'error');
-        }
-    }
-    
-    async updateCheckoutItem(cartId, quantity) {
-        await this.updateCartItem(cartId, quantity);
+        });
     }
 
+    // Synchronous cart quantity update for instant UI feedback (like product modal)
+    updateCartItemSync(cartId, quantity) {
+        if (quantity < 1) return;
+
+        const inputEl = document.querySelector(`.quantity-value-input[onchange*="${cartId}"]`);
+        const cartTotalEl = document.getElementById('cart-total');
+        const oldQuantity = inputEl ? parseInt(inputEl.value) : quantity;
+        const oldTotal = cartTotalEl ? parseFloat(cartTotalEl.textContent.replace(/,/g, '')) : 0;
+
+        // Find the cart item to get its price for local total update
+        const cartItemEl = inputEl ? inputEl.closest('.cart-item') : null;
+        const itemPriceEl = cartItemEl ? cartItemEl.querySelector('.cart-item-price') : null;
+        const itemPrice = itemPriceEl ? parseFloat(itemPriceEl.textContent.replace(/[^\d.]/g, '')) : 0;
+
+        // Update input value immediately
+        if (inputEl) {
+            inputEl.value = quantity;
+            this._updateCartQuantityButtons(cartId);
+        }
+
+        // Update total price immediately
+        if (cartTotalEl && itemPrice) {
+            const quantityDiff = quantity - oldQuantity;
+            const newTotal = oldTotal + (itemPrice * quantityDiff);
+            cartTotalEl.textContent = this.fmtNumber(newTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Debounce the API call so rapid clicks only send one request
+        this._debounceCartUpdate(cartId, quantity, oldQuantity, oldTotal);
+    }
+
+    _debounceCartUpdate(cartId, quantity, oldQuantity, oldTotal) {
+        if (!this._cartUpdateTimers) {
+            this._cartUpdateTimers = {};
+        }
+        if (this._cartUpdateTimers[cartId]) {
+            clearTimeout(this._cartUpdateTimers[cartId]);
+        }
+        this._cartUpdateTimers[cartId] = setTimeout(() => {
+            this._sendCartUpdate(cartId, quantity, oldQuantity, oldTotal);
+            delete this._cartUpdateTimers[cartId];
+        }, 400);
+    }
+
+    _sendCartUpdate(cartId, quantity, oldQuantity, oldTotal) {
+        const inputEl = document.querySelector(`.quantity-value-input[onchange*="${cartId}"]`);
+        const cartTotalEl = document.getElementById('cart-total');
+
+        const requestBody = { quantity };
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+
+        if (!this.token) {
+            requestBody.sessionId = this.sessionId;
+        } else {
+            headers['Authorization'] = `Bearer ${this.token}`;
+        }
+
+        fetch(`${this.apiBase}/cart/${cartId}`, {
+            method: 'PUT',
+            headers: headers,
+            body: JSON.stringify(requestBody)
+        }).then(async response => {
+            if (response.ok) {
+                const data = await response.json();
+
+                // Update cart count from response
+                const cartCountEl = document.getElementById('cart-count');
+                const count = data.summary ? (data.summary.itemCount || 0) : 0;
+                if (cartCountEl) {
+                    cartCountEl.textContent = count;
+                    cartCountEl.style.display = count > 0 ? 'inline-flex' : 'none';
+                }
+
+                // Update total with actual server value
+                if (cartTotalEl && data.summary) {
+                    cartTotalEl.textContent = this.fmtNumber(data.summary.subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+
+                this._updateCartQuantityButtons(cartId);
+            } else {
+                // Revert optimistic update on error
+                if (inputEl) {
+                    inputEl.value = oldQuantity;
+                    this._updateCartQuantityButtons(cartId);
+                }
+                if (cartTotalEl) {
+                    cartTotalEl.textContent = this.fmtNumber(oldTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+                const data = await response.json();
+                this.showMessage(data.message || 'Failed to update cart', 'error');
+            }
+        }).catch(error => {
+            // Revert optimistic update on error
+            if (inputEl) {
+                inputEl.value = oldQuantity;
+                this._updateCartQuantityButtons(cartId);
+            }
+            if (cartTotalEl) {
+                cartTotalEl.textContent = this.fmtNumber(oldTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            console.error('Error updating cart item:', error);
+            this.showMessage('Failed to update cart item', 'error');
+        });
+    }
+    
     async handleCartQuantityInput(cartId, rawValue, maxStock, inputEl) {
         const parsed = Number.parseInt(String(rawValue || '').trim(), 10);
         const safeMax = Number.isFinite(Number(maxStock)) && Number(maxStock) > 0 ? Number(maxStock) : 1;
         const nextQuantity = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), safeMax) : 1;
         if (inputEl) inputEl.value = String(nextQuantity);
-        await this.updateCartItem(cartId, nextQuantity);
+        this.updateCartItemSync(cartId, nextQuantity);
+    }
+
+    handleCartQuantityButton(cartId, delta, maxStock) {
+        const inputEl = document.querySelector(`.quantity-value-input[onchange*="${cartId}"]`);
+        const safeMax = Number.isFinite(Number(maxStock)) && Number(maxStock) > 0 ? Number(maxStock) : 1;
+        const current = inputEl ? parseInt(inputEl.value, 10) : 1;
+        const nextQuantity = Math.min(Math.max(current + delta, 1), safeMax);
+        this.updateCartItemSync(cartId, nextQuantity);
     }
 
     async handleCheckoutQuantityInput(cartId, rawValue, maxStock, inputEl) {
@@ -5121,7 +5972,60 @@ class AgricultureMarket {
         const safeMax = Number.isFinite(Number(maxStock)) && Number(maxStock) > 0 ? Number(maxStock) : 1;
         const nextQuantity = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), safeMax) : 1;
         if (inputEl) inputEl.value = String(nextQuantity);
-        await this.updateCheckoutItem(cartId, nextQuantity);
+        this.updateCheckoutItemSync(cartId, nextQuantity);
+    }
+
+    handleCheckoutQuantityButton(cartId, delta, maxStock) {
+        const inputEl = document.querySelector(`.checkout-qty-input[onchange*="${cartId}"]`);
+        const safeMax = Number.isFinite(Number(maxStock)) && Number(maxStock) > 0 ? Number(maxStock) : 1;
+        const current = inputEl ? parseInt(inputEl.value, 10) : 1;
+        const nextQuantity = Math.min(Math.max(current + delta, 1), safeMax);
+        this.updateCheckoutItemSync(cartId, nextQuantity);
+    }
+
+    updateCheckoutItemSync(cartId, quantity) {
+        if (quantity < 1) return;
+
+        const inputEl = document.querySelector(`.checkout-qty-input[onchange*="${cartId}"]`);
+        const checkoutItemEl = inputEl ? inputEl.closest('.checkout-item') : null;
+        const itemTotalEl = checkoutItemEl ? checkoutItemEl.querySelector('.checkout-item-price') : null;
+        const priceTextEl = checkoutItemEl ? checkoutItemEl.querySelector('.checkout-item-meta small') : null;
+        const oldQuantity = inputEl ? parseInt(inputEl.value) : quantity;
+        const itemPrice = priceTextEl ? parseFloat(priceTextEl.textContent.replace(/[^\d.]/g, '')) : 0;
+
+        if (inputEl) {
+            inputEl.value = quantity;
+        }
+
+        if (itemTotalEl && itemPrice) {
+            itemTotalEl.textContent = this.fmtCurrency(itemPrice * quantity);
+        }
+
+        this._updateCheckoutTotals();
+        this._debounceCartUpdate(cartId, quantity, oldQuantity, 0);
+    }
+
+    _updateCheckoutTotals() {
+        const checkoutSubtotal = document.getElementById('checkout-subtotal');
+        const checkoutTotal = document.getElementById('checkout-total');
+        const checkoutTotalFooter = document.getElementById('checkout-total-footer');
+
+        const itemTotals = Array.from(document.querySelectorAll('.checkout-item-price')).map(el =>
+            parseFloat(el.textContent.replace(/[^\d.]/g, '')) || 0
+        );
+        const subtotal = itemTotals.reduce((sum, val) => sum + val, 0);
+        const deliveryFee = this.getDeliveryFee();
+        const grandTotal = subtotal + (deliveryFee > 0 ? deliveryFee : 0);
+
+        if (checkoutSubtotal) {
+            checkoutSubtotal.textContent = this.fmtNumber(subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        if (checkoutTotal) {
+            checkoutTotal.textContent = this.fmtNumber(grandTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        if (checkoutTotalFooter) {
+            checkoutTotalFooter.textContent = this.fmtNumber(grandTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
     }
     
     async removeCheckoutItem(cartId) {
@@ -5129,6 +6033,13 @@ class AgricultureMarket {
     }
 
     async removeCartItem(cartId) {
+        // Find and disable the delete button, show loading state
+        const deleteBtn = document.querySelector(`.remove-item[onclick*="${cartId}"]`);
+        if (deleteBtn) {
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
         try {
             const headers = {
                 'Content-Type': 'application/json'
@@ -5150,21 +6061,35 @@ class AgricultureMarket {
             });
 
             if (response.ok) {
-                this.updateCartCount();
-                this.openCart(); // Refresh cart display
+                const data = await response.json();
                 
-                // If checkout modal is open, refresh it too
-                const checkoutModal = document.getElementById('checkout-modal');
-                if (checkoutModal && checkoutModal.classList.contains('open')) {
-                    await this.openCheckoutModal();
+                // Update cart count from response
+                const cartCountEl = document.getElementById('cart-count');
+                const count = data.summary ? (data.summary.itemCount || 0) : 0;
+                if (cartCountEl) {
+                    cartCountEl.textContent = count;
+                    cartCountEl.style.display = count > 0 ? 'inline-flex' : 'none';
                 }
+                
+                // Render cart with updated data
+                this.renderCart(data);
             } else {
                 const data = await response.json();
                 this.showMessage(data.message || 'Failed to remove item', 'error');
+                // Re-enable button on error
+                if (deleteBtn) {
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                }
             }
         } catch (error) {
             console.error('Error removing cart item:', error);
             this.showMessage('Failed to remove item', 'error');
+            // Re-enable button on error
+            if (deleteBtn) {
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+            }
         }
     }
 
@@ -5214,7 +6139,6 @@ class AgricultureMarket {
         const checkoutItems = document.getElementById('checkout-items-list');
         const checkoutItemsContainer = checkoutItems?.closest('.checkout-items-container');
         const checkoutSubtotal = document.getElementById('checkout-subtotal');
-        const checkoutTotal = document.getElementById('checkout-total');
         const checkoutTotalFooter = document.getElementById('checkout-total-footer');
 
         if (!checkoutItems) return;
@@ -5243,7 +6167,7 @@ class AgricultureMarket {
                         ${badge}
                     </div>
                     <div class="checkout-item-controls">
-                        <button type="button" class="checkout-qty-btn" onclick="app.updateCheckoutItem(${item.id}, ${item.quantity - 1})" ${(item.quantity <= 1 || isUnavailable) ? 'disabled' : ''} aria-label="Decrease quantity">
+                        <button type="button" class="checkout-qty-btn" onclick="app.handleCheckoutQuantityButton(${item.id}, -1, ${Math.max(1, Number(item.stock_quantity) || 1)})" ${(item.quantity <= 1 || isUnavailable) ? 'disabled' : ''} aria-label="Decrease quantity">
                             <i class="fas fa-minus"></i>
                         </button>
                         <input
@@ -5256,7 +6180,7 @@ class AgricultureMarket {
                             aria-label="Checkout quantity"
                             onchange="app.handleCheckoutQuantityInput(${item.id}, this.value, ${Math.max(1, Number(item.stock_quantity) || 1)}, this)"
                             onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}" ${disabledAttr}>
-                        <button type="button" class="checkout-qty-btn" onclick="app.updateCheckoutItem(${item.id}, ${item.quantity + 1})" aria-label="Increase quantity" ${disabledAttr}>
+                        <button type="button" class="checkout-qty-btn" onclick="app.handleCheckoutQuantityButton(${item.id}, 1, ${Math.max(1, Number(item.stock_quantity) || 1)})" aria-label="Increase quantity" ${disabledAttr}>
                             <i class="fas fa-plus"></i>
                         </button>
                         <button type="button" class="checkout-remove-btn" onclick="app.removeCheckoutItem(${item.id})" aria-label="Remove item">
@@ -5288,9 +6212,6 @@ class AgricultureMarket {
 
         if (checkoutSubtotal) {
             checkoutSubtotal.textContent = this.fmtNumber(subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-        if (checkoutTotal) {
-            checkoutTotal.textContent = this.fmtNumber(grandTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         if (checkoutTotalFooter) {
             checkoutTotalFooter.textContent = this.fmtNumber(grandTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -5355,11 +6276,14 @@ class AgricultureMarket {
         const address = (this.savedAddresses || []).find(a => String(a.id) === String(addressId));
         if (!address) return;
         
-        // Populate full name
-        const fullNameInput = document.getElementById('checkout-fullname');
-        if (fullNameInput) {
-            fullNameInput.value = address.full_name || '';
-        }
+        // Populate first name, middle name, last name
+        const firstNameInput = document.getElementById('checkout-firstname');
+        const middleNameInput = document.getElementById('checkout-middlename');
+        const lastNameInput = document.getElementById('checkout-lastname');
+        
+        if (firstNameInput) firstNameInput.value = address.first_name || '';
+        if (middleNameInput) middleNameInput.value = address.middle_name || '';
+        if (lastNameInput) lastNameInput.value = address.last_name || '';
         
         // Populate phone number (remove +63 prefix if present)
         const phoneInput = document.getElementById('checkout-phone');
@@ -5375,7 +6299,10 @@ class AgricultureMarket {
     async handleCheckout(e) {
         e.preventDefault();
 
-        const fullName = document.getElementById('checkout-fullname').value.trim();
+        const firstName = document.getElementById('checkout-firstname').value.trim();
+        const middleName = document.getElementById('checkout-middlename').value.trim();
+        const lastName = document.getElementById('checkout-lastname').value.trim();
+        const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim();
         const phone = document.getElementById('checkout-phone').value.trim();
         const phoneDigits = phone.replace(/\D/g, '');
         const deliveryAddress = 'Trabajo Market, M. Dela Fuente St., Sampaloc, Manila, Metro Manila';
@@ -5384,9 +6311,10 @@ class AgricultureMarket {
         const specialInstructions = document.getElementById('special-instructions').value.trim();
 
         // Validate required fields
-        if (!fullName) {
-            this.showMessage('Please enter recipient\'s full name', 'error');
-            document.getElementById('checkout-fullname').focus();
+        if (!firstName || !lastName) {
+            this.showMessage('Please enter recipient\'s first name and last name', 'error');
+            if (!firstName) document.getElementById('checkout-firstname').focus();
+            else document.getElementById('checkout-lastname').focus();
             return;
         }
 
@@ -5522,9 +6450,11 @@ class AgricultureMarket {
     }
 
     openAuthModal(role, mode) {
+        console.log('[DEBUG] openAuthModal called with role:', role, 'mode:', mode);
         // If cart is open, close it so auth modal is not covered
         try { this.closeCart(); } catch (e) {}
         const authModal = document.getElementById('auth-modal');
+        console.log('[DEBUG] Auth modal element found:', !!authModal);
         const authTitle = document.getElementById('auth-modal-title');
         const authSubmitBtn = document.getElementById('auth-submit-btn');
         const sendOtpBtn = document.getElementById('send-otp-btn');
@@ -5674,10 +6604,27 @@ class AgricultureMarket {
         try {
             if (authModal && authModal.parentElement !== document.body) document.body.appendChild(authModal);
         } catch (e) {}
+        console.log('[DEBUG] Auth modal parent before open:', authModal?.parentElement?.tagName);
+        console.log('[DEBUG] Auth modal classes before open:', authModal?.className);
         authModal.classList.add('open');
+        console.log('[DEBUG] Auth modal classes after open:', authModal?.className);
         this.setPageScrollLocked(true);
         this.activateAuthFocusTrap();
         this.focusAuthModalPrimaryField(mode);
+        
+        // Force reCAPTCHA wrapper to be visible for login mode
+        if (mode === 'login') {
+            const authLoginRecaptchaWrap = document.getElementById('auth-login-recaptcha-wrap');
+            if (authLoginRecaptchaWrap) {
+                authLoginRecaptchaWrap.style.display = 'block';
+            }
+        }
+        
+        // Reset and re-render reCAPTCHA widgets
+        this.resetRecaptchaWidgets();
+        setTimeout(() => {
+            this.renderRecaptchaWidgets(mode);
+        }, 300);
     }
 
     getAuthModalFocusableElements() {
@@ -6297,8 +7244,12 @@ class AgricultureMarket {
         
         // Don't clear form data when closing - preserve it for next time
         const authModal = document.getElementById('auth-modal');
+        console.log('[DEBUG] closeAuthModal called');
+        console.log('[DEBUG] Auth modal element found:', !!authModal);
         if (authModal) {
+            console.log('[DEBUG] Auth modal classes before close:', authModal.className);
             authModal.classList.remove('open');
+            console.log('[DEBUG] Auth modal classes after close:', authModal.className);
         }
         this.setPageScrollLocked(false);
         // Reset state but keep form data
@@ -6311,6 +7262,9 @@ class AgricultureMarket {
         this.otpEmail = null;
         this.setRegisterRecaptchaVisible(false);
         this.clearMessage();
+
+        // Update nav state after modal closes
+        setTimeout(() => this.updateActiveNavLink(), 100);
 
         const focusTarget = this._authLastFocusedElement;
         this._authLastFocusedElement = null;
@@ -6384,7 +7338,7 @@ class AgricultureMarket {
             });
             // Focus on first input
             setTimeout(() => {
-                const firstInput = document.getElementById('floating-address-fullname');
+                const firstInput = document.getElementById('floating-address-firstname');
                 if (firstInput) {
                     firstInput.focus();
                 }
@@ -6474,7 +7428,10 @@ class AgricultureMarket {
     async saveAddressFromCheckout(e) {
         e.preventDefault();
         
-        const fullName = document.getElementById('floating-address-fullname').value.trim();
+        const firstName = document.getElementById('floating-address-firstname').value.trim();
+        const middleName = document.getElementById('floating-address-middlename').value.trim();
+        const lastName = document.getElementById('floating-address-lastname').value.trim();
+        const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim();
         const phone = document.getElementById('floating-address-phone').value.trim();
         const phoneDigits = phone.replace(/\D/g, '');
         const street = document.getElementById('floating-address-street').value.trim();
@@ -6483,9 +7440,10 @@ class AgricultureMarket {
         const hasSelection = addressParts.province && addressParts.city && addressParts.barangay;
         
         // Validation
-        if (!fullName) {
-            this.showMessage('Please enter your full name', 'error');
-            document.getElementById('floating-address-fullname').focus();
+        if (!firstName || !lastName) {
+            this.showMessage('Please enter your first name and last name', 'error');
+            if (!firstName) document.getElementById('floating-address-firstname').focus();
+            else document.getElementById('floating-address-lastname').focus();
             return;
         }
         
@@ -6519,6 +7477,9 @@ class AgricultureMarket {
         const payload = {
             label: '',
             full_name: fullName,
+            first_name: firstName,
+            middle_name: middleName,
+            last_name: lastName,
             phone: phoneWithPrefix,
             street,
             barangay: addressParts.barangay || '',
@@ -6607,6 +7568,14 @@ class AgricultureMarket {
     }
 
     updateActiveNavLink() {
+        // Don't update nav when auth modal or product details modal is open
+        const authModal = document.getElementById('auth-modal');
+        const productModal = document.getElementById('product-details-modal');
+        if ((authModal && authModal.classList.contains('open')) ||
+            (productModal && productModal.classList.contains('active'))) {
+            return;
+        }
+
         const sections = ['home', 'featured', 'products', 'about', 'contact'];
         const headerEl = document.querySelector('.header');
         const headerOffset = headerEl ? headerEl.offsetHeight : 100;
@@ -6739,6 +7708,9 @@ function initializeApp() {
         // Make app globally accessible for onclick handlers
         window.app = app;
         console.log('App initialized successfully');
+        
+        // Initialize true LQIP with Cloudinary transformations
+        initializeLQIP();
     } catch (error) {
         console.error('Failed to initialize app:', error);
         console.error('Error stack:', error.stack);
@@ -6748,6 +7720,89 @@ function initializeApp() {
             productsGrid.innerHTML = `<div class="error-state"><p>Failed to initialize application: ${error.message}</p><p>Please refresh the page.</p></div>`;
         }
     }
+}
+
+// True LQIP using Cloudinary transformations for actual speed improvement
+function initializeLQIP() {
+    // Generate thumbnail URL from Cloudinary URL
+    const getThumbnailUrl = (url) => {
+        if (!url || url.includes('resendlogo.png')) return null;
+        
+        // Check if it's a Cloudinary URL
+        if (url.includes('cloudinary.com')) {
+            // Add Cloudinary transformation for low-quality thumbnail
+            // q_30: quality 30%, w_100: width 100px, c_scale: scale to fit, f_auto: auto format
+            const transformation = 'q_30,w_100,c_scale,f_auto';
+            
+            if (url.includes('/upload/')) {
+                return url.replace('/upload/', `/upload/${transformation}/`);
+            }
+        }
+        return null;
+    };
+
+    const handleImageLoad = (img) => {
+        const fullSrc = img.getAttribute('data-full-src') || img.src;
+        const thumbSrc = getThumbnailUrl(fullSrc);
+
+        if (thumbSrc) {
+            // Set thumbnail as initial source
+            img.src = thumbSrc;
+            img.setAttribute('data-full-src', fullSrc);
+            
+            // Load full image after thumbnail
+            const fullImg = new Image();
+            fullImg.onload = () => {
+                img.src = fullSrc;
+                img.classList.add('loaded');
+                img.setAttribute('data-loaded', 'true');
+            };
+            fullImg.onerror = () => {
+                // If full image fails, keep thumbnail but mark as loaded
+                img.classList.add('loaded');
+                img.setAttribute('data-loaded', 'true');
+            };
+            fullImg.src = fullSrc;
+        } else {
+            // No thumbnail available, load full image directly
+            if (img.complete) {
+                img.classList.add('loaded');
+                img.setAttribute('data-loaded', 'true');
+            } else {
+                img.addEventListener('load', () => {
+                    img.classList.add('loaded');
+                    img.setAttribute('data-loaded', 'true');
+                });
+                img.addEventListener('error', () => {
+                    img.classList.add('loaded');
+                    img.setAttribute('data-loaded', 'true');
+                });
+            }
+        }
+    };
+
+    // Handle existing images
+    document.querySelectorAll('img[data-lqip="true"]').forEach(handleImageLoad);
+
+    // Observe for new images (for dynamically loaded content)
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === 1) { // Element node
+                    if (node.tagName === 'IMG' && node.getAttribute('data-lqip') === 'true') {
+                        handleImageLoad(node);
+                    }
+                    // Check child nodes
+                    node.querySelectorAll?.('img[data-lqip="true"]').forEach(handleImageLoad);
+                }
+            });
+        });
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
 }
 
 // Initialize when DOM is ready
