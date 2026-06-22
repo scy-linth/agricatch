@@ -32,22 +32,31 @@
   height: calc(100vh - 60px) !important;
   max-height: calc(100vh - 60px) !important;
 }
-/* Chat input char counter - position absolutely so it doesn't affect input width */
-.char-counter {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 0.7rem;
-  color: var(--ac-text-muted);
-  pointer-events: none;
+/* Compose bar must span the full width of the main panel */
+#chat .chat-compose-bar {
+  width: 100%;
+  box-sizing: border-box;
 }
-.char-counter-warning {
-  color: #ef4444;
+#chat .chat-input-wrap {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
 }
-/* Add padding-right to input so text doesn't go under char counter */
-.chat-compose-input {
-  padding-right: 40px !important;
+#chat .chat-compose-input {
+  width: 100%;
+  min-width: 0;
+}
+/* Chat messages feed must fill available space */
+#chat .chat-messages-feed {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* Chat main panel must use all remaining width */
+#chat .chat-main-panel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 /* Modal styles for any modals that might be needed */
 .modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(15,23,42,.55); align-items:flex-start; justify-content:center; padding:1.5rem 1rem; overflow-y:auto; }
