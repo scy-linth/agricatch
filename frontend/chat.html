@@ -23,6 +23,30 @@
     <link rel="stylesheet" href="/css/agricatch-admin.css?v=chat-rebuild-20260622">
 </head>
 <body>
+<style>
+/* CHAT PAGE — PAGE-SCOPED OVERRIDES (complement agricatch-admin.css) */
+/* Modal styles for any modals that might be needed */
+.modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(15,23,42,.55); align-items:flex-start; justify-content:center; padding:1.5rem 1rem; overflow-y:auto; }
+.modal.open { display:flex; }
+.modal .modal-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:100%; max-width:620px; margin:auto; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+.modal .modal-header { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); background:#fff; position:sticky; top:0; z-index:2; }
+.modal .modal-header h3 { margin:0; font-size:1.05rem; font-weight:700; color:#fff; }
+.modal .close-btn { background:white; border:1px solid rgba(0,0,0,0.08); color:var(--ac-text-muted,#6b7e72); cursor:pointer; font-size:.9rem; padding:4px; border-radius:50%; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); transition:all .15s; }
+.modal .close-btn:hover { background:#f8f9fa; color:var(--ac-primary,#2d7a3a); }
+.product-details-modal { display:none; position:fixed; inset:0; z-index:1070; align-items:center; justify-content:center; }
+.product-details-modal.active { display:flex; }
+.product-details-overlay { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:0; }
+.product-details-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:calc(100% - 2rem); max-width:640px; max-height:calc(100vh - 3rem); overflow-y:auto; position:relative; z-index:1; }
+.product-details-topbar { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); position:sticky; top:0; background:#fff; z-index:2; }
+.product-details-topbar h3 { margin:0; font-size:1.05rem; font-weight:700; color:var(--ac-text,#1a2e1e); }
+.product-details-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--ac-text-muted,#6b7e72); line-height:1; padding:0 4px; }
+.product-details-close:hover { color:var(--ac-danger,#dc2626); }
+.admin-detail-panel { position:fixed; top:60px; right:0; width:420px; height:calc(100vh - 60px); background:#fff; border-left:1px solid var(--ac-border,#e2e8f0); z-index:900; transform:translateX(100%); transition:transform .3s ease; overflow-y:auto; padding:1rem; box-shadow:-4px 0 20px rgba(0,0,0,.06); }
+.admin-detail-panel.open { transform:translateX(0); }
+.panel-close { background:none; border:none; font-size:1.3rem; cursor:pointer; position:absolute; top:.75rem; right:.75rem; color:var(--ac-text-muted); transition:color .15s; }
+.panel-close:hover { color:var(--ac-danger,#dc2626); }
+.panel-content { margin-top:2rem; }
+</style>
     <!-- Loading Screen -->
     <div id="admin-loading-screen" class="admin-loading-screen">
         <div class="loading-content">
