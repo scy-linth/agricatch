@@ -6211,41 +6211,52 @@ class FarmerDashboard {
 
         const name = document.getElementById('product-name').value;
         const description = document.getElementById('product-description').value;
-        const price = document.getElementById('product-price').value;
         const categoryInput = document.getElementById('product-category');
         const category_id = categoryInput?.dataset.value || categoryInput?.value;
-        const stock_quantity = document.getElementById('product-stock').value;
         const unitInput = document.getElementById('product-unit');
-        const unit = unitInput?.value || 'kg'; // Use catalog default unit or fallback to kg
+        const unit = unitInput?.value || 'kg';
         const locationDisplay = document.getElementById('product-location-display');
         const location = locationDisplay?.value || document.getElementById('product-location').value;
-        const harvestDate = document.getElementById('harvest-date').value;
-        const expiryDate = document.getElementById('expiry-date').value;
-        const isPreorder = document.getElementById('is-preorder').checked;
-        const preorderAvailabilityDate = document.getElementById('preorder-availability-date').value;
-        const maxPreorderQuantity = document.getElementById('max-preorder-quantity').value;
+
+        // Handle tabbed management fields
+        const activeTab = document.querySelector('#add-management-tabs .nav-link.active');
+        const isPreorderTab = activeTab && activeTab.getAttribute('data-bs-target') === '#add-preorders-tab';
+        
+        let price, stock_quantity, harvestDate, expiryDate, preorderAvailabilityDate, maxPreorderQuantity, reservationCutoffDate;
+        
+        if (isPreorderTab) {
+            // Pre-order tab is active
+            price = '0';
+            stock_quantity = '0';
+            harvestDate = '';
+            expiryDate = '';
+            preorderAvailabilityDate = document.getElementById('add-preorder-availability-date').value;
+            maxPreorderQuantity = document.getElementById('add-max-preorder-quantity').value;
+            reservationCutoffDate = document.getElementById('add-reservation-cutoff-date').value || '';
+        } else {
+            // Available Now tab is active
+            price = document.getElementById('add-price').value;
+            stock_quantity = document.getElementById('add-stock-quantity').value;
+            harvestDate = document.getElementById('add-harvest-date').value || '';
+            expiryDate = document.getElementById('add-expiry-date').value || '';
+            preorderAvailabilityDate = '';
+            maxPreorderQuantity = '0';
+            reservationCutoffDate = '';
+        }
 
         if (Number(price) < 0 || Number(stock_quantity) < 0) {
-            this.showMessage('Price and stock must be zero or higher.', 'error');
-            return;
+            throw new Error('Price and stock must be zero or higher.');
+        }
+
+        if (isPreorderTab && !preorderAvailabilityDate) {
+            throw new Error('Expected harvest date is required for pre-orders.');
         }
 
         if (!this.validateProductDates({
-            harvestEl: document.getElementById('harvest-date'),
-            expiryEl: document.getElementById('expiry-date')
+            harvestEl: document.getElementById('add-harvest-date'),
+            expiryEl: document.getElementById('add-expiry-date')
         })) {
-            return;
-        }
-
-        // Validate pre-order fields
-        if (isPreorder && !preorderAvailabilityDate) {
-            this.showMessage('Pre-order availability date is required when listing as pre-order.', 'error');
-            return;
-        }
-
-        if (isPreorder && expiryDate && new Date(expiryDate) < new Date(preorderAvailabilityDate)) {
-            this.showMessage('Expiry date must be on or after pre-order availability date.', 'error');
-            return;
+            throw new Error('Invalid product dates.');
         }
 
         // Upload image through backend so production domain always stores Cloudinary URLs consistently.
@@ -6253,19 +6264,14 @@ class FarmerDashboard {
         let imagePublicId = '';
         const imageFile = document.getElementById('product-image').files[0];
         if (imageFile) {
-            try {
-                const categorySelect = document.getElementById('product-category');
-                const uploaded = await this.uploadProductImage(imageFile, {
-                    name,
-                    category_id,
-                    category_name: categorySelect?.selectedOptions?.[0]?.text || ''
-                });
-                imageUrl = uploaded.imageUrl || '';
-                imagePublicId = uploaded.public_id || '';
-            } catch (err) {
-                this.showMessage('Image upload failed: ' + err.message, 'error');
-                return;
-            }
+            const categorySelect = document.getElementById('product-category');
+            const uploaded = await this.uploadProductImage(imageFile, {
+                name,
+                category_id,
+                category_name: categorySelect?.selectedOptions?.[0]?.text || ''
+            });
+            imageUrl = uploaded.imageUrl || '';
+            imagePublicId = uploaded.public_id || '';
         }
 
         // Now send product data to backend
@@ -6279,40 +6285,38 @@ class FarmerDashboard {
         formData.append('location', location);
         formData.append('harvest_date', harvestDate);
         formData.append('expiry_date', expiryDate);
-        formData.append('is_preorder', isPreorder);
-        if (isPreorder) {
+        if (isPreorderTab) {
+            formData.append('max_preorder_quantity', maxPreorderQuantity);
             formData.append('preorder_availability_date', preorderAvailabilityDate);
-            if (maxPreorderQuantity) formData.append('max_preorder_quantity', maxPreorderQuantity);
+            if (reservationCutoffDate) formData.append('reservation_cutoff_date', reservationCutoffDate);
         }
         if (imageUrl) formData.append('image_url', imageUrl);
         if (typeof imagePublicId !== 'undefined' && imagePublicId) formData.append('cloudinary_public_id', imagePublicId);
 
-        try {
-            const response = await fetch(`${this.apiBase}/products`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                },
-                body: formData
-            });
+        const response = await fetch(`${this.apiBase}/products`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${this.token}`
+            },
+            body: formData
+        });
 
-            const data = await response.json();
+        const data = await response.json();
 
-            if (response.ok) {
-                this.showMessage('Product added successfully!', 'success');
-                document.getElementById('add-product-form').reset();
-                const preview = document.getElementById('product-image-preview');
-                if (preview) preview.innerHTML = '';
-                this.closeAddProductModal(true);
-                this.loadMyProducts();
-                this.loadFarmerStats();
-            } else {
-                this.showMessage(data.message || 'Failed to add product', 'error');
-            }
+        if (response.ok) {
+            this.showMessage('Product added successfully!', 'success');
+            document.getElementById('add-product-form').reset();
+            const preview = document.getElementById('product-image-preview');
+            if (preview) preview.innerHTML = '';
+            this.closeAddProductModal(true);
+            this.loadMyProducts();
+            this.loadFarmerStats();
+        } else {
+            throw new Error(data.message || 'Failed to add product');
+        }
         } catch (error) {
             console.error('Error adding product:', error);
-            this.showMessage('Error adding product', 'error');
-        }
+            this.showMessage(error.message || 'Error adding product', 'error');
         } finally {
             this.isSubmittingAddProduct = false;
             if (submitBtn) {
@@ -6334,23 +6338,22 @@ class FarmerDashboard {
         this.isSubmittingEditProduct = true;
         this.setEditModalBusyState(true, originalSubmitText || 'Update Product');
 
-        try {
-
         const productId = document.getElementById('edit-product-id').value;
         if (!productId) {
             this.showMessage('Missing product ID', 'error');
+            this.isSubmittingEditProduct = false;
+            this.setEditModalBusyState(false, originalSubmitText || 'Update Product');
             return;
         }
 
+        try {
         const formData = new FormData();
         formData.append('name', document.getElementById('edit-product-name').value);
         formData.append('description', document.getElementById('edit-product-description').value);
-        formData.append('price', document.getElementById('edit-product-price').value);
         const editCategoryInput = document.getElementById('edit-product-category');
         const editUnitInput = document.getElementById('edit-product-unit');
         formData.append('category_id', editCategoryInput?.dataset.value || editCategoryInput?.value);
-        formData.append('stock_quantity', document.getElementById('edit-product-stock').value);
-        formData.append('unit', editUnitInput?.value || 'kg'); // Use catalog default unit or fallback to kg
+        formData.append('unit', editUnitInput?.value || 'kg');
         
         // Compose address from PSGC fields
         const zoneEl = document.getElementById('product-location-zone');
@@ -6372,89 +6375,97 @@ class FarmerDashboard {
         }
         formData.append('location', location);
 
-        const harvestDate = document.getElementById('edit-harvest-date').value;
-        const expiryDate = document.getElementById('edit-expiry-date').value;
-        const isPreorder = document.getElementById('edit-is-preorder').checked;
-        const preorderAvailabilityDate = document.getElementById('edit-preorder-availability-date').value;
-        const maxPreorderQuantity = document.getElementById('edit-max-preorder-quantity').value;
+        // Handle tabbed management fields
+        const activeTab = document.querySelector('#edit-management-tabs .nav-link.active');
+        const isPreorderTab = activeTab && activeTab.getAttribute('data-bs-target') === '#edit-preorders-tab';
+        
+        let price, stock_quantity, harvestDate, expiryDate, preorderAvailabilityDate, maxPreorderQuantity, reservationCutoffDate;
+        
+        if (isPreorderTab) {
+            // Pre-order tab is active
+            price = document.getElementById('edit-product-price').value;
+            stock_quantity = document.getElementById('edit-product-stock').value;
+            harvestDate = '';
+            expiryDate = '';
+            preorderAvailabilityDate = document.getElementById('edit-preorder-availability-date').value;
+            maxPreorderQuantity = document.getElementById('edit-max-preorder-quantity').value;
+            reservationCutoffDate = document.getElementById('edit-reservation-cutoff-date').value || '';
+        } else {
+            // Available Now tab is active
+            price = document.getElementById('edit-price').value;
+            stock_quantity = document.getElementById('edit-stock-quantity').value;
+            harvestDate = document.getElementById('edit-harvest-date').value || '';
+            expiryDate = document.getElementById('edit-expiry-date').value || '';
+            preorderAvailabilityDate = '';
+            maxPreorderQuantity = '0';
+            reservationCutoffDate = '';
+        }
 
-        const editPrice = Number(document.getElementById('edit-product-price').value);
-        const editStock = Number(document.getElementById('edit-product-stock').value);
+        formData.append('price', price);
+        formData.append('stock_quantity', stock_quantity);
+
+        const editPrice = Number(price);
+        const editStock = Number(stock_quantity);
         if (editPrice < 0 || editStock < 0) {
-            this.showMessage('Price and stock must be zero or higher.', 'error');
-            return;
+            throw new Error('Price and stock must be zero or higher.');
         }
 
         if (!this.validateProductDates({
             harvestEl: document.getElementById('edit-harvest-date'),
             expiryEl: document.getElementById('edit-expiry-date')
         })) {
-            return;
+            throw new Error('Invalid product dates.');
         }
 
-        // Validate pre-order fields
-        if (isPreorder && !preorderAvailabilityDate) {
-            this.showMessage('Pre-order availability date is required when listing as pre-order.', 'error');
-            return;
-        }
-
-        if (isPreorder && expiryDate && new Date(expiryDate) < new Date(preorderAvailabilityDate)) {
-            this.showMessage('Expiry date must be on or after pre-order availability date.', 'error');
-            return;
+        if (isPreorderTab && !preorderAvailabilityDate) {
+            throw new Error('Expected harvest date is required for pre-orders.');
         }
 
         formData.append('harvest_date', harvestDate);
         formData.append('expiry_date', expiryDate);
-        formData.append('is_preorder', isPreorder);
-        if (isPreorder) {
+        if (isPreorderTab) {
+            formData.append('max_preorder_quantity', maxPreorderQuantity);
             formData.append('preorder_availability_date', preorderAvailabilityDate);
-            if (maxPreorderQuantity) formData.append('max_preorder_quantity', maxPreorderQuantity);
+            if (reservationCutoffDate) formData.append('reservation_cutoff_date', reservationCutoffDate);
         }
 
         const imageFile = document.getElementById('edit-product-image').files[0];
         if (imageFile) {
-            try {
-                const editName = document.getElementById('edit-product-name').value;
-                const editCategoryInput = document.getElementById('edit-product-category');
-                const editCategoryId = editCategoryInput?.dataset.value || editCategoryInput?.value;
-                const editCategorySelect = document.getElementById('edit-product-category');
-                const uploaded = await this.uploadProductImage(imageFile, {
-                    name: editName,
-                    category_id: editCategoryId,
-                    category_name: editCategorySelect?.selectedOptions?.[0]?.text || ''
-                });
-                if (uploaded.imageUrl) formData.append('image_url', uploaded.imageUrl);
-                if (uploaded.public_id) formData.append('cloudinary_public_id', uploaded.public_id);
-            } catch (err) {
-                this.showMessage('Image upload failed: ' + err.message, 'error');
-                return;
-            }
-        }
-
-        try {
-            const response = await fetch(`${this.apiBase}/products/${productId}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                },
-                body: formData
+            const editName = document.getElementById('edit-product-name').value;
+            const editCategoryInput = document.getElementById('edit-product-category');
+            const editCategoryId = editCategoryInput?.dataset.value || editCategoryInput?.value;
+            const editCategorySelect = document.getElementById('edit-product-category');
+            const uploaded = await this.uploadProductImage(imageFile, {
+                name: editName,
+                category_id: editCategoryId,
+                category_name: editCategorySelect?.selectedOptions?.[0]?.text || ''
             });
-
-            const data = await response.json().catch(() => ({}));
-
-            if (response.ok) {
-                const isResubmit = this.currentEditProductStatus === 'rejected';
-                this.showMessage(isResubmit ? 'Product resubmitted for approval!' : 'Product updated successfully!', 'success');
-                this.closeEditModal(true);
-                this.loadMyProducts();
-                this.loadFarmerStats();
-            } else {
-                this.showMessage(data.message || 'Failed to update product', 'error');
-            }
-        } catch (error) {
-            console.error('Error updating product:', error);
-            this.showMessage('Error updating product', 'error');
+            if (uploaded.imageUrl) formData.append('image_url', uploaded.imageUrl);
+            if (uploaded.public_id) formData.append('cloudinary_public_id', uploaded.public_id);
         }
+
+        const response = await fetch(`${this.apiBase}/products/${productId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${this.token}`
+            },
+            body: formData
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+            const isResubmit = this.currentEditProductStatus === 'rejected';
+            this.showMessage(isResubmit ? 'Product resubmitted for approval!' : 'Product updated successfully!', 'success');
+            this.closeEditModal(true);
+            this.loadMyProducts();
+            this.loadFarmerStats();
+        } else {
+            throw new Error(data.message || 'Failed to update product');
+        }
+        } catch (error) {
+            console.error('Error in edit product:', error);
+            this.showMessage(error.message || 'Error processing product update', 'error');
         } finally {
             this.isSubmittingEditProduct = false;
             const isResubmit = this.currentEditProductStatus === 'rejected';
