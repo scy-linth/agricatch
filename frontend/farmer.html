@@ -21,6 +21,24 @@
     <link rel="stylesheet" href="/vendor/simple-datatables/style.css">
     <!-- AgriCatch SaaS overrides — loaded LAST -->
     <link rel="stylesheet" href="/css/agricatch-admin.css?v=farmer-rebuild-20260614">
+
+    <script>
+    // Authorization check - run immediately in head before page loads
+    try {
+        var token = localStorage.getItem("token");
+        if (!token) {
+            window.location.replace("/index.html#login");
+        } else {
+            var payload = JSON.parse(atob(token.split(".")[1]));
+            var role = payload.role;
+            if (role !== "farmer") {
+                window.location.replace("/index.html#login");
+            }
+        }
+    } catch (e) {
+        window.location.replace("/index.html#login");
+    }
+    </script>
 </head>
 
 <style>
@@ -46,6 +64,20 @@
 #farmer-sidebar-dropdown-menu button:hover {
   background: var(--ac-bg);
 }
+/* Top profile header arrow — visible even when shop name is truncated */
+#header .nav-profile .profile-arrow {
+  color: rgba(255,255,255,.75);
+  font-size: .75rem;
+  transition: transform .2s ease, color .2s;
+  flex-shrink: 0;
+}
+#header .nav-profile:hover .profile-arrow,
+#header .nav-profile[aria-expanded="true"] .profile-arrow {
+  color: #fff;
+}
+#header .nav-profile[aria-expanded="true"] .profile-arrow {
+  transform: rotate(180deg);
+}
 .modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(15,23,42,.55); align-items:flex-start; justify-content:center; padding:1.5rem 1rem; overflow-y:auto; }
 .modal.open { display:flex; }
 .modal .modal-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:100%; max-width:620px; margin:auto; position:relative; overflow:hidden; display:flex; flex-direction:column; }
@@ -61,7 +93,7 @@
 .product-details-topbar h3 { margin:0; font-size:1.05rem; font-weight:700; color:var(--ac-text,#1a2e1e); }
 .product-details-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--ac-text-muted,#6b7e72); line-height:1; padding:0 4px; }
 .product-details-close:hover { color:var(--ac-danger,#dc2626); }
-#farmer-verif-banner { padding:.65rem 1.15rem; border-radius:8px; margin-bottom:.75rem; font-size:.875rem; font-weight:600; }
+#farmer-verif-banner { padding:.65rem 1.15rem; border-radius:8px; margin-bottom:.75rem; font-size:.875rem; font-weight:600; display:flex; align-items:center; gap:.5rem; }
 #my-products-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1rem; }
 .product-tabs { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
 .product-tabs .tab-btn { padding:.4rem .85rem; border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; background:#fff; font-size:.82rem; font-weight:600; cursor:pointer; color:var(--ac-text-muted,#6b7e72); transition:background .15s,color .15s,border-color .15s; }
@@ -109,12 +141,30 @@
 .custom-select-option.selected::after { content:'✓'; margin-left:auto; font-size:.8rem; font-weight:700; color:var(--ac-primary,#2d7a3a); }
 .custom-select-option.active { background:var(--ac-primary,#2d7a3a); color:#fff; }
 .custom-select-option.active::after { color:#fff; }
+/* Unit input fields - read-only with no cursor */
+#product-unit,
+#edit-product-unit {
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  background-color: #f8f9fa;
+  color: #6b7e72;
+  font-weight: 500;
+}
 .product-form .form-row { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; margin-bottom:.75rem; }
 .product-form .form-group { margin-bottom:.65rem; }
 .product-form .form-group label { display:block; font-size:.8rem; font-weight:600; margin-bottom:.25rem; color:var(--ac-text,#1a2e1e); }
 .product-form .form-actions { display:flex; justify-content:flex-end; gap:.5rem; padding:.75rem 1.25rem; border-top:1px solid var(--ac-border,#e2e8f0); background:#fff; position:sticky; bottom:0; z-index:1; }
 .image-preview img { max-width:280px; max-height:280px; border-radius:8px; margin:.5rem auto 0; display:block; border:1px solid var(--ac-border); }
 .field-hint { font-size:.77rem; color:var(--ac-text-muted,#6b7e72); margin-top:.2rem; display:block; }
+.form-control:disabled,
+.form-select:disabled {
+    background: #f8f9fa;
+    color: #6b7280;
+    cursor: not-allowed;
+}
 .admin-detail-panel { position:fixed; top:60px; right:0; width:420px; height:calc(100vh - 60px); background:#fff; border-left:1px solid var(--ac-border,#e2e8f0); z-index:900; transform:translateX(100%); transition:transform .3s ease; overflow-y:auto; padding:1rem; box-shadow:-4px 0 20px rgba(0,0,0,.06); }
 .admin-detail-panel.open { transform:translateX(0); }
 .panel-close { background:none; border:none; font-size:1.3rem; cursor:pointer; position:absolute; top:.75rem; right:.75rem; color:var(--ac-text-muted); transition:color .15s; }
@@ -316,8 +366,10 @@
 }
 /* Status Colors */
 .order-card-status.pending { background: #fef3c7; color: #d97706; }
+.order-card-status.preorder_reserved { background: #f3e8ff; color: #9333ea; }
 .order-card-status.confirmed { background: #dbeafe; color: #2563eb; }
 .order-card-status.preparing { background: #ede9fe; color: #7c3aed; }
+.order-card-status.scheduled { background: #e0f2fe; color: #0369a1; }
 .order-card-status.out_for_delivery { background: #cffafe; color: #0891b2; }
 .order-card-status.delivered { background: #dcfce7; color: #16a34a; }
 .order-card-status.cancelled { background: #fee2e2; color: #dc2626; }
@@ -336,6 +388,26 @@
 #farmer-sidebar-dropdown-menu button { display:flex; align-items:center; gap:.5rem; width:100%; text-align:left; padding:.55rem .85rem; background:none; border:none; font-size:.875rem; cursor:pointer; color:var(--ac-text,#1a2e1e); transition:background .1s; }
 #farmer-sidebar-dropdown-menu button:hover { background:var(--ac-bg,#f5f7f5); }
 #farmer-sidebar-dropdown-menu button.text-danger { color:#dc2626 !important; }
+
+/* Pre-order fields styling */
+#preorder-fields, #edit-preorder-fields {
+  background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+  border: 2px solid #eab308;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 0.75rem;
+  transition: all 0.3s ease;
+}
+
+#preorder-fields label, #edit-preorder-fields label {
+  color: #a16207;
+  font-weight: 600;
+}
+
+#preorder-fields .field-hint, #edit-preorder-fields .field-hint {
+  color: #6b7280;
+  font-style: italic;
+}
 
 /* Sidebar toggle behavior (mirrors admin.js pattern) */
 #farmer-sidebar.sidebar {
@@ -620,6 +692,19 @@
     background: #f9fafb;
 }
 
+/* Center notification icon in circle */
+.notification-icon-dropdown {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.notification-icon-dropdown i {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
 /* Fix dropdown overflow */
 .dropdown-menu.notifications {
     overflow: hidden;
@@ -663,49 +748,76 @@
         <button id="farmer-sidebar-toggle" class="admin-sidebar-toggle-btn" type="button" aria-label="Toggle sidebar">
             <i class="bi bi-list"></i>
         </button>
-        <a href="/" class="logo d-flex align-items-center" style="gap:4px;">
+        <div class="logo d-flex align-items-center" style="gap:4px;">
             <img src="/images/logo.png" alt="AgriCatch">
             <span>AgriCatch</span>
-        </a>
+        </div>
     </div>
     <nav class="header-nav ms-auto">
         <ul class="d-flex align-items-center list-unstyled mb-0 gap-1">
 
+            <!-- Messages dropdown -->
+            <li class="nav-item dropdown">
+                <a class="nav-link nav-icon" href="javascript:void(0)" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-chat-dots"></i>
+                    <span id="chat-topbar-badge" class="badge bg-danger badge-number" style="display:none">0</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications" style="min-width:320px;max-width:400px;">
+                    <li class="dropdown-header">
+                        You have <span id="chat-unread-count">0</span> unread messages
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <div id="chat-dropdown-loading" class="text-center py-3" style="display:none;">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <span class="ms-2 small text-muted">Loading...</span>
+                    </div>
+                    <div id="chat-dropdown-list"></div>
+                    <li><hr class="dropdown-divider"></li>
+                    <li class="dropdown-footer">
+                        <a href="javascript:void(0)" id="show-all-messages-link">View all messages</a>
+                    </li>
+                </ul>
+            </li><!-- End Messages Nav -->
 
             <!-- Notifications dropdown -->
             <li class="nav-item dropdown">
-                <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" aria-expanded="false">
+                <a class="nav-link nav-icon" href="javascript:void(0)" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-bell"></i>
                     <span id="notif-badge" class="badge bg-danger badge-number" style="display:none">0</span>
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications" style="min-width:360px;">
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications" style="min-width:320px;max-width:400px;">
                     <li class="dropdown-header">
                         You have <span id="notif-count">0</span> new notifications
                     </li>
                     <li><hr class="dropdown-divider"></li>
-                    <div id="notif-list"><!-- populated by farmer.js --></div>
+                    <div id="notif-dropdown-loading" class="text-center py-3" style="display:none;">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <span class="ms-2 small text-muted">Loading...</span>
+                    </div>
+                    <div id="notif-list"></div>
                     <li><hr class="dropdown-divider"></li>
                     <li class="dropdown-footer">
-                        <a href="#" id="show-all-notifications-link">Show all notifications</a>
+                        <a href="javascript:void(0)" id="show-all-notifications-link">Show all notifications</a>
                     </li>
                 </ul>
             </li><!-- End Notifications Nav -->
 
             <!-- Profile dropdown -->
             <li class="nav-item dropdown pe-3">
-                <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#"
+                <a class="nav-link nav-profile d-flex align-items-center pe-0" href="javascript:void(0)"
                    data-bs-toggle="dropdown" aria-expanded="false">
                     <div class="profile-avatar-ring">
                         <span class="profile-initial" id="header-profile-initial"></span>
                     </div>
-                    <span class="d-none d-md-block dropdown-toggle ps-2 fw-semibold" id="user-name" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Farmer</span>
+                    <span class="d-none d-md-block ps-2 fw-semibold" id="user-name" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Farmer</span>
+                    <i class="bi bi-chevron-down d-none d-md-block ms-1 profile-arrow"></i>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow profile">
                     <li class="dropdown-header">
                         <div class="d-flex align-items-center justify-content-center gap-1">
                             <h6 class="mb-0 fw-semibold" id="user-name-dd" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></h6>
                             <i id="header-verified-icon" class="bi bi-check-circle-fill text-primary" style="display:none;font-size:0.9rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Verified"></i>
-                            <i id="header-premium-icon" class="bi bi-gem text-warning" style="display:none;font-size:0.9rem;" data-bs-toggle="tooltip" data-bs-placement="top" title="Premium Partner"></i>
+                            <i id="header-premium-icon" class="bi bi-gem" style="display:none;font-size:0.9rem;color:#9333ea;" data-bs-toggle="tooltip" data-bs-placement="top" title="Premium Partner"></i>
                         </div>
                         <span id="user-email" class="small text-muted" style="display:block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
                         <div class="mt-1 d-flex align-items-center justify-content-center">
@@ -714,42 +826,42 @@
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item d-flex align-items-center" href="#"
+                        <a class="dropdown-item d-flex align-items-center" href="javascript:void(0)"
                            onclick="farmerDashboard&&farmerDashboard.showSection('profile','overview');return false;">
                             <i class="bi bi-person"></i><span>My Profile</span>
                         </a>
                     </li>
-                    <li>
-                        <a class="dropdown-item d-flex align-items-center" href="#"
-                           id="verification-request-btn"
-                           onclick="farmerDashboard&&farmerDashboard.openVerificationSection();return false;">
-                            <i class="bi bi-shield-check"></i><span id="verification-menu-text">Request Verification</span>
-                        </a>
-                    </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item d-flex align-items-center" href="#"
+                        <a class="dropdown-item d-flex align-items-center" href="javascript:void(0)"
                            onclick="farmerDashboard&&farmerDashboard.showSection('profile','edit');return false;">
                             <i class="bi bi-gear"></i><span>Edit Profile</span>
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item d-flex align-items-center" href="#"
+                        <a class="dropdown-item d-flex align-items-center" href="javascript:void(0)"
                            onclick="farmerDashboard&&farmerDashboard.showSection('profile','password');return false;">
                             <i class="bi bi-shield-lock"></i><span>Change Password</span>
                         </a>
                     </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center" href="javascript:void(0)"
+                           id="verification-request-btn"
+                           onclick="farmerDashboard&&farmerDashboard.openVerificationSection();return false;">
+                            <i class="bi bi-shield-check"></i><span id="verification-menu-text">Verification</span>
+                        </a>
+                    </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item d-flex align-items-center" href="#" id="dropdown-support-tickets">
+                        <a class="dropdown-item d-flex align-items-center" href="javascript:void(0)" id="dropdown-support-tickets">
                             <i class="bi bi-ticket-perforated"></i><span>Support Tickets</span>
                             <span id="support-tickets-dropdown-badge" class="badge bg-danger ms-auto support-dropdown-badge" style="display:none;">0</span>
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a id="logout-btn" class="dropdown-item d-flex align-items-center text-danger" href="#"
+                        <a id="logout-btn" class="dropdown-item d-flex align-items-center text-danger" href="javascript:void(0)"
                            onclick="farmerDashboard&&farmerDashboard.logout();return false;">
                             <i class="bi bi-box-arrow-right"></i><span>Sign Out</span>
                         </a>
@@ -949,16 +1061,42 @@
         <div class="row g-3 mb-3">
             <div class="col-lg-8">
                 <div class="card h-100">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item report-period-filter" href="#" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Reports</h5>
+                        <h5 class="card-title">Reports <span id="reports-period-label">| Today</span></h5>
                         <div id="reportsChart" style="min-height:350px;"></div>
                     </div>
                 </div>
             </div>
             <div class="col-lg-4">
                 <div class="card h-100">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item status-period-filter" href="#" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item status-period-filter" href="#" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item status-period-filter" href="#" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item status-period-filter" href="#" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item status-period-filter" href="#" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Order Status</h5>
+                        <h5 class="card-title">Order Status <span id="status-period-label">| Today</span></h5>
                         <div id="statusChart" style="min-height:320px;"></div>
                         <div id="overview-status-breakdown" class="mt-2"></div>
                     </div>
@@ -1166,75 +1304,164 @@
         <div class="tab-content">
             <!-- My Products Tab -->
             <div class="tab-pane fade show active" id="products-list-tab">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="section-filter-bar row g-2 mb-3 align-items-end">
-                            <div class="col-md-1 col-sm-6">
-                                <label class="form-label small fw-semibold mb-1">Show</label>
-                                <select class="form-select form-select-sm" data-entries-section="products" style="min-width: 60px;">
-                                    <option value="10">10</option>
-                                    <option value="25">25</option>
-                                    <option value="50" selected>50</option>
-                                    <option value="100">100</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2 col-sm-6">
-                                <label class="form-label small fw-semibold mb-1">Category</label>
-                                <select id="product-category-filter" class="form-select form-select-sm">
-                                    <option value="">All categories</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2 col-sm-6">
-                                <label class="form-label small fw-semibold mb-1">Status</label>
-                                <select id="product-status-filter" class="form-select form-select-sm">
-                                    <option value="" selected>Any status</option>
-                                    <option value="available">Active</option>
-                                    <option value="disabled">Disabled</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4 col-sm-6 ms-md-auto">
-                                <label class="form-label small fw-semibold mb-1">Search</label>
-                                <div class="d-flex gap-2">
-                                    <div class="input-group input-group-sm flex-grow-1">
-                                        <input type="text" id="products-search-input" class="form-control me-2" placeholder="Product name…">
-                                        <button id="products-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                <!-- Nested Tabs: Available Now / Pre-orders -->
+                <ul class="nav nav-tabs nav-tabs-bordered mb-3" id="products-management-tabs">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#available-now-tab">Available Now</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#preorders-tab">Pre-orders</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Available Now Tab -->
+                    <div class="tab-pane fade show active" id="available-now-tab">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                                    <div class="col-md-1 col-sm-6">
+                                        <label class="form-label small fw-semibold mb-1">Show</label>
+                                        <select class="form-select form-select-sm" data-entries-section="available-products" style="min-width: 60px;">
+                                            <option value="10">10</option>
+                                            <option value="25">25</option>
+                                            <option value="50" selected>50</option>
+                                            <option value="100">100</option>
+                                        </select>
                                     </div>
-                                    <button id="products-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
+                                    <div class="col-md-2 col-sm-6">
+                                        <label class="form-label small fw-semibold mb-1">Category</label>
+                                        <select id="available-category-filter" class="form-select form-select-sm">
+                                            <option value="">All categories</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 col-sm-6">
+                                        <label class="form-label small fw-semibold mb-1">Status</label>
+                                        <select id="available-status-filter" class="form-select form-select-sm">
+                                            <option value="" selected>Any status</option>
+                                            <option value="active">Active</option>
+                                            <option value="out_of_stock">Out of Stock</option>
+                                            <option value="disabled">Disabled</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                                        <label class="form-label small fw-semibold mb-1">Search</label>
+                                        <div class="d-flex gap-2">
+                                            <div class="input-group input-group-sm flex-grow-1">
+                                                <input type="text" id="available-search-input" class="form-control me-2" placeholder="Product name…">
+                                                <button id="available-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                                            </div>
+                                            <button id="available-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
+                                        </div>
+                                    </div>
                                 </div>
+
+                                <div class="table-responsive">
+                                    <table id="available-products-table" class="table ac-table table-sm table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:56px">Image</th>
+                                                <th>ID</th>
+                                                <th>Product</th>
+                                                <th>Category</th>
+                                                <th>Price</th>
+                                                <th>Stock</th>
+                                                <th>Status</th>
+                                                <th>Reviews</th>
+                                                <th class="col-actions">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="available-products-tbody">
+                                            <tr>
+                                                <td colspan="9">
+                                                    <div class="table-skeleton">
+                                                        <div class="skeleton-row"></div>
+                                                        <div class="skeleton-row"></div>
+                                                        <div class="skeleton-row"></div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div id="available-products-pagination" class="pagination-container"></div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="table-responsive">
-                            <table id="products-table" class="table ac-table table-sm table-hover align-middle">
-                                <thead>
-                                    <tr>
-                                        <th style="width:56px">Image</th>
-                                        <th>ID</th>
-                                        <th>Product</th>
-                                        <th>Category</th>
-                                        <th>Price</th>
-                                        <th>Stock</th>
-                                        <th>Status</th>
-                                        <th>Reviews</th>
-                                        <th class="col-actions">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="products-tbody">
-                                    <tr>
-                                        <td colspan="9">
-                                            <div class="table-skeleton">
-                                                <div class="skeleton-row"></div>
-                                                <div class="skeleton-row"></div>
-                                                <div class="skeleton-row"></div>
+                    <!-- Pre-orders Tab -->
+                    <div class="tab-pane fade" id="preorders-tab">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                                    <div class="col-md-1 col-sm-6">
+                                        <label class="form-label small fw-semibold mb-1">Show</label>
+                                        <select class="form-select form-select-sm" data-entries-section="preorder-products" style="min-width: 60px;">
+                                            <option value="10">10</option>
+                                            <option value="25">25</option>
+                                            <option value="50" selected>50</option>
+                                            <option value="100">100</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 col-sm-6">
+                                        <label class="form-label small fw-semibold mb-1">Category</label>
+                                        <select id="preorder-category-filter" class="form-select form-select-sm">
+                                            <option value="">All categories</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 col-sm-6">
+                                        <label class="form-label small fw-semibold mb-1">Status</label>
+                                        <select id="preorder-status-filter" class="form-select form-select-sm">
+                                            <option value="" selected>Any status</option>
+                                            <option value="active">Active</option>
+                                            <option value="harvest_ready">Harvest Ready</option>
+                                            <option value="disabled">Disabled</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                                        <label class="form-label small fw-semibold mb-1">Search</label>
+                                        <div class="d-flex gap-2">
+                                            <div class="input-group input-group-sm flex-grow-1">
+                                                <input type="text" id="preorder-search-input" class="form-control me-2" placeholder="Product name…">
+                                                <button id="preorder-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
                                             </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                            <button id="preorder-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table id="preorder-products-table" class="table ac-table table-sm table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:56px">Image</th>
+                                                <th>ID</th>
+                                                <th>Product</th>
+                                                <th>Category</th>
+                                                <th>Expected Harvest</th>
+                                                <th>Reservation Progress</th>
+                                                <th>Status</th>
+                                                <th class="col-actions">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="preorder-products-tbody">
+                                            <tr>
+                                                <td colspan="8">
+                                                    <div class="table-skeleton">
+                                                        <div class="skeleton-row"></div>
+                                                        <div class="skeleton-row"></div>
+                                                        <div class="skeleton-row"></div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div id="preorder-products-pagination" class="pagination-container"></div>
+                            </div>
                         </div>
-
-                        <div id="products-pagination" class="pagination-container"></div>
-
                     </div>
                 </div>
             </div>
@@ -1307,11 +1534,6 @@
                 <h4 class="ac-section-hero__title">Order Management</h4>
                 <p class="ac-section-hero__sub">View and manage customer orders for your products.</p>
             </div>
-            <div class="ac-section-hero__actions">
-                <button id="refresh-orders-btn" class="btn btn-outline-secondary btn-sm" type="button">
-                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-                </button>
-            </div>
         </div>
         <div class="card">
             <div class="card-body">
@@ -1367,17 +1589,8 @@
                     </div>
                 </div>
 
-                <div class="row g-2 mb-3">
-                    <div class="col-md-4 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Date Range</label>
-                        <select id="orders-date-filter" class="form-select form-select-sm">
-                            <option value="all">All Time</option>
-                            <option value="today">Today</option>
-                            <option value="week">This Week</option>
-                            <option value="month">This Month</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6 col-sm-6 ms-md-auto">
+                <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm flex-grow-1">
@@ -1395,8 +1608,10 @@
                 </div>
                 <div class="order-tabs">
                     <button id="pending-orders-tab" class="tab-btn active" type="button">Pending <span class="tab-count" id="pending-orders-count">0</span></button>
+                    <button id="preorder_reserved-orders-tab" class="tab-btn" type="button">Preorder Reserved <span class="tab-count" id="preorder_reserved-orders-count">0</span></button>
                     <button id="confirmed-orders-tab" class="tab-btn" type="button">Confirmed <span class="tab-count" id="confirmed-orders-count">0</span></button>
                     <button id="preparing-orders-tab" class="tab-btn" type="button">Preparing <span class="tab-count" id="preparing-orders-count">0</span></button>
+                    <button id="scheduled-orders-tab" class="tab-btn" type="button">Scheduled <span class="tab-count" id="scheduled-orders-count">0</span></button>
                     <button id="out_for_delivery-orders-tab" class="tab-btn" type="button">Out for Delivery <span class="tab-count" id="out_for_delivery-orders-count">0</span></button>
                     <button id="delivered-orders-tab" class="tab-btn" type="button">Delivered <span class="tab-count" id="delivered-orders-count">0</span></button>
                     <button id="cancelled-orders-tab" class="tab-btn" type="button">Cancelled <span class="tab-count" id="cancelled-orders-count">0</span></button>
@@ -1481,7 +1696,7 @@
                             <div class="row g-3">
                                 <div class="col-12">
                                     <label class="form-label small fw-semibold" for="shop-name-input">Shop / Farm Name</label>
-                                    <input type="text" id="shop-name-input" class="form-control form-control-sm" maxlength="120" placeholder="My Farm Shop">
+                                    <input type="text" id="shop-name-input" class="form-control form-control-sm" maxlength="40" placeholder="My Farm Shop">
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label small fw-semibold">Farm / Pick-up Location</label>
@@ -1590,15 +1805,6 @@
 
         <div class="card">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="d-flex gap-2">
-                        <select class="form-select form-select-sm" id="support-tickets-entries" style="width: auto;">
-                            <option value="10">10 per page</option>
-                            <option value="25">25 per page</option>
-                            <option value="50">50 per page</option>
-                        </select>
-                    </div>
-                </div>
                 <div class="table-responsive">
                     <table class="table" id="support-tickets-table">
                         <thead>
@@ -1823,17 +2029,20 @@
                                     <div class="row mb-3">
                                         <div class="col-md-4">
                                             <label class="form-label">First Name</label>
-                                            <input type="text" id="pe-firstname" class="form-control form-control-sm">
+                                            <input type="text" id="pe-firstname" class="form-control form-control-sm" maxlength="40">
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label">Middle Name (Optional)</label>
-                                            <input type="text" id="pe-middlename" class="form-control form-control-sm" placeholder="Optional">
+                                            <input type="text" id="pe-middlename" class="form-control form-control-sm" placeholder="Optional" maxlength="40">
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label">Last Name</label>
-                                            <input type="text" id="pe-lastname" class="form-control form-control-sm">
+                                            <input type="text" id="pe-lastname" class="form-control form-control-sm" maxlength="40">
                                         </div>
                                     </div>
+                                    <small class="form-text small" id="pe-name-verified-hint" style="display:none; color:#10b981; font-weight:500; margin-bottom: 1rem;">
+                                        <i class="bi bi-check-circle-fill me-1"></i>Verified: name can't be edited
+                                    </small>
                                     <div class="mb-3">
                                         <label class="form-label">Phone</label>
                                         <div class="input-group input-group-sm">
@@ -2062,13 +2271,12 @@
                         <div class="col-md-6">
                             <div class="card border-0 h-100" style="background: #f8f9fa; color: #1a2e1e;">
                                 <div class="card-body p-3">
-                                    <h6 class="fw-bold mb-3"><i class="bi bi-circle me-2"></i>Free Tier</h6>
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-tag me-2"></i>Free Tier</h6>
                                     <ul class="list-unstyled small mb-0">
                                         <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Up to <strong>10 product listings</strong></li>
                                         <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Basic sales analytics</li>
-                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Customer chat support</li>
-                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>Standard product approval</li>
-                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>This Month Dashboard Filter Only</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Standard product approval</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>This Month Dashboard Filter Only</li>
                                     </ul>
                                 </div>
                             </div>
@@ -2079,17 +2287,18 @@
                                     <h6 class="fw-bold mb-3"><i class="bi bi-gem me-2 text-success"></i>Premium Tier</h6>
                                     <ul class="list-unstyled small mb-0">
                                         <li class="mb-2"><i class="bi bi-infinity text-success me-2"></i><strong>Unlimited product listings</strong></li>
-                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
                                         <li class="mb-2"><i class="bi bi-graph-up text-success me-2"></i>Advanced sales analytics</li>
-                                        <li class="mb-2"><i class="bi bi-palette text-success me-2"></i>Custom product branding</li>
+                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
                                         <li class="mb-2"><i class="bi bi-clock-history text-success me-2"></i>All-Time Dashboard Filter</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Request new products</li>
+                                        <li class="mb-2"><i class="bi bi-patch-check text-success me-2"></i>Premium badge on customer page</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <button class="btn ac-btn-primary btn-sm w-100" id="btn-upgrade-premium">
+                    <button class="btn ac-btn-primary btn-sm" id="btn-upgrade-premium">
                         <i class="bi bi-star-fill me-1"></i> Upgrade to Premium
                     </button>
                 </div>
@@ -2097,40 +2306,23 @@
                     <div class="alert alert-success"><i class="bi bi-gem"></i> <strong>Premium Partner</strong></div>
                     <p>Expires: <strong id="subscription-expiry-date">—</strong></p>
                     <div id="subscription-expiry-warning" style="display:none;"></div>
-                    
-                    <!-- Free vs Premium Comparison -->
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <div class="card border-0 h-100" style="background: #f8f9fa; color: #1a2e1e;">
-                                <div class="card-body p-3">
-                                    <h6 class="fw-bold mb-3"><i class="bi bi-circle me-2"></i>Free Tier</h6>
-                                    <ul class="list-unstyled small mb-0">
-                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Up to <strong>10 product listings</strong></li>
-                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Basic sales analytics</li>
-                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Customer chat support</li>
-                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>Standard product approval</li>
-                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>This Month Dashboard Filter Only</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card border-0 h-100" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
-                                <div class="card-body p-3">
-                                    <h6 class="fw-bold mb-3"><i class="bi bi-gem me-2 text-success"></i>Premium Tier</h6>
-                                    <ul class="list-unstyled small mb-0">
-                                        <li class="mb-2"><i class="bi bi-infinity text-success me-2"></i><strong>Unlimited product listings</strong></li>
-                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
-                                        <li class="mb-2"><i class="bi bi-graph-up text-success me-2"></i>Advanced sales analytics</li>
-                                        <li class="mb-2"><i class="bi bi-palette text-success me-2"></i>Custom product branding</li>
-                                        <li class="mb-2"><i class="bi bi-clock-history text-success me-2"></i>All-Time Dashboard Filter</li>
-                                    </ul>
-                                </div>
-                            </div>
+
+                    <div class="card border-0 mb-4" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                        <div class="card-body p-4">
+                            <h6 class="fw-bold mb-3"><i class="bi bi-gem me-2 text-success"></i>You are a Premium Member</h6>
+                            <p class="text-muted small mb-3">Enjoy these exclusive benefits:</p>
+                            <ul class="list-unstyled small mb-0">
+                                <li class="mb-2"><i class="bi bi-infinity text-success me-2"></i><strong>Unlimited product listings</strong></li>
+                                <li class="mb-2"><i class="bi bi-graph-up text-success me-2"></i>Advanced sales analytics</li>
+                                <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
+                                <li class="mb-2"><i class="bi bi-clock-history text-success me-2"></i>All-Time Dashboard Filter</li>
+                                <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Request new products</li>
+                                <li class="mb-2"><i class="bi bi-patch-check text-success me-2"></i>Premium badge on customer page</li>
+                            </ul>
                         </div>
                     </div>
-                    
-                    <button class="btn ac-btn-primary btn-sm w-100" id="btn-extend-subscription">
+
+                    <button class="btn ac-btn-primary btn-sm" id="btn-extend-subscription">
                         <i class="bi bi-plus-circle me-1"></i> Extend Subscription
                     </button>
                 </div>
@@ -2142,13 +2334,12 @@
                         <div class="col-md-6">
                             <div class="card border-0 h-100" style="background: #f8f9fa; color: #1a2e1e;">
                                 <div class="card-body p-3">
-                                    <h6 class="fw-bold mb-3"><i class="bi bi-circle me-2"></i>Free Tier</h6>
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-tag me-2"></i>Free Tier</h6>
                                     <ul class="list-unstyled small mb-0">
                                         <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Up to <strong>10 product listings</strong></li>
                                         <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Basic sales analytics</li>
-                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Customer chat support</li>
-                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>Standard product approval</li>
-                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>This Month Dashboard Filter Only</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Standard product approval</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>This Month Dashboard Filter Only</li>
                                     </ul>
                                 </div>
                             </div>
@@ -2159,10 +2350,11 @@
                                     <h6 class="fw-bold mb-3"><i class="bi bi-gem me-2 text-success"></i>Premium Tier</h6>
                                     <ul class="list-unstyled small mb-0">
                                         <li class="mb-2"><i class="bi bi-infinity text-success me-2"></i><strong>Unlimited product listings</strong></li>
-                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
                                         <li class="mb-2"><i class="bi bi-graph-up text-success me-2"></i>Advanced sales analytics</li>
-                                        <li class="mb-2"><i class="bi bi-palette text-success me-2"></i>Custom product branding</li>
+                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
                                         <li class="mb-2"><i class="bi bi-clock-history text-success me-2"></i>All-Time Dashboard Filter</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Request new products</li>
+                                        <li class="mb-2"><i class="bi bi-patch-check text-success me-2"></i>Premium badge on customer page</li>
                                     </ul>
                                 </div>
                             </div>
@@ -2177,13 +2369,12 @@
                         <div class="col-md-6">
                             <div class="card border-0 h-100" style="background: #f8f9fa; color: #1a2e1e;">
                                 <div class="card-body p-3">
-                                    <h6 class="fw-bold mb-3"><i class="bi bi-circle me-2"></i>Free Tier</h6>
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-tag me-2"></i>Free Tier</h6>
                                     <ul class="list-unstyled small mb-0">
                                         <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Up to <strong>10 product listings</strong></li>
                                         <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Basic sales analytics</li>
-                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Customer chat support</li>
-                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>Standard product approval</li>
-                                        <li class="mb-2"><i class="bi bi-x text-danger me-2"></i>This Month Dashboard Filter Only</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Standard product approval</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>This Month Dashboard Filter Only</li>
                                     </ul>
                                 </div>
                             </div>
@@ -2194,17 +2385,18 @@
                                     <h6 class="fw-bold mb-3"><i class="bi bi-gem me-2 text-success"></i>Premium Tier</h6>
                                     <ul class="list-unstyled small mb-0">
                                         <li class="mb-2"><i class="bi bi-infinity text-success me-2"></i><strong>Unlimited product listings</strong></li>
-                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
                                         <li class="mb-2"><i class="bi bi-graph-up text-success me-2"></i>Advanced sales analytics</li>
-                                        <li class="mb-2"><i class="bi bi-palette text-success me-2"></i>Custom product branding</li>
+                                        <li class="mb-2"><i class="bi bi-lightning-charge text-success me-2"></i>Priority product approval</li>
                                         <li class="mb-2"><i class="bi bi-clock-history text-success me-2"></i>All-Time Dashboard Filter</li>
+                                        <li class="mb-2"><i class="bi bi-check text-success me-2"></i>Request new products</li>
+                                        <li class="mb-2"><i class="bi bi-patch-check text-success me-2"></i>Premium badge on customer page</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <button class="btn ac-btn-primary btn-sm w-100" id="btn-renew-premium"><i class="bi bi-star-fill me-1"></i> Renew Premium</button>
+                    <button class="btn ac-btn-primary btn-sm" id="btn-renew-premium"><i class="bi bi-star-fill me-1"></i> Renew Premium</button>
                 </div>
             </div>
         </div>
@@ -2223,8 +2415,8 @@
     <!-- MODAL: SHOP ADDRESS (PSGC) -->
     <div id="shop-address-modal" class="modal" style="z-index:1090;">
         <div class="modal-content" style="max-width:500px;">
-            <div class="modal-header" style="background:#fff!important;color:#fff!important;">
-                <h3 style="color:#fff!important;"><i class="bi bi-geo-alt me-2 text-success"></i>Farm / Pick-up Location</h3>
+            <div class="modal-header" style="background:#2d7a3a;color:#fff;">
+                <h3 style="color:#fff;"><i class="bi bi-geo-alt me-2"></i>Farm / Pick-up Location</h3>
                 <button class="close-btn" id="close-shop-address-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
             </div>
             <div style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(80vh - 58px);">
@@ -2317,17 +2509,11 @@
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group">
-                    <label for="product-unit">Unit <span class="text-danger">*</span></label>
-                    <div class="custom-select-field">
-                        <div class="custom-select-input-wrap">
-                            <input type="text" id="product-unit" class="form-control form-control-sm" placeholder="Select unit" autocomplete="off" readonly required>
-                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
-                        </div>
-                        <div id="product-unit-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Unit options"></div>
-                    </div>
+                <div class="form-group" style="flex:0.3;">
+                    <label for="product-unit">Unit</label>
+                    <input type="text" id="product-unit" class="form-control form-control-sm" value="kg" readonly>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="flex:1;">
                     <label for="product-price">Price (&#8369;) <span class="text-danger">*</span></label>
                     <input type="number" id="product-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
                     <small id="product-price-suggestion" class="field-hint">Suggested price: --</small>
@@ -2353,6 +2539,27 @@
                 </div>
             </div>
             <div class="form-group">
+                <div class="form-check">
+                    <input type="checkbox" id="is-preorder" class="form-check-input" name="is_preorder">
+                    <label for="is-preorder" class="form-check-label">List as Preorder</label>
+                </div>
+                <small class="field-hint">Enable this to sell products before harvest. Customers can reserve now and you'll deliver when ready.</small>
+            </div>
+            <div id="preorder-fields" style="display:none;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="preorder-availability-date">Preorder Availability Date <span class="text-danger">*</span></label>
+                        <input type="date" id="preorder-availability-date" class="form-control form-control-sm" name="preorder_availability_date">
+                        <small class="field-hint">When will this product be available for delivery?</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="max-preorder-quantity">Max Preorder Quantity</label>
+                        <input type="number" id="max-preorder-quantity" class="form-control form-control-sm" min="1" step="1" inputmode="numeric" name="max_preorder_quantity">
+                        <small class="field-hint">Maximum number of preorders to accept (optional)</small>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
                 <label for="product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
                 <div style="display:flex;gap:.5rem;align-items:center;">
                     <textarea id="product-location-display" class="form-control form-control-sm" rows="2" placeholder="Auto-filled from shop address — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
@@ -2367,6 +2574,9 @@
                 <input type="file" id="product-image" class="form-control form-control-sm" name="image" accept="image/*">
                 <small class="field-hint">Upload a clear, well-lit photo of your product.</small>
                 <div id="product-image-preview" class="image-preview"></div>
+            </div>
+            <div class="alert alert-info" style="font-size:0.85rem;padding:0.6rem 0.85rem;margin-bottom:0;">
+                <i class="bi bi-info-circle me-1"></i><strong>Delivery Responsibility:</strong> You are responsible for delivering your products to customers.
             </div>
         </form>
         <div class="modal-footer">
@@ -2410,20 +2620,14 @@
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group">
-                    <label for="edit-product-unit">Unit <span class="text-danger">*</span></label>
-                    <div class="custom-select-field">
-                        <div class="custom-select-input-wrap">
-                            <input type="text" id="edit-product-unit" class="form-control form-control-sm" placeholder="Select unit" autocomplete="off" readonly required>
-                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
-                        </div>
-                        <div id="edit-product-unit-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Unit options"></div>
-                    </div>
+                <div class="form-group" style="flex:0.3;">
+                    <label for="edit-product-unit">Unit</label>
+                    <input type="text" id="edit-product-unit" class="form-control form-control-sm" value="kg" readonly>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="flex:1;">
                     <label for="edit-product-price">Price (&#8369;) <span class="text-danger">*</span></label>
                     <input type="number" id="edit-product-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
-                    <small id="edit-product-price-suggestion" class="field-hint">Suggested lowest price: —</small>
+                    <small id="edit-product-price-suggestion" class="field-hint">Suggested price: —</small>
                 </div>
             </div>
             <div class="form-group">
@@ -2443,6 +2647,27 @@
                 <div class="form-group">
                     <label for="edit-expiry-date">Best Before / Expiry</label>
                     <input type="date" id="edit-expiry-date" class="form-control form-control-sm" name="expiry_date">
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="form-check">
+                    <input type="checkbox" id="edit-is-preorder" class="form-check-input" name="is_preorder">
+                    <label for="edit-is-preorder" class="form-check-label">List as Preorder</label>
+                </div>
+                <small class="field-hint">Enable this to sell products before harvest. Customers can reserve now and you'll deliver when ready.</small>
+            </div>
+            <div id="edit-preorder-fields" style="display:none;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-preorder-availability-date">Preorder Availability Date <span class="text-danger">*</span></label>
+                        <input type="date" id="edit-preorder-availability-date" class="form-control form-control-sm" name="preorder_availability_date">
+                        <small class="field-hint">When will this product be available for delivery?</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-max-preorder-quantity">Max Preorder Quantity</label>
+                        <input type="number" id="edit-max-preorder-quantity" class="form-control form-control-sm" min="1" step="1" inputmode="numeric" name="max_preorder_quantity">
+                        <small class="field-hint">Maximum number of preorders to accept (optional)</small>
+                    </div>
                 </div>
             </div>
             <div class="form-group">
@@ -2639,6 +2864,30 @@
     </div>
 </div>
 
+<!-- MODAL: SCHEDULE DELIVERY -->
+<div id="schedule-delivery-modal" class="modal">
+    <div class="modal-content" style="max-width:420px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-calendar me-2 text-primary"></i>Schedule Delivery</h3>
+            <button class="close-btn" id="schedule-delivery-close" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <form id="schedule-delivery-form" style="padding:1rem 1.25rem;">
+            <p id="schedule-delivery-order" class="text-muted small mb-3"></p>
+            <div class="mb-3">
+                <label for="delivery-date-input" class="form-label fw-semibold">Delivery Date <span class="text-danger">*</span></label>
+                <input type="date" id="delivery-date-input" class="form-control" required>
+                <small class="text-muted" style="font-size:0.75rem;">Select the date for delivery (DATE ONLY)</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="schedule-delivery-cancel" class="btn btn-sm btn-secondary">Cancel</button>
+                <button type="submit" id="schedule-delivery-submit" class="btn btn-sm btn-primary">
+                    <i class="bi bi-check-lg me-1"></i>Schedule Delivery
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- MODAL: REJECTION REASON -->
 <div id="rejection-reason-modal" class="modal">
     <div class="modal-content" style="max-width:500px;">
@@ -2680,14 +2929,6 @@
                         <label class="form-label">Description <span class="text-danger">*</span></label>
                         <textarea class="form-control" id="support-ticket-description" rows="4" maxlength="500" required></textarea>
                         <small class="text-muted" id="description-char-count">0/500 characters</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Priority</label>
-                        <select class="form-select" id="support-ticket-priority">
-                            <option value="low">Low</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="high">High</option>
-                        </select>
                     </div>
                 </form>
             </div>
@@ -2733,26 +2974,32 @@
                             </div>
                             <div class="col-12">
                                 <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
-                                    <i class="bi bi-lightning-charge me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
-                                    <span class="small" style="color: #1a5c2a;">Priority product approval</span>
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
-                                    <i class="bi bi-palette me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
-                                    <span class="small" style="color: #1a5c2a;">Custom product branding</span>
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
                                     <i class="bi bi-graph-up me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
                                     <span class="small" style="color: #1a5c2a;">Advanced sales analytics</span>
                                 </div>
                             </div>
                             <div class="col-12">
                                 <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
-                                    <i class="bi bi-search me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
-                                    <span class="small" style="color: #1a5c2a;">Priority search placement</span>
+                                    <i class="bi bi-lightning-charge me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
+                                    <span class="small" style="color: #1a5c2a;">Priority product approval</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
+                                    <i class="bi bi-clock-history me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
+                                    <span class="small" style="color: #1a5c2a;">All-Time Dashboard Filter</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
+                                    <i class="bi bi-check-circle me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
+                                    <span class="small" style="color: #1a5c2a;">Request new products</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex align-items-center p-2 rounded" style="background: rgba(255,255,255,0.6);">
+                                    <i class="bi bi-patch-check me-2" style="font-size: 1.1rem; color: #2d7a3a;"></i>
+                                    <span class="small" style="color: #1a5c2a;">Premium badge on customer page</span>
                                 </div>
                             </div>
                         </div>
@@ -2836,6 +3083,21 @@
         </div>
     </div>
 </div>
+
+<script>
+// Hide loading screen when page is fully loaded
+window.addEventListener('load', function() {
+    const loadingScreen = document.getElementById('admin-loading-screen');
+    const body = document.body;
+
+    if (loadingScreen) {
+        setTimeout(() => {
+            loadingScreen.classList.add('hidden');
+            body.classList.remove('loading');
+        }, 500);
+    }
+});
+</script>
 
 </body>
 </html>
