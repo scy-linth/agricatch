@@ -6223,6 +6223,8 @@ class FarmerDashboard {
                     <td>${statusBadge}</td>
                     <td class="col-actions">
                         <button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}">Edit</button>
+                        <button class="btn btn-sm btn-success btn-action-harvest" data-product-id="${product.id}" title="Harvest Now">Harvest</button>
+                        <button class="btn btn-sm btn-warning btn-action-convert" data-product-id="${product.id}" title="Convert Remaining Inventory">Convert</button>
                     </td>
                 </tr>
             `;
@@ -7081,6 +7083,7 @@ class FarmerDashboard {
                 const preorderQuantityGroup = document.getElementById('edit-preorder-quantity-group');
                 const preorderFields = document.getElementById('edit-preorder-fields');
                 const harvestBtn = document.getElementById('edit-harvest-now-btn');
+                const convertBtn = document.getElementById('edit-convert-inventory-btn');
                 
                 if (isPreorder) {
                     if (availablePriceGroup) availablePriceGroup.style.display = 'none';
@@ -7090,6 +7093,7 @@ class FarmerDashboard {
                     if (preorderQuantityGroup) preorderQuantityGroup.style.display = 'block';
                     if (preorderFields) preorderFields.style.display = 'block';
                     if (harvestBtn) harvestBtn.style.display = 'inline-block';
+                    if (convertBtn) convertBtn.style.display = 'inline-block';
                 } else {
                     if (availablePriceGroup) availablePriceGroup.style.display = 'block';
                     if (availableStockGroup) availableStockGroup.style.display = 'block';
@@ -7098,6 +7102,7 @@ class FarmerDashboard {
                     if (preorderQuantityGroup) preorderQuantityGroup.style.display = 'none';
                     if (preorderFields) preorderFields.style.display = 'none';
                     if (harvestBtn) harvestBtn.style.display = 'none';
+                    if (convertBtn) convertBtn.style.display = 'none';
                 }
 
                 // Populate edit form
