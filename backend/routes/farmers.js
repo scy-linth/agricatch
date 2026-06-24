@@ -33,6 +33,22 @@ const requireFarmer = async (req, res) => {
   return user;
 };
 
+const requireFarmerOrCustomer = async (req, res) => {
+  const user = getUserFromToken(req);
+  if (!user) {
+    res.status(401).json({ message: 'Authentication required' });
+    return null;
+  }
+
+  const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [user.id]);
+  if (!['farmer', 'customer'].includes(userResult.rows[0]?.role)) {
+    res.status(403).json({ message: 'Farmer or customer access required' });
+    return null;
+  }
+
+  return user;
+};
+
 async function getFarmerTier(userId) {
   try {
     const subRes = await pool.query(
@@ -85,8 +101,8 @@ const calcPercentChange = (current, previous) => {
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT u.id, u.username, u.full_name, u.email, u.phone,
-             u.address as location, COALESCE(u.is_verified, false) as is_verified,
+      SELECT u.id, u.username, u.full_name, COALESCE(u.shop_name, u.full_name) as shop_name,
+             COALESCE(u.is_verified, false) as is_verified,
              u.created_at, COUNT(p.id) as product_count
       FROM users u
       LEFT JOIN products p ON p.farmer_id = u.id
@@ -107,7 +123,7 @@ router.get('/:id/profile', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(`
-      SELECT u.id, u.username, u.full_name, u.shop_name, u.email, u.phone, u.address as location, u.is_verified,
+      SELECT u.id, u.username, u.full_name, COALESCE(u.shop_name, u.full_name) as shop_name, u.is_verified,
              u.shop_description, u.shop_banner_url, u.shop_avatar_url, u.created_at,
              -- Aggregate: total orders (all statuses) for farmer's products
              (SELECT COUNT(*) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.farmer_id = u.id)::int AS total_sales,
@@ -511,21 +527,25 @@ router.get('/me/report', async (req, res) => {
 
     const period = req.query.period || 'today';
 
+    // Use same time reference as /me/metrics for consistency
+    // Delivered orders use updated_at (delivery date), others use created_at
+    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.updated_at, o.created_at) ELSE o.created_at END`;
+
     let groupExpr, filterExpr;
     if (period === 'today') {
-      groupExpr = `DATE_TRUNC('hour', o.created_at)`;
-      filterExpr = `DATE(o.created_at) = CURRENT_DATE`;
+      groupExpr = `DATE_TRUNC('hour', ${timeRef})`;
+      filterExpr = `DATE(${timeRef}) = CURRENT_DATE`;
     } else if (period === 'week') {
-      groupExpr = `DATE(o.created_at)`;
-      filterExpr = `o.created_at >= DATE_TRUNC('week', CURRENT_DATE)`;
+      groupExpr = `DATE(${timeRef})`;
+      filterExpr = `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE)`;
     } else if (period === 'month') {
-      groupExpr = `DATE(o.created_at)`;
-      filterExpr = `o.created_at >= DATE_TRUNC('month', CURRENT_DATE)`;
+      groupExpr = `DATE(${timeRef})`;
+      filterExpr = `${timeRef} >= DATE_TRUNC('month', CURRENT_DATE)`;
     } else if (period === 'year') {
-      groupExpr = `DATE_TRUNC('month', o.created_at)`;
-      filterExpr = `o.created_at >= DATE_TRUNC('year', CURRENT_DATE)`;
+      groupExpr = `DATE_TRUNC('month', ${timeRef})`;
+      filterExpr = `${timeRef} >= DATE_TRUNC('year', CURRENT_DATE)`;
     } else {
-      groupExpr = `DATE_TRUNC('month', o.created_at)`;
+      groupExpr = `DATE_TRUNC('month', ${timeRef})`;
       filterExpr = '1=1';
     }
 
@@ -752,6 +772,17 @@ router.put('/profile', async (req, res) => {
     if (hasPersonalNameFields && (!firstName || !lastName)) {
       return res.status(400).json({ message: 'First name and last name are required when updating personal name fields' });
     }
+    if (hasPersonalNameFields) {
+      if (firstName.length > 40) {
+        return res.status(400).json({ message: 'First name must be 40 characters or less' });
+      }
+      if (middleName.length > 40) {
+        return res.status(400).json({ message: 'Middle name must be 40 characters or less' });
+      }
+      if (lastName.length > 40) {
+        return res.status(400).json({ message: 'Last name must be 40 characters or less' });
+      }
+    }
 
     // Get current shop banner and avatar URLs if columns exist
     // Handle case where columns might not exist in database yet
@@ -777,8 +808,12 @@ router.put('/profile', async (req, res) => {
     let paramIndex = 1;
 
     if (shop_name !== undefined && shop_name !== null && shop_name !== '') {
+      const trimmedShopName = String(shop_name).trim();
+      if (trimmedShopName.length > 40) {
+        return res.status(400).json({ message: 'Shop name must be 40 characters or less' });
+      }
       updates.push(`shop_name = $${paramIndex}`);
-      values.push(shop_name);
+      values.push(trimmedShopName);
       paramIndex++;
     }
 
@@ -893,29 +928,19 @@ router.put('/profile', async (req, res) => {
   }
 });
 
-// Farmer: request verification
+// Farmer/Customer: request verification
 router.post('/me/verification-request', async (req, res) => {
   try {
-    const user = await requireFarmer(req, res);
+    const user = await requireFarmerOrCustomer(req, res);
     if (!user) return;
 
     const { document_url, notes } = req.body;
 
-    // Check if farmer is already verified
+    // Check if user is already verified
     const userResult = await pool.query('SELECT is_verified FROM users WHERE id = $1', [user.id]);
     if (userResult.rows[0].is_verified) {
       return res.status(400).json({ message: 'Your account is already verified' });
     }
-
-    // Check if there's already a pending verification request
-    // REMOVED: Allow new requests even if pending exists for unverified workflow
-    // const existingRequest = await pool.query(
-    //   'SELECT id FROM verification_requests WHERE farmer_id = $1 AND status = $2',
-    //   [user.id, 'pending']
-    // );
-    // if (existingRequest.rows.length > 0) {
-    //   return res.status(400).json({ message: 'You already have a pending verification request' });
-    // }
 
     // Create verification request
     const result = await pool.query(
@@ -930,13 +955,13 @@ router.post('/me/verification-request', async (req, res) => {
       const admins = await pool.query(
         "SELECT id FROM users WHERE role IN ('admin', 'super_admin')"
       );
-      
+      const roleLabel = user.role === 'farmer' ? 'Farmer' : 'User';
       for (const admin of admins.rows) {
         await pool.query(
           `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
            VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
           [admin.id, 'verification_request', 'New Verification Request', 
-           `Farmer ${user.username} has requested account verification.`]
+           `${roleLabel} ${user.username} has requested account verification.`]
         );
         broadcastEvent('notification.created', { user_id: admin.id });
       }
@@ -955,10 +980,10 @@ router.post('/me/verification-request', async (req, res) => {
   }
 });
 
-// Farmer: get verification request status
+// Farmer/Customer: get verification request status
 router.get('/me/verification-request', async (req, res) => {
   try {
-    const user = await requireFarmer(req, res);
+    const user = await requireFarmerOrCustomer(req, res);
     if (!user) return;
 
     const result = await pool.query(
@@ -977,6 +1002,49 @@ router.get('/me/verification-request', async (req, res) => {
   } catch (error) {
     console.error('Get verification request error:', error);
     res.status(500).json({ message: 'Server error fetching verification request' });
+  }
+});
+
+// Harvest pre-order inventory (transfer to available stock)
+router.post('/products/:id/harvest-preorder', async (req, res) => {
+  try {
+    const user = await requireFarmer(req, res);
+    if (!user) return;
+
+    const productId = parseInt(req.params.id);
+
+    // Verify product belongs to farmer
+    const productCheck = await pool.query(
+      'SELECT id, farmer_id, stock_quantity, reserved_quantity FROM products WHERE id = $1',
+      [productId]
+    );
+
+    if (productCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (productCheck.rows[0].farmer_id !== user.id) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const product = productCheck.rows[0];
+
+    // Transfer reserved quantity to stock quantity
+    const updatedStock = product.stock_quantity + product.reserved_quantity;
+    
+    await pool.query(
+      'UPDATE products SET stock_quantity = $1, reserved_quantity = 0, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [updatedStock, productId]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Pre-order inventory harvested successfully',
+      new_stock_quantity: updatedStock
+    });
+  } catch (error) {
+    console.error('Error harvesting pre-order:', error);
+    res.status(500).json({ error: 'Failed to harvest pre-order inventory' });
   }
 });
 
