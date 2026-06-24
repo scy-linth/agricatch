@@ -601,6 +601,58 @@ class FarmerDashboard {
         document.documentElement.classList.add('modal-open');
         document.body.classList.add('modal-open');
         
+        // Reset to step 1
+        document.getElementById('add-product-step-1').style.display = 'block';
+        document.getElementById('add-product-step-2').style.display = 'none';
+        
+        // Check if farmer already has products of each type
+        const hasAvailable = this.myProductsCache?.some(p => !p.is_preorder && p.status === 'approved');
+        const hasPreorder = this.myProductsCache?.some(p => p.is_preorder && p.status === 'approved');
+        
+        // Disable cards if farmer already has that type
+        const availableCard = document.getElementById('product-type-available');
+        const preorderCard = document.getElementById('product-type-preorder');
+        const warningDiv = document.getElementById('product-type-warning');
+        const warningText = document.getElementById('product-type-warning-text');
+        
+        if (availableCard) {
+            if (hasAvailable) {
+                availableCard.classList.add('disabled');
+                availableCard.style.opacity = '0.5';
+                availableCard.style.pointerEvents = 'none';
+            } else {
+                availableCard.classList.remove('disabled');
+                availableCard.style.opacity = '1';
+                availableCard.style.pointerEvents = 'auto';
+            }
+        }
+        
+        if (preorderCard) {
+            if (hasPreorder) {
+                preorderCard.classList.add('disabled');
+                preorderCard.style.opacity = '0.5';
+                preorderCard.style.pointerEvents = 'none';
+            } else {
+                preorderCard.classList.remove('disabled');
+                preorderCard.style.opacity = '1';
+                preorderCard.style.pointerEvents = 'auto';
+            }
+        }
+        
+        // Show warning if both types are disabled
+        if (hasAvailable && hasPreorder) {
+            warningDiv.style.display = 'block';
+            warningText.textContent = 'You already have both an Available Now and a Pre-order product. Contact support to add more.';
+        } else if (hasAvailable) {
+            warningDiv.style.display = 'block';
+            warningText.textContent = 'You already have an Available Now product. You can add a Pre-order product.';
+        } else if (hasPreorder) {
+            warningDiv.style.display = 'block';
+            warningText.textContent = 'You already have a Pre-order product. You can add an Available Now product.';
+        } else {
+            warningDiv.style.display = 'none';
+        }
+        
         // Auto-fill location from shop address
         const shopLocation = this.currentShopProfile?.location || '';
         const locationDisplay = document.getElementById('product-location-display');
@@ -616,12 +668,38 @@ class FarmerDashboard {
         await this.loadProductCatalogNames();
     }
 
+    selectProductType(productType) {
+        const productTypeInput = document.getElementById('add-product-type');
+        const availableFields = document.getElementById('available-now-fields');
+        const preorderFields = document.getElementById('preorder-fields');
+        
+        if (productTypeInput) {
+            productTypeInput.value = productType;
+        }
+        
+        // Show/hide specific fields based on product type
+        if (productType === 'available') {
+            if (availableFields) availableFields.style.display = 'block';
+            if (preorderFields) preorderFields.style.display = 'none';
+        } else if (productType === 'preorder') {
+            if (availableFields) availableFields.style.display = 'none';
+            if (preorderFields) preorderFields.style.display = 'block';
+        }
+        
+        // Re-render product name suggestions to filter out existing products for this type
+        this.renderProductNameSuggestions('add', true);
+        
+        // Move to step 2
+        document.getElementById('add-product-step-1').style.display = 'none';
+        document.getElementById('add-product-step-2').style.display = 'block';
+    }
+
     setupNonNegativeInputs() {
         const inputIds = [
             'product-price',
             'product-stock',
-            'edit-product-price',
-            'edit-product-stock'
+            'edit-price',
+            'edit-stock-quantity'
         ];
 
         const blockNegative = (input) => {
@@ -935,12 +1013,20 @@ class FarmerDashboard {
 
     filterRequests() {
         const statusFilter = document.getElementById('request-status-filter')?.value || '';
-        const searchInput = document.getElementById('requests-search-input')?.value?.toLowerCase() || '';
+        const searchInput = document.getElementById('requests-search-input')?.value?.toLowerCase() || 
+                          document.getElementById('approval-search-input')?.value?.toLowerCase() || '';
+        const categoryFilter = document.getElementById('approval-category-filter')?.value?.toLowerCase() || '';
         
         let filtered = this.requestsCache;
         
         if (statusFilter) {
             filtered = filtered.filter(r => String(r.status || 'pending') === statusFilter);
+        }
+        
+        if (categoryFilter) {
+            filtered = filtered.filter(r => 
+                (r.category_name || r.requested_category_name || '').toLowerCase().includes(categoryFilter)
+            );
         }
         
         if (searchInput) {
@@ -1356,13 +1442,25 @@ class FarmerDashboard {
             }
         });
 
-        document.getElementById('edit-disable-product-preorder-btn')?.addEventListener('click', () => {
-            const productId = document.getElementById('edit-product-id').value;
-            if (productId) {
-                document.getElementById('confirm-disable-btn').dataset.productId = productId;
-                document.getElementById('disable-confirm-modal').classList.add('open');
-            }
-        });
+        // Edit management tabs - toggle button visibility
+        const editAvailableTab = document.querySelector('button[data-bs-target="#edit-available-now-tab"]');
+        const editPreorderTab = document.querySelector('button[data-bs-target="#edit-preorders-tab"]');
+        const harvestBtn = document.getElementById('edit-harvest-now-btn');
+        const convertBtn = document.getElementById('edit-convert-inventory-btn');
+
+        if (editAvailableTab) {
+            editAvailableTab.addEventListener('shown.bs.tab', () => {
+                if (harvestBtn) harvestBtn.style.display = 'none';
+                if (convertBtn) convertBtn.style.display = 'none';
+            });
+        }
+
+        if (editPreorderTab) {
+            editPreorderTab.addEventListener('shown.bs.tab', () => {
+                if (harvestBtn) harvestBtn.style.display = 'inline-block';
+                if (convertBtn) convertBtn.style.display = 'inline-block';
+            });
+        }
 
         document.getElementById('add-product-form')?.addEventListener('submit', (e) => this.handleAddProduct(e));
         document.getElementById('edit-product-form')?.addEventListener('submit', (e) => this.handleEditProduct(e));
@@ -1412,28 +1510,49 @@ class FarmerDashboard {
             }
         });
 
-        // Product management tabs
-        document.querySelectorAll('.product-management-tabs .tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tab = e.target.dataset.tab;
-                if (!tab) return;
+        // Product tabs - Bootstrap tab event listeners
+        const availableNowTab = document.querySelector('button[data-bs-target="#available-now-tab"]');
+        const preordersTab = document.querySelector('button[data-bs-target="#preorders-tab"]');
+        const approvalTab = document.querySelector('button[data-bs-target="#approval-tab"]');
 
-                // Update active button
-                document.querySelectorAll('.product-management-tabs .tab-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-
-                // Show/hide tab content
-                document.querySelectorAll('.product-tab-content').forEach(content => {
-                    content.classList.remove('active');
-                    content.style.display = 'none';
-                });
-                const targetContent = document.getElementById(`${tab}-tab`);
-                if (targetContent) {
-                    targetContent.classList.add('active');
-                    targetContent.style.display = 'block';
-                }
+        if (availableNowTab) {
+            availableNowTab.addEventListener('shown.bs.tab', () => {
+                // Show Available Now KPI cards and filter
+                document.getElementById('kpi-available').style.display = 'flex';
+                document.getElementById('kpi-preorder').style.display = 'none';
+                document.getElementById('kpi-approval').style.display = 'none';
+                document.getElementById('filter-available').style.display = 'flex';
+                document.getElementById('filter-preorder').style.display = 'none';
+                document.getElementById('filter-approval').style.display = 'none';
+                this.filterAvailableProducts();
             });
-        });
+        }
+
+        if (preordersTab) {
+            preordersTab.addEventListener('shown.bs.tab', () => {
+                // Show Pre-orders KPI cards and filter
+                document.getElementById('kpi-available').style.display = 'none';
+                document.getElementById('kpi-preorder').style.display = 'flex';
+                document.getElementById('kpi-approval').style.display = 'none';
+                document.getElementById('filter-available').style.display = 'none';
+                document.getElementById('filter-preorder').style.display = 'flex';
+                document.getElementById('filter-approval').style.display = 'none';
+                this.filterPreorderProducts();
+            });
+        }
+
+        if (approvalTab) {
+            approvalTab.addEventListener('shown.bs.tab', () => {
+                // Show Approval KPI cards and filter
+                document.getElementById('kpi-available').style.display = 'none';
+                document.getElementById('kpi-preorder').style.display = 'none';
+                document.getElementById('kpi-approval').style.display = 'flex';
+                document.getElementById('filter-available').style.display = 'none';
+                document.getElementById('filter-preorder').style.display = 'none';
+                document.getElementById('filter-approval').style.display = 'flex';
+                this.loadRequestsTable();
+            });
+        }
 
         // Format phone input with spaces (9XX XXX XXXX)
         const pePhone = document.getElementById('pe-phone');
@@ -1609,6 +1728,21 @@ class FarmerDashboard {
             this.filterRequests();
         });
 
+        // Approval search button
+        document.getElementById('approval-search-btn')?.addEventListener('click', () => {
+            this.filterRequests();
+        });
+
+        // Approval refresh button
+        document.getElementById('approval-refresh-btn')?.addEventListener('click', () => {
+            this.loadRequestsTable();
+        });
+
+        // Approval category filter
+        document.getElementById('approval-category-filter')?.addEventListener('change', () => {
+            this.filterRequests();
+        });
+
         // Product request details modal close buttons
         document.getElementById('close-request-details-modal')?.addEventListener('click', () => {
             this.closeRequestDetailsModal();
@@ -1710,11 +1844,6 @@ class FarmerDashboard {
             if (displayEl && previewEl) displayEl.value = previewEl.value;
             closeShopAddr();
         });
-
-        const productsSearchInput = document.getElementById('products-search-input');
-        if (productsSearchInput) {
-            productsSearchInput.addEventListener('input', () => this.filterProducts());
-        }
 
         const ordersSearchInput = document.getElementById('orders-search-input');
         if (ordersSearchInput) {
@@ -1973,13 +2102,25 @@ class FarmerDashboard {
 
         const addProductModal = document.getElementById('add-product-modal');
         const closeAddProductModalBtn = document.getElementById('close-add-product-modal');
-        const cancelAddProductBtn = document.getElementById('cancel-add-product-btn');
+        const backToStep1Btn = document.getElementById('back-to-step-1');
+        
         if (closeAddProductModalBtn) {
             closeAddProductModalBtn.addEventListener('click', () => this.closeAddProductModal());
         }
-        if (cancelAddProductBtn) {
-            cancelAddProductBtn.addEventListener('click', () => this.closeAddProductModal());
+        if (backToStep1Btn) {
+            backToStep1Btn.addEventListener('click', () => {
+                document.getElementById('add-product-step-1').style.display = 'block';
+                document.getElementById('add-product-step-2').style.display = 'none';
+            });
         }
+        
+        // Product type card click handlers
+        document.querySelectorAll('.product-type-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const productType = card.dataset.productType;
+                this.selectProductType(productType);
+            });
+        });
 
         const customerRatingModal = document.getElementById('customer-rating-modal');
         const customerRatingClose = document.getElementById('customer-rating-close');
@@ -2066,11 +2207,37 @@ class FarmerDashboard {
         document.getElementById('btn-renew-premium')?.addEventListener('click', () => this.openSubscriptionModal('renew'));
         document.getElementById('btn-submit-subscription')?.addEventListener('click', () => this.submitSubscriptionRequest());
 
-        // Product filters (updated for table layout)
-        document.getElementById('product-category-filter')?.addEventListener('change', () => this.filterProducts());
-        document.getElementById('product-status-filter')?.addEventListener('change', () => this.filterProducts());
-        document.getElementById('products-search-btn')?.addEventListener('click', () => this.filterProducts());
-        document.getElementById('products-refresh-btn')?.addEventListener('click', () => this.loadMyProducts());
+        // Available products filters
+        document.getElementById('available-category-filter')?.addEventListener('change', () => this.filterAvailableProducts());
+        document.getElementById('available-status-filter')?.addEventListener('change', () => this.filterAvailableProducts());
+        document.getElementById('available-search-btn')?.addEventListener('click', () => this.filterAvailableProducts());
+        document.getElementById('available-refresh-btn')?.addEventListener('click', () => this.loadMyProducts());
+        
+        const availableSearchInput = document.getElementById('available-search-input');
+        if (availableSearchInput) {
+            availableSearchInput.addEventListener('input', () => this.filterAvailableProducts());
+            availableSearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.filterAvailableProducts();
+                }
+            });
+        }
+        
+        // Preorder products filters
+        document.getElementById('preorder-category-filter')?.addEventListener('change', () => this.filterPreorderProducts());
+        document.getElementById('preorder-status-filter')?.addEventListener('change', () => this.filterPreorderProducts());
+        document.getElementById('preorder-search-btn')?.addEventListener('click', () => this.filterPreorderProducts());
+        document.getElementById('preorder-refresh-btn')?.addEventListener('click', () => this.loadMyProducts());
+        
+        const preorderSearchInput = document.getElementById('preorder-search-input');
+        if (preorderSearchInput) {
+            preorderSearchInput.addEventListener('input', () => this.filterPreorderProducts());
+            preorderSearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.filterPreorderProducts();
+                }
+            });
+        }
         
         const cancelEditBtn = document.getElementById('cancel-edit-btn');
         if (cancelEditBtn) {
@@ -2186,6 +2353,17 @@ class FarmerDashboard {
         // Product edit button (event delegation)
         document.addEventListener('click', (e) => {
             const editBtn = e.target.closest('.product-edit-btn');
+            if (editBtn) {
+                const productId = Number(editBtn.getAttribute('data-product-id'));
+                if (productId && !isNaN(productId)) {
+                    this.editProduct(productId);
+                }
+            }
+        });
+
+        // Event delegation for new Edit buttons
+        document.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.btn-action-edit');
             if (editBtn) {
                 const productId = Number(editBtn.getAttribute('data-product-id'));
                 if (productId && !isNaN(productId)) {
@@ -2310,7 +2488,28 @@ class FarmerDashboard {
         const isAlreadyOpen = listEl.classList.contains('open');
         const query = forceAll ? '' : String(nameInput.value || '').trim().toLowerCase();
         const source = Array.isArray(this.catalogProductNames) ? this.catalogProductNames : [];
-        const matches = source
+        
+        // For add mode, filter out product names that already exist for the selected product type
+        let filteredSource = source;
+        if (!isEdit && this.myProductsCache) {
+            const productType = document.getElementById('add-product-type')?.value || '';
+            const existingProductNames = this.myProductsCache
+                .filter(p => {
+                    if (productType === 'available') {
+                        return !p.is_preorder;
+                    } else if (productType === 'preorder') {
+                        return p.is_preorder;
+                    }
+                    return false;
+                })
+                .map(p => String(p.name || '').trim().toLowerCase());
+            
+            filteredSource = source.filter(item => 
+                !existingProductNames.includes(String(item.name).trim().toLowerCase())
+            );
+        }
+        
+        const matches = filteredSource
             .filter((item) => !query || String(item.name).toLowerCase().includes(query))
             .slice(0, 10);
 
@@ -2604,6 +2803,7 @@ class FarmerDashboard {
         const categoryInput = document.getElementById(isEdit ? 'edit-product-category' : 'product-category');
         const nameInput = document.getElementById(isEdit ? 'edit-product-name' : 'product-name');
         const hint = document.getElementById(isEdit ? 'edit-product-price-suggestion' : 'product-price-suggestion');
+        const priceInput = document.getElementById(isEdit ? 'edit-price' : 'product-price');
         if (!nameInput) return;
 
         const categoryId = String(categoryInput?.dataset.value || categoryInput?.value || '').trim();
@@ -2689,7 +2889,7 @@ class FarmerDashboard {
         const addPrice = document.getElementById('product-price');
         if (addPrice) addPrice.addEventListener('focus', () => this.updatePriceSuggestion('add'));
 
-        const editPrice = document.getElementById('edit-product-price');
+        const editPrice = document.getElementById('edit-price');
         if (editPrice) editPrice.addEventListener('focus', () => this.updatePriceSuggestion('edit'));
 
         this.syncProductNameAvailability('add');
@@ -2743,6 +2943,7 @@ class FarmerDashboard {
         const nameInput = document.getElementById(isEdit ? 'edit-product-name' : 'product-name');
         const categoryInput = document.getElementById(isEdit ? 'edit-product-category' : 'product-category');
         const hint = document.getElementById(isEdit ? 'edit-product-price-suggestion' : 'product-price-suggestion');
+        const priceInput = document.getElementById(isEdit ? 'edit-price' : 'product-price');
 
         if (!nameInput || !hint) return;
 
@@ -4766,7 +4967,25 @@ class FarmerDashboard {
             if (response.ok) {
                 const data = await response.json();
                 this.myProductsCache = Array.isArray(data.products) ? data.products : [];
-                this.renderMyProducts(data.products);
+                
+                // Initialize KPI cards and filter visibility (show Available Now by default)
+                document.getElementById('kpi-available').style.display = 'flex';
+                document.getElementById('kpi-preorder').style.display = 'none';
+                document.getElementById('kpi-approval').style.display = 'none';
+                document.getElementById('filter-available').style.display = 'flex';
+                document.getElementById('filter-preorder').style.display = 'none';
+                document.getElementById('filter-approval').style.display = 'none';
+                
+                // Split products by is_preorder flag
+                const availableProducts = this.myProductsCache.filter(p => !p.is_preorder);
+                const preorderProducts = this.myProductsCache.filter(p => p.is_preorder);
+                
+                // Render to correct tables
+                this.renderAvailableProducts(availableProducts);
+                this.renderPreorderProducts(preorderProducts);
+                
+                // Update KPI cards
+                this.updateProductKPIs(this.myProductsCache);
                 
                 // Show product limit warning for unverified farmers
                 try {
@@ -4792,12 +5011,19 @@ class FarmerDashboard {
                 } catch (_) { /* ignore user check error */ }
                 
                 // Reset filters to default
-                const statusFilter = document.getElementById('product-status-filter');
-                const categoryFilter = document.getElementById('product-category-filter');
-                const searchInput = document.getElementById('products-search-input');
-                if (statusFilter) statusFilter.value = '';
-                if (categoryFilter) categoryFilter.value = '';
-                if (searchInput) searchInput.value = '';
+                const availableStatusFilter = document.getElementById('available-status-filter');
+                const availableCategoryFilter = document.getElementById('available-category-filter');
+                const availableSearchInput = document.getElementById('available-search-input');
+                const preorderStatusFilter = document.getElementById('preorder-status-filter');
+                const preorderCategoryFilter = document.getElementById('preorder-category-filter');
+                const preorderSearchInput = document.getElementById('preorder-search-input');
+                
+                if (availableStatusFilter) availableStatusFilter.value = '';
+                if (availableCategoryFilter) availableCategoryFilter.value = '';
+                if (availableSearchInput) availableSearchInput.value = '';
+                if (preorderStatusFilter) preorderStatusFilter.value = '';
+                if (preorderCategoryFilter) preorderCategoryFilter.value = '';
+                if (preorderSearchInput) preorderSearchInput.value = '';
             }
         } catch (error) {
             console.error('Error loading products:', error);
@@ -5679,7 +5905,10 @@ class FarmerDashboard {
         }
     }
 
+    // DEPRECATED: renderMyProducts is no longer used - replaced by renderAvailableProducts and renderPreorderProducts
+    // Kept for backward compatibility in case of legacy references
     renderMyProducts(products) {
+        console.warn('renderMyProducts is deprecated - use renderAvailableProducts or renderPreorderProducts instead');
         this.destroySortableTable('products-table');
         const tbody = document.getElementById('products-tbody');
         if (!tbody) return;
@@ -5873,7 +6102,7 @@ class FarmerDashboard {
         // Render pagination
         this.renderPagination('products-pagination', pg, (page) => {
             this.pagination['products'].page = page;
-            this.filterProducts();
+            // Note: filterProducts is deprecated, pagination no longer functional for this deprecated function
         });
     }
 
@@ -5884,15 +6113,16 @@ class FarmerDashboard {
         tbody.innerHTML = '';
         
         if (products.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4">No available products found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">No available products found</td></tr>';
             return;
         }
+        
+        // Update category filter options
+        this.refreshProductCategoryFilterOptions(this.myProductsCache);
         
         products.forEach(product => {
             const statusBadge = this.getAvailableStatusBadge(product);
             const stock = Number(product.stock_quantity ?? 0);
-            const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
-            const isAdminDisabled = (product.is_admin_disabled === true || product.is_admin_disabled === 't' || product.is_admin_disabled === 'true' || product.is_admin_disabled === 1 || product.is_admin_disabled === '1');
             
             // Normalize image URL
             let productImageUrl = product.image_url || '';
@@ -5903,18 +6133,14 @@ class FarmerDashboard {
                 productImageUrl = '/images/logo.png';
             }
 
-            const thumb = productImageUrl
-                ? `<img src="${this.escapeHtml(productImageUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">`
-                : '';
-            const placeholder = `<div style="width:48px;height:48px;background:#e9ecef;border-radius:6px;display:flex;align-items:center;justify-content:center;" ${productImageUrl ? 'style="display:none"' : ''}><i class="bi bi-image text-muted"></i></div>`;
+            const thumb = `<img src="${this.escapeHtml(productImageUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;" alt="" onerror="this.src='/images/logo.png'">`;
 
             const reviewCount = Number(product.total_reviews || 0);
             const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
             
             const row = `
                 <tr>
-                    <td>${thumb}${placeholder}</td>
-                    <td class="small">${product.id}</td>
+                    <td>${thumb}</td>
                     <td>
                         <div class="fw-semibold small">${this.escapeHtml(product.name)}</div>
                     </td>
@@ -5924,8 +6150,7 @@ class FarmerDashboard {
                     <td>${statusBadge}</td>
                     <td class="small">${reviewCount} <i class="bi bi-star-fill text-warning"></i> ${avgRating}</td>
                     <td class="col-actions">
-                        <button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}"><i class="bi bi-pencil"></i></button>
-                        <button class="btn btn-sm btn-outline-danger btn-action-disable" data-product-id="${product.id}"><i class="bi bi-x-lg"></i></button>
+                        <button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}">Edit</button>
                     </td>
                 </tr>
             `;
@@ -5940,9 +6165,12 @@ class FarmerDashboard {
         tbody.innerHTML = '';
         
         if (products.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">No pre-order products found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4">No pre-order products found</td></tr>';
             return;
         }
+        
+        // Update category filter options
+        this.refreshProductCategoryFilterOptions(this.myProductsCache);
         
         products.forEach(product => {
             const statusBadge = this.getPreorderStatusBadge(product);
@@ -5959,15 +6187,11 @@ class FarmerDashboard {
                 productImageUrl = '/images/logo.png';
             }
 
-            const thumb = productImageUrl
-                ? `<img src="${this.escapeHtml(productImageUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">`
-                : '';
-            const placeholder = `<div style="width:48px;height:48px;background:#e9ecef;border-radius:6px;display:flex;align-items:center;justify-content:center;" ${productImageUrl ? 'style="display:none"' : ''}><i class="bi bi-image text-muted"></i></div>`;
+            const thumb = `<img src="${this.escapeHtml(productImageUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;" alt="" onerror="this.src='/images/logo.png'">`;
 
             const row = `
                 <tr>
-                    <td>${thumb}${placeholder}</td>
-                    <td class="small">${product.id}</td>
+                    <td>${thumb}</td>
                     <td>
                         <div class="fw-semibold small">${this.escapeHtml(product.name)}</div>
                     </td>
@@ -5981,9 +6205,7 @@ class FarmerDashboard {
                     </td>
                     <td>${statusBadge}</td>
                     <td class="col-actions">
-                        <button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}"><i class="bi bi-pencil"></i></button>
-                        <button class="btn btn-sm btn-outline-success btn-action-harvest" data-product-id="${product.id}"><i class="bi bi-check-circle"></i></button>
-                        <button class="btn btn-sm btn-outline-danger btn-action-disable" data-product-id="${product.id}"><i class="bi bi-x-lg"></i></button>
+                        <button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}">Edit</button>
                     </td>
                 </tr>
             `;
@@ -6019,37 +6241,75 @@ class FarmerDashboard {
     }
 
     updateProductKPIs(products) {
-        const total = products.length;
-        const active = products.filter(p => {
+        // Update all tab-specific KPIs
+        this.updateAvailableKPIs(products);
+        this.updatePreorderKPIs(products);
+        this.updateApprovalKPIs(products);
+    }
+
+    updateAvailableKPIs(products) {
+        const availableProducts = products.filter(p => !p.is_preorder);
+        const total = availableProducts.length;
+        const active = availableProducts.filter(p => {
             const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
             const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
             const stock = Number(p.stock_quantity ?? 0);
             return isAvailable && !isAdminDisabled && stock > 0;
         }).length;
-        const lowStock = products.filter(p => {
+        const lowStock = availableProducts.filter(p => {
             const stock = Number(p.stock_quantity ?? 0);
             const status = String(p.status || 'approved').toLowerCase().trim();
             const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
             return status === 'approved' && !isAdminDisabled && stock > 0 && stock <= this.lowStockThreshold;
         }).length;
-        const noStock = products.filter(p => {
+        const outOfStock = availableProducts.filter(p => {
             const stock = Number(p.stock_quantity ?? 0);
             const status = String(p.status || 'approved').toLowerCase().trim();
             const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
             return status === 'approved' && !isAdminDisabled && stock === 0;
         }).length;
-        const pending = products.filter(p => p.status === 'pending').length;
 
-        const totalEl = document.getElementById('kpi-total-products');
-        const activeEl = document.getElementById('kpi-active-products');
-        const lowStockEl = document.getElementById('kpi-low-stock');
-        const noStockEl = document.getElementById('kpi-no-stock');
-        const pendingEl = document.getElementById('kpi-pending-products');
+        const totalEl = document.getElementById('kpi-available-total');
+        const activeEl = document.getElementById('kpi-available-active');
+        const lowStockEl = document.getElementById('kpi-available-low-stock');
+        const outOfStockEl = document.getElementById('kpi-available-out-of-stock');
 
         if (totalEl) totalEl.textContent = total;
         if (activeEl) activeEl.textContent = active;
         if (lowStockEl) lowStockEl.textContent = lowStock;
-        if (noStockEl) noStockEl.textContent = noStock;
+        if (outOfStockEl) outOfStockEl.textContent = outOfStock;
+    }
+
+    updatePreorderKPIs(products) {
+        const preorderProducts = products.filter(p => p.is_preorder);
+        const active = preorderProducts.filter(p => {
+            const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+            const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
+            return isAvailable && !isAdminDisabled;
+        }).length;
+        const harvestReady = preorderProducts.filter(p => p.status === 'harvest_ready').length;
+        const reservedUnits = preorderProducts.reduce((sum, p) => sum + (Number(p.reserved_quantity) || 0), 0);
+        const pendingHarvest = preorderProducts.filter(p => {
+            const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+            const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
+            return isAvailable && !isAdminDisabled && p.status !== 'harvest_ready';
+        }).length;
+
+        const activeEl = document.getElementById('kpi-preorder-active');
+        const harvestReadyEl = document.getElementById('kpi-preorder-harvest-ready');
+        const reservedEl = document.getElementById('kpi-preorder-reserved');
+        const pendingEl = document.getElementById('kpi-preorder-pending');
+
+        if (activeEl) activeEl.textContent = active;
+        if (harvestReadyEl) harvestReadyEl.textContent = harvestReady;
+        if (reservedEl) reservedEl.textContent = reservedUnits;
+        if (pendingEl) pendingEl.textContent = pendingHarvest;
+    }
+
+    updateApprovalKPIs(products) {
+        const pending = products.filter(p => p.status === 'pending').length;
+
+        const pendingEl = document.getElementById('kpi-approval-pending');
         if (pendingEl) pendingEl.textContent = pending;
     }
 
@@ -6245,22 +6505,32 @@ class FarmerDashboard {
     }
 
     refreshProductCategoryFilterOptions(products) {
-        const categoryFilter = document.getElementById('product-category-filter');
-        if (!categoryFilter) return;
+        // Update both available and preorder category filters
+        const availableCategoryFilter = document.getElementById('available-category-filter');
+        const preorderCategoryFilter = document.getElementById('preorder-category-filter');
+        
+        if (!availableCategoryFilter && !preorderCategoryFilter) return;
 
-        const previousValue = String(categoryFilter.value || '').trim().toLowerCase();
         const categories = Array.from(new Set(
             (Array.isArray(products) ? products : [])
                 .map((p) => String(p?.category_name || '').trim())
                 .filter(Boolean)
         )).sort((a, b) => a.localeCompare(b));
 
-        categoryFilter.innerHTML = ['<option value="">Category: All</option>']
+        const optionsHtml = ['<option value="">All categories</option>']
             .concat(categories.map((category) => `<option value="${this.escapeAttr(category.toLowerCase())}">${this.escapeHtml(category)}</option>`))
             .join('');
 
-        if (previousValue && categories.some((category) => category.toLowerCase() === previousValue)) {
-            categoryFilter.value = previousValue;
+        if (availableCategoryFilter) {
+            const previousValue = String(availableCategoryFilter.value || '').trim().toLowerCase();
+            availableCategoryFilter.innerHTML = optionsHtml;
+            availableCategoryFilter.value = previousValue;
+        }
+
+        if (preorderCategoryFilter) {
+            const previousValue = String(preorderCategoryFilter.value || '').trim().toLowerCase();
+            preorderCategoryFilter.innerHTML = optionsHtml;
+            preorderCategoryFilter.value = previousValue;
         }
     }
 
@@ -6520,8 +6790,8 @@ class FarmerDashboard {
         
         if (isPreorderTab) {
             // Pre-order tab is active
-            price = document.getElementById('edit-product-price').value;
-            stock_quantity = document.getElementById('edit-product-stock').value;
+            price = document.getElementById('edit-price').value;
+            stock_quantity = document.getElementById('edit-stock-quantity').value;
             harvestDate = '';
             expiryDate = '';
             preorderAvailabilityDate = document.getElementById('edit-preorder-availability-date').value;
@@ -6780,10 +7050,31 @@ class FarmerDashboard {
                 const data = await response.json();
                 const product = data.product;
 
+                // Determine if product is preorder and show correct tab
+                const isPreorder = product.is_preorder === true || product.is_preorder === 't' || product.is_preorder === 'true' || product.is_preorder === 1 || product.is_preorder === '1';
+                
+                // Set correct tab based on product type
+                const availableTab = document.querySelector('button[data-bs-target="#edit-available-now-tab"]');
+                const preorderTab = document.querySelector('button[data-bs-target="#edit-preorders-tab"]');
+                const availableTabContent = document.getElementById('edit-available-now-tab');
+                const preorderTabContent = document.getElementById('edit-preorders-tab');
+                
+                if (isPreorder) {
+                    if (availableTab) availableTab.classList.remove('active');
+                    if (preorderTab) preorderTab.classList.add('active');
+                    if (availableTabContent) availableTabContent.classList.remove('active', 'show');
+                    if (preorderTabContent) preorderTabContent.classList.add('active', 'show');
+                } else {
+                    if (availableTab) availableTab.classList.add('active');
+                    if (preorderTab) preorderTab.classList.remove('active');
+                    if (availableTabContent) availableTabContent.classList.add('active', 'show');
+                    if (preorderTabContent) preorderTabContent.classList.remove('active', 'show');
+                }
+
                 // Populate edit form
                 document.getElementById('edit-product-id').value = product.id;
                 document.getElementById('edit-product-name').value = product.name;
-                document.getElementById('edit-product-price').value = product.price;
+                document.getElementById('edit-price').value = product.price;
                 const editCategoryInput = document.getElementById('edit-product-category');
                 const editCategoryDropdown = document.getElementById('edit-product-category-dropdown');
 
@@ -6798,7 +7089,7 @@ class FarmerDashboard {
                     }
                 }
 
-                document.getElementById('edit-product-stock').value = product.stock_quantity;
+                document.getElementById('edit-stock-quantity').value = product.stock_quantity;
                 document.getElementById('edit-product-description').value = product.description || '';
                 
                 // Parse and populate PSGC address fields
@@ -7023,6 +7314,92 @@ class FarmerDashboard {
         });
 
         this.renderMyProducts(filtered);
+    }
+
+    filterAvailableProducts() {
+        // Filter available products from cache and re-render
+        if (!this.myProductsCache || !Array.isArray(this.myProductsCache)) {
+            return;
+        }
+
+        const searchTerm = (document.getElementById('available-search-input')?.value || '').toLowerCase().trim();
+        const statusFilter = (document.getElementById('available-status-filter')?.value || '').toLowerCase().trim();
+        const categoryFilter = (document.getElementById('available-category-filter')?.value || '').toLowerCase().trim();
+
+        // Start with non-preorder products only
+        let filtered = this.myProductsCache.filter(p => !p.is_preorder);
+
+        filtered = filtered.filter(product => {
+            // Search filter
+            const nameMatch = !searchTerm || String(product.name || '').toLowerCase().includes(searchTerm);
+            
+            // Status filter
+            let statusMatch = true;
+            if (statusFilter === 'active') {
+                const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+                const isAdminDisabled = (product.is_admin_disabled === true || product.is_admin_disabled === 't' || product.is_admin_disabled === 'true' || product.is_admin_disabled === 1 || product.is_admin_disabled === '1');
+                const stock = Number(product.stock_quantity ?? 0);
+                statusMatch = isAvailable && !isAdminDisabled && stock > 0;
+            } else if (statusFilter === 'out_of_stock') {
+                const stock = Number(product.stock_quantity ?? 0);
+                statusMatch = stock === 0;
+            } else if (statusFilter === 'disabled') {
+                const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+                statusMatch = !isAvailable;
+            }
+
+            // Category filter
+            let categoryMatch = true;
+            if (categoryFilter) {
+                categoryMatch = String(product.category_name || '').toLowerCase().includes(categoryFilter);
+            }
+
+            return nameMatch && statusMatch && categoryMatch;
+        });
+
+        this.renderAvailableProducts(filtered);
+    }
+
+    filterPreorderProducts() {
+        // Filter preorder products from cache and re-render
+        if (!this.myProductsCache || !Array.isArray(this.myProductsCache)) {
+            return;
+        }
+
+        const searchTerm = (document.getElementById('preorder-search-input')?.value || '').toLowerCase().trim();
+        const statusFilter = (document.getElementById('preorder-status-filter')?.value || '').toLowerCase().trim();
+        const categoryFilter = (document.getElementById('preorder-category-filter')?.value || '').toLowerCase().trim();
+
+        // Start with preorder products only
+        let filtered = this.myProductsCache.filter(p => p.is_preorder);
+
+        filtered = filtered.filter(product => {
+            // Search filter
+            const nameMatch = !searchTerm || String(product.name || '').toLowerCase().includes(searchTerm);
+            
+            // Status filter
+            let statusMatch = true;
+            if (statusFilter === 'active') {
+                const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+                const isAdminDisabled = (product.is_admin_disabled === true || product.is_admin_disabled === 't' || product.is_admin_disabled === 'true' || product.is_admin_disabled === 1 || product.is_admin_disabled === '1');
+                statusMatch = isAvailable && !isAdminDisabled;
+            } else if (statusFilter === 'harvest_ready') {
+                statusMatch = product.status === 'harvest_ready';
+            } else if (statusFilter === 'disabled') {
+                const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+                statusMatch = !isAvailable;
+            }
+
+            // Category filter
+            let categoryMatch = true;
+            if (categoryFilter) {
+                categoryMatch = String(product.category_name || '').toLowerCase().includes(categoryFilter);
+            }
+
+            return nameMatch && statusMatch && categoryMatch;
+        });
+
+        this.renderPreorderProducts(filtered);
     }
 
     applyProductSort() {
@@ -7818,7 +8195,18 @@ class FarmerDashboard {
         const q = (document.getElementById('farmer-search-input')?.value || '').trim().toLowerCase();
 
         if (this.activeSection === 'products') {
-            this.filterProducts();
+            // Check which tab is active and apply appropriate filter
+            const availableTab = document.getElementById('available-now-tab');
+            const preorderTab = document.getElementById('preorders-tab');
+            
+            if (availableTab && availableTab.style.display !== 'none') {
+                this.filterAvailableProducts();
+            } else if (preorderTab && preorderTab.style.display !== 'none') {
+                this.filterPreorderProducts();
+            } else {
+                // Default to available if neither is visible
+                this.filterAvailableProducts();
+            }
             return;
         }
 

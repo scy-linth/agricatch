@@ -1226,66 +1226,216 @@
                 <button id="add-product-tab" class="btn ac-btn-primary btn-sm" type="button">
                     <i class="bi bi-plus-lg me-1"></i>Add Product
                 </button>
-                <button id="request-product-btn" class="btn btn-outline-secondary btn-sm" type="button">
-                    <i class="bi bi-send me-1"></i>Request
-                </button>
             </div>
         </div>
 
-        <!-- KPI Summary Cards -->
-        <div class="row mb-3">
-            <div class="col">
-                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
-                    <div class="card-body py-2">
-                        <h6 class="text-muted mb-0 small">Total Products</h6>
-                        <h4 class="mb-0 fw-bold" style="color: #146c43;" id="kpi-total-products">--</h4>
+        <!-- KPI Cards Section -->
+        <div id="kpi-cards-section" class="mb-3">
+            <!-- Available Now KPI Cards -->
+            <div id="kpi-available" class="row">
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Total Products</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #146c43;" id="kpi-available-total">--</h4>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col">
-                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%); border-left: 4px solid #22c55e;">
-                    <div class="card-body py-2">
-                        <h6 class="text-muted mb-0 small">Active Products</h6>
-                        <h4 class="mb-0 fw-bold" style="color: #15803d;" id="kpi-active-products">--</h4>
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%); border-left: 4px solid #22c55e;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Active Products</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #15803d;" id="kpi-available-active">--</h4>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col">
-                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
-                    <div class="card-body py-2">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-muted mb-0 small">Low Stock <span id="low-stock-threshold-label" class="small">| ≤15</span></h6>
-                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="kpi-low-stock">--</h4>
-                            </div>
-                            <div class="dropdown">
-                                <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
-                                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                                    <li class="dropdown-header text-start"><h6>Low Stock Threshold</h6></li>
-                                    <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="3">3 items</a></li>
-                                    <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="5">5 items</a></li>
-                                    <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="10">10 items</a></li>
-                                    <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="15">15 items</a></li>
-                                    <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="20">20 items</a></li>
-                                </ul>
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-0 small">Low Stock <span id="low-stock-threshold-label" class="small">| ≤15</span></h6>
+                                    <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="kpi-available-low-stock">--</h4>
+                                </div>
+                                <div class="dropdown">
+                                    <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
+                                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                                        <li class="dropdown-header text-start"><h6>Low Stock Threshold</h6></li>
+                                        <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="3">3 items</a></li>
+                                        <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="5">5 items</a></li>
+                                        <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="10">10 items</a></li>
+                                        <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="15">15 items</a></li>
+                                        <li><a class="dropdown-item low-stock-threshold" href="#" data-threshold="20">20 items</a></li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="col">
-                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fde8e8 0%, #f8d7da 100%); border-left: 4px solid #dc3545;">
-                    <div class="card-body py-2">
-                        <h6 class="text-muted mb-0 small">No Stock</h6>
-                        <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="kpi-no-stock">--</h4>
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fde8e8 0%, #f8d7da 100%); border-left: 4px solid #dc3545;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Out of Stock</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="kpi-available-out-of-stock">--</h4>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col">
-                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 4px solid #6c757d;">
-                    <div class="card-body py-2">
-                        <h6 class="text-muted mb-0 small">Pending</h6>
-                        <h4 class="mb-0 fw-bold" style="color: #5a6268;" id="kpi-pending-products">--</h4>
+
+            <!-- Pre-orders KPI Cards -->
+            <div id="kpi-preorder" class="row" style="display:none;">
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Active Pre-orders</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #146c43;" id="kpi-preorder-active">--</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%); border-left: 4px solid #22c55e;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Harvest Ready</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #15803d;" id="kpi-preorder-harvest-ready">--</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Reserved Units</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="kpi-preorder-reserved">--</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-left: 4px solid #0d6efd;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Pending Harvest</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #0a58ca;" id="kpi-preorder-pending">--</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Approval KPI Cards -->
+            <div id="kpi-approval" class="row justify-content-center" style="display:none;">
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Pending Approval</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="kpi-approval-pending">--</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div id="filter-section" class="card mb-3">
+            <div class="card-body">
+                <!-- Available Now Filter -->
+                <div id="filter-available" class="section-filter-bar row g-2 align-items-end">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="available-products" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Category</label>
+                        <select id="available-category-filter" class="form-select form-select-sm">
+                            <option value="">All categories</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="available-status-filter" class="form-select form-select-sm">
+                            <option value="" selected>Any status</option>
+                            <option value="active">Active</option>
+                            <option value="out_of_stock">Out of Stock</option>
+                            <option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="available-search-input" class="form-control me-2" placeholder="Product name…">
+                                <button id="available-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                            </div>
+                            <button id="available-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pre-orders Filter -->
+                <div id="filter-preorder" class="section-filter-bar row g-2 align-items-end" style="display:none;">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="preorder-products" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Category</label>
+                        <select id="preorder-category-filter" class="form-select form-select-sm">
+                            <option value="">All categories</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Status</label>
+                        <select id="preorder-status-filter" class="form-select form-select-sm">
+                            <option value="" selected>Any status</option>
+                            <option value="active">Active</option>
+                            <option value="harvest_ready">Harvest Ready</option>
+                            <option value="disabled">Disabled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="preorder-search-input" class="form-control me-2" placeholder="Product name…">
+                                <button id="preorder-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                            </div>
+                            <button id="preorder-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Approval Filter -->
+                <div id="filter-approval" class="section-filter-bar row g-2 align-items-end" style="display:none;">
+                    <div class="col-md-1 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Show</label>
+                        <select class="form-select form-select-sm" data-entries-section="approval-products" style="min-width: 60px;">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Category</label>
+                        <select id="approval-category-filter" class="form-select form-select-sm">
+                            <option value="">All categories</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                        <label class="form-label small fw-semibold mb-1">Search</label>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <input type="text" id="approval-search-input" class="form-control me-2" placeholder="Product name…">
+                                <button id="approval-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                            </div>
+                            <button id="approval-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1294,200 +1444,94 @@
         <!-- Products Tabs -->
         <ul class="nav nav-tabs nav-tabs-bordered mb-3" id="products-tabs">
             <li class="nav-item">
-                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#products-list-tab">My Products</button>
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#available-now-tab">Available Now</button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#products-requests-tab">Approval</button>
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#preorders-tab">Pre-orders</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#approval-tab">Approval</button>
             </li>
         </ul>
 
         <div class="tab-content">
-            <!-- My Products Tab -->
-            <div class="tab-pane fade show active" id="products-list-tab">
-                <!-- Nested Tabs: Available Now / Pre-orders -->
-                <div class="product-management-tabs mb-3">
-                    <button class="tab-btn active" data-tab="available-now">Available Now</button>
-                    <button class="tab-btn" data-tab="preorders">Pre-orders</button>
-                </div>
-
-                <!-- Available Now Tab -->
-                <div class="product-tab-content" id="available-now-tab">
-                    <div class="card">
-                            <div class="card-body">
-                                <div class="section-filter-bar row g-2 mb-3 align-items-end">
-                                    <div class="col-md-1 col-sm-6">
-                                        <label class="form-label small fw-semibold mb-1">Show</label>
-                                        <select class="form-select form-select-sm" data-entries-section="available-products" style="min-width: 60px;">
-                                            <option value="10">10</option>
-                                            <option value="25">25</option>
-                                            <option value="50" selected>50</option>
-                                            <option value="100">100</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-2 col-sm-6">
-                                        <label class="form-label small fw-semibold mb-1">Category</label>
-                                        <select id="available-category-filter" class="form-select form-select-sm">
-                                            <option value="">All categories</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-2 col-sm-6">
-                                        <label class="form-label small fw-semibold mb-1">Status</label>
-                                        <select id="available-status-filter" class="form-select form-select-sm">
-                                            <option value="" selected>Any status</option>
-                                            <option value="active">Active</option>
-                                            <option value="out_of_stock">Out of Stock</option>
-                                            <option value="disabled">Disabled</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-4 col-sm-6 ms-md-auto">
-                                        <label class="form-label small fw-semibold mb-1">Search</label>
-                                        <div class="d-flex gap-2">
-                                            <div class="input-group input-group-sm flex-grow-1">
-                                                <input type="text" id="available-search-input" class="form-control me-2" placeholder="Product name…">
-                                                <button id="available-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+            <!-- Available Now Tab -->
+            <div class="tab-pane fade show active" id="available-now-tab">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table id="available-products-table" class="table ac-table table-sm table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th style="width:56px">Image</th>
+                                        <th>Product</th>
+                                        <th>Category</th>
+                                        <th>Price</th>
+                                        <th>Stock</th>
+                                        <th>Status</th>
+                                        <th>Reviews</th>
+                                        <th class="col-actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="available-products-tbody">
+                                    <tr>
+                                        <td colspan="8">
+                                            <div class="table-skeleton">
+                                                <div class="skeleton-row"></div>
+                                                <div class="skeleton-row"></div>
+                                                <div class="skeleton-row"></div>
                                             </div>
-                                            <button id="available-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="table-responsive">
-                                    <table id="available-products-table" class="table ac-table table-sm table-hover align-middle">
-                                        <thead>
-                                            <tr>
-                                                <th style="width:56px">Image</th>
-                                                <th>ID</th>
-                                                <th>Product</th>
-                                                <th>Category</th>
-                                                <th>Price</th>
-                                                <th>Stock</th>
-                                                <th>Status</th>
-                                                <th>Reviews</th>
-                                                <th class="col-actions">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="available-products-tbody">
-                                            <tr>
-                                                <td colspan="9">
-                                                    <div class="table-skeleton">
-                                                        <div class="skeleton-row"></div>
-                                                        <div class="skeleton-row"></div>
-                                                        <div class="skeleton-row"></div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <div id="available-products-pagination" class="pagination-container"></div>
-                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Pre-orders Tab -->
-                <div class="product-tab-content" id="preorders-tab" style="display:none;">
-                    <div class="card">
-                            <div class="card-body">
-                                <div class="section-filter-bar row g-2 mb-3 align-items-end">
-                                    <div class="col-md-1 col-sm-6">
-                                        <label class="form-label small fw-semibold mb-1">Show</label>
-                                        <select class="form-select form-select-sm" data-entries-section="preorder-products" style="min-width: 60px;">
-                                            <option value="10">10</option>
-                                            <option value="25">25</option>
-                                            <option value="50" selected>50</option>
-                                            <option value="100">100</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-2 col-sm-6">
-                                        <label class="form-label small fw-semibold mb-1">Category</label>
-                                        <select id="preorder-category-filter" class="form-select form-select-sm">
-                                            <option value="">All categories</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-2 col-sm-6">
-                                        <label class="form-label small fw-semibold mb-1">Status</label>
-                                        <select id="preorder-status-filter" class="form-select form-select-sm">
-                                            <option value="" selected>Any status</option>
-                                            <option value="active">Active</option>
-                                            <option value="harvest_ready">Harvest Ready</option>
-                                            <option value="disabled">Disabled</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-4 col-sm-6 ms-md-auto">
-                                        <label class="form-label small fw-semibold mb-1">Search</label>
-                                        <div class="d-flex gap-2">
-                                            <div class="input-group input-group-sm flex-grow-1">
-                                                <input type="text" id="preorder-search-input" class="form-control me-2" placeholder="Product name…">
-                                                <button id="preorder-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
-                                            </div>
-                                            <button id="preorder-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="table-responsive">
-                                    <table id="preorder-products-table" class="table ac-table table-sm table-hover align-middle">
-                                        <thead>
-                                            <tr>
-                                                <th style="width:56px">Image</th>
-                                                <th>ID</th>
-                                                <th>Product</th>
-                                                <th>Category</th>
-                                                <th>Expected Harvest</th>
-                                                <th>Reservation Progress</th>
-                                                <th>Status</th>
-                                                <th class="col-actions">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="preorder-products-tbody">
-                                            <tr>
-                                                <td colspan="8">
-                                                    <div class="table-skeleton">
-                                                        <div class="skeleton-row"></div>
-                                                        <div class="skeleton-row"></div>
-                                                        <div class="skeleton-row"></div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <div id="preorder-products-pagination" class="pagination-container"></div>
-                            </div>
-                        </div>
+                        <div id="available-products-pagination" class="pagination-container"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- My Requests Tab -->
-            <div class="tab-pane fade" id="products-requests-tab">
+            <!-- Pre-orders Tab -->
+            <div class="tab-pane fade" id="preorders-tab">
                 <div class="card">
                     <div class="card-body">
-                        <div class="section-filter-bar row g-2 mb-3 align-items-end">
-                            <div class="col-md-2 col-sm-6">
-                                <label class="form-label small fw-semibold mb-1">Status</label>
-                                <select id="request-status-filter" class="form-select form-select-sm">
-                                    <option value="" selected>All statuses</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="approved">Approved</option>
-                                    <option value="rejected">Rejected</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4 col-sm-6 ms-md-auto">
-                                <label class="form-label small fw-semibold mb-1">Search</label>
-                                <div class="d-flex gap-2">
-                                    <div class="input-group input-group-sm flex-grow-1">
-                                        <input type="text" id="requests-search-input" class="form-control me-2" placeholder="Product name…">
-                                        <button id="requests-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
-                                    </div>
-                                    <button id="requests-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh requests"><i class="bi bi-arrow-clockwise"></i></button>
-                                </div>
-                            </div>
+                        <div class="table-responsive">
+                            <table id="preorder-products-table" class="table ac-table table-sm table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th style="width:56px">Image</th>
+                                        <th>Product</th>
+                                        <th>Category</th>
+                                        <th>Expected Harvest</th>
+                                        <th>Reservation Progress</th>
+                                        <th>Status</th>
+                                        <th class="col-actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="preorder-products-tbody">
+                                    <tr>
+                                        <td colspan="7">
+                                            <div class="table-skeleton">
+                                                <div class="skeleton-row"></div>
+                                                <div class="skeleton-row"></div>
+                                                <div class="skeleton-row"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
 
+                        <div id="preorder-products-pagination" class="pagination-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Approval Tab -->
+            <div class="tab-pane fade" id="approval-tab">
+                <div class="card">
+                    <div class="card-body">
                         <div class="table-responsive">
                             <table id="requests-table" class="table ac-table table-sm table-hover align-middle">
                                 <thead>
@@ -1515,7 +1559,6 @@
                         </div>
 
                         <div id="requests-pagination" class="pagination-container"></div>
-
                     </div>
                 </div>
             </div>
@@ -2480,151 +2523,149 @@
             <h3><i class="bi bi-plus-circle-fill me-2 text-success"></i>Add Product</h3>
             <button class="close-btn" id="close-add-product-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
-        <form id="add-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(85vh - 58px);">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="product-category">Category <span class="text-danger">*</span></label>
-                    <div class="custom-select-field">
-                        <div class="custom-select-input-wrap">
-                            <input type="text" id="product-category" class="form-control form-control-sm" placeholder="Select category" autocomplete="off" readonly required>
-                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
+        
+        <!-- Step 1: Product Type Selection -->
+        <div id="add-product-step-1" class="modal-body" style="padding:1.5rem;">
+            <h5 class="mb-3">What type of product do you want to add?</h5>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card h-100 cursor-pointer product-type-card" data-product-type="available" id="product-type-available">
+                        <div class="card-body text-center py-4">
+                            <i class="bi bi-box-seam-fill text-success mb-2" style="font-size:2rem;"></i>
+                            <h6 class="fw-bold">Available Now</h6>
+                            <p class="small text-muted mb-0">Products ready for immediate sale</p>
                         </div>
-                        <div id="product-category-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Category options"></div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="product-name">Product Name <span class="text-danger">*</span></label>
-                    <div class="product-name-field">
-                        <div class="product-name-input-wrap">
-                            <input type="text" id="product-name" class="form-control form-control-sm"
-                                   placeholder="Choose a category first" autocomplete="off" disabled required>
-                            <i class="bi bi-chevron-down pn-chevron" aria-hidden="true"></i>
+                <div class="col-md-6">
+                    <div class="card h-100 cursor-pointer product-type-card" data-product-type="preorder" id="product-type-preorder">
+                        <div class="card-body text-center py-4">
+                            <i class="bi bi-calendar-check-fill text-primary mb-2" style="font-size:2rem;"></i>
+                            <h6 class="fw-bold">Pre-orders</h6>
+                            <p class="small text-muted mb-0">Reserve future harvests</p>
                         </div>
-                        <div id="product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product suggestions"></div>
                     </div>
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group" style="flex:0.3;">
-                    <label for="product-unit">Unit</label>
-                    <input type="text" id="product-unit" class="form-control form-control-sm" value="kg" readonly>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label for="product-price">Price (&#8369;) <span class="text-danger">*</span></label>
-                    <input type="number" id="product-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
-                    <small id="product-price-suggestion" class="field-hint">Suggested price: --</small>
-                </div>
+            <div id="product-type-warning" class="alert alert-warning mt-3" style="display:none;">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                <span id="product-type-warning-text"></span>
             </div>
-            <div class="form-group">
-                <label for="product-stock">Stock Quantity <span class="text-danger">*</span></label>
-                <input type="number" id="product-stock" class="form-control form-control-sm" min="0" step="1" inputmode="numeric" required>
-            </div>
-            <div class="form-group">
-                <label for="product-description">Description</label>
-                <textarea id="product-description" class="form-control form-control-sm" rows="3" maxlength="500"
-                          placeholder="Describe your fresh product..."></textarea>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="harvest-date">Expected Harvest Date</label>
-                    <input type="date" id="harvest-date" class="form-control form-control-sm" name="harvest_date">
-                </div>
-                <div class="form-group">
-                    <label for="expiry-date">Best Before / Expiry</label>
-                    <input type="date" id="expiry-date" class="form-control form-control-sm" name="expiry_date">
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
-                <div style="display:flex;gap:.5rem;align-items:center;">
-                    <textarea id="product-location-display" class="form-control form-control-sm" rows="2" placeholder="Auto-filled from shop address — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
-                    <button type="button" id="open-add-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
-                        <i class="bi bi-geo-alt me-1"></i>Set Location
-                    </button>
-                </div>
-                <input type="hidden" id="product-location">
-            </div>
-            <div class="form-group">
-                <label for="product-image">Product Image</label>
-                <input type="file" id="product-image" class="form-control form-control-sm" name="image" accept="image/*">
-                <small class="field-hint">Upload a clear, well-lit photo of your product.</small>
-                <div id="product-image-preview" class="image-preview"></div>
-            </div>
-            <div class="alert alert-info" style="font-size:0.85rem;padding:0.6rem 0.85rem;margin-bottom:0;">
-                <i class="bi bi-info-circle me-1"></i><strong>Delivery Responsibility:</strong> You are responsible for delivering your products to customers.
-            </div>
-            
-            <!-- Management Section -->
-            <div class="mt-4 pt-3 border-top">
-                <h6 class="fw-bold mb-3">Management</h6>
+        </div>
+
+        <!-- Step 2: Product Form -->
+        <div id="add-product-step-2" style="display:none;">
+            <form id="add-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(85vh - 120px);">
+                <input type="hidden" id="add-product-type" name="product_type">
                 
-                <!-- Management Tabs -->
-                <ul class="nav nav-tabs nav-tabs-bordered mb-3" id="add-management-tabs">
-                    <li class="nav-item">
-                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#add-available-now-tab">Available Now</button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#add-preorders-tab">Pre-orders</button>
-                    </li>
-                </ul>
-
-                <div class="tab-content">
-                    <!-- Available Now Tab -->
-                    <div class="tab-pane fade show active" id="add-available-now-tab">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="add-stock-quantity">Stock Quantity <span class="text-danger">*</span></label>
-                                <input type="number" id="add-stock-quantity" class="form-control form-control-sm" name="stock_quantity" min="0" required>
-                                <small class="field-hint">Current available inventory</small>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="product-category">Category <span class="text-danger">*</span></label>
+                        <div class="custom-select-field">
+                            <div class="custom-select-input-wrap">
+                                <input type="text" id="product-category" class="form-control form-control-sm" placeholder="Select category" autocomplete="off" readonly required>
+                                <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
                             </div>
-                            <div class="form-group">
-                                <label for="add-price">Price (₱) <span class="text-danger">*</span></label>
-                                <input type="number" id="add-price" class="form-control form-control-sm" name="price" min="0" step="0.01" required>
-                                <small class="field-hint">Price per unit</small>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="add-harvest-date">Harvest Date</label>
-                                <input type="date" id="add-harvest-date" class="form-control form-control-sm" name="harvest_date">
-                                <small class="field-hint">When was this harvested?</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="add-expiry-date">Expiry Date</label>
-                                <input type="date" id="add-expiry-date" class="form-control form-control-sm" name="expiry_date">
-                                <small class="field-hint">When does this expire?</small>
-                            </div>
+                            <div id="product-category-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Category options"></div>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label for="product-name">Product Name <span class="text-danger">*</span></label>
+                        <div class="product-name-field">
+                            <div class="product-name-input-wrap">
+                                <input type="text" id="product-name" class="form-control form-control-sm"
+                                       placeholder="Choose a category first" autocomplete="off" disabled required>
+                                <i class="bi bi-chevron-down pn-chevron" aria-hidden="true"></i>
+                            </div>
+                            <div id="product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product suggestions"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:0.3;">
+                        <label for="product-unit">Unit</label>
+                        <input type="text" id="product-unit" class="form-control form-control-sm" value="kg" readonly>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="product-price">Price (&#8369;) <span class="text-danger">*</span></label>
+                        <input type="number" id="product-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
+                        <small id="product-price-suggestion" class="field-hint">Suggested price: --</small>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="product-description">Description</label>
+                    <textarea id="product-description" class="form-control form-control-sm" rows="3" maxlength="500"
+                              placeholder="Describe your fresh product..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
+                    <div style="display:flex;gap:.5rem;align-items:center;">
+                        <textarea id="product-location-display" class="form-control form-control-sm" rows="2" placeholder="Auto-filled from shop address — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
+                        <button type="button" id="open-add-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
+                            <i class="bi bi-geo-alt me-1"></i>Set Location
+                        </button>
+                    </div>
+                    <input type="hidden" id="product-location">
+                </div>
+                <div class="form-group">
+                    <label for="product-image">Product Image</label>
+                    <input type="file" id="product-image" class="form-control form-control-sm" name="image" accept="image/*">
+                    <small class="field-hint">Upload a clear, well-lit photo of your product.</small>
+                    <div id="product-image-preview" class="image-preview"></div>
+                </div>
 
-                    <!-- Pre-orders Tab -->
-                    <div class="tab-pane fade" id="add-preorders-tab">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="add-preorder-availability-date">Expected Harvest Date <span class="text-danger">*</span></label>
-                                <input type="date" id="add-preorder-availability-date" class="form-control form-control-sm" name="preorder_availability_date">
-                                <small class="field-hint">When will this harvest be ready?</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="add-max-preorder-quantity">Maximum Reservation Quantity <span class="text-danger">*</span></label>
-                                <input type="number" id="add-max-preorder-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1" required>
-                                <small class="field-hint">Maximum number of reservations allowed</small>
-                            </div>
+                <!-- Available Now Specific Fields -->
+                <div id="available-now-fields" style="display:none;">
+                    <div class="form-group">
+                        <label for="add-stock-quantity">Stock Quantity <span class="text-danger">*</span></label>
+                        <input type="number" id="add-stock-quantity" class="form-control form-control-sm" name="stock_quantity" min="0" required>
+                        <small class="field-hint">Current available inventory</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="add-harvest-date">Harvest Date</label>
+                            <input type="date" id="add-harvest-date" class="form-control form-control-sm" name="harvest_date">
+                            <small class="field-hint">When was this harvested?</small>
                         </div>
                         <div class="form-group">
-                            <label for="add-reservation-cutoff-date">Reservation Cutoff Date</label>
-                            <input type="date" id="add-reservation-cutoff-date" class="form-control form-control-sm" name="reservation_cutoff_date">
-                            <small class="field-hint">Last date customers can reserve (optional)</small>
+                            <label for="add-expiry-date">Expiry Date</label>
+                            <input type="date" id="add-expiry-date" class="form-control form-control-sm" name="expiry_date">
+                            <small class="field-hint">When does this expire?</small>
                         </div>
                     </div>
                 </div>
+
+                <!-- Pre-order Specific Fields -->
+                <div id="preorder-fields" style="display:none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="add-preorder-availability-date">Expected Harvest Date <span class="text-danger">*</span></label>
+                            <input type="date" id="add-preorder-availability-date" class="form-control form-control-sm" name="preorder_availability_date" required>
+                            <small class="field-hint">When will this harvest be ready?</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="add-max-preorder-quantity">Maximum Reservation Quantity <span class="text-danger">*</span></label>
+                            <input type="number" id="add-max-preorder-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1" required>
+                            <small class="field-hint">Maximum number of reservations allowed</small>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="add-reservation-cutoff-date">Reservation Cutoff Date</label>
+                        <input type="date" id="add-reservation-cutoff-date" class="form-control form-control-sm" name="reservation_cutoff_date">
+                        <small class="field-hint">Last date customers can reserve (optional)</small>
+                    </div>
+                </div>
+
+                <div class="alert alert-info" style="font-size:0.85rem;padding:0.6rem 0.85rem;margin-bottom:0;">
+                    <i class="bi bi-info-circle me-1"></i><strong>Delivery Responsibility:</strong> You are responsible for delivering your products to customers.
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button type="button" id="back-to-step-1" class="btn btn-sm btn-secondary">Back</button>
+                <button type="submit" form="add-product-form" class="btn btn-sm btn-primary">
+                    <i class="bi bi-cloud-upload me-1"></i>Submit for Approval
+                </button>
             </div>
-        </form>
-        <div class="modal-footer">
-            <button type="button" id="cancel-add-product-btn" class="btn btn-sm btn-secondary">Cancel</button>
-            <button type="submit" form="add-product-form" class="btn btn-sm btn-primary">
-                <i class="bi bi-cloud-upload me-1"></i>Submit for Approval
-            </button>
         </div>
     </div>
 </div>
@@ -2665,30 +2706,11 @@
                     <label for="edit-product-unit">Unit</label>
                     <input type="text" id="edit-product-unit" class="form-control form-control-sm" value="kg" readonly>
                 </div>
-                <div class="form-group" style="flex:1;">
-                    <label for="edit-product-price">Price (&#8369;) <span class="text-danger">*</span></label>
-                    <input type="number" id="edit-product-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
-                    <small id="edit-product-price-suggestion" class="field-hint">Suggested price: —</small>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="edit-product-stock">Stock Quantity <span class="text-danger">*</span></label>
-                <input type="number" id="edit-product-stock" class="form-control form-control-sm" min="0" step="1" inputmode="numeric" required>
             </div>
             <div class="form-group">
                 <label for="edit-product-description">Description</label>
                 <textarea id="edit-product-description" class="form-control form-control-sm" rows="3" maxlength="500"
                           placeholder="Describe your fresh product..."></textarea>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="edit-harvest-date">Expected Harvest Date</label>
-                    <input type="date" id="edit-harvest-date" class="form-control form-control-sm" name="harvest_date">
-                </div>
-                <div class="form-group">
-                    <label for="edit-expiry-date">Best Before / Expiry</label>
-                    <input type="date" id="edit-expiry-date" class="form-control form-control-sm" name="expiry_date">
-                </div>
             </div>
             <div class="form-group">
                 <label for="edit-product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
@@ -2747,10 +2769,6 @@
                                 <small class="field-hint">When does this expire?</small>
                             </div>
                         </div>
-                        <div class="form-actions">
-                            <button type="button" id="edit-disable-product-btn" class="btn btn-sm btn-danger">Disable Product</button>
-                            <button type="submit" form="edit-product-form" class="btn btn-sm btn-primary">Save Changes</button>
-                        </div>
                     </div>
 
                     <!-- Pre-orders Tab -->
@@ -2786,19 +2804,15 @@
                                 <small class="text-muted" id="edit-available-slots">Available Slots: 0</small>
                             </div>
                         </div>
-                        
-                        <div class="form-actions">
-                            <button type="button" id="edit-harvest-now-btn" class="btn btn-sm btn-success">Harvested Now</button>
-                            <button type="button" id="edit-convert-inventory-btn" class="btn btn-sm btn-warning">Convert Remaining Inventory</button>
-                            <button type="button" id="edit-disable-product-preorder-btn" class="btn btn-sm btn-danger">Disable Product</button>
-                            <button type="submit" form="edit-product-form" class="btn btn-sm btn-primary">Save Changes</button>
-                        </div>
                     </div>
                 </div>
             </div>
         </form>
         <div class="modal-footer gap-2" style="padding:.75rem 1.25rem;border-top:1px solid #e2e8f0;background:#fff;flex-shrink:0;">
             <button type="button" id="cancel-edit-btn" class="btn btn-sm btn-secondary">Cancel</button>
+            <button type="button" id="edit-harvest-now-btn" class="btn btn-sm btn-success" style="display:none;">Harvested Now</button>
+            <button type="button" id="edit-convert-inventory-btn" class="btn btn-sm btn-warning" style="display:none;">Convert Remaining Inventory</button>
+            <button type="button" id="edit-disable-product-btn" class="btn btn-sm btn-danger">Disable Product</button>
             <button type="submit" form="edit-product-form" class="btn btn-sm btn-ac-green">
                 <i class="bi bi-check-lg me-1"></i>Update Product
             </button>
