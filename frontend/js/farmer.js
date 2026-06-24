@@ -1286,6 +1286,84 @@ class FarmerDashboard {
             }
         });
 
+        // Harvest confirmation modal
+        document.getElementById('close-harvest-confirm-modal')?.addEventListener('click', () => {
+            document.getElementById('harvest-confirm-modal').classList.remove('open');
+        });
+        document.getElementById('cancel-harvest-btn')?.addEventListener('click', () => {
+            document.getElementById('harvest-confirm-modal').classList.remove('open');
+        });
+        document.getElementById('confirm-harvest-btn')?.addEventListener('click', () => {
+            const productId = document.getElementById('confirm-harvest-btn').dataset.productId;
+            if (productId) {
+                this.handleHarvestPreorder(productId);
+            }
+            document.getElementById('harvest-confirm-modal').classList.remove('open');
+        });
+
+        // Convert confirmation modal
+        document.getElementById('close-convert-confirm-modal')?.addEventListener('click', () => {
+            document.getElementById('convert-confirm-modal').classList.remove('open');
+        });
+        document.getElementById('cancel-convert-btn')?.addEventListener('click', () => {
+            document.getElementById('convert-confirm-modal').classList.remove('open');
+        });
+        document.getElementById('confirm-convert-btn')?.addEventListener('click', () => {
+            const productId = document.getElementById('confirm-convert-btn').dataset.productId;
+            if (productId) {
+                this.handleConvertPreorder(productId);
+            }
+            document.getElementById('convert-confirm-modal').classList.remove('open');
+        });
+
+        // Disable confirmation modal
+        document.getElementById('close-disable-confirm-modal')?.addEventListener('click', () => {
+            document.getElementById('disable-confirm-modal').classList.remove('open');
+        });
+        document.getElementById('cancel-disable-btn')?.addEventListener('click', () => {
+            document.getElementById('disable-confirm-modal').classList.remove('open');
+        });
+        document.getElementById('confirm-disable-btn')?.addEventListener('click', () => {
+            const productId = document.getElementById('confirm-disable-btn').dataset.productId;
+            if (productId) {
+                this.handleDisableProduct(productId);
+            }
+            document.getElementById('disable-confirm-modal').classList.remove('open');
+        });
+
+        // Edit modal action buttons
+        document.getElementById('edit-harvest-now-btn')?.addEventListener('click', () => {
+            const productId = document.getElementById('edit-product-id').value;
+            if (productId) {
+                document.getElementById('confirm-harvest-btn').dataset.productId = productId;
+                document.getElementById('harvest-confirm-modal').classList.add('open');
+            }
+        });
+
+        document.getElementById('edit-convert-inventory-btn')?.addEventListener('click', () => {
+            const productId = document.getElementById('edit-product-id').value;
+            if (productId) {
+                document.getElementById('confirm-convert-btn').dataset.productId = productId;
+                document.getElementById('convert-confirm-modal').classList.add('open');
+            }
+        });
+
+        document.getElementById('edit-disable-product-btn')?.addEventListener('click', () => {
+            const productId = document.getElementById('edit-product-id').value;
+            if (productId) {
+                document.getElementById('confirm-disable-btn').dataset.productId = productId;
+                document.getElementById('disable-confirm-modal').classList.add('open');
+            }
+        });
+
+        document.getElementById('edit-disable-product-preorder-btn')?.addEventListener('click', () => {
+            const productId = document.getElementById('edit-product-id').value;
+            if (productId) {
+                document.getElementById('confirm-disable-btn').dataset.productId = productId;
+                document.getElementById('disable-confirm-modal').classList.add('open');
+            }
+        });
+
         document.getElementById('add-product-form')?.addEventListener('submit', (e) => this.handleAddProduct(e));
         document.getElementById('edit-product-form')?.addEventListener('submit', (e) => this.handleEditProduct(e));
         document.getElementById('save-shop-profile-btn')?.addEventListener('click', (e) => this.handleShopProfileUpdate(e));
@@ -1296,6 +1374,42 @@ class FarmerDashboard {
         document.getElementById('profile-password-form')?.addEventListener('submit', (e) => {
             e.preventDefault();
             this.changePassword();
+        });
+
+        // Event delegation for product action buttons
+        document.addEventListener('click', (e) => {
+            // Harvest button
+            const harvestBtn = e.target.closest('.btn-action-harvest');
+            if (harvestBtn) {
+                const productId = harvestBtn.dataset.productId;
+                if (productId) {
+                    document.getElementById('confirm-harvest-btn').dataset.productId = productId;
+                    document.getElementById('harvest-confirm-modal').classList.add('open');
+                }
+                return;
+            }
+
+            // Convert button
+            const convertBtn = e.target.closest('.btn-action-convert');
+            if (convertBtn) {
+                const productId = convertBtn.dataset.productId;
+                if (productId) {
+                    document.getElementById('confirm-convert-btn').dataset.productId = productId;
+                    document.getElementById('convert-confirm-modal').classList.add('open');
+                }
+                return;
+            }
+
+            // Disable button
+            const disableBtn = e.target.closest('.btn-action-disable');
+            if (disableBtn) {
+                const productId = disableBtn.dataset.productId;
+                if (productId) {
+                    document.getElementById('confirm-disable-btn').dataset.productId = productId;
+                    document.getElementById('disable-confirm-modal').classList.add('open');
+                }
+                return;
+            }
         });
 
         // Format phone input with spaces (9XX XXX XXXX)
