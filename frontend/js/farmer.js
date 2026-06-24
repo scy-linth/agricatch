@@ -1412,6 +1412,29 @@ class FarmerDashboard {
             }
         });
 
+        // Product management tabs
+        document.querySelectorAll('.product-management-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tab = e.target.dataset.tab;
+                if (!tab) return;
+
+                // Update active button
+                document.querySelectorAll('.product-management-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+
+                // Show/hide tab content
+                document.querySelectorAll('.product-tab-content').forEach(content => {
+                    content.classList.remove('active');
+                    content.style.display = 'none';
+                });
+                const targetContent = document.getElementById(`${tab}-tab`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                    targetContent.style.display = 'block';
+                }
+            });
+        });
+
         // Format phone input with spaces (9XX XXX XXXX)
         const pePhone = document.getElementById('pe-phone');
         if (pePhone) {

@@ -1305,19 +1305,14 @@
             <!-- My Products Tab -->
             <div class="tab-pane fade show active" id="products-list-tab">
                 <!-- Nested Tabs: Available Now / Pre-orders -->
-                <ul class="nav nav-tabs nav-tabs-bordered mb-3" id="products-management-tabs">
-                    <li class="nav-item">
-                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#available-now-tab">Available Now</button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#preorders-tab">Pre-orders</button>
-                    </li>
-                </ul>
+                <div class="product-management-tabs mb-3">
+                    <button class="tab-btn active" data-tab="available-now">Available Now</button>
+                    <button class="tab-btn" data-tab="preorders">Pre-orders</button>
+                </div>
 
-                <div class="tab-content">
-                    <!-- Available Now Tab -->
-                    <div class="tab-pane fade show active" id="available-now-tab">
-                        <div class="card">
+                <!-- Available Now Tab -->
+                <div class="product-tab-content" id="available-now-tab">
+                    <div class="card">
                             <div class="card-body">
                                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
                                     <div class="col-md-1 col-sm-6">
@@ -1389,10 +1384,11 @@
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Pre-orders Tab -->
-                    <div class="tab-pane fade" id="preorders-tab">
-                        <div class="card">
+                <!-- Pre-orders Tab -->
+                <div class="product-tab-content" id="preorders-tab" style="display:none;">
+                    <div class="card">
                             <div class="card-body">
                                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
                                     <div class="col-md-1 col-sm-6">

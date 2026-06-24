@@ -3575,3 +3575,41 @@ body.sidebar-collapsed #main.main {
     gap: 0.5rem;
     justify-content: center;
 }
+
+/* ─── Product Management Tabs ───────────────────────────────────────────── */
+.product-management-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.product-management-tabs .tab-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--ac-border);
+    border-radius: 6px;
+    background: #fff;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--ac-text-muted);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.product-management-tabs .tab-btn:hover {
+    background: var(--ac-bg);
+    color: var(--ac-text);
+}
+
+.product-management-tabs .tab-btn.active {
+    background: var(--ac-primary);
+    color: #fff;
+    border-color: var(--ac-primary);
+}
+
+.product-tab-content {
+    display: none;
+}
+
+.product-tab-content.active {
+    display: block;
+}
