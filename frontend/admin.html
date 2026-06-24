@@ -21,8 +21,52 @@
     <link rel="stylesheet" href="/vendor/simple-datatables/style.css">
     <!-- AgriCatch SaaS overrides — loaded LAST -->
     <link rel="stylesheet" href="/css/agricatch-admin.css?v=sections-rebuild-20260609">
+
+    <script>
+    // Authorization check - run immediately in head before page loads
+    (function() {
+        try {
+            var token = localStorage.getItem("token");
+            if (!token) {
+                window.location.replace("/index.html#login");
+                return;
+            }
+            var payload = JSON.parse(atob(token.split(".")[1]));
+            var role = payload.role;
+            if (role !== "admin" && role !== "super_admin") {
+                window.location.replace("/index.html#login");
+                return;
+            }
+        } catch (e) {
+            window.location.replace("/index.html#login");
+            return;
+        }
+    })();
+    </script>
 </head>
 <body>
+
+<script>
+// Authorization check - run immediately when body starts (double-check)
+(function() {
+    try {
+        var token = localStorage.getItem("token");
+        if (!token) {
+            window.location.replace("/index.html#login");
+            return;
+        }
+        var payload = JSON.parse(atob(token.split(".")[1]));
+        var role = payload.role;
+        if (role !== "admin" && role !== "super_admin") {
+            window.location.replace("/index.html#login");
+            return;
+        }
+    } catch (e) {
+        window.location.replace("/index.html#login");
+        return;
+    }
+})();
+</script>
 
 <!-- Loading Screen (first child of body so z-index:9999 covers everything) -->
 <div id="admin-loading-screen" class="loading-screen">
@@ -55,10 +99,10 @@
         <button id="admin-sidebar-toggle" class="admin-sidebar-toggle-btn" type="button" aria-label="Toggle sidebar">
             <i class="bi bi-list"></i>
         </button>
-        <a href="/" class="logo d-flex align-items-center" style="gap:4px;">
+        <div class="logo d-flex align-items-center" style="gap:4px;">
             <img src="/images/logo.png" alt="AgriCatch">
             <span>AgriCatch</span>
-        </a>
+        </div>
     </div>
 
     <!-- Right nav -->
@@ -72,6 +116,16 @@
                 </a>
             </li>
 
+
+            <!-- Support Center Chat -->
+            <li class="nav-item">
+                <a class="nav-link nav-icon" href="#"
+                   onclick="adminDashboard&&adminDashboard.navigateTo('chat');return false;"
+                   aria-label="Support Center">
+                    <i class="bi bi-chat-dots"></i>
+                    <span id="chat-topbar-badge" class="badge bg-danger badge-number" style="display:none">0</span>
+                </a>
+            </li><!-- End Support Center Nav -->
 
             <!-- Notifications dropdown -->
             <li class="nav-item dropdown">
@@ -284,6 +338,7 @@
             <a class="nav-link collapsed sidebar-link" href="#notifications" data-section="notifications">
                 <i class="bi bi-bell"></i>
                 <span>Notifications</span>
+                <span id="notif-sidebar-badge" class="badge bg-danger ms-auto" style="display:none;">0</span>
             </a>
         </li>
 
@@ -807,6 +862,7 @@
                 <div class="verification-tabs order-tabs mb-3">
                     <button class="tab-btn active" data-status="">All</button>
                     <button class="tab-btn" data-status="pending">Pending</button>
+                    <button class="tab-btn" data-status="preorder_reserved">Pre-order Reserved</button>
                     <button class="tab-btn" data-status="confirmed">Confirmed</button>
                     <button class="tab-btn" data-status="preparing">Preparing</button>
                     <button class="tab-btn" data-status="out_for_delivery">Out for Delivery</button>
@@ -1168,12 +1224,13 @@
                                 <th>Name</th>
                                 <th>Category</th>
                                 <th>Products</th>
+                                <th>Suggest Price</th>
                                 <th>Status</th>
                                 <th class="col-actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="catalog-names-tbody">
-                            <tr><td colspan="6" class="table-placeholder">Loading…</td></tr>
+                            <tr><td colspan="7" class="table-placeholder">Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1820,6 +1877,36 @@
                 </div>
             </div>
 
+            <!-- Delivery Address Settings -->
+            <div class="col-12 mt-3">
+                <div class="card ac-data-card">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-geo-alt"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Delivery Address Configuration</h6>
+                                <p class="ac-data-card__subtitle">Control how customers select delivery addresses</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="setting-use-default-delivery-address" checked>
+                            <label class="form-check-label" for="setting-use-default-delivery-address">
+                                <strong>Use Default Delivery Address (Trabajo Market)</strong>
+                            </label>
+                        </div>
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle me-1"></i>
+                            When ON: All orders use the fixed address "Trabajo Market, M. Dela Fuente St., Sampaloc, Manila, Metro Manila"<br>
+                            When OFF: Customers can select custom addresses using PSGC dropdowns
+                        </small>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <!-- Payment Accounts & Pricing Settings (superadmin only) -->
@@ -1859,26 +1946,26 @@
                 </div>
             </div>
 
-            <!-- Pricing Settings -->
+            <!-- Platform Fee Settings -->
             <div class="card mt-3">
                 <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-gear"></i> Subscription Pricing</h5>
+                    <h5 class="card-title"><i class="bi bi-gear"></i> Platform Fee (Subscription)</h5>
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label small text-muted">Monthly Price (₱)</label>
+                            <label class="form-label small text-muted">Monthly Platform Fee (₱)</label>
                             <input type="number" class="form-control" id="setting-premium-monthly-price" value="299">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label small text-muted">3-Month Discount (%)</label>
+                            <label class="form-label small text-muted">3-Month Platform Fee Discount (%)</label>
                             <input type="number" class="form-control" id="setting-discount-3m" value="10">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label small text-muted">6-Month Discount (%)</label>
+                            <label class="form-label small text-muted">6-Month Platform Fee Discount (%)</label>
                             <input type="number" class="form-control" id="setting-discount-6m" value="20">
                         </div>
                     </div>
                     <button class="btn ac-btn-primary btn-sm mt-3" id="btn-save-subscription-settings">
-                        <i class="bi bi-check-lg me-1"></i>Save Pricing
+                        <i class="bi bi-check-lg me-1"></i>Save Platform Fee
                     </button>
                 </div>
             </div>
@@ -2274,47 +2361,43 @@
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-body">
-                <!-- Stats Dashboard -->
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
-                            <div class="card-body py-2">
-                                <h6 class="text-muted mb-0 small">Open</h6>
-                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="support-open-count">0</h4>
-                            </div>
-                        </div>
+        <!-- Stats Dashboard -->
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                    <div class="card-body py-2">
+                        <h6 class="text-muted mb-0 small">Open</h6>
+                        <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="support-open-count">0</h4>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%); border-left: 4px solid #0dcaf0;">
-                            <div class="card-body py-2">
-                                <h6 class="text-muted mb-0 small">In Progress</h6>
-                                <h4 class="mb-0 fw-bold" style="color: #0aa2c0;" id="support-in-progress-count">0</h4>
-                            </div>
-                        </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%); border-left: 4px solid #0dcaf0;">
+                    <div class="card-body py-2">
+                        <h6 class="text-muted mb-0 small">In Progress</h6>
+                        <h4 class="mb-0 fw-bold" style="color: #0aa2c0;" id="support-in-progress-count">0</h4>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
-                            <div class="card-body py-2">
-                                <h6 class="text-muted mb-0 small">Resolved</h6>
-                                <h4 class="mb-0 fw-bold" style="color: #146c43;" id="support-resolved-count">0</h4>
-                            </div>
-                        </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                    <div class="card-body py-2">
+                        <h6 class="text-muted mb-0 small">Resolved</h6>
+                        <h4 class="mb-0 fw-bold" style="color: #146c43;" id="support-resolved-count">0</h4>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 4px solid #6c757d;">
-                            <div class="card-body py-2">
-                                <h6 class="text-muted mb-0 small">Closed</h6>
-                                <h4 class="mb-0 fw-bold" style="color: #5a6268;" id="support-closed-count">0</h4>
-                            </div>
-                        </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 4px solid #6c757d;">
+                    <div class="card-body py-2">
+                        <h6 class="text-muted mb-0 small">Closed</h6>
+                        <h4 class="mb-0 fw-bold" style="color: #5a6268;" id="support-closed-count">0</h4>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Panel: Unified Inbox - moved outside card for full height -->
+        <!-- Panel: Unified Inbox -->
         <div id="panel-conversations" class="support-chat-panel" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;">
 
             <!-- admin-chat-drawer INSIDE the section: becomes a full-width inbox panel. -->
@@ -2382,7 +2465,7 @@
                         </div>
                         <!-- Ticket number display (hidden by default, shown for tickets) -->
                         <div id="ticket-number-control" class="ticket-number-control" style="display:none;">
-                            <span class="badge bg-primary" id="chat-ticket-number">#—</span>
+                            <span class="chat-thread-ticket-number" id="chat-ticket-number">#—</span>
                         </div>
                     </div>
 
@@ -2712,7 +2795,8 @@
                     <table id="verification-requests-table" class="table table-hover ac-table table-sm align-middle">
                         <thead>
                             <tr>
-                                <th>Farmer</th>
+                                <th>Role</th>
+                                <th>Full Name</th>
                                 <th>Shop</th>
                                 <th>Document</th>
                                 <th>Date</th>
@@ -3181,17 +3265,17 @@
                     <div class="form-group">
                         <label class="form-label" for="edit-user-firstname">First Name</label>
                         <input type="text" id="edit-user-firstname"
-                               class="form-control" placeholder="First name">
+                               class="form-control" placeholder="First name" maxlength="40">
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="edit-user-middlename">Middle Name (Optional)</label>
                         <input type="text" id="edit-user-middlename"
-                               class="form-control" placeholder="Middle name">
+                               class="form-control" placeholder="Middle name" maxlength="40">
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="edit-user-lastname">Last Name</label>
                         <input type="text" id="edit-user-lastname"
-                               class="form-control" placeholder="Last name">
+                               class="form-control" placeholder="Last name" maxlength="40">
                     </div>
                 </div>
 
@@ -3204,7 +3288,7 @@
                 <div class="form-group mb-3" id="edit-user-shop-name-group" style="display:none;">
                     <label class="form-label" for="edit-user-shopname">Shop Name</label>
                     <input type="text" id="edit-user-shopname"
-                           class="form-control" placeholder="Shop name (for farmers)">
+                           class="form-control" placeholder="Shop name (for farmers)" maxlength="40">
                 </div>
 
                 <div class="form-row-2 mb-3">
@@ -3308,19 +3392,19 @@
                             First Name <span class="required-mark">*</span>
                         </label>
                         <input type="text" id="create-user-firstname"
-                               class="form-control" placeholder="First name" required>
+                               class="form-control" placeholder="First name" maxlength="40" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="create-user-middlename">Middle Name (Optional)</label>
                         <input type="text" id="create-user-middlename"
-                               class="form-control" placeholder="Optional">
+                               class="form-control" placeholder="Optional" maxlength="40">
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="create-user-lastname">
                             Last Name <span class="required-mark">*</span>
                         </label>
                         <input type="text" id="create-user-lastname"
-                               class="form-control" placeholder="Last name" required>
+                               class="form-control" placeholder="Last name" maxlength="40" required>
                     </div>
                 </div>
 
@@ -3361,7 +3445,7 @@
                 <div class="form-group mb-3" id="create-user-shop-name-group" style="display:none;">
                     <label class="form-label" for="create-user-shopname">Shop Name</label>
                     <input type="text" id="create-user-shopname"
-                           class="form-control" placeholder="Shop name (for farmers)">
+                           class="form-control" placeholder="Shop name (for farmers)" maxlength="40">
                 </div>
 
                 <div class="form-group mb-2">
@@ -3487,7 +3571,6 @@
         </button>
     </div>
 </aside>
-
 
 <!-- ── Add Category Modal ────────────────────────────────────────── -->
 <div id="add-category-modal" class="admin-modal-backdrop">
@@ -3683,10 +3766,11 @@
                         <div class="mt-2 p-3 bg-light rounded">
                             <ul class="mb-0 ps-3" style="font-size:0.9rem;">
                                 <li><i class="bi bi-check-circle-fill text-success me-2"></i>Unlimited product listings</li>
-                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Priority approval for products</li>
-                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Custom product names</li>
-                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Advanced analytics & reports</li>
-                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>All-time data access</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Advanced sales analytics</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Priority product approval</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>All-Time Dashboard Filter</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Request new products</li>
+                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>Premium badge on customer page</li>
                             </ul>
                         </div>
                     </div>
@@ -3808,7 +3892,6 @@
             <ul class="nav nav-tabs nav-tabs-bordered" id="customerDetailTabs">
                 <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cdt-overview">Overview</button></li>
                 <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cdt-orders">Order History</button></li>
-                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cdt-addresses">Addresses</button></li>
             </ul>
             <div class="tab-content p-3">
                 <div class="tab-pane fade show active" id="cdt-overview">
@@ -3830,11 +3913,6 @@
                         </table>
                     </div>
                 </div>
-                <div class="tab-pane fade" id="cdt-addresses">
-                    <div id="cdt-addresses-content">
-                        <div class="text-center py-5"><span class="spinner-border"></span></div>
-                    </div>
-                </div>
             </div>
         </div>
         <div class="modal-footer gap-2">
@@ -3845,6 +3923,14 @@
             <button class="btn btn-sm btn-ac-green" id="cdt-enable-btn" type="button">
                 <span class="spinner-border spinner-border-sm d-none me-1" id="cdt-enable-spinner"></span>
                 Enable
+            </button>
+            <button class="btn btn-sm btn-ac-green" id="cdt-verify-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="cdt-verify-spinner"></span>
+                Verify
+            </button>
+            <button class="btn btn-sm btn-ac-red" id="cdt-unverify-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="cdt-unverify-spinner"></span>
+                Unverify
             </button>
             <button class="btn btn-sm btn-ac-green" id="cdt-edit-btn" type="button">Edit</button>
         </div>
@@ -3902,11 +3988,11 @@
                 <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-enable-spinner"></span>
                 Enable
             </button>
-            <button class="btn btn-sm d-none btn-ac-green" id="fdt-verify-btn" type="button" data-roles="super_admin">
+            <button class="btn btn-sm btn-ac-green" id="fdt-verify-btn" type="button">
                 <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-verify-spinner"></span>
                 Verify
             </button>
-            <button class="btn btn-sm d-none btn-ac-red" id="fdt-unverify-btn" type="button" data-roles="super_admin">
+            <button class="btn btn-sm btn-ac-red" id="fdt-unverify-btn" type="button">
                 <span class="spinner-border spinner-border-sm d-none me-1" id="fdt-unverify-spinner"></span>
                 Unverify
             </button>
@@ -3991,6 +4077,14 @@
             <button class="btn btn-sm btn-ac-green" id="adt-enable-btn" type="button">
                 <span class="spinner-border spinner-border-sm d-none me-1" id="adt-enable-spinner"></span>
                 Enable
+            </button>
+            <button class="btn btn-sm btn-ac-green" id="adt-verify-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="adt-verify-spinner"></span>
+                Verify
+            </button>
+            <button class="btn btn-sm btn-ac-red" id="adt-unverify-btn" type="button">
+                <span class="spinner-border spinner-border-sm d-none me-1" id="adt-unverify-spinner"></span>
+                Unverify
             </button>
             <button class="btn btn-sm btn-ac-green" id="adt-edit-btn" type="button">Edit</button>
         </div>
@@ -4222,6 +4316,20 @@
 <script src="/js/admin.js?v=ui-refinements-20260603g"></script>
 <script src="/js/chat.js"></script>
 
+<script>
+// Hide loading screen when page is fully loaded
+window.addEventListener('load', function() {
+    const loadingScreen = document.getElementById('admin-loading-screen');
+    const body = document.body;
+
+    if (loadingScreen) {
+        setTimeout(() => {
+            loadingScreen.classList.add('hidden');
+            body.classList.remove('loading');
+        }, 500);
+    }
+});
+</script>
 
 </body>
 </html>
