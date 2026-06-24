@@ -342,6 +342,38 @@ a:hover { color: var(--ac-primary-dark); }
   background: var(--ac-primary-light);
 }
 
+/* Chat dropdown items */
+.chat-dropdown-item {
+  transition: background 0.15s ease;
+}
+
+.chat-dropdown-item:hover {
+  background: var(--ac-primary-light);
+}
+
+.chat-dropdown-item.chat-dropdown-item-unread {
+  background: #ecfdf5;
+}
+
+.chat-dropdown-item.chat-dropdown-item-unread:hover {
+  background: var(--ac-primary-light);
+}
+
+.notification-icon-dropdown {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.notification-icon-dropdown.notification-icon-unread {
+  background: #10b981;
+  color: #fff;
+}
+
+.notification-icon-dropdown i {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 /* Fix dropdown overflow */
 .dropdown-menu.notifications {
   overflow: hidden;
@@ -358,6 +390,9 @@ a:hover { color: var(--ac-primary-dark); }
 
 /* Notification items in section */
 .notification-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   background: #f9fafb;
   border: 1px solid #d1d5db;
   border-radius: 8px;
@@ -1586,7 +1621,6 @@ body.sidebar-collapsed #main.main {
   border: 1px solid var(--ac-border) !important;
   border-radius: 10px !important;
   overflow: hidden;
-  min-height: 500px;
 }
 /* When section is active, always show the drawer regardless of .active class */
 #chat.admin-section-card.active .admin-chat-drawer,
@@ -1600,7 +1634,7 @@ body.sidebar-collapsed #main.main {
 #support-ticket-chat.admin-section-card.active {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 80px);
+  height: calc(100vh);
   overflow: hidden;
 }
 
@@ -1610,9 +1644,9 @@ body.sidebar-collapsed #main.main {
   margin-bottom: 8px;
 }
 
-#chat.admin-section-card.active .card,
-#support-ticket-chat.admin-section-card.active .card {
-  display: none;
+#chat.admin-section-card.active .row.mb-3 {
+  flex-shrink: 0;
+  margin-bottom: 0;
 }
 
 #chat.admin-section-card.active #panel-conversations {
@@ -1620,16 +1654,13 @@ body.sidebar-collapsed #main.main {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  height: 800px;
-  min-height: 800px;
-  padding: 0 12px 12px;
+  min-height: 0;
 }
 
 #chat.admin-section-card.active .admin-chat-drawer,
 #support-ticket-chat.admin-section-card.active .admin-chat-drawer {
   flex: 1;
   height: 100%;
-  min-height: 0;
   overflow: hidden;
   display: flex !important;
 }
@@ -1893,7 +1924,6 @@ body.sidebar-collapsed #main.main {
   min-width: 0;
   overflow: hidden;
   background: #fff;
-  min-height: 400px;
   height: 100%;
 }
 
@@ -3434,4 +3464,114 @@ body.sidebar-collapsed #main.main {
   font-size: .82rem;
   color: var(--ac-text-muted);
   margin: 0;
+}
+
+/* ─── Nested Tabbed Management Sections ─────────────────────────────────── */
+.management-tabs {
+    margin-top: 1rem;
+}
+
+.management-tabs .nav-tabs {
+    border-bottom: 2px solid #dee2e6;
+    margin-bottom: 1rem;
+}
+
+.management-tabs .nav-link {
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #6c757d;
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.management-tabs .nav-link:hover {
+    color: #0d6efd;
+    border-bottom-color: #0d6efd;
+}
+
+.management-tabs .nav-link.active {
+    color: #0d6efd;
+    border-bottom-color: #0d6efd;
+    background-color: transparent;
+}
+
+/* Purple progress bar for pre-orders */
+.progress-bar.bg-purple {
+    background-color: #6f42c1;
+}
+
+/* Reservation summary card */
+.reservation-summary {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.reservation-summary h6 {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.reservation-summary .progress {
+    height: 8px;
+    margin-top: 0.5rem;
+}
+
+/* Action buttons in edit modal */
+.edit-modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.edit-modal-actions .btn {
+    flex: 1;
+    min-width: 120px;
+}
+
+/* Confirmation modals */
+.modal.open {
+    display: flex;
+}
+
+.modal-confirm-body {
+    text-align: center;
+    padding: 2rem;
+}
+
+.modal-confirm-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.modal-confirm-icon.text-success {
+    color: #198754;
+}
+
+.modal-confirm-icon.text-warning {
+    color: #ffc107;
+}
+
+.modal-confirm-icon.text-danger {
+    color: #dc3545;
+}
+
+.modal-confirm-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.modal-confirm-text {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+}
+
+.modal-confirm-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
 }
