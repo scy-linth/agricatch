@@ -1048,4 +1048,54 @@ router.post('/products/:id/harvest-preorder', async (req, res) => {
   }
 });
 
+// Convert remaining pre-order inventory to available stock
+router.post('/products/:id/convert-preorder', async (req, res) => {
+  try {
+    const user = await requireFarmer(req, res);
+    if (!user) return;
+
+    const productId = parseInt(req.params.id);
+
+    // Verify product belongs to farmer
+    const productCheck = await pool.query(
+      'SELECT id, farmer_id, stock_quantity, reserved_quantity, max_preorder_quantity FROM products WHERE id = $1',
+      [productId]
+    );
+
+    if (productCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (productCheck.rows[0].farmer_id !== user.id) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const product = productCheck.rows[0];
+    
+    // Calculate remaining available slots
+    const remainingSlots = product.max_preorder_quantity - product.reserved_quantity;
+    
+    if (remainingSlots <= 0) {
+      return res.status(400).json({ error: 'No remaining pre-order slots to convert' });
+    }
+
+    // Add remaining slots to stock quantity and disable pre-order
+    const updatedStock = product.stock_quantity + remainingSlots;
+    
+    await pool.query(
+      'UPDATE products SET stock_quantity = $1, max_preorder_quantity = 0, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [updatedStock, productId]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Remaining pre-order inventory converted successfully',
+      new_stock_quantity: updatedStock
+    });
+  } catch (error) {
+    console.error('Error converting pre-order:', error);
+    res.status(500).json({ error: 'Failed to convert pre-order inventory' });
+  }
+});
+
 module.exports = router;
