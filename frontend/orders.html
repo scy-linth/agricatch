@@ -3,63 +3,538 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Pre-orders - AgriCatch</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <title>My Orders — AgriCatch</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+
+    <!-- NiceAdmin base -->
+    <link rel="stylesheet" href="/css/nicemain.css">
+    <!-- AgriCatch SaaS overrides -->
+    <link rel="stylesheet" href="/css/agricatch-admin.css">
+
+
+<style>
+/* ── Orders page — standalone customer view ───────────────── */
+
+/* Topbar — gradient matching landing page header */
+.orders-topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1030;
+  height: 60px;
+  background: linear-gradient(135deg, #4ade80, #0ea5e9);
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  gap: 1rem;
+  backdrop-filter: blur(10px);
+}
+.orders-topbar .brand-name {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  color: #fff;
+}
+.orders-topbar .tagline {
+  font-size: .7rem;
+  color: rgba(255,255,255,.8);
+  margin: 0;
+  line-height: 1;
+}
+.orders-topbar .back-btn {
+  background: rgba(255,255,255,.35);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.5);
+  font-size: .8rem;
+  font-weight: 600;
+  padding: .3rem .75rem;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  text-decoration: none;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.orders-topbar .back-btn:hover {
+  background: rgba(255,255,255,.5);
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Main area */
+#orders-main {
+  margin-top: 60px;
+  padding: 1.5rem 1.75rem 3rem;
+  min-height: calc(100vh - 60px);
+  background: var(--ac-bg, #f5f7f5);
+}
+@media (max-width: 767px) {
+  #orders-main { padding: 1rem .75rem 2.5rem; }
+  .orders-topbar { padding: 0 .75rem; }
+}
+
+/* Order tab nav */
+.order-tabs {
+  display: flex;
+  gap: .35rem;
+  flex-wrap: wrap;
+  margin-bottom: .85rem;
+}
+.order-tabs .tab-btn {
+  padding: .35rem .75rem;
+  border-radius: 8px;
+  border: 1px solid var(--ac-border, #e2e8e4);
+  background: #fff;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ac-text-muted, #6b7e72);
+  transition: background .15s, color .15s, border-color .15s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.order-tabs .tab-btn.active {
+  background: var(--ac-primary, #2d7a3a);
+  color: #fff;
+  border-color: var(--ac-primary, #2d7a3a);
+}
+.order-tabs .tab-btn:hover:not(.active) {
+  background: var(--ac-primary-light, #e8f5e9);
+  color: var(--ac-primary, #2d7a3a);
+  border-color: var(--ac-primary-muted, #c8e6c9);
+}
+.order-tabs .tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  font-size: .72rem;
+  background: #ef4444;
+  color: #fff;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Orders list */
+.orders-list { display: flex; flex-direction: column; gap: .6rem; }
+
+/* Order card */
+.order-card {
+  background: #fff;
+  border: 1px solid var(--ac-border, #e2e8e4);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  transition: box-shadow .15s, border-color .15s;
+}
+.order-card:hover {
+  box-shadow: 0 4px 18px rgba(0,0,0,.08);
+  border-color: var(--ac-primary-muted, #c8e6c9);
+}
+.order-card-highlight {
+  box-shadow: 0 0 0 2.5px var(--ac-primary, #2d7a3a) !important;
+  animation: pulse-border .45s ease 3;
+}
+@keyframes pulse-border {
+  0%   { box-shadow: 0 0 0 2.5px var(--ac-primary, #2d7a3a); }
+  50%  { box-shadow: 0 0 0 5px rgba(45,122,58,.18); }
+  100% { box-shadow: 0 0 0 2.5px var(--ac-primary, #2d7a3a); }
+}
+
+/* Order card header */
+.order-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-bottom: .75rem;
+  padding-bottom: .65rem;
+  border-bottom: 1px solid var(--ac-border-light, #eef2ef);
+}
+.order-head-left {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+}
+.order-date {
+  font-size: .78rem;
+  color: var(--ac-text-muted, #6b7e72);
+  line-height: 1.35;
+}
+.order-date small { display: block; font-size: .72rem; }
+.order-id {
+  font-size: .875rem;
+  font-weight: 700;
+  color: var(--ac-primary, #2d7a3a);
+  background: var(--ac-primary-light, #e8f5e9);
+  padding: .2rem .55rem;
+  border-radius: 6px;
+}
+.order-status-line {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .825rem;
+  font-weight: 500;
+  color: var(--ac-text-muted, #6b7e72);
+}
+
+/* Order item body */
+.order-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.order-item img {
+  width: 68px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 10px;
+  flex-shrink: 0;
+  border: 1px solid var(--ac-border-light, #eef2ef);
+  background: var(--ac-bg, #f5f7f5);
+}
+.order-item-info {
+  flex: 1;
+  min-width: 0;
+}
+.order-item-name {
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--ac-text, #1a2e1e);
+  margin-bottom: .2rem;
+}
+.order-item-meta {
+  font-size: .8rem;
+  color: var(--ac-text-muted, #6b7e72);
+  margin-bottom: .15rem;
+}
+.order-item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: .45rem;
+  flex-shrink: 0;
+}
+.order-total {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ac-primary, #2d7a3a);
+}
+.order-actions {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  align-items: flex-end;
+}
+
+/* btn-small — alias for Bootstrap btn-sm */
+.btn.btn-small {
+  padding: .25rem .6rem;
+  font-size: .78rem;
+  border-radius: .4rem;
+  font-weight: 600;
+}
+
+/* Status pill (mirrors agricatch-admin.css status pills) */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: .2rem .55rem;
+  border-radius: 20px;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.status-pill.pending   { background: var(--s-pending-bg, #fffbeb);  color: var(--s-pending, #d97706); }
+.status-pill.confirmed { background: var(--s-confirmed-bg, #eff6ff); color: var(--s-confirmed, #2563eb); }
+.status-pill.preparing { background: var(--s-preparing-bg, #f5f3ff); color: var(--s-preparing, #7c3aed); }
+.status-pill.delivered { background: var(--s-delivered-bg, #f0faf2); color: var(--s-delivered, #2d7a3a); }
+.status-pill.cancelled { background: var(--s-cancelled-bg, #fef2f2); color: var(--s-cancelled, #dc2626); }
+.status-pill.out_for_delivery { background: #f0f9ff; color: #0369a1; }
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--ac-text-muted, #6b7e72);
+  font-size: .9rem;
+}
+.empty-state i {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: .75rem;
+  color: var(--ac-primary-muted, #c8e6c9);
+}
+
+/* Modal (same pattern as farmer.html) */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1070;
+  background: rgba(15,23,42,.55);
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+}
+.modal.open { display: flex; }
+.modal .modal-content {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.18);
+  width: 100%;
+  max-width: 520px;
+  margin: auto;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.modal .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .875rem 1.25rem;
+  border-bottom: 1px solid var(--ac-border, #e2e8e4);
+  background: var(--ac-primary, #2d7a3a);
+}
+.modal .modal-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+}
+.modal .close-btn {
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.25);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+  line-height: 1;
+}
+.modal .close-btn:hover { background: rgba(255,255,255,.3); }
+.modal .form-group {
+  padding: 0 1.25rem;
+  margin-bottom: .9rem;
+}
+.modal .form-group:first-child { margin-top: 1rem; }
+.modal .form-group label {
+  display: block;
+  font-size: .8rem;
+  font-weight: 600;
+  margin-bottom: .3rem;
+  color: var(--ac-text, #1a2e1e);
+}
+.modal .form-group textarea {
+  width: 100%;
+  border: 1px solid var(--ac-border, #e2e8e4);
+  border-radius: 8px;
+  padding: .5rem .75rem;
+  font-size: .875rem;
+  resize: vertical;
+  outline: none;
+  transition: border-color .15s;
+  font-family: inherit;
+}
+.modal .form-group textarea:focus {
+  border-color: var(--ac-primary, #2d7a3a);
+  box-shadow: 0 0 0 3px rgba(45,122,58,.12);
+}
+.modal .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .5rem;
+  padding: .85rem 1.25rem;
+  border-top: 1px solid var(--ac-border-light, #eef2ef);
+  background: var(--ac-bg, #f5f7f5);
+}
+
+/* Rating modal specific */
+.order-rating-product-name {
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--ac-text, #1a2e1e);
+  padding: .5rem .75rem;
+  background: var(--ac-primary-light, #e8f5e9);
+  border-radius: 8px;
+}
+.order-rating-stars {
+  display: flex;
+  gap: .35rem;
+  margin: .25rem 0;
+}
+.order-rating-star-btn {
+  background: none;
+  border: none;
+  font-size: 1.6rem;
+  color: #d1d5db;
+  cursor: pointer;
+  padding: 0 .1rem;
+  transition: color .12s, transform .1s;
+}
+.order-rating-star-btn.active { color: #f59e0b; }
+.order-rating-star-btn:hover { color: #f59e0b; transform: scale(1.15); }
+.order-rating-value {
+  font-size: .78rem;
+  color: var(--ac-text-muted, #6b7e72);
+  font-weight: 500;
+}
+
+/* Reason view modal body */
+.order-reason-view-body {
+  padding: 1rem 1.25rem;
+  font-size: .9rem;
+  color: var(--ac-text, #1a2e1e);
+  line-height: 1.6;
+}
+.order-reason-view-body p {
+  margin: 0;
+  background: var(--ac-bg, #f5f7f5);
+  padding: .75rem 1rem;
+  border-radius: 8px;
+  border-left: 3px solid var(--s-cancelled, #dc2626);
+}
+
+/* Bootstrap button overrides (brand colours) */
+.btn-ac-green {
+  background: var(--ac-primary, #2d7a3a);
+  color: #fff;
+  border-color: var(--ac-primary, #2d7a3a);
+}
+.btn-ac-green:hover {
+  background: var(--ac-primary-dark, #1e5429);
+  color: #fff;
+  border-color: var(--ac-primary-dark, #1e5429);
+}
+
+/* Responsive order card */
+@media (max-width: 575px) {
+  .order-item { flex-wrap: wrap; }
+  .order-item-side {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding-top: .5rem;
+    border-top: 1px solid var(--ac-border-light, #eef2ef);
+  }
+  .order-actions { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
+}
+</style>
 </head>
-<body>
-    <header class="header">
-        <div class="container">
-            <div class="header-content">
-                <div class="logo">
-                    <div class="logo-and-title">
-                        <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
-                        <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
-                    </div>
-                    <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
-                </div>
-                <div class="header-actions">
-                    <a href="/#products" id="back-to-origin-btn" class="btn btn-secondary">Back</a>
-                </div>
+
+<body class="loading" style="background:var(--ac-bg,#f5f7f5);">
+
+<!-- Loading Screen -->
+<div id="loading-screen" class="loading-screen">
+    <div class="loading-content">
+        <div class="loading-logo">
+            <img src="/images/logo.png" alt="AgriCatch Logo" class="loading-logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="loading-logo-fallback" style="display:none; align-items:center; justify-content:center; width:60px; height:60px; background:rgba(255,255,255,0.2); border-radius:50%; font-size:1.5rem; font-weight:bold; color:white;">AC</div>
+            <h1 class="loading-title">
+                <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
+            </h1>
+        </div>
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+        </div>
+        <p class="loading-text">Loading...</p>
+    </div>
+</div>
+
+<!-- ── Top bar ───────────────────────────────────────────────────────── -->
+<header class="orders-topbar">
+    <a href="/index.html" class="d-flex align-items-center gap-2" style="text-decoration:none;">
+        <img src="/images/logo.png" alt="AgriCatch" height="34" style="flex-shrink:0;">
+        <div>
+            <div class="brand-name">AgriCatch</div>
+            <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
+        </div>
+    </a>
+
+    <a href="/index.html" id="back-to-origin-btn" class="back-btn ms-auto" onclick="restoreLandingPagePosition(event)">
+        <i class="bi bi-arrow-left"></i>
+        <span>Back</span>
+    </a>
+</header>
+
+<!-- ── Main content ──────────────────────────────────────────────────── -->
+<main id="orders-main">
+
+    <!-- Breadcrumb -->
+    <div class="pagetitle">
+        <nav>
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Home</li>
+                <li class="breadcrumb-item active">My Orders</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Orders section -->
+    <section id="orders" class="admin-section-card active">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-bag-check"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">My Orders</h4>
+                <p class="ac-section-hero__sub">Track and manage your orders.</p>
             </div>
         </div>
-    </header>
 
-    <main class="orders-page">
-        <div class="container">
-            <div class="orders-header">
-                <h2>Pre-order Management</h2>
-                <p>Track your pre-orders and view pre-order details.</p>
-                <div class="orders-search-bar" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                    <input type="search" id="orders-search-input" placeholder="Search by product name or pre-order ID..." style="flex:1;min-width:220px;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:0.95rem;">
-                    <input type="date" id="orders-date-from" title="From date" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
-                    <input type="date" id="orders-date-to" title="To date" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
-                    <button type="button" id="orders-search-clear" class="btn btn-secondary btn-small" style="white-space:nowrap;">Clear</button>
+        <div class="card">
+            <div class="card-body px-3 pt-3 pb-2">
+
+            <!-- Status tabs -->
+            <div class="order-tabs">
+                <button id="all-orders-tab"       class="tab-btn active" type="button">All</button>
+                <button id="active-orders-tab"    class="tab-btn"        type="button">Active</button>
+                <button id="delivered-orders-tab" class="tab-btn"        type="button">Delivered</button>
+                <button id="cancelled-orders-tab" class="tab-btn"        type="button">Cancelled</button>
+            </div>
+
+            <!-- Tab panels -->
+            <div id="all-orders-section" class="tab-content active">
+                <div id="all-orders-list" class="orders-list">
+                    <div class="empty-state">
+                        <i class="bi bi-hourglass-split"></i>
+                        Loading your orders...
+                    </div>
                 </div>
             </div>
-            <div class="order-tabs">
-                <button id="pending-orders-tab" class="tab-btn active" type="button">Pending</button>
-                <button id="confirmed-orders-tab" class="tab-btn" type="button">Confirmed</button>
-                <button id="preparing-orders-tab" class="tab-btn" type="button">Preparing</button>
-                <button id="out_for_delivery-orders-tab" class="tab-btn" type="button">Out for Delivery</button>
-                <button id="delivered-orders-tab" class="tab-btn" type="button">Delivered</button>
-                <button id="cancelled-orders-tab" class="tab-btn" type="button">Cancelled</button>
-            </div>
 
-            <div id="pending-orders-section" class="tab-content active">
-                <div id="pending-orders-list" class="orders-list"></div>
-            </div>
-
-            <div id="confirmed-orders-section" class="tab-content">
-                <div id="confirmed-orders-list" class="orders-list"></div>
-            </div>
-
-            <div id="preparing-orders-section" class="tab-content">
-                <div id="preparing-orders-list" class="orders-list"></div>
-            </div>
-
-            <div id="out_for_delivery-orders-section" class="tab-content">
-                <div id="out_for_delivery-orders-list" class="orders-list"></div>
+            <div id="active-orders-section" class="tab-content">
+                <div id="active-orders-list" class="orders-list"></div>
             </div>
 
             <div id="delivered-orders-section" class="tab-content">
@@ -69,92 +544,149 @@
             <div id="cancelled-orders-section" class="tab-content">
                 <div id="cancelled-orders-list" class="orders-list"></div>
             </div>
-        </div>
-    </main>
 
-    <div id="order-rating-modal" class="modal">
-        <div class="modal-content modal-medium order-rating-modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-star"></i> Rate Product</h3>
-                <button type="button" class="close-btn" id="close-order-rating-modal">&times;</button>
-            </div>
-            <form id="order-rating-form" class="order-rating-form">
-                <div class="form-group">
-                    <label>Product</label>
-                    <div id="order-rating-product-name" class="order-rating-product-name">—</div>
-                </div>
-                <div class="form-group">
-                    <label>Your Rating</label>
-                    <div id="order-rating-stars" class="order-rating-stars">
-                        <button type="button" class="order-rating-star-btn" data-rating="1" aria-label="1 star"><i class="fas fa-star"></i></button>
-                        <button type="button" class="order-rating-star-btn" data-rating="2" aria-label="2 stars"><i class="fas fa-star"></i></button>
-                        <button type="button" class="order-rating-star-btn" data-rating="3" aria-label="3 stars"><i class="fas fa-star"></i></button>
-                        <button type="button" class="order-rating-star-btn" data-rating="4" aria-label="4 stars"><i class="fas fa-star"></i></button>
-                        <button type="button" class="order-rating-star-btn" data-rating="5" aria-label="5 stars"><i class="fas fa-star"></i></button>
-                    </div>
-                    <small id="order-rating-value" class="order-rating-value">Select a rating</small>
-                </div>
-                <div class="form-group">
-                    <label for="order-rating-comment">Comment (optional)</label>
-                    <textarea id="order-rating-comment" rows="4" maxlength="500" placeholder="Share your experience with this product..."></textarea>
-                </div>
-                <div class="form-actions order-rating-actions">
-                    <button type="button" class="btn btn-secondary" id="cancel-order-rating-btn">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="submit-order-rating-btn">Save Rating</button>
-                </div>
-            </form>
         </div>
     </div>
+    </section>
 
-    <div id="order-cancel-modal" class="modal">
-        <div class="modal-content modal-medium order-cancel-modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-ban"></i> Cancel Pre-order</h3>
-                <button type="button" class="close-btn" id="close-order-cancel-modal">&times;</button>
+</main>
+
+<!-- ── Rate Product Modal ────────────────────────────────────────────── -->
+<div id="order-rating-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-star me-1"></i> Rate Product</h3>
+            <button type="button" class="close-btn" id="close-order-rating-modal" aria-label="Close">&times;</button>
+        </div>
+        <form id="order-rating-form">
+            <div class="form-group" style="margin-top:1rem;">
+                <label>Product</label>
+                <div id="order-rating-product-name" class="order-rating-product-name">—</div>
             </div>
-            <form id="order-cancel-form" class="order-cancel-form">
-                <div class="form-group">
-                    <label for="order-cancel-reason-input">Reason for cancellation</label>
-                    <textarea id="order-cancel-reason-input" rows="4" maxlength="500" placeholder="Tell us why you are cancelling this pre-order..."></textarea>
+            <div class="form-group">
+                <label>Your Rating</label>
+                <div id="order-rating-stars" class="order-rating-stars">
+                    <button type="button" class="order-rating-star-btn" data-rating="1" aria-label="1 star"><i class="fas fa-star"></i></button>
+                    <button type="button" class="order-rating-star-btn" data-rating="2" aria-label="2 stars"><i class="fas fa-star"></i></button>
+                    <button type="button" class="order-rating-star-btn" data-rating="3" aria-label="3 stars"><i class="fas fa-star"></i></button>
+                    <button type="button" class="order-rating-star-btn" data-rating="4" aria-label="4 stars"><i class="fas fa-star"></i></button>
+                    <button type="button" class="order-rating-star-btn" data-rating="5" aria-label="5 stars"><i class="fas fa-star"></i></button>
                 </div>
-                <div class="form-actions order-cancel-actions">
-                    <button type="button" class="btn btn-secondary" id="cancel-order-cancel-btn">Close</button>
-                    <button type="submit" class="btn btn-danger" id="submit-order-cancel-btn">Confirm Cancel</button>
-                </div>
-            </form>
+                <small id="order-rating-value" class="order-rating-value">Select a rating</small>
+            </div>
+            <div class="form-group">
+                <label for="order-rating-comment">Comment <span style="font-weight:400;color:var(--ac-text-muted,#6b7e72);">(optional)</span></label>
+                <textarea id="order-rating-comment" rows="4" maxlength="500"
+                          placeholder="Share your experience with this product..."></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-order-rating-btn">Cancel</button>
+                <button type="submit" class="btn btn-sm btn-ac-green" id="submit-order-rating-btn">Save Rating</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── Cancel Preorder Modal ────────────────────────────────────────── -->
+<div id="order-cancel-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header" style="background:#dc2626;">
+            <h3><i class="fas fa-ban me-1"></i> Cancel Order</h3>
+            <button type="button" class="close-btn" id="close-order-cancel-modal" aria-label="Close">&times;</button>
+        </div>
+        <form id="order-cancel-form">
+            <div class="form-group" style="margin-top:1rem;">
+                <label for="order-cancel-reason-input">Reason for cancellation</label>
+                <textarea id="order-cancel-reason-input" rows="4" maxlength="500"
+                          placeholder="Tell us why you are cancelling this order..."></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-order-cancel-btn">Close</button>
+                <button type="submit" class="btn btn-sm btn-danger" id="submit-order-cancel-btn">Confirm Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── Cancellation Reason View Modal ───────────────────────────────── -->
+<div id="order-reason-view-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header" style="background:#475569;">
+            <h3><i class="fas fa-circle-info me-1"></i> Cancellation Reason</h3>
+            <button type="button" class="close-btn" id="close-order-reason-view-modal" aria-label="Close">&times;</button>
+        </div>
+        <div class="order-reason-view-body">
+            <p id="order-reason-view-text">No reason provided.</p>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="close-order-reason-view-btn">Close</button>
         </div>
     </div>
+</div>
 
-    <div id="order-reason-view-modal" class="modal">
-        <div class="modal-content modal-medium order-cancel-modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-circle-info"></i> Cancellation Reason</h3>
-                <button type="button" class="close-btn" id="close-order-reason-view-modal">&times;</button>
-            </div>
-            <div class="order-reason-view-body">
-                <p id="order-reason-view-text">No reason provided.</p>
-            </div>
-            <div class="form-actions order-cancel-actions">
-                <button type="button" class="btn btn-secondary" id="close-order-reason-view-btn">Close</button>
-            </div>
-        </div>
-    </div>
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/format.js"></script>
+<script src="/js/orders.js"></script>
+<script>
+// Authorization check - redirect if not logged in or not customer
+(function() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/index.html#login';
+        return;
+    }
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const role = payload.role;
+        if (role !== 'customer') {
+            if (role === 'farmer') {
+                window.location.href = '/farmer.html';
+            } else if (role === 'admin' || role === 'super_admin') {
+                window.location.href = '/admin.html';
+            } else {
+                window.location.href = '/index.html';
+            }
+        }
+    } catch (e) {
+        window.location.href = '/index.html';
+    }
+})();
 
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h3>AgriCatch</h3>
-                    <p>Freshly Harvested! Pre-ordered for you! Your trusted source for fresh farm products.</p>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2024 AgriCatch. All rights reserved.</p>
-            </div>
-        </div>
-    </footer>
+// Restore landing page scroll position
+function restoreLandingPagePosition(event) {
+    const scrollY = sessionStorage.getItem('landingPageScrollY');
+    const hash = sessionStorage.getItem('landingPageHash');
+    if (scrollY) {
+        sessionStorage.setItem('restoreScrollY', scrollY);
+        sessionStorage.setItem('restoreHash', hash || '#home');
+    }
+}
 
-    <script src="/js/format.js"></script>
-    <script src="/js/orders.js"></script>
+// Hide loading screen when page is fully loaded
+window.addEventListener('load', function() {
+    const loadingScreen = document.getElementById('loading-screen');
+    const body = document.body;
+
+    if (loadingScreen) {
+        setTimeout(() => {
+            loadingScreen.classList.add('hidden');
+            body.classList.remove('loading');
+        }, 50);
+    }
+});
+
+// Fallback: Hide loading screen after 1.5 seconds even if page doesn't fully load
+setTimeout(function() {
+    const loadingScreen = document.getElementById('loading-screen');
+    const body = document.body;
+
+    if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
+        console.warn('Loading screen timeout - forcing hide');
+        loadingScreen.classList.add('hidden');
+        body.classList.remove('loading');
+    }
+}, 1500);
+</script>
 </body>
 </html>
