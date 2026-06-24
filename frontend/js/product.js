@@ -79,11 +79,23 @@ class ProductPage {
         const safeFarmer = this.escapeHtml(product.farmer_name || 'Local Farmer');
         const verifiedBadge = product.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : '';
         const safeUnit = this.escapeHtml(product.unit || 'unit');
-        const safeLocation = this.escapeHtml(product.farm_location || product.location || 'Unknown location');
+        const safeLocation = this.escapeHtml(
+            product.province 
+                ? (product.city ? `${product.city}, ${product.province}` : product.province)
+                : product.farm_location || product.location || 'your local area'
+        );
         const productRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
         container.innerHTML = `
             <div class="product-card">
+                ${product.is_preorder ? `
+                <div class="alert alert-warning mb-3" role="alert">
+                    <i class="fas fa-clock me-2"></i>
+                    <strong>Pre-order Item</strong>
+                    ${product.preorder_availability_date ? `<br>Available on: ${product.preorder_availability_date}` : ''}
+                    ${product.max_preorder_quantity ? `<br>Reservations: ${this.fmtNumber(product.reserved_quantity ?? 0)} / ${this.fmtNumber(product.max_preorder_quantity)}` : ''}
+                </div>
+                ` : ''}
                 <img src="${imgSrc}"
                      alt="${safeName}" class="product-image">
                 <div class="product-info">
@@ -98,6 +110,9 @@ class ProductPage {
                         </div>
                         <div class="seller-location"><i class="fas fa-location-dot"></i> <span class="seller-location-text">Ships from ${safeLocation}</span></div>
                         <span>Stock: ${this.fmtNumber(product.stock_quantity ?? 0)}</span>
+                        ${product.is_preorder && product.max_preorder_quantity ? `
+                        <span>Reserved: ${this.fmtNumber(product.reserved_quantity ?? 0)} / ${this.fmtNumber(product.max_preorder_quantity)}</span>
+                        ` : ''}
                         <span>
                             ${productRating}
                             <i class="fas fa-star rating-icon" aria-hidden="true"></i>
