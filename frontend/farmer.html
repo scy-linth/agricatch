@@ -1226,6 +1226,9 @@
                 <button id="add-product-tab" class="btn ac-btn-primary btn-sm" type="button">
                     <i class="bi bi-plus-lg me-1"></i>Add Product
                 </button>
+                <button id="request-product-btn" class="btn btn-outline-primary btn-sm" type="button">
+                    <i class="bi bi-question-circle me-1"></i>Request Product
+                </button>
             </div>
         </div>
 
@@ -1233,14 +1236,6 @@
         <div id="kpi-cards-section" class="mb-3">
             <!-- Available Now KPI Cards -->
             <div id="kpi-available" class="row">
-                <div class="col">
-                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
-                        <div class="card-body py-2">
-                            <h6 class="text-muted mb-0 small">Total Products</h6>
-                            <h4 class="mb-0 fw-bold" style="color: #146c43;" id="kpi-available-total">--</h4>
-                        </div>
-                    </div>
-                </div>
                 <div class="col">
                     <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%); border-left: 4px solid #22c55e;">
                         <div class="card-body py-2">
@@ -1285,34 +1280,18 @@
             <!-- Pre-orders KPI Cards -->
             <div id="kpi-preorder" class="row" style="display:none;">
                 <div class="col">
-                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
-                        <div class="card-body py-2">
-                            <h6 class="text-muted mb-0 small">Active Pre-orders</h6>
-                            <h4 class="mb-0 fw-bold" style="color: #146c43;" id="kpi-preorder-active">--</h4>
-                        </div>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%); border-left: 4px solid #22c55e;">
-                        <div class="card-body py-2">
-                            <h6 class="text-muted mb-0 small">Harvest Ready</h6>
-                            <h4 class="mb-0 fw-bold" style="color: #15803d;" id="kpi-preorder-harvest-ready">--</h4>
-                        </div>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
-                        <div class="card-body py-2">
-                            <h6 class="text-muted mb-0 small">Reserved Units</h6>
-                            <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="kpi-preorder-reserved">--</h4>
-                        </div>
-                    </div>
-                </div>
-                <div class="col">
                     <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-left: 4px solid #0d6efd;">
                         <div class="card-body py-2">
                             <h6 class="text-muted mb-0 small">Pending Harvest</h6>
                             <h4 class="mb-0 fw-bold" style="color: #0a58ca;" id="kpi-preorder-pending">--</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fde8e8 0%, #f8d7da 100%); border-left: 4px solid #dc3545;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Reservation Full</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="kpi-preorder-reserved-max">--</h4>
                         </div>
                     </div>
                 </div>
@@ -1647,7 +1626,7 @@
                 </div>
                 <div class="order-tabs">
                     <button id="pending-orders-tab" class="tab-btn active" type="button">Pending <span class="tab-count" id="pending-orders-count">0</span></button>
-                    <button id="preorder_reserved-orders-tab" class="tab-btn" type="button">Preorder Reserved <span class="tab-count" id="preorder_reserved-orders-count">0</span></button>
+                    <button id="preorder_reserved-orders-tab" class="tab-btn" type="button">Pre-order Reserved <span class="tab-count" id="preorder_reserved-orders-count">0</span></button>
                     <button id="confirmed-orders-tab" class="tab-btn" type="button">Confirmed <span class="tab-count" id="confirmed-orders-count">0</span></button>
                     <button id="preparing-orders-tab" class="tab-btn" type="button">Preparing <span class="tab-count" id="preparing-orders-count">0</span></button>
                     <button id="scheduled-orders-tab" class="tab-btn" type="button">Scheduled <span class="tab-count" id="scheduled-orders-count">0</span></button>
@@ -2591,6 +2570,28 @@
                         <input type="number" id="product-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
                         <small id="product-price-suggestion" class="field-hint">Suggested price: --</small>
                     </div>
+                    <div class="form-group" style="flex:1;" id="add-stock-group" style="display:none;">
+                        <label for="add-stock-quantity">Stock Quantity <span class="text-danger">*</span></label>
+                        <input type="number" id="add-stock-quantity" class="form-control form-control-sm" name="stock_quantity" min="0" required>
+                        <small class="field-hint">Current available inventory</small>
+                    </div>
+                    <div class="form-group" style="flex:1;" id="add-preorder-date-group" style="display:none;">
+                        <label for="add-preorder-availability-date">Expected Harvest Date <span class="text-danger">*</span></label>
+                        <input type="date" id="add-preorder-availability-date" class="form-control form-control-sm" name="preorder_availability_date">
+                        <small class="field-hint">When will this harvest be ready?</small>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;" id="add-expiry-group" style="display:none;">
+                        <label for="add-expiry-date">Best Before</label>
+                        <input type="date" id="add-expiry-date" class="form-control form-control-sm" name="expiry_date">
+                        <small class="field-hint">Best before date</small>
+                    </div>
+                    <div class="form-group" style="flex:1;" id="add-preorder-quantity-group" style="display:none;">
+                        <label for="add-max-preorder-quantity">Maximum Reservation Quantity <span class="text-danger">*</span></label>
+                        <input type="number" id="add-max-preorder-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1" required>
+                        <small class="field-hint">Maximum number of reservations allowed</small>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="product-description">Description</label>
@@ -2614,47 +2615,8 @@
                     <div id="product-image-preview" class="image-preview"></div>
                 </div>
 
-                <!-- Available Now Specific Fields -->
-                <div id="available-now-fields" style="display:none;">
-                    <div class="form-group">
-                        <label for="add-stock-quantity">Stock Quantity <span class="text-danger">*</span></label>
-                        <input type="number" id="add-stock-quantity" class="form-control form-control-sm" name="stock_quantity" min="0" required>
-                        <small class="field-hint">Current available inventory</small>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="add-harvest-date">Harvest Date</label>
-                            <input type="date" id="add-harvest-date" class="form-control form-control-sm" name="harvest_date">
-                            <small class="field-hint">When was this harvested?</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="add-expiry-date">Expiry Date</label>
-                            <input type="date" id="add-expiry-date" class="form-control form-control-sm" name="expiry_date">
-                            <small class="field-hint">When does this expire?</small>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Pre-order Specific Fields -->
-                <div id="preorder-fields" style="display:none;">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="add-preorder-availability-date">Expected Harvest Date <span class="text-danger">*</span></label>
-                            <input type="date" id="add-preorder-availability-date" class="form-control form-control-sm" name="preorder_availability_date" required>
-                            <small class="field-hint">When will this harvest be ready?</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="add-max-preorder-quantity">Maximum Reservation Quantity <span class="text-danger">*</span></label>
-                            <input type="number" id="add-max-preorder-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1" required>
-                            <small class="field-hint">Maximum number of reservations allowed</small>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="add-reservation-cutoff-date">Reservation Cutoff Date</label>
-                        <input type="date" id="add-reservation-cutoff-date" class="form-control form-control-sm" name="reservation_cutoff_date">
-                        <small class="field-hint">Last date customers can reserve (optional)</small>
-                    </div>
-                </div>
+                <div id="preorder-fields" style="display:none;"></div>
 
                 <div class="alert alert-info" style="font-size:0.85rem;padding:0.6rem 0.85rem;margin-bottom:0;">
                     <i class="bi bi-info-circle me-1"></i><strong>Delivery Responsibility:</strong> You are responsible for delivering your products to customers.
@@ -2706,6 +2668,33 @@
                     <label for="edit-product-unit">Unit</label>
                     <input type="text" id="edit-product-unit" class="form-control form-control-sm" value="kg" readonly>
                 </div>
+                <div class="form-group" style="flex:1;" id="edit-available-price-group">
+                    <label for="edit-price">Price (₱) <span class="text-danger">*</span></label>
+                    <input type="number" id="edit-price" class="form-control form-control-sm" name="price" min="0" step="0.01" required>
+                    <small class="field-hint">Price per unit</small>
+                </div>
+                <div class="form-group" style="flex:1;" id="edit-available-stock-group">
+                    <label for="edit-stock-quantity">Stock Quantity <span class="text-danger">*</span></label>
+                    <input type="number" id="edit-stock-quantity" class="form-control form-control-sm" name="stock_quantity" min="0" required>
+                    <small class="field-hint">Current available inventory</small>
+                </div>
+                <div class="form-group" style="flex:1;" id="edit-available-expiry-group">
+                    <label for="edit-expiry-date">Best Before</label>
+                    <input type="date" id="edit-expiry-date" class="form-control form-control-sm" name="expiry_date">
+                    <small class="field-hint">Best before date</small>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;" id="edit-preorder-date-group" style="display:none;">
+                    <label for="edit-preorder-availability-date">Expected Harvest Date <span class="text-danger">*</span></label>
+                    <input type="date" id="edit-preorder-availability-date" class="form-control form-control-sm" name="preorder_availability_date">
+                    <small class="field-hint">When will this harvest be ready?</small>
+                </div>
+                <div class="form-group" style="flex:1;" id="edit-preorder-quantity-group" style="display:none;">
+                    <label for="edit-max-preorder-quantity">Maximum Reservation Quantity <span class="text-danger">*</span></label>
+                    <input type="number" id="edit-max-preorder-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1" required>
+                    <small class="field-hint">Maximum number of reservations allowed</small>
+                </div>
             </div>
             <div class="form-group">
                 <label for="edit-product-description">Description</label>
@@ -2727,92 +2716,11 @@
                 <small class="field-hint">Leave empty to keep the current image.</small>
                 <div id="edit-product-image-preview" class="image-preview"></div>
             </div>
-            
-            <!-- Management Section -->
-            <div class="mt-4 pt-3 border-top">
-                <h6 class="fw-bold mb-3">Management</h6>
-                
-                <!-- Management Tabs -->
-                <ul class="nav nav-tabs nav-tabs-bordered mb-3" id="edit-management-tabs">
-                    <li class="nav-item">
-                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#edit-available-now-tab">Available Now</button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#edit-preorders-tab">Pre-orders</button>
-                    </li>
-                </ul>
-
-                <div class="tab-content">
-                    <!-- Available Now Tab -->
-                    <div class="tab-pane fade show active" id="edit-available-now-tab">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="edit-stock-quantity">Stock Quantity <span class="text-danger">*</span></label>
-                                <input type="number" id="edit-stock-quantity" class="form-control form-control-sm" name="stock_quantity" min="0" required>
-                                <small class="field-hint">Current available inventory</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="edit-price">Price (₱) <span class="text-danger">*</span></label>
-                                <input type="number" id="edit-price" class="form-control form-control-sm" name="price" min="0" step="0.01" required>
-                                <small class="field-hint">Price per unit</small>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="edit-harvest-date">Harvest Date</label>
-                                <input type="date" id="edit-harvest-date" class="form-control form-control-sm" name="harvest_date">
-                                <small class="field-hint">When was this harvested?</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="edit-expiry-date">Expiry Date</label>
-                                <input type="date" id="edit-expiry-date" class="form-control form-control-sm" name="expiry_date">
-                                <small class="field-hint">When does this expire?</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Pre-orders Tab -->
-                    <div class="tab-pane fade" id="edit-preorders-tab">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="edit-preorder-availability-date">Expected Harvest Date <span class="text-danger">*</span></label>
-                                <input type="date" id="edit-preorder-availability-date" class="form-control form-control-sm" name="preorder_availability_date">
-                                <small class="field-hint">When will this harvest be ready?</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="edit-max-preorder-quantity">Maximum Reservation Quantity <span class="text-danger">*</span></label>
-                                <input type="number" id="edit-max-preorder-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1" required>
-                                <small class="field-hint">Maximum number of reservations allowed</small>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-reservation-cutoff-date">Reservation Cutoff Date</label>
-                            <input type="date" id="edit-reservation-cutoff-date" class="form-control form-control-sm" name="reservation_cutoff_date">
-                            <small class="field-hint">Last date customers can reserve (optional)</small>
-                        </div>
-                        
-                        <!-- Reservation Summary Card -->
-                        <div class="card bg-light mb-3">
-                            <div class="card-body py-2">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <small class="fw-semibold">Reserved:</small>
-                                    <small class="fw-bold" id="edit-reserved-count">0 / 0</small>
-                                </div>
-                                <div class="progress" style="height: 6px;">
-                                    <div class="progress-bar" id="edit-reservation-progress" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <small class="text-muted" id="edit-available-slots">Available Slots: 0</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </form>
         <div class="modal-footer gap-2" style="padding:.75rem 1.25rem;border-top:1px solid #e2e8f0;background:#fff;flex-shrink:0;">
             <button type="button" id="cancel-edit-btn" class="btn btn-sm btn-secondary">Cancel</button>
             <button type="button" id="edit-harvest-now-btn" class="btn btn-sm btn-success" style="display:none;">Harvested Now</button>
-            <button type="button" id="edit-convert-inventory-btn" class="btn btn-sm btn-warning" style="display:none;">Convert Remaining Inventory</button>
-            <button type="button" id="edit-disable-product-btn" class="btn btn-sm btn-danger">Disable Product</button>
+            <button type="button" id="edit-toggle-status-btn" class="btn btn-sm btn-danger">Disable Product</button>
             <button type="submit" form="edit-product-form" class="btn btn-sm btn-ac-green">
                 <i class="bi bi-check-lg me-1"></i>Update Product
             </button>
@@ -2856,15 +2764,15 @@
     </div>
 </div>
 
-<!-- MODAL: DISABLE PRODUCT CONFIRMATION -->
+<!-- MODAL: TOGGLE PRODUCT STATUS CONFIRMATION -->
 <div id="disable-confirm-modal" class="modal">
     <div class="modal-content" style="max-width:480px;">
         <div class="modal-header">
-            <h3><i class="bi bi-x-circle-fill me-2 text-danger"></i>Disable Product</h3>
+            <h3 id="toggle-status-modal-title"><i class="bi bi-x-circle-fill me-2 text-danger"></i>Disable Product</h3>
             <button class="close-btn" id="close-disable-confirm-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body" style="padding:1.5rem;">
-            <p class="mb-0">This product will no longer be visible to customers.</p>
+            <p id="toggle-status-modal-message" class="mb-0">This product will no longer be visible to customers.</p>
             <p class="mb-0 mt-2">You can enable it again later.</p>
         </div>
         <div class="modal-footer">

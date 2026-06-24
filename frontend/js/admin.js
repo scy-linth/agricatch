@@ -119,9 +119,11 @@ class AdminDashboard {
 
     getValidStatusOptions(currentStatus) {
         const validTransitions = {
-            pending: ['confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'],
-            confirmed: ['preparing', 'out_for_delivery', 'delivered', 'cancelled'],
-            preparing: ['out_for_delivery', 'delivered', 'cancelled'],
+            pending: ['confirmed', 'cancelled'],
+            preorder_reserved: ['confirmed', 'cancelled'],
+            confirmed: ['preparing', 'cancelled'],
+            preparing: ['scheduled', 'cancelled'],
+            scheduled: ['out_for_delivery', 'cancelled'],
             out_for_delivery: ['delivered', 'cancelled'],
             delivered: [],
             cancelled: []
@@ -129,8 +131,10 @@ class AdminDashboard {
 
         const statusLabels = {
             pending: 'Pending',
+            preorder_reserved: 'Pre-order Reserved',
             confirmed: 'Confirmed',
             preparing: 'Preparing',
+            scheduled: 'Scheduled',
             out_for_delivery: 'Out for Delivery',
             delivered: 'Delivered',
             cancelled: 'Cancelled'
@@ -149,8 +153,10 @@ class AdminDashboard {
     getAllStatusOptions(currentStatus) {
         const statusLabels = {
             pending: 'Pending',
+            preorder_reserved: 'Pre-order Reserved',
             confirmed: 'Confirmed',
             preparing: 'Preparing',
+            scheduled: 'Scheduled',
             out_for_delivery: 'Out for Delivery',
             delivered: 'Delivered',
             cancelled: 'Cancelled'
@@ -158,17 +164,21 @@ class AdminDashboard {
 
         const statusColors = {
             pending: '#ffc107',
+            preorder_reserved: '#9333ea',
             confirmed: '#17a2b8',
             preparing: '#fd7e14',
+            scheduled: '#0ea5e9',
             out_for_delivery: '#6f42c1',
             delivered: '#28a745',
             cancelled: '#dc3545'
         };
 
         const validTransitions = {
-            pending: ['confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'],
-            confirmed: ['preparing', 'out_for_delivery', 'delivered', 'cancelled'],
-            preparing: ['out_for_delivery', 'delivered', 'cancelled'],
+            pending: ['confirmed', 'cancelled'],
+            preorder_reserved: ['confirmed', 'cancelled'],
+            confirmed: ['preparing', 'cancelled'],
+            preparing: ['scheduled', 'cancelled'],
+            scheduled: ['out_for_delivery', 'cancelled'],
             out_for_delivery: ['delivered', 'cancelled'],
             delivered: [],
             cancelled: []
@@ -389,6 +399,8 @@ class AdminDashboard {
         this.setupEventListeners();
         this.setupRealtime();
         this.startUnreadPolling();
+        this.loadNotifications();
+        this.startNotifPolling();
         this.loadProductApprovalsBadge();
         this.loadSubscriptionBadgeCount();
         this.loadSupportTicketsBadge();
@@ -596,15 +608,28 @@ class AdminDashboard {
                 if (typeof this._refreshUnread === 'function') this._refreshUnread();
             });
 
+            es.addEventListener('support.message', () => {
+                this.loadSupportTicketsBadge();
+            });
+
+            es.addEventListener('support.read', () => {
+                this.loadSupportTicketsBadge();
+            });
+
             es.addEventListener('notification.created', (evt) => {
                 try {
                     const data = JSON.parse(evt.data);
                     if (data.user_id === this.currentUserId) {
-                        this.loadNotifications();
+                        // Don't reload if user is viewing notifications section to avoid pagination reset
+                        if (this.activeSection !== 'notifications') {
+                            this.loadNotifications();
+                        }
                     }
                 } catch (e) {
-                    // If parsing fails, refresh anyway as fallback
-                    this.loadNotifications();
+                    // If parsing fails, refresh anyway as fallback (but only if not in notifications section)
+                    if (this.activeSection !== 'notifications') {
+                        this.loadNotifications();
+                    }
                 }
             });
         } catch (e) {
@@ -1189,6 +1214,31 @@ class AdminDashboard {
         document.getElementById('unverify-from-details-btn')?.addEventListener('click', (e) => {
             const requestId = e.target.dataset.requestId;
             this.openUnverifyModal(requestId);
+        });
+
+        // Stop notification polling when user leaves page
+        window.addEventListener('beforeunload', () => {
+            this.stopNotifPolling();
+        });
+
+        // Stop polling when tab is hidden, resume when visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.stopNotifPolling();
+            } else {
+                this.startNotifPolling();
+            }
+        });
+
+        // Handle online/offline events
+        window.addEventListener('online', () => {
+            this.startNotifPolling();
+            this.showToast('Connection restored. Syncing...', 'success');
+        });
+
+        window.addEventListener('offline', () => {
+            this.stopNotifPolling();
+            this.showToast('You are offline. Some features may be limited.', 'warning');
         });
 
         // Approve button in details modal
@@ -2200,7 +2250,8 @@ class AdminDashboard {
 
     async loadKpiCard(card, period) {
         try {
-            const res = await fetch(`${this.apiBase}/admin/dashboard/stats?period=${period}&metric=${card}`, {
+            const timestamp = Date.now();
+            const res = await fetch(`${this.apiBase}/admin/dashboard/stats?period=${period}&metric=${card}&_t=${timestamp}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (!res.ok) return;
@@ -2252,7 +2303,8 @@ class AdminDashboard {
 
     async loadReportsChart(period) {
         try {
-            const res = await fetch(`${this.apiBase}/admin/dashboard/report?period=${period}`, {
+            const timestamp = Date.now();
+            const res = await fetch(`${this.apiBase}/admin/dashboard/report?period=${period}&_t=${timestamp}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (!res.ok) return;
@@ -2332,7 +2384,8 @@ class AdminDashboard {
         try {
             const pg = this.pagination.activity;
             pg.page = page;
-            const params = new URLSearchParams({ period, page: String(page), limit: String(pg.limit) });
+            const timestamp = Date.now();
+            const params = new URLSearchParams({ period, page: String(page), limit: String(pg.limit), _t: String(timestamp) });
             const res = await fetch(`${this.apiBase}/admin/dashboard/recent-activity?${params}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
@@ -2350,7 +2403,8 @@ class AdminDashboard {
         try {
             const pg = this.pagination['top-products'];
             pg.page = page;
-            const params = new URLSearchParams({ period, page: String(page), limit: String(pg.limit) });
+            const timestamp = Date.now();
+            const params = new URLSearchParams({ period, page: String(page), limit: String(pg.limit), _t: String(timestamp) });
             const res = await fetch(`${this.apiBase}/admin/dashboard/top-products?${params}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
@@ -2368,7 +2422,8 @@ class AdminDashboard {
         try {
             const pg = this.pagination['top-farmers'];
             pg.page = page;
-            const params = new URLSearchParams({ period, page: String(page), limit: String(pg.limit) });
+            const timestamp = Date.now();
+            const params = new URLSearchParams({ period, page: String(page), limit: String(pg.limit), _t: String(timestamp) });
             const res = await fetch(`${this.apiBase}/admin/dashboard/top-farmers?${params}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
@@ -2387,7 +2442,8 @@ class AdminDashboard {
             const dates = this._periodToDates(period || 'today');
             const pg = this.pagination['recent-sales'];
             pg.page = page;
-            const params = new URLSearchParams({ page: String(page), limit: String(pg.limit) });
+            const timestamp = Date.now();
+            const params = new URLSearchParams({ page: String(page), limit: String(pg.limit), _t: String(timestamp) });
             if (dates.date_from) params.set('date_from', dates.date_from);
             if (dates.date_to)   params.set('date_to',   dates.date_to);
             const res = await fetch(`${this.apiBase}/admin/orders?${params}`, {
@@ -3444,6 +3500,46 @@ class AdminDashboard {
         }).join('');
 
         document.getElementById('save-settings-btn')?.addEventListener('click', () => this.savePlatformSettings());
+
+        // Handle delivery address setting separately
+        const useDefaultAddressCheckbox = document.getElementById('setting-use-default-delivery-address');
+        if (useDefaultAddressCheckbox) {
+            useDefaultAddressCheckbox.checked = settings.use_default_delivery_address?.value === 'true';
+            useDefaultAddressCheckbox.addEventListener('change', () => this.saveDeliveryAddressSetting());
+        }
+    }
+
+    async saveDeliveryAddressSetting() {
+        const checkbox = document.getElementById('setting-use-default-delivery-address');
+        if (!checkbox) return;
+
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({
+                    use_default_delivery_address: checkbox.checked ? 'true' : 'false'
+                })
+            });
+
+            if (response.ok) {
+                this.showMessage('Delivery address setting updated successfully', 'success');
+                // Reload settings to update checkbox state
+                await this.loadPlatformSettings();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to update delivery address setting', 'error');
+                // Revert checkbox on error
+                checkbox.checked = !checkbox.checked;
+            }
+        } catch (error) {
+            console.error('Error saving delivery address setting:', error);
+            this.showMessage('Failed to update delivery address setting', 'error');
+            checkbox.checked = !checkbox.checked;
+        }
     }
 
     async savePlatformSettings() {
@@ -3744,6 +3840,7 @@ class AdminDashboard {
                         ['Full Name', safeUser.full_name || '—'], ['Username', safeUser.username || '—'],
                         ['Email', safeUser.email || '—'], ['Phone', safeUser.phone || '—'],
                         ['Address', safeUser.address || '—'],
+                        ['Verification', safeUser.is_verified ? this.renderStatus('Verified', 'verified') : this.renderStatus('Unverified', 'unverified')],
                         ['Status', safeUser.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
                         ['Rating', user.rating ? `<span class="star-rating">★</span> ${Number(user.rating).toFixed(1)}` : '—'],
                         ['Joined', safeUser.created_at ? new Date(safeUser.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
@@ -3775,32 +3872,74 @@ class AdminDashboard {
                 }
             }
 
-            // Addresses tab
-            const addrEl = document.getElementById('cdt-addresses-content');
-            if (addrEl) {
-                if (!addresses.length) {
-                    addrEl.innerHTML = `<div class="text-muted small py-3 text-center">No saved addresses</div>`;
-                } else {
-                    addrEl.innerHTML = addresses.map(a => `
-                        <div class="border rounded p-2 mb-2 small">
-                            ${a.is_default ? `<span class="badge bg-success-subtle text-success mb-1">Default</span><br>` : ''}
-                            <div class="fw-semibold">${this.escapeHtml(a.full_address || a.address_line || '')}</div>
-                            ${a.barangay ? `<div class="text-muted">${this.escapeHtml([a.barangay, a.city, a.province].filter(Boolean).join(', '))}</div>` : ''}
-                        </div>
-                    `).join('');
-                }
-            }
-
             // Action buttons
             const isDisabled = !!user.is_disabled;
             const disableBtn = document.getElementById('cdt-disable-btn');
             const enableBtn  = document.getElementById('cdt-enable-btn');
+            const verifyBtn  = document.getElementById('cdt-verify-btn');
+            const unverifyBtn = document.getElementById('cdt-unverify-btn');
+
+            const isVerified = !!safeUser.is_verified;
+            const canVerify = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId;
 
             if (disableBtn) disableBtn.style.display = isDisabled ? 'none' : '';
             if (enableBtn)  enableBtn.style.display  = isDisabled ? '' : 'none';
+            if (verifyBtn)  verifyBtn.style.display  = (isVerified || !canVerify) ? 'none' : '';
+            if (unverifyBtn) unverifyBtn.style.display = (!isVerified || !canVerify) ? 'none' : '';
 
             const editBtn = document.getElementById('cdt-edit-btn');
             if (editBtn) { editBtn.onclick = () => { this.previousModalId = 'customer-detail-modal'; this.openUserEdit(userId); }; }
+
+            if (verifyBtn) { verifyBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to verify this customer?', { title: 'Verify Customer', danger: false })) return;
+                const spinner = document.getElementById('cdt-verify-spinner');
+                if (verifyBtn) verifyBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                const r = await fetch(`${this.apiBase}/admin/users/${userId}/verify`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({ is_verified: true })
+                });
+                if (verifyBtn) verifyBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (r.ok) {
+                    this.showToast('Customer verified', 'success');
+                    verifyBtn.style.display = 'none';
+                    if (unverifyBtn) unverifyBtn.style.display = '';
+                    const ov = document.getElementById('cdt-overview-content');
+                    if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Unverified<\/span>/, '<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Verified</span>');
+                    this.loadUsers();
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.message || 'Failed to verify customer', 'error');
+                }
+            }; }
+
+            if (unverifyBtn) { unverifyBtn.onclick = async () => {
+                const reason = window.prompt('Please provide a reason for unverifying this customer:');
+                if (!reason || !reason.trim()) return;
+                const spinner = document.getElementById('cdt-unverify-spinner');
+                if (unverifyBtn) unverifyBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                const r = await fetch(`${this.apiBase}/admin/users/${userId}/verify`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({ is_verified: false, reason })
+                });
+                if (unverifyBtn) unverifyBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (r.ok) {
+                    this.showToast('Customer unverified', 'success');
+                    unverifyBtn.style.display = 'none';
+                    if (verifyBtn) verifyBtn.style.display = '';
+                    const ov = document.getElementById('cdt-overview-content');
+                    if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Verified<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Unverified</span>');
+                    this.loadUsers();
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.message || 'Failed to unverify customer', 'error');
+                }
+            }; }
 
             if (disableBtn) { disableBtn.onclick = async () => {
                 if (!await this.adminConfirm('Are you sure you want to disable this customer?', { title: 'Disable Customer', danger: true })) return;
@@ -3981,33 +4120,52 @@ class AdminDashboard {
 
             if (verifyBtn) verifyBtn.onclick = async () => {
                 if (!await this.adminConfirm('Are you sure you want to verify this farmer?', { title: 'Verify Farmer', danger: false })) return;
-                
-                // Show loading state
                 const spinner = document.getElementById('fdt-verify-spinner');
                 if (verifyBtn) verifyBtn.disabled = true;
                 if (spinner) spinner.classList.remove('d-none');
-                
-                await this.toggleFarmerVerification(farmerId, true);
-                
-                // Hide loading state
+                const r = await fetch(`${this.apiBase}/admin/users/${farmerId}/verify`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({ is_verified: true })
+                });
                 if (verifyBtn) verifyBtn.disabled = false;
                 if (spinner) spinner.classList.add('d-none');
-                
-                verifyBtn.classList.add('d-none');
-                if (unverifyBtn) unverifyBtn.classList.remove('d-none');
-                const infoEl = document.getElementById('fdt-info-content');
-                if (infoEl) infoEl.innerHTML = infoEl.innerHTML.replace(/<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">No<\/span>/, '<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">Yes</span>');
-                this.loadFarmers();
+                if (r.ok) {
+                    this.showToast('Farmer verified', 'success');
+                    verifyBtn.classList.add('d-none');
+                    if (unverifyBtn) unverifyBtn.classList.remove('d-none');
+                    const infoEl = document.getElementById('fdt-info-content');
+                    if (infoEl) infoEl.innerHTML = infoEl.innerHTML.replace(/<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">No<\/span>/, '<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">Yes</span>');
+                    this.loadFarmers();
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.message || 'Failed to verify farmer', 'error');
+                }
             };
             if (unverifyBtn) unverifyBtn.onclick = async () => {
-                // Open the unverify modal instead of using prompt
-                this.currentUnverifyFarmerId = farmerId;
-                const modal = document.getElementById('unverify-modal');
-                this.modalZIndex++;
-                modal.style.zIndex = this.modalZIndex;
-                modal.classList.add('open');
-                // Clear previous reason
-                document.getElementById('unverify-reason').value = '';
+                const reason = window.prompt('Please provide a reason for unverifying this farmer:');
+                if (!reason || !reason.trim()) return;
+                const spinner = document.getElementById('fdt-unverify-spinner');
+                if (unverifyBtn) unverifyBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                const r = await fetch(`${this.apiBase}/admin/users/${farmerId}/verify`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({ is_verified: false, reason })
+                });
+                if (unverifyBtn) unverifyBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (r.ok) {
+                    this.showToast('Farmer unverified', 'success');
+                    unverifyBtn.classList.add('d-none');
+                    if (verifyBtn) verifyBtn.classList.remove('d-none');
+                    const infoEl = document.getElementById('fdt-info-content');
+                    if (infoEl) infoEl.innerHTML = infoEl.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Yes<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:.85rem;font-weight:500;">No</span>');
+                    this.loadFarmers();
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.message || 'Failed to unverify farmer', 'error');
+                }
             };
             if (enableBtn)  enableBtn.onclick  = async () => {
                 if (!await this.adminConfirm('Are you sure you want to enable this farmer?', { title: 'Enable Farmer', danger: false })) return;
@@ -4162,6 +4320,7 @@ class AdminDashboard {
                 ['Email', user.email || '—'], ['Phone', user.phone || '—'],
                 ['Address', user.address || '—'],
                 ['Role', this.formatRole(user.role)],
+                ['Verification', user.is_verified ? this.renderStatus('Verified', 'verified') : this.renderStatus('Unverified', 'unverified')],
                 ['Status', user.is_disabled ? this.renderStatus('Disabled', 'disabled') : this.renderStatus('Active', 'active')],
                 ['Joined', user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
             ];
@@ -4182,16 +4341,73 @@ class AdminDashboard {
 
             const isSuperAdmin = user.role === 'super_admin';
             const isDisabled = !!user.is_disabled;
+            const isVerified = !!user.is_verified;
             const canToggle = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId && !isSuperAdmin;
+            const canVerify = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId && !isSuperAdmin && (user.role === 'customer' || user.role === 'farmer');
             const disableBtn = document.getElementById('adt-disable-btn');
             const enableBtn  = document.getElementById('adt-enable-btn');
+            const verifyBtn  = document.getElementById('adt-verify-btn');
+            const unverifyBtn = document.getElementById('adt-unverify-btn');
             const editBtn    = document.getElementById('adt-edit-btn');
 
             if (disableBtn) disableBtn.style.display = (isDisabled || !canToggle) ? 'none' : '';
             if (enableBtn)  enableBtn.style.display  = (!isDisabled || !canToggle) ? 'none' : '';
+            if (verifyBtn)  verifyBtn.style.display  = (isVerified || !canVerify) ? 'none' : '';
+            if (unverifyBtn) unverifyBtn.style.display = (!isVerified || !canVerify) ? 'none' : '';
             if (editBtn)    editBtn.style.display    = canToggle ? '' : 'none';
 
             if (editBtn) { editBtn.onclick = () => { this.previousModalId = 'all-users-detail-modal'; this.openUserEdit(userId); }; }
+
+            if (verifyBtn) { verifyBtn.onclick = async () => {
+                if (!await this.adminConfirm('Are you sure you want to verify this user?', { title: 'Verify User', danger: false })) return;
+                const spinner = document.getElementById('adt-verify-spinner');
+                if (verifyBtn) verifyBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                const r = await fetch(`${this.apiBase}/admin/users/${userId}/verify`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({ is_verified: true })
+                });
+                if (verifyBtn) verifyBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (r.ok) {
+                    this.showToast('User verified', 'success');
+                    verifyBtn.style.display = 'none';
+                    if (unverifyBtn) unverifyBtn.style.display = '';
+                    const ov = document.getElementById('adt-overview-content');
+                    if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Unverified<\/span>/, '<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Verified</span>');
+                    this.loadAllUsers();
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.message || 'Failed to verify user', 'error');
+                }
+            }; }
+
+            if (unverifyBtn) { unverifyBtn.onclick = async () => {
+                const reason = window.prompt('Please provide a reason for unverifying this user:');
+                if (!reason || !reason.trim()) return;
+                const spinner = document.getElementById('adt-unverify-spinner');
+                if (unverifyBtn) unverifyBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                const r = await fetch(`${this.apiBase}/admin/users/${userId}/verify`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                    body: JSON.stringify({ is_verified: false, reason })
+                });
+                if (unverifyBtn) unverifyBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (r.ok) {
+                    this.showToast('User unverified', 'success');
+                    unverifyBtn.style.display = 'none';
+                    if (verifyBtn) verifyBtn.style.display = '';
+                    const ov = document.getElementById('adt-overview-content');
+                    if (ov) ov.innerHTML = ov.innerHTML.replace(/<span style="color:#41bf5b;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Verified<\/span>/, '<span style="color:#dc2626;background:transparent;border:none;padding:0;font-size:\.85rem;font-weight:500;">Unverified</span>');
+                    this.loadAllUsers();
+                } else {
+                    const data = await r.json();
+                    this.showToast(data.message || 'Failed to unverify user', 'error');
+                }
+            }; }
 
             if (disableBtn) { disableBtn.onclick = async () => {
                 if (!await this.adminConfirm('Are you sure you want to disable this user?', { title: 'Disable User', danger: true })) return;
@@ -4736,7 +4952,9 @@ class AdminDashboard {
                     item.classList.add('read');
                 }
                 if (!skipReload) {
-                    this.loadNotifications();
+                    // Preserve current page when reloading
+                    const currentPage = this.pagination.notifications?.page || 1;
+                    this.loadNotifications(currentPage);
                 }
             }
         } catch (err) {
@@ -4757,7 +4975,9 @@ class AdminDashboard {
                 this.showToast('Failed to mark all as read', 'error');
                 return;
             }
-            this.loadNotifications();
+            // Preserve current page when reloading
+            const currentPage = this.pagination.notifications?.page || 1;
+            this.loadNotifications(currentPage);
         } catch (err) {
             this.showToast('Failed to mark all as read', 'error');
         } finally {
@@ -5144,6 +5364,8 @@ class AdminDashboard {
             });
             if (!response.ok) return;
             const data = await response.json();
+            console.log('Catalog names loaded:', data.names?.[0]);
+            console.log('Catalog names admin_set_average_price:', data.names?.[0]?.admin_set_average_price);
             this.lastCatalogNames = data.names || [];
             pg.total = Number(data.total || 0);
             this.renderCatalogNames(this.lastCatalogNames);
@@ -5187,7 +5409,11 @@ class AdminDashboard {
                             valA = a.product_count || 0;
                             valB = b.product_count || 0;
                             break;
-                        case 4: // status (is_disabled)
+                        case 4: // admin_set_average_price
+                            valA = a.admin_set_average_price !== null ? a.admin_set_average_price : -1;
+                            valB = b.admin_set_average_price !== null ? b.admin_set_average_price : -1;
+                            break;
+                        case 5: // status (is_disabled)
                             valA = a.is_disabled ? 1 : 0;
                             valB = b.is_disabled ? 1 : 0;
                             break;
@@ -5202,23 +5428,30 @@ class AdminDashboard {
         }
 
         if (!filtered.length) {
-            tbody.innerHTML = `<tr><td colspan="6" style="color:#64748b;">No catalog names yet.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="color:#64748b;">No catalog names yet.</td></tr>`;
             this.renderPagination('catalog-products-pagination', pg, (page) => {
                 this.loadCatalogNames(page);
             });
-            this.refreshSortableTable('catalog-products-table', { columns: [{ select: 5, sortable: false }] });
+            this.refreshSortableTable('catalog-products-table', { columns: [{ select: 6, sortable: false }] });
             return;
         }
 
         tbody.innerHTML = filtered.map((item) => {
             const isDisabled = !!item.is_disabled;
             const statusPill = this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
+            const suggestedPrice = item.admin_set_average_price !== null && Number.isFinite(Number(item.admin_set_average_price))
+                ? `₱${Number(item.admin_set_average_price).toFixed(2)} <span class="badge bg-info ms-1">Admin</span>`
+                : '<span class="text-muted">—</span>';
+            if (item.id === 8) {
+                console.log('Rendering Ampalaya:', { item, suggestedPrice, admin_set_average_price: item.admin_set_average_price });
+            }
             return `
             <tr>
                 <td>${item.id}</td>
                 <td>${this.escapeHtml(item.name || '')}</td>
                 <td>${this.escapeHtml(item.category_name || '—')}</td>
                 <td>${item.product_count || 0}</td>
+                <td>${suggestedPrice}</td>
                 <td>${statusPill}</td>
                 <td>
                     <button class="btn btn-sm py-0 px-2 btn-ac-green catalog-edit-btn" data-catalog-id="${item.id}">Edit</button>
@@ -5314,21 +5547,31 @@ class AdminDashboard {
 
         if (result.action === 'save') {
             try {
+                const payload = {
+                    name: result.name,
+                    category_id: result.category_id,
+                    default_unit: result.default_unit,
+                    admin_set_average_price: result.admin_set_average_price
+                };
+                console.log('PUT payload:', payload);
                 const response = await fetch(`${this.apiBase}/admin/catalog-names/${catalogId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${this.token}`
                     },
-                    body: JSON.stringify({ name: result.name, category_id: result.category_id })
+                    body: JSON.stringify(payload)
                 });
                 const data = await response.json().catch(() => ({}));
+                console.log('PUT response:', data);
+                console.log('PUT response item:', data.item);
                 if (!response.ok) {
                     this.showMessage(data.message || 'Failed to update product name', 'error');
                     return;
                 }
                 this.showMessage('Product name updated', 'success');
-                this.loadCatalogNames();
+                // Small delay to ensure database commit is complete before reload
+                setTimeout(() => this.loadCatalogNames(), 100);
             } catch (error) {
                 console.error('Edit catalog name error:', error);
                 this.showMessage('Failed to update product name', 'error');
@@ -5589,11 +5832,13 @@ class AdminDashboard {
         tbody.innerHTML = filtered.map(p => `
             <tr>
                 <td class="small text-muted">${p.id}</td>
-                <td class="small fw-semibold">${this.escapeHtml(p.name || '')}</td>
+                <td class="small fw-semibold">${this.escapeHtml(p.name || '')}${p.is_preorder ? '<span class="badge bg-warning text-dark ms-1">Pre-order</span>' : ''}</td>
                 <td class="small">${this.escapeHtml(p.category_name || '—')}</td>
                 <td class="small">
                     <div class="fw-semibold">${this.escapeHtml(p.farmer_shop_name || p.farmer_name || '—')}</div>
                     ${p.farmer_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(p.farmer_name)}</div>` : ''}
+                    ${p.is_preorder && p.preorder_availability_date ? `<div class="text-muted" style="font-size:.75rem">Available: ${new Date(p.preorder_availability_date).toLocaleDateString()}</div>` : ''}
+                    ${p.is_preorder && p.max_preorder_quantity ? `<div class="text-muted" style="font-size:.75rem">Max: ${this.fmtNumber(p.max_preorder_quantity)}</div>` : ''}
                 </td>
                 <td class="small">${this.fmtCurrency(p.price)}</td>
                 <td class="small">${p.stock || 0}</td>
@@ -5657,16 +5902,21 @@ class AdminDashboard {
 
     async loadSupportTicketsBadge() {
         try {
-            const response = await fetch(`${this.apiBase}/support-tickets?status=open&limit=1`, {
+            const response = await fetch(`${this.apiBase}/support-tickets/unread-count`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (!response.ok) return;
             const data = await response.json();
-            const count = data.total || 0;
-            const badge = document.getElementById('chat-support-badge');
-            if (badge) {
-                badge.textContent = count;
-                badge.style.display = count > 0 ? 'inline-block' : 'none';
+            const count = data.unread_count || 0;
+            const sidebarBadge = document.getElementById('chat-support-badge');
+            const topbarBadge = document.getElementById('chat-topbar-badge');
+            if (sidebarBadge) {
+                sidebarBadge.textContent = count;
+                sidebarBadge.style.display = count > 0 ? 'inline-block' : 'none';
+            }
+            if (topbarBadge) {
+                topbarBadge.textContent = count > 99 ? '99+' : String(count);
+                topbarBadge.style.display = count > 0 ? '' : 'none';
             }
         } catch (error) {
             console.error('Load support tickets badge error:', error);
@@ -6610,6 +6860,33 @@ class AdminDashboard {
         this._subscriptionBadgeInterval = setInterval(loadSubBadge, 60000);
     }
 
+    startNotifPolling() {
+        if (this.notifPollInterval) {
+            clearInterval(this.notifPollInterval);
+        }
+        this.notifPollFailures = 0;
+        this.notifPollInterval = setInterval(() => {
+            // Don't poll if user is viewing notifications section to avoid pagination reset
+            if (this.activeSection === 'notifications') return;
+            this.loadNotifications(1).catch(err => {
+                this.notifPollFailures++;
+                console.error('Notification poll error:', err);
+                if (this.notifPollFailures >= 5) {
+                    this.stopNotifPolling();
+                    this.showToast('Unable to load notifications. Please refresh the page.', 'warning');
+                }
+            });
+        }, 10000); // Poll every 10 seconds
+    }
+
+    stopNotifPolling() {
+        if (this.notifPollInterval) {
+            clearInterval(this.notifPollInterval);
+            this.notifPollInterval = null;
+        }
+        this.notifPollFailures = 0;
+    }
+
     initChat() {
         // Initialize chat UI for admin dashboard if chat section exists
         if (document.getElementById('chat-messages') && typeof ChatUI !== 'undefined') {
@@ -7132,6 +7409,20 @@ class AdminDashboard {
             || (this.lastAllUsers || []).find(u => u.id === Number(userId));
         const isFarmer = user?.role === 'farmer';
 
+        // Validate name/shop length limits
+        if (first_name.trim().length > 40) {
+            this.showMessage('First name must be 40 characters or less', 'error'); return;
+        }
+        if (middle_name.trim().length > 40) {
+            this.showMessage('Middle name must be 40 characters or less', 'error'); return;
+        }
+        if (last_name.trim().length > 40) {
+            this.showMessage('Last name must be 40 characters or less', 'error'); return;
+        }
+        if (isFarmer && shop_name.trim().length > 40) {
+            this.showMessage('Shop name must be 40 characters or less', 'error'); return;
+        }
+
         // Build address from PSGC fields (use preview if already composed)
         const province = document.getElementById('edit-user-province')?.value?.trim() || '';
         const city = document.getElementById('edit-user-city')?.value?.trim() || '';
@@ -7203,6 +7494,21 @@ class AdminDashboard {
         const phone = rawPhone ? ('+63' + rawPhone.replace(/^\+63/, '')) : '';
         const password = document.getElementById('create-user-password')?.value || '';
         const full_name = [first_name, middle_name, last_name].filter(Boolean).join(' ').trim();
+
+        // Validate name/shop length limits
+        if (first_name.length > 40) {
+            this.showMessage('First name must be 40 characters or less', 'error'); return;
+        }
+        if (middle_name.length > 40) {
+            this.showMessage('Middle name must be 40 characters or less', 'error'); return;
+        }
+        if (last_name.length > 40) {
+            this.showMessage('Last name must be 40 characters or less', 'error'); return;
+        }
+        if (role === 'farmer' && shop_name.length > 40) {
+            this.showMessage('Shop name must be 40 characters or less', 'error'); return;
+        }
+
         const submitBtn = document.getElementById('create-user-submit-btn');
 
         if (!first_name || !last_name || !username || !email || !role || password.length < 6) {
@@ -7268,7 +7574,7 @@ class AdminDashboard {
         }
     }
 
-    openProductEdit(productId) {
+    async openProductEdit(productId) {
         const panel = document.getElementById('edit-product-panel');
         const content = document.getElementById('edit-product-content');
         if (!panel || !content) return;
@@ -7276,7 +7582,21 @@ class AdminDashboard {
         const product = (this.lastProducts || []).find(p => p.id === productId);
         if (!product) return;
 
-        // Load catalog names for the dropdown
+        // Load catalog names for the dropdown if not already loaded
+        if (!this.lastCatalogNames || this.lastCatalogNames.length === 0) {
+            try {
+                const response = await fetch(`${this.apiBase}/admin/catalog-names`, {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    this.lastCatalogNames = data.names || [];
+                }
+            } catch (error) {
+                console.error('Error loading catalog names:', error);
+            }
+        }
+
         const catalogNames = this.lastCatalogNames || [];
         const catalogOptions = catalogNames.map(cn => 
             `<option value="${cn.id}" ${cn.id === product.catalog_name_id ? 'selected' : ''}>${this.escapeHtml(cn.name)}</option>`
@@ -7323,7 +7643,11 @@ class AdminDashboard {
 
             <div class="form-group mb-3">
                 <label class="form-label" for="edit-product-location">Location</label>
-                <input type="text" id="edit-product-location" class="form-control" value="${this.escapeHtml(product.location || '')}">
+                <input type="text" id="edit-product-location" class="form-control" value="${this.escapeHtml(
+                    product.province 
+                        ? (product.city ? `${product.city}, ${product.province}` : product.province)
+                        : product.location || ''
+                )}">
             </div>
 
             <div class="form-group mb-2">
@@ -7433,14 +7757,16 @@ class AdminDashboard {
         }
 
         const productId = document.getElementById('edit-product-id').value;
-        const catalogNameId = document.getElementById('edit-product-name').value;
+        const productNameSelect = document.getElementById('edit-product-name');
+        const catalogNameId = productNameSelect.value;
+        const productName = productNameSelect.options[productNameSelect.selectedIndex]?.text || '';
         const price = document.getElementById('edit-product-price').value;
         const stock_quantity = document.getElementById('edit-product-stock').value;
         const location = document.getElementById('edit-product-location').value;
         const description = document.getElementById('edit-product-description').value;
         const imageInput = document.getElementById('edit-product-image');
         const formData = new FormData();
-        formData.append('catalog_name_id', catalogNameId);
+        formData.append('name', productName);
         formData.append('price', price);
         formData.append('stock_quantity', stock_quantity);
         formData.append('location', location);
@@ -7852,6 +8178,7 @@ class AdminDashboard {
             const isDisabled = !!order.is_disabled;
             const statusClass = isDisabled ? 'pending' : this.getStatusClass(order.status);
             const statusLabel = isDisabled ? 'Disabled' : this.formatStatus(order.status);
+            const isPreorder = order.is_preorder || (order.items && order.items[0] && order.items[0].is_preorder) || false;
             const customerInfo = `
                 <div class="fw-semibold">${this.escapeHtml(order.full_name || '—')}${order.username ? ` <span style="color:#777171f0;font-size:.75rem">(${this.escapeHtml(order.username)})</span>` : ''}</div>
                 ${order.email ? `<div class="text-muted">${this.escapeHtml(order.email)}</div>` : ''}
@@ -7860,7 +8187,7 @@ class AdminDashboard {
             return `
             <tr>
                 <td class="text-center"><img src="${this.escapeHtml(productImage)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;"></td>
-                <td class="col-order">#${order.id}</td>
+                <td class="col-order">#${order.id}${isPreorder ? '<span class="badge bg-warning text-dark ms-1">Preorder</span>' : ''}</td>
                 <td>${customerInfo}</td>
                 <td>${this.fmtCurrency(order.total_amount)}</td>
                 <td style="text-align:center">${this.renderStatus(statusLabel, isDisabled ? 'disabled' : order.status)}</td>
@@ -8291,6 +8618,17 @@ class AdminDashboard {
             const catOptions = cats.map(c => `<option value="${c.id}" ${c.id == item.category_id ? 'selected' : ''}>${this.escapeHtml(c.name)}</option>`).join('');
 
             // Populate panel content
+            const units = [
+                { value: 'kg', label: 'Kilogram (kg)' },
+                { value: 'pieces', label: 'Pieces' },
+                { value: 'boxes', label: 'Boxes' },
+                { value: 'bundle', label: 'Bundle' },
+                { value: 'sack', label: 'Sack' },
+                { value: 'tray', label: 'Tray' },
+                { value: 'liter', label: 'Liter (L)' }
+            ];
+            const unitOptions = units.map(u => `<option value="${u.value}" ${(item.default_unit || 'kg') === u.value ? 'selected' : ''}>${this.escapeHtml(u.label)}</option>`).join('');
+
             content.innerHTML = `
                 <div class="form-group mb-3">
                     <label class="form-label">
@@ -8304,6 +8642,20 @@ class AdminDashboard {
                         Category <span class="required-mark">*</span>
                     </label>
                     <select id="catalog-edit-category" class="form-select">${catOptions}</select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        Default Unit <span class="required-mark">*</span>
+                    </label>
+                    <select id="catalog-edit-unit" class="form-select">${unitOptions}</select>
+                    <small class="text-muted">This will be the default unit when farmers add this product</small>
+                </div>
+                <div class="form-group mt-3">
+                    <label class="form-label fw-semibold">Suggested Average Price (₱)</label>
+                    <input type="number" id="catalog-edit-suggested-price"
+                           class="form-control" placeholder="e.g. 75" min="0" step="0.01"
+                           value="${item.admin_set_average_price !== null && Number.isFinite(Number(item.admin_set_average_price)) ? item.admin_set_average_price : ''}">
+                    <small class="text-muted">Leave empty to use calculated price from real sales data</small>
                 </div>
                 <div class="form-group mt-3">
                     <label class="form-label fw-semibold">Linked Products (${Number(item.product_count || 0)})</label>
@@ -8353,16 +8705,23 @@ class AdminDashboard {
                 if (!n) { document.getElementById('catalog-edit-name').classList.add('is-invalid'); return; }
                 const cid = Number(document.getElementById('catalog-edit-category').value || 0);
                 if (!cid) return;
+
+                const unit = document.getElementById('catalog-edit-unit').value;
+                const suggestedPriceInput = document.getElementById('catalog-edit-suggested-price');
+                const suggestedPrice = suggestedPriceInput.value.trim();
+                const numSuggestedPrice = suggestedPrice ? Number(suggestedPrice) : null;
+                console.log('Saving catalog item:', { name: n, category_id: cid, default_unit: unit, admin_set_average_price: numSuggestedPrice });
+
                 if (!await this.adminConfirm('Are you sure you want to save these changes?', { title: 'Save Product Name', danger: false })) return;
-                
+
                 // Show loading state
                 const saveBtn = document.getElementById('catalog-edit-save');
                 const spinner = document.getElementById('catalog-edit-save-spinner');
                 if (saveBtn) saveBtn.disabled = true;
                 if (spinner) spinner.classList.remove('d-none');
-                
-                done({ action: 'save', name: n, category_id: cid });
-                
+
+                done({ action: 'save', name: n, category_id: cid, default_unit: unit, admin_set_average_price: numSuggestedPrice });
+
                 // Hide loading state after short delay
                 setTimeout(() => {
                     if (saveBtn) saveBtn.disabled = false;
@@ -8566,7 +8925,7 @@ class AdminDashboard {
         tbody.innerHTML = '';
 
         if (!this.verificationRequests || this.verificationRequests.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No verification requests found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No verification requests found</td></tr>';
             return;
         }
 
@@ -8584,9 +8943,13 @@ class AdminDashboard {
                 ? `<img src="${this.escapeHtml(request.document_url)}" style="width:50px; height:50px; object-fit:cover; border-radius:4px; cursor:pointer;" class="verification-doc-thumb" data-doc-url="${this.escapeHtml(request.document_url)}" data-farmer-name="${this.escapeHtml(request.full_name || request.username)}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';" /><i class="bi bi-image-slash text-danger" style="display:none;font-size:1.2rem;"></i>`
                 : '<i class="bi bi-dash text-muted"></i>';
 
+            // Handle shop name - show '-' for customers who don't have shops
+            const shopName = request.role === 'customer' ? '-' : (request.shop_name || '—');
+
             row.innerHTML = `
+                <td><span class="badge ${request.role === 'farmer' ? 'bg-primary' : 'bg-secondary'}">${this.escapeHtml(request.role || '—')}</span></td>
                 <td>${this.escapeHtml(request.full_name || request.username)}</td>
-                <td>${this.escapeHtml(request.shop_name || '—')}</td>
+                <td>${this.escapeHtml(shopName)}</td>
                 <td>${docIndicator}</td>
                 <td>${new Date(request.created_at).toLocaleDateString()}</td>
                 <td>${statusBadge}</td>
@@ -8651,17 +9014,22 @@ class AdminDashboard {
         document.getElementById('review-modal-title').textContent =
             action === 'approve' ? 'Approve Verification Request' : 'Reject Verification Request';
 
+        const userType = request.role === 'customer' ? 'Customer' : 'Farmer';
+        const shopName = request.role === 'customer' ? '—' : (request.shop_name || '—');
+        const productsCount = request.role === 'customer' ? '—' : (request.product_count || 0);
+        const deliveredOrders = request.role === 'customer' ? '—' : (request.delivered_orders || 0);
+
         document.getElementById('review-farmer-details').innerHTML = `
             <div class="row">
                 <div class="col-md-6">
-                    <p><strong>Farmer:</strong> ${this.escapeHtml(request.full_name || request.username)}</p>
+                    <p><strong>${userType}:</strong> ${this.escapeHtml(request.full_name || request.username)}</p>
                     <p><strong>Email:</strong> ${this.escapeHtml(request.email)}</p>
                     <p><strong>Phone:</strong> ${request.phone ? '+63' + request.phone : '—'}</p>
                 </div>
                 <div class="col-md-6">
-                    <p><strong>Shop:</strong> ${this.escapeHtml(request.shop_name || '—')}</p>
-                    <p><strong>Products:</strong> ${request.product_count || 0}</p>
-                    <p><strong>Delivered Orders:</strong> ${request.delivered_orders || 0}</p>
+                    <p><strong>Shop:</strong> ${this.escapeHtml(shopName)}</p>
+                    <p><strong>Products:</strong> ${productsCount}</p>
+                    <p><strong>Delivered Orders:</strong> ${deliveredOrders}</p>
                 </div>
             </div>
             ${request.notes ? `<p><strong>Notes:</strong> ${this.escapeHtml(request.notes)}</p>` : ''}
@@ -8777,18 +9145,21 @@ class AdminDashboard {
                         rejectBtn.dataset.requestId = request.id;
                     }
 
+                    const isCustomer = request.role === 'customer';
+                    const userInfoTitle = isCustomer ? 'Customer Information' : 'Farmer Information';
+
                     content.innerHTML = `
                         <div class="row">
                             <div class="col-md-6">
-                                <h5>Farmer Information</h5>
+                                <h5>${userInfoTitle}</h5>
                                 <table class="table table-sm">
                                     <tr><td><strong>Name:</strong></td><td>${this.escapeHtml(request.full_name || request.username)}</td></tr>
                                     <tr><td><strong>Email:</strong></td><td>${this.escapeHtml(request.email)}</td></tr>
                                     <tr><td><strong>Phone:</strong></td><td>${this.escapeHtml(request.phone || '—')}</td></tr>
-                                    <tr><td><strong>Shop Name:</strong></td><td>${this.escapeHtml(request.shop_name || '—')}</td></tr>
+                                    ${!isCustomer ? `<tr><td><strong>Shop Name:</strong></td><td>${this.escapeHtml(request.shop_name || '—')}</td></tr>` : ''}
                                     <tr><td><strong>Address:</strong></td><td>${this.escapeHtml(request.address || '—')}</td></tr>
-                                    <tr><td><strong>Products:</strong></td><td>${request.product_count || 0}</td></tr>
-                                    <tr><td><strong>Delivered Orders:</strong></td><td>${request.delivered_orders || 0}</td></tr>
+                                    ${!isCustomer ? `<tr><td><strong>Products:</strong></td><td>${request.product_count || 0}</td></tr>` : ''}
+                                    ${!isCustomer ? `<tr><td><strong>Delivered Orders:</strong></td><td>${request.delivered_orders || 0}</td></tr>` : ''}
                                 </table>
                             </div>
                             <div class="col-md-6">

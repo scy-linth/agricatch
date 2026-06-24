@@ -12,7 +12,7 @@ class OrdersPage {
                 this.apiBase = this.apiFallbackBase;
             }
         }
-        this.token = localStorage.getItem('token');
+        this.token = this.normalizeAuthToken(localStorage.getItem('token'));
         this.userId = this.getUserId();
         this.currentStatus = 'pending';
         const params = new URLSearchParams(window.location.search);
@@ -24,7 +24,8 @@ class OrdersPage {
             sessionStorage.getItem('ordersReturnScrollY') ||
             NaN
         );
-        this.ordersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
+        this.ordersByStatus = { pending: [], preorder_reserved: [], confirmed: [], preparing: [], scheduled: [], out_for_delivery: [], delivered: [], cancelled: [] };
+        this.currentTab = 'all';
         this.ratingDraft = {
             productId: null,
             reviewId: null,
@@ -36,6 +37,15 @@ class OrdersPage {
         this.dateFrom = '';
         this.dateTo = '';
         this.init();
+    }
+
+    normalizeAuthToken(token) {
+        if (!token) return null;
+        try {
+            return token.replace(/^["']|["']$/g, '').trim();
+        } catch (e) {
+            return token;
+        }
     }
 
     getApiBases() {
@@ -104,7 +114,7 @@ class OrdersPage {
 
     init() {
         if (!this.token) {
-            window.location.href = '/?login=1';
+            this.showGuestLoginPrompt();
             return;
         }
         localStorage.setItem('ordersReturnTo', this.returnTo);
@@ -112,6 +122,64 @@ class OrdersPage {
         this.configureBackButton();
         this.loadOrders();
         this.setupRealtime();
+    }
+
+    showGuestLoginPrompt() {
+        // Show toast message
+        this.showToast('Please log in to view your orders', 'info');
+        
+        // Store return URL
+        const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        
+        // Redirect to home with login prompt
+        setTimeout(() => {
+            window.location.href = `/?login=1&returnUrl=${returnUrl}`;
+        }, 1500);
+    }
+
+    showToast(message, type = 'info') {
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            padding: 12px 20px;
+            border-radius: 8px;
+            background: ${type === 'info' ? '#0ea5e9' : '#ef4444'};
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease;
+        `;
+        toast.textContent = message;
+        
+        // Add animation keyframes if not exists
+        if (!document.getElementById('toast-animations')) {
+            const style = document.createElement('style');
+            style.id = 'toast-animations';
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        document.body.appendChild(toast);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            toast.style.animation = 'slideOut 0.3s ease forwards';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
     normalizeReturnTo(value) {
@@ -136,11 +204,9 @@ class OrdersPage {
     }
 
     setupEventListeners() {
-        // Setup tab click handlers
-        document.getElementById('pending-orders-tab')?.addEventListener('click', () => this.switchOrderTab('pending'));
-        document.getElementById('confirmed-orders-tab')?.addEventListener('click', () => this.switchOrderTab('confirmed'));
-        document.getElementById('preparing-orders-tab')?.addEventListener('click', () => this.switchOrderTab('preparing'));
-        document.getElementById('out_for_delivery-orders-tab')?.addEventListener('click', () => this.switchOrderTab('out_for_delivery'));
+        // Setup tab click handlers - simplified tabs: All, Active, Delivered, Cancelled
+        document.getElementById('all-orders-tab')?.addEventListener('click', () => this.switchOrderTab('all'));
+        document.getElementById('active-orders-tab')?.addEventListener('click', () => this.switchOrderTab('active'));
         document.getElementById('delivered-orders-tab')?.addEventListener('click', () => this.switchOrderTab('delivered'));
         document.getElementById('cancelled-orders-tab')?.addEventListener('click', () => this.switchOrderTab('cancelled'));
 
@@ -213,22 +279,30 @@ class OrdersPage {
         });
     }
 
-    switchOrderTab(status) {
-        this.currentStatus = status;
+    switchOrderTab(tab) {
+        this.currentTab = tab;
         
         // Hide all tabs and sections
         document.querySelectorAll('.order-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         
         // Show selected tab and section
-        const tab = document.getElementById(`${status}-orders-tab`);
-        const section = document.getElementById(`${status}-orders-section`);
+        const tabBtn = document.getElementById(`${tab}-orders-tab`);
+        const section = document.getElementById(`${tab}-orders-section`);
         
-        if (tab) tab.classList.add('active');
+        if (tabBtn) tabBtn.classList.add('active');
         if (section) section.classList.add('active');
         
-        // Render orders for this status
-        this.renderOrdersByStatus(status);
+        // Map simplified tabs to actual order statuses
+        const statusMap = {
+            'all': ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery', 'delivered', 'cancelled'],
+            'active': ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery'],
+            'delivered': ['delivered'],
+            'cancelled': ['cancelled']
+        };
+        
+        const statuses = statusMap[tab] || statusMap['all'];
+        this.renderOrdersByStatus(statuses);
     }
 
     setupRealtime() {
@@ -293,9 +367,30 @@ class OrdersPage {
                 this.groupOrdersByStatus(data.orders || []);
                 this.renderAllOrders();
                 this.applyHighlightFromQuery();
+            } else {
+                console.error('Failed to load orders:', response.status, response.statusText);
+                this.showErrorState();
             }
         } catch (error) {
             console.error('Error loading orders:', error);
+            this.showErrorState();
+        }
+    }
+
+    showErrorState() {
+        const ordersContainer = document.getElementById('orders');
+        if (ordersContainer) {
+            const cardBody = ordersContainer.querySelector('.card-body');
+            if (cardBody) {
+                cardBody.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="bi bi-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
+                        <p class="text-muted mt-3">Unable to load orders</p>
+                        <p class="text-muted small">Please check your connection and try again</p>
+                        <button class="btn btn-sm btn-primary mt-2" onclick="location.reload()">Retry</button>
+                    </div>
+                `;
+            }
         }
     }
 
@@ -331,7 +426,8 @@ class OrdersPage {
 
     groupOrdersByStatus(orders) {
         // Reset all status arrays
-        this.ordersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
+        this.ordersByStatus = { pending: [], preorder_reserved: [], confirmed: [], preparing: [], scheduled: [], out_for_delivery: [], delivered: [], cancelled: [] };
+        this.currentTab = 'all';
         
         // Group orders by status
         orders.forEach(order => {
@@ -374,16 +470,24 @@ class OrdersPage {
         }
     }
 
-    renderOrdersByStatus(status) {
-        const orders = this.ordersByStatus[status] || [];
-        const container = document.getElementById(`${status}-orders-list`);
+    renderOrdersByStatus(statuses) {
+        // Handle both single status string and array of statuses
+        const statusArray = Array.isArray(statuses) ? statuses : [statuses];
+        const container = document.getElementById(`${this.currentTab}-orders-list`);
         if (!container) return;
+
+        // Collect orders from all relevant statuses
+        let allOrders = [];
+        statusArray.forEach(status => {
+            const orders = this.ordersByStatus[status] || [];
+            allOrders = allOrders.concat(orders);
+        });
 
         // Apply search + date filters
         const q = this.searchQuery || '';
         const fromMs = this.dateFrom ? new Date(this.dateFrom).getTime() : 0;
         const toMs = this.dateTo ? new Date(this.dateTo + 'T23:59:59').getTime() : Infinity;
-        const filtered = orders.filter((order) => {
+        const filtered = allOrders.filter((order) => {
             const item = (order.items && order.items[0]) || order;
             const matchesSearch = !q
                 || String(order.id || '').includes(q)
@@ -394,13 +498,14 @@ class OrdersPage {
         });
 
         if (filtered.length === 0) {
-            const statusLabel = this.formatStatusLabel(status);
-            container.innerHTML = `<div class="empty-state">No ${statusLabel} orders found${q ? ' matching your search' : ''}.</div>`;
+            const tabLabel = this.formatTabLabel(this.currentTab);
+            container.innerHTML = `<div class="empty-state">No ${tabLabel} orders found${q ? ' matching your search' : ''}.</div>`;
             return;
         }
 
         container.innerHTML = filtered.map(order => {
             const item = (order.items && order.items[0]) || order;
+            const isPreorder = order.is_preorder || item.is_preorder || false;
             const canCancel = (item.status || order.status || 'pending') === 'pending';
             const deliveredAtRaw = item.delivered_at || order.delivered_at || null;
             const isDelivered = (item.status || order.status || 'pending') === 'delivered';
@@ -451,11 +556,12 @@ class OrdersPage {
                             <div>${displayDate}</div>
                             <small>${displayTime}</small>
                         </div>
-                        <div class="order-id">Pre-order #${order.id}</div>
+                        <div class="order-id">${isPreorder ? 'Pre-order' : 'Order'} #${order.id}</div>
                     </div>
                     <div class="order-status-line">
-                        <strong>Pre-order Status:</strong>
+                        <strong>${isPreorder ? 'Pre-order' : 'Order'} Status:</strong>
                         <span style="font-weight: 600; color: ${this.getStatusColor(currentStatus)};">${this.formatStatusLabel(currentStatus)}</span>
+                        ${isPreorder ? '<span class="badge bg-warning text-dark ms-2">Pre-order</span>' : ''}
                     </div>
                 </div>
                 ${timelineHtml}
@@ -465,6 +571,7 @@ class OrdersPage {
                         <div class="order-item-name">${item.product_name || 'Product'}</div>
                         <div class="order-item-meta">${this.fmtNumber(quantity)} x ${this.fmtCurrency(item.price || order.price || 0)} ${item.unit || ''}</div>
                         <div class="order-item-meta"><strong>From:</strong> ${item.farmer_name || 'Local Farmer'}${item.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : ''}</div>
+                        ${isPreorder && item.preorder_availability_date ? `<div class="order-item-meta"><strong>Available:</strong> ${item.preorder_availability_date}</div>` : ''}
                         ${(currentStatus === 'cancelled') ? `
                             <div class="order-item-meta">
                                 <button class="btn btn-small btn-secondary" onclick="ordersPage.openReasonViewer('${encodedReason}')">
@@ -483,7 +590,7 @@ class OrdersPage {
                             ` : ''}
                             ${isDelivered ? `
                                 <button class="btn btn-small btn-secondary" onclick="ordersPage.reorder(${order.id})" title="Add items back to cart">
-                                    <i class="fas fa-redo"></i> Re-pre-order
+                                    <i class="fas fa-redo"></i> Reorder
                                 </button>
                             ` : ''}
                             ${canRateNow ? `
@@ -766,16 +873,17 @@ class OrdersPage {
     }
 
     clearOrders() {
-        // Clear all order containers
-        const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
-        statuses.forEach(status => {
-            const container = document.getElementById(`${status}-orders-list`);
+        // Clear all order containers using simplified tab structure
+        const tabs = ['all', 'active', 'delivered', 'cancelled'];
+        tabs.forEach(tab => {
+            const container = document.getElementById(`${tab}-orders-list`);
             if (container) {
                 container.innerHTML = '<div class="empty-state">No orders found.</div>';
             }
         });
         // Reset orders by status
-        this.ordersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
+        this.ordersByStatus = { pending: [], preorder_reserved: [], confirmed: [], preparing: [], scheduled: [], out_for_delivery: [], delivered: [], cancelled: [] };
+        this.currentTab = 'all';
         // Force reload from server
         this.loadOrders();
     }
@@ -862,13 +970,25 @@ class OrdersPage {
     formatStatusLabel(status) {
         const labels = {
             'pending': 'Pending',
+            'preorder_reserved': 'Pre-order Reserved',
             'confirmed': 'Confirmed',
             'preparing': 'Preparing',
+            'scheduled': 'Scheduled',
             'out_for_delivery': 'Out for Delivery',
             'delivered': 'Delivered',
             'cancelled': 'Cancelled'
         };
         return labels[status] || status;
+    }
+
+    formatTabLabel(tab) {
+        const labels = {
+            'all': 'All',
+            'active': 'Active',
+            'delivered': 'Delivered',
+            'cancelled': 'Cancelled'
+        };
+        return labels[tab] || tab;
     }
 }
 

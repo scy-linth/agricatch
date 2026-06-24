@@ -1106,11 +1106,16 @@ class FarmerDashboard {
                 try {
                     const data = JSON.parse(evt.data);
                     if (data.user_id === this.userId) {
-                        this.loadNotifications();
+                        // Don't reload if user is viewing notifications section to avoid pagination reset
+                        if (this.activeSection !== 'notifications') {
+                            this.loadNotifications();
+                        }
                     }
                 } catch (e) {
-                    // If parsing fails, refresh anyway as fallback
-                    this.loadNotifications();
+                    // If parsing fails, refresh anyway as fallback (but only if not in notifications section)
+                    if (this.activeSection !== 'notifications') {
+                        this.loadNotifications();
+                    }
                 }
             });
 
@@ -4220,6 +4225,7 @@ class FarmerDashboard {
     }
 
     async loadNotifications(page = 1) {
+        console.log('[DEBUG] loadNotifications called with page:', page, 'activeSection:', this.activeSection);
         try {
             // Load notifications (no loading spinner for polling)
             const limit = 20;
@@ -4528,6 +4534,9 @@ class FarmerDashboard {
         }
         this.notifPollFailures = 0;
         this.notifPollInterval = setInterval(() => {
+            // Don't poll if user is viewing notifications section to avoid pagination reset
+            console.log('[DEBUG] Polling check - activeSection:', this.activeSection, 'is notifications?', this.activeSection === 'notifications');
+            if (this.activeSection === 'notifications') return;
             this.loadNotifications(1).catch(err => {
                 this.notifPollFailures++;
                 console.error('Notification poll error:', err);
@@ -4733,7 +4742,9 @@ class FarmerDashboard {
                     item.classList.add('read');
                 }
                 if (!skipReload) {
-                    this.loadNotifications();
+                    // Preserve current page when reloading
+                    const currentPage = this.pagination.notifications?.page || 1;
+                    this.loadNotifications(currentPage);
                 }
             }
         } catch (err) {
@@ -4753,7 +4764,9 @@ class FarmerDashboard {
                 this.showMessage('Failed to mark all as read', 'error');
                 return;
             }
-            this.loadNotifications();
+            // Preserve current page when reloading
+            const currentPage = this.pagination.notifications?.page || 1;
+            this.loadNotifications(currentPage);
         } catch (err) {
             this.showMessage('Failed to mark all as read', 'error');
         } finally {
@@ -7918,7 +7931,7 @@ class FarmerDashboard {
     getOrderStatusBadge(status) {
         const statusMap = {
             pending: { class: 'pending', label: 'Pending' },
-            preorder_reserved: { class: 'preorder_reserved', label: 'Preorder Reserved' },
+            preorder_reserved: { class: 'preorder_reserved', label: 'Pre-order Reserved' },
             confirmed: { class: 'confirmed', label: 'Confirmed' },
             preparing: { class: 'preparing', label: 'Preparing' },
             scheduled: { class: 'scheduled', label: 'Scheduled' },
