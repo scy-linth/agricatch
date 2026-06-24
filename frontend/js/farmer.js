@@ -16,8 +16,8 @@ class FarmerDashboard {
         }
         this.userId = this.getUserId();
         this.lastOrdersById = new Map();
-        this.lastOrdersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
-        this.ordersCountByStatus = { pending: 0, confirmed: 0, preparing: 0, out_for_delivery: 0, delivered: 0, cancelled: 0 };
+        this.lastOrdersByStatus = { pending: [], preorder_reserved: [], confirmed: [], preparing: [], scheduled: [], out_for_delivery: [], delivered: [], cancelled: [] };
+        this.ordersCountByStatus = { pending: 0, preorder_reserved: 0, confirmed: 0, preparing: 0, scheduled: 0, out_for_delivery: 0, delivered: 0, cancelled: 0 };
         this.activeOrderStatus = 'pending';
         this.activeSection = 'overview';
         this.currentShopProfile = null;
@@ -60,6 +60,14 @@ class FarmerDashboard {
         this.currentTicketId = null;
         this.ticketPollInterval = null;
         this.ticketPollFailures = 0;
+
+        // Chat polling for real-time unread message updates
+        this.chatPollInterval = null;
+        this.chatPollFailures = 0;
+
+        // Notifications polling for real-time updates
+        this.notifPollInterval = null;
+        this.notifPollFailures = 0;
 
         if (!this.token) {
             window.location.href = '/?login=1';
@@ -530,9 +538,10 @@ class FarmerDashboard {
         this.setupDetailPanel();
         this.setupRealtime();
         this.initChat();
-        this.initUnitDropdowns();
         this.loadNotifications();
         this.loadMessages();
+        this.startChatPolling();
+        this.startNotifPolling();
         this.updateHeaderUser();
         // Re-trigger verification UI update after header is updated
         this.updateVerificationUI();
@@ -996,6 +1005,38 @@ class FarmerDashboard {
                 }
             });
 
+            // Listen for new chat messages - instant badge update
+            es.addEventListener('chat.message', () => {
+                this.loadMessages();
+            });
+
+            es.addEventListener('chat.read', () => {
+                this.loadMessages();
+            });
+
+            // Listen for support ticket messages
+            es.addEventListener('support.message', () => {
+                this.loadSupportTicketsBadge();
+            });
+
+            // Listen for support ticket read events
+            es.addEventListener('support.read', () => {
+                this.loadSupportTicketsBadge();
+            });
+
+            // Listen for new notifications
+            es.addEventListener('notification.created', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    if (data.user_id === this.userId) {
+                        this.loadNotifications();
+                    }
+                } catch (e) {
+                    // If parsing fails, refresh anyway as fallback
+                    this.loadNotifications();
+                }
+            });
+
             es.addEventListener('error', async () => {
                 const switched = await this.resolveWorkingApiBase();
                 if (switched) {
@@ -1229,6 +1270,22 @@ class FarmerDashboard {
             document.body.classList.remove('toggle-sidebar');
         });
 
+        // Pre-order checkbox toggle for add product form
+        document.getElementById('is-preorder')?.addEventListener('change', (e) => {
+            const preorderFields = document.getElementById('preorder-fields');
+            if (preorderFields) {
+                preorderFields.style.display = e.target.checked ? 'block' : 'none';
+            }
+        });
+
+        // Pre-order checkbox toggle for edit product form
+        document.getElementById('edit-is-preorder')?.addEventListener('change', (e) => {
+            const preorderFields = document.getElementById('edit-preorder-fields');
+            if (preorderFields) {
+                preorderFields.style.display = e.target.checked ? 'block' : 'none';
+            }
+        });
+
         document.getElementById('add-product-form')?.addEventListener('submit', (e) => this.handleAddProduct(e));
         document.getElementById('edit-product-form')?.addEventListener('submit', (e) => this.handleEditProduct(e));
         document.getElementById('save-shop-profile-btn')?.addEventListener('click', (e) => this.handleShopProfileUpdate(e));
@@ -1301,6 +1358,36 @@ class FarmerDashboard {
                     modal.classList.remove('open');
                 }
             }
+        });
+
+        // Stop chat and notifications polling when user leaves page
+        window.addEventListener('beforeunload', () => {
+            this.stopChatPolling();
+            this.stopNotifPolling();
+        });
+
+        // Stop polling when tab is hidden, resume when visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.stopChatPolling();
+                this.stopNotifPolling();
+            } else {
+                this.startChatPolling();
+                this.startNotifPolling();
+            }
+        });
+
+        // Handle online/offline events
+        window.addEventListener('online', () => {
+            this.startChatPolling();
+            this.startNotifPolling();
+            this.showMessage('Connection restored. Syncing...', 'success');
+        });
+
+        window.addEventListener('offline', () => {
+            this.stopChatPolling();
+            this.stopNotifPolling();
+            this.showMessage('You are offline. Some features may be limited.', 'warning');
         });
 
         const editShopBtn = document.getElementById('edit-shop-profile-btn');
@@ -1778,6 +1865,28 @@ class FarmerDashboard {
             });
         }
 
+        // Schedule delivery modal event listeners
+        const scheduleDeliveryModal = document.getElementById('schedule-delivery-modal');
+        const scheduleDeliveryClose = document.getElementById('schedule-delivery-close');
+        const scheduleDeliveryCancel = document.getElementById('schedule-delivery-cancel');
+        const scheduleDeliveryForm = document.getElementById('schedule-delivery-form');
+        if (scheduleDeliveryClose) {
+            scheduleDeliveryClose.addEventListener('click', () => this.closeScheduleDeliveryModal());
+        }
+        if (scheduleDeliveryCancel) {
+            scheduleDeliveryCancel.addEventListener('click', () => this.closeScheduleDeliveryModal());
+        }
+        if (scheduleDeliveryForm) {
+            scheduleDeliveryForm.addEventListener('submit', (e) => this.submitScheduleDeliveryForm(e));
+        }
+        if (scheduleDeliveryModal) {
+            scheduleDeliveryModal.addEventListener('click', (e) => {
+                if (e.target === scheduleDeliveryModal) {
+                    this.closeScheduleDeliveryModal();
+                }
+            });
+        }
+
         // Rejection reason modal event listeners
         const rejectionReasonClose = document.getElementById('rejection-reason-close');
         const rejectionReasonCloseBtn = document.getElementById('rejection-reason-close-btn');
@@ -1804,10 +1913,12 @@ class FarmerDashboard {
             });
         });
 
-        // Order status tabs - all 6 statuses
+        // Order status tabs - all statuses including preorder_reserved and scheduled
         document.getElementById('pending-orders-tab')?.addEventListener('click', () => this.switchOrderTab('pending'));
+        document.getElementById('preorder_reserved-orders-tab')?.addEventListener('click', () => this.switchOrderTab('preorder_reserved'));
         document.getElementById('confirmed-orders-tab')?.addEventListener('click', () => this.switchOrderTab('confirmed'));
         document.getElementById('preparing-orders-tab')?.addEventListener('click', () => this.switchOrderTab('preparing'));
+        document.getElementById('scheduled-orders-tab')?.addEventListener('click', () => this.switchOrderTab('scheduled'));
         document.getElementById('out_for_delivery-orders-tab')?.addEventListener('click', () => this.switchOrderTab('out_for_delivery'));
         document.getElementById('delivered-orders-tab')?.addEventListener('click', () => this.switchOrderTab('delivered'));
         document.getElementById('cancelled-orders-tab')?.addEventListener('click', () => this.switchOrderTab('cancelled'));
@@ -1968,6 +2079,16 @@ class FarmerDashboard {
                 this.updateOrderItemStatus(orderId, actualOrderItemId, status);
             }
 
+            if (action === 'schedule-delivery') {
+                const orderId = Number(btn.getAttribute('data-order-id'));
+                if (!orderId || isNaN(orderId)) {
+                    console.error('Invalid order ID for schedule delivery:', { orderId });
+                    this.showMessage('Invalid order information. Please refresh the page.', 'error');
+                    return;
+                }
+                this.openScheduleDeliveryModal(orderId);
+            }
+
             if (action === 'chat-customer') {
                 const customerId = Number(btn.getAttribute('data-customer-id'));
                 const orderId = Number(btn.getAttribute('data-order-id'));
@@ -2024,22 +2145,12 @@ class FarmerDashboard {
                 return Array.isArray(data.names) ? data.names : [];
             };
 
-            // Use selected category names first, then include global names as fallback
-            // so known items like "Malunggay" are still discoverable in dropdown.
-            const scopedNames = await fetchNames(categoryId || null);
-            const globalNames = categoryId ? await fetchNames(null) : [];
-            const merged = [];
-            const seen = new Set();
-            for (const name of [...scopedNames, ...globalNames]) {
-                const normalized = String(name || '').trim();
-                if (!normalized) continue;
-                const key = normalized.toLowerCase();
-                if (seen.has(key)) continue;
-                seen.add(key);
-                merged.push(normalized);
-            }
-
-            this.catalogProductNames = merged;
+            // Only show products from the selected category
+            const names = await fetchNames(categoryId || null);
+            this.catalogProductNames = names.map(item => ({
+                name: String(item.name || '').trim(),
+                default_unit: String(item.default_unit || 'kg').trim()
+            })).filter(n => n.name);
             this.renderProductNameSuggestions('add');
             this.renderProductNameSuggestions('edit');
         } catch (error) {
@@ -2063,7 +2174,7 @@ class FarmerDashboard {
         const query = forceAll ? '' : String(nameInput.value || '').trim().toLowerCase();
         const source = Array.isArray(this.catalogProductNames) ? this.catalogProductNames : [];
         const matches = source
-            .filter((name) => !query || String(name).toLowerCase().includes(query))
+            .filter((item) => !query || String(item.name).toLowerCase().includes(query))
             .slice(0, 10);
 
         if (!matches.length) {
@@ -2073,9 +2184,9 @@ class FarmerDashboard {
         }
 
         const currentValue = String(nameInput.value || '').trim().toLowerCase();
-        listEl.innerHTML = matches.map((name) => {
-            const isSelected = currentValue && String(name).toLowerCase() === currentValue;
-            return `<button type="button" class="product-name-option${isSelected ? ' selected' : ''}" data-name="${this.escapeAttr(name)}">${this.escapeHtml(name)}</button>`;
+        listEl.innerHTML = matches.map((item) => {
+            const isSelected = currentValue && String(item.name).toLowerCase() === currentValue;
+            return `<button type="button" class="product-name-option${isSelected ? ' selected' : ''}" data-name="${this.escapeAttr(item.name)}" data-unit="${this.escapeAttr(item.default_unit)}">${this.escapeHtml(item.name)}</button>`;
         }).join('');
         // Only open dropdown when user explicitly triggered it (forceAll) or it was already open
         if (forceAll || isAlreadyOpen) {
@@ -2087,7 +2198,15 @@ class FarmerDashboard {
             btn.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 const selected = String(btn.getAttribute('data-name') || '').trim();
+                const selectedUnit = String(btn.getAttribute('data-unit') || 'kg').trim();
                 nameInput.value = selected;
+                // Store the selected unit for later use
+                nameInput.dataset.selectedUnit = selectedUnit;
+                // Update the unit display field
+                const unitInput = document.getElementById(isEdit ? 'edit-product-unit' : 'product-unit');
+                if (unitInput) {
+                    unitInput.value = selectedUnit;
+                }
                 listEl.classList.remove('open');
                 this.updatePriceSuggestion(mode);
             });
@@ -2176,38 +2295,6 @@ class FarmerDashboard {
         });
     }
 
-    initUnitDropdowns() {
-        const units = [
-            { value: 'kg', label: 'Kilogram (kg)' },
-            { value: 'pieces', label: 'Pieces' },
-            { value: 'boxes', label: 'Boxes' },
-            { value: 'bundle', label: 'Bundle' },
-            { value: 'sack', label: 'Sack' },
-            { value: 'tray', label: 'Tray' },
-            { value: 'liter', label: 'Liter (L)' }
-        ];
-
-        const renderUnitOptions = (selected = '') => {
-            return units.map(unit => {
-                const isSelected = String(selected) === unit.value ? 'selected' : '';
-                return `<button type="button" class="custom-select-option${isSelected ? ' selected' : ''}" data-value="${this.escapeAttr(unit.value)}" data-label="${this.escapeAttr(unit.label)}">${this.escapeHtml(unit.label)}</button>`;
-            }).join('');
-        };
-
-        const addInput = document.getElementById('product-unit');
-        const addDropdown = document.getElementById('product-unit-dropdown');
-        const editInput = document.getElementById('edit-product-unit');
-        const editDropdown = document.getElementById('edit-product-unit-dropdown');
-
-        if (addDropdown) {
-            addDropdown.innerHTML = renderUnitOptions(addInput?.value || '');
-            this.setupCustomSelectDropdown('product-unit');
-        }
-        if (editDropdown) {
-            editDropdown.innerHTML = renderUnitOptions(editInput?.value || '');
-            this.setupCustomSelectDropdown('edit-product-unit');
-        }
-    }
 
     initProductPsgc() {
         const initPsgc = async () => {
@@ -2407,8 +2494,6 @@ class FarmerDashboard {
         const editName = document.getElementById('edit-product-name');
         const addCategory = document.getElementById('product-category');
         const editCategory = document.getElementById('edit-product-category');
-        const addUnit = document.getElementById('product-unit');
-        const editUnit = document.getElementById('edit-product-unit');
 
         if (addName) {
             addName.readOnly = true;
@@ -2470,13 +2555,6 @@ class FarmerDashboard {
         const editPrice = document.getElementById('edit-product-price');
         if (editPrice) editPrice.addEventListener('focus', () => this.updatePriceSuggestion('edit'));
 
-        if (addUnit) {
-            addUnit.addEventListener('change', () => this.updatePriceSuggestion('add'));
-        }
-        if (editUnit) {
-            editUnit.addEventListener('change', () => this.updatePriceSuggestion('edit'));
-        }
-
         this.syncProductNameAvailability('add');
         this.syncProductNameAvailability('edit');
     }
@@ -2527,22 +2605,20 @@ class FarmerDashboard {
         const isEdit = mode === 'edit';
         const nameInput = document.getElementById(isEdit ? 'edit-product-name' : 'product-name');
         const categoryInput = document.getElementById(isEdit ? 'edit-product-category' : 'product-category');
-        const unitInput = document.getElementById(isEdit ? 'edit-product-unit' : 'product-unit');
-        const priceInput = document.getElementById(isEdit ? 'edit-product-price' : 'product-price');
         const hint = document.getElementById(isEdit ? 'edit-product-price-suggestion' : 'product-price-suggestion');
 
         if (!nameInput || !hint) return;
 
         const name = String(nameInput.value || '').trim();
         const categoryId = String(categoryInput?.dataset?.value || categoryInput?.value || '').trim();
-        const unit = String(unitInput?.value || '').trim();
+        const unit = String(nameInput?.dataset.selectedUnit || 'kg').trim();
         if (!name) {
-            hint.textContent = 'Suggested lowest price: —';
+            hint.textContent = 'Suggested price: —';
             return;
         }
 
         try {
-            hint.textContent = 'Suggested lowest price: checking...';
+            hint.textContent = 'Suggested price: checking...';
             const params = new URLSearchParams({ name });
             if (categoryId) params.set('category_id', categoryId);
             if (unit) params.set('unit', unit);
@@ -2551,7 +2627,7 @@ class FarmerDashboard {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (!response.ok) {
-                hint.textContent = 'Suggested lowest price: —';
+                hint.textContent = 'Suggested price: —';
                 return;
             }
 
@@ -2559,15 +2635,11 @@ class FarmerDashboard {
             const hasSystemSample = Number(data?.sample_count || 0) > 0;
             const lowest = hasSystemSample ? Number(data.suggested_lowest_price || 0) : 0;
             hint.textContent = lowest > 0
-                ? `Suggested lowest price: ${this.fmtCurrency(lowest)}`
-                : 'Suggested lowest price: —';
-
-            if (priceInput && (!priceInput.value || Number(priceInput.value) <= 0) && lowest > 0) {
-                priceInput.value = lowest.toFixed(2);
-            }
+                ? `Suggested price: ${this.fmtCurrency(lowest)}`
+                : 'Suggested price: —';
         } catch (error) {
             console.error('Error updating price suggestion:', error);
-            hint.textContent = 'Suggested lowest price: —';
+            hint.textContent = 'Suggested price: —';
         }
     }
 
@@ -2611,6 +2683,11 @@ class FarmerDashboard {
             : (validSections.has(hash) ? hash : 'overview');
 
         this.showSection(initialSection);
+
+        // Stop chat polling if initial section is chat (chat.js handles it)
+        if (initialSection === 'chat') {
+            this.stopChatPolling();
+        }
 
         // Clear hash from URL after using it for initial section
         if (window.location.hash) {
@@ -2735,6 +2812,11 @@ class FarmerDashboard {
             this.clearNotificationHighlight();
         }
 
+        // Resume chat polling when leaving chat section
+        if (this.activeSection === 'chat' && safeSection !== 'chat') {
+            this.startChatPolling();
+        }
+
         this.activeSection = safeSection;
         // Save current section to localStorage
         localStorage.setItem('farmerActiveSection', safeSection);
@@ -2832,6 +2914,7 @@ class FarmerDashboard {
                 this.clearKpiValues();
             }
             this.loadOverviewMetrics();
+            this.loadAnnouncements();
         }
 
         const titles = {
@@ -2877,11 +2960,10 @@ class FarmerDashboard {
         } else if (safeSection === 'products') {
             this.switchTab('list-products');
             this.loadMyProducts();
-        } else if (safeSection === 'overview') {
-            this.loadOverviewMetrics();
-            this.loadAnnouncements();
         } else if (safeSection === 'chat') {
             this.loadFarmerStats({ skipProducts: true });
+            // Stop farmer.js chat polling since chat.js handles it in chat section
+            this.stopChatPolling();
         } else if (safeSection === 'shop') {
             this.loadShopProfile();
         } else if (safeSection === 'subscription') {
@@ -2968,7 +3050,8 @@ class FarmerDashboard {
                     const productsData = await productsResponse.json();
                     const availableProducts = (productsData.products || []).filter(p => {
                         const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
-                        return isAvailable && p.status === 'approved';
+                        const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
+                        return isAvailable && p.status === 'approved' && !isAdminDisabled;
                     });
                     const myProductsEl = document.getElementById('my-products');
                     if (myProductsEl) myProductsEl.textContent = this.fmtNumber(availableProducts.length);
@@ -3796,6 +3879,7 @@ class FarmerDashboard {
 
     async loadNotifications(page = 1) {
         try {
+            // Load notifications (no loading spinner for polling)
             const limit = 20;
             const res = await fetch(`${this.apiBase}/notifications?page=${page}&limit=${limit}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -3890,7 +3974,7 @@ class FarmerDashboard {
             const relTime = this._relativeTime(new Date(n.created_at));
             const readStatus = n.is_read ? 'read' : 'unread';
             return `<li>
-                <a class="dropdown-item notification-item-dropdown ${readStatus} py-2 notif-header-link" href="#" style="border:none;padding:0.75rem 1rem;margin:0.25rem 0.5rem;border-radius:8px;">
+                <a class="dropdown-item notification-item-dropdown ${readStatus} py-2 notif-header-link" href="#" tabindex="0" style="border:none;padding:0.75rem 1rem;margin:0.25rem 0.5rem;border-radius:8px;">
                     <div class="d-flex align-items-center gap-2">
                         <div class="notification-icon-dropdown" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${n.is_read ? '#f3f4f6' : '#ecfdf5'};color:${n.is_read ? '#6b7280' : '#10b981'};font-size:0.875rem;">
                             <i class="bi ${ic}"></i>
@@ -3905,7 +3989,7 @@ class FarmerDashboard {
             </li>`;
         }).join('');
 
-        // Add click handlers to navigate to notifications section and highlight selected notification
+        // Add click and keyboard handlers to navigate to notifications section and highlight selected notification
         dropdownList.querySelectorAll('.notif-header-link').forEach((link, index) => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -3913,6 +3997,16 @@ class FarmerDashboard {
                 this.showSection('notifications');
                 if (notifId) {
                     this.highlightNotification(notifId);
+                }
+            });
+            link.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const notifId = recent[index]?.id;
+                    this.showSection('notifications');
+                    if (notifId) {
+                        this.highlightNotification(notifId);
+                    }
                 }
             });
         });
@@ -3944,23 +4038,171 @@ class FarmerDashboard {
 
     async loadMessages() {
         try {
-            const res = await fetch(`${this.apiBase}/messages/unread-count`, {
+            // Load conversations for dropdown (no loading spinner for polling)
+            const res = await fetch(`${this.apiBase}/messages/conversations`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (res.ok) {
                 const data = await res.json();
-                const unread = data.count || 0;
-                const badge = document.getElementById('farmer-chat-unread');
-                const count = document.getElementById('messages-count');
-                if (badge) {
-                    badge.textContent = unread > 99 ? '99+' : String(unread);
-                    badge.style.display = unread ? '' : 'none';
+                const conversations = data.conversations || [];
+                this._updateChatHeaderDropdown(conversations);
+                
+                // Calculate unread counts
+                const usersWithUnread = conversations.filter(conv => conv.unread_count > 0).length;
+                const totalUnreadMessages = conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
+                
+                // Update badges
+                const topbarBadge = document.getElementById('chat-topbar-badge');
+                const sidebarBadge = document.getElementById('chat-unread-badge');
+                const unreadCountEl = document.getElementById('chat-unread-count');
+                
+                // Top header badge: number of users with unread messages
+                if (topbarBadge) {
+                    topbarBadge.textContent = usersWithUnread > 99 ? '99+' : String(usersWithUnread);
+                    topbarBadge.style.display = usersWithUnread > 0 ? 'inline-block' : 'none';
                 }
-                if (count) count.textContent = unread > 99 ? '99+' : String(unread);
+                if (sidebarBadge) {
+                    sidebarBadge.textContent = usersWithUnread > 99 ? '99+' : String(usersWithUnread);
+                    sidebarBadge.style.display = usersWithUnread > 0 ? 'inline-flex' : 'none';
+                }
+                // Dropdown header: total unread messages across all users
+                if (unreadCountEl) {
+                    unreadCountEl.textContent = totalUnreadMessages;
+                }
             }
         } catch (err) {
             console.error('Error loading messages:', err);
+            this._updateChatHeaderDropdown([], true);
         }
+    }
+
+    _updateChatHeaderDropdown(conversations, error = null) {
+        const dropdownList = document.getElementById('chat-dropdown-list');
+        if (!dropdownList) return;
+
+        if (error) {
+            dropdownList.innerHTML = `<li class="text-center py-2 small text-danger">Failed to load messages</li>`;
+            return;
+        }
+
+        const recent = conversations.slice(0, 5);
+        if (!recent.length) {
+            dropdownList.innerHTML = `<li class="text-center py-2 small text-muted">No messages</li>`;
+            return;
+        }
+
+        dropdownList.innerHTML = recent.map(conv => {
+            const customerName = conv.other_shop_name || conv.other_full_name || conv.other_username || 'Customer';
+            const lastMessage = conv.last_message || 'No messages yet';
+            const lastMessageTime = conv.last_message_at ? this._relativeTime(new Date(conv.last_message_at)) : '';
+            const unreadCount = conv.unread_count || 0;
+            const isUnread = unreadCount > 0;
+
+            return `<li>
+                <a class="dropdown-item py-2 chat-dropdown-item ${isUnread ? 'chat-dropdown-item-unread' : ''}" href="#" data-conversation-id="${this.escapeAttr(conv.conversation_id)}" tabindex="0" style="border:none;padding:0.75rem 1rem;margin:0.25rem 0.5rem;border-radius:8px;">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="notification-icon-dropdown ${isUnread ? 'notification-icon-unread' : ''}" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.875rem;">
+                            <i class="bi bi-person"></i>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div class="small" style="font-weight:${isUnread ? '600' : '500'};color:${isUnread ? '#065f46' : '#111827'};line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this.escapeHtml(customerName)}</div>
+                            <div style="font-size:0.75rem;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this.escapeHtml(lastMessage)}</div>
+                            <div style="font-size:0.7rem;color:#9ca3af;">${lastMessageTime}</div>
+                        </div>
+                        ${isUnread ? `<span class="badge bg-danger" style="font-size:0.65rem;padding:2px 6px;border-radius:10px;">${unreadCount}</span>` : ''}
+                    </div>
+                </a>
+            </li>`;
+        }).join('');
+
+        // Add click and keyboard handlers for conversation items
+        dropdownList.querySelectorAll('.chat-dropdown-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const conversationId = item.dataset.conversationId;
+                this.openConversation(conversationId);
+            });
+            item.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const conversationId = item.dataset.conversationId;
+                    this.openConversation(conversationId);
+                }
+            });
+        });
+    }
+
+    async openConversation(conversationId) {
+        try {
+            // Mark conversation as read
+            await fetch(`${this.apiBase}/messages/conversation/${conversationId}/read`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            
+            // Navigate to chat section
+            this.showSection('chat');
+            
+            // Reload messages to update badges
+            this.loadMessages();
+            
+            // If chat instance exists, select the conversation
+            if (window.chatUI && typeof window.chatUI.openConversation === 'function') {
+                window.chatUI.openConversation(conversationId);
+            }
+        } catch (err) {
+            console.error('Error opening conversation:', err);
+        }
+    }
+
+    startChatPolling() {
+        if (this.chatPollInterval) {
+            clearInterval(this.chatPollInterval);
+        }
+        this.chatPollFailures = 0;
+        this.chatPollInterval = setInterval(() => {
+            this.loadMessages().catch(err => {
+                this.chatPollFailures++;
+                console.error('Chat poll error:', err);
+                if (this.chatPollFailures >= 5) {
+                    this.stopChatPolling();
+                    this.showMessage('Unable to load messages. Please refresh the page.', 'warning');
+                }
+            });
+        }, 10000); // Poll every 10 seconds
+    }
+
+    stopChatPolling() {
+        if (this.chatPollInterval) {
+            clearInterval(this.chatPollInterval);
+            this.chatPollInterval = null;
+        }
+        this.chatPollFailures = 0;
+    }
+
+    startNotifPolling() {
+        if (this.notifPollInterval) {
+            clearInterval(this.notifPollInterval);
+        }
+        this.notifPollFailures = 0;
+        this.notifPollInterval = setInterval(() => {
+            this.loadNotifications(1).catch(err => {
+                this.notifPollFailures++;
+                console.error('Notification poll error:', err);
+                if (this.notifPollFailures >= 5) {
+                    this.stopNotifPolling();
+                    this.showMessage('Unable to load notifications. Please refresh the page.', 'warning');
+                }
+            });
+        }, 10000); // Poll every 10 seconds (less frequent than chat)
+    }
+
+    stopNotifPolling() {
+        if (this.notifPollInterval) {
+            clearInterval(this.notifPollInterval);
+            this.notifPollInterval = null;
+        }
+        this.notifPollFailures = 0;
     }
 
     updateHeaderUser() {
@@ -4742,7 +4984,8 @@ class FarmerDashboard {
             if (this.myProductsCache) {
                 const availableProducts = this.myProductsCache.filter(p => {
                     const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
-                    return isAvailable && p.status === 'approved';
+                    const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
+                    return isAvailable && p.status === 'approved' && !isAdminDisabled;
                 });
                 valEl.textContent = this.fmtNumber(availableProducts.length);
             }
@@ -5370,10 +5613,11 @@ class FarmerDashboard {
                 const getPriority = (p) => {
                     const s = p.status || 'approved';
                     const avail = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+                    const adminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
                     const stock = Number(p.stock_quantity ?? 0);
                     if (s === 'pending') return 4;
                     if (s === 'rejected') return 5;
-                    if (!avail) return 3;
+                    if (!avail || adminDisabled) return 3;
                     if (stock <= 0) return 2;
                     return 1; // Available
                 };
@@ -5398,6 +5642,7 @@ class FarmerDashboard {
         tbody.innerHTML = paginatedProducts.map(product => {
             const stock = Number(product.stock_quantity ?? 0);
             const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+            const isAdminDisabled = (product.is_admin_disabled === true || product.is_admin_disabled === 't' || product.is_admin_disabled === 'true' || product.is_admin_disabled === 1 || product.is_admin_disabled === '1');
             const approvalStatus = product.status || 'approved';
             let statusLabel, statusKey;
             
@@ -5410,8 +5655,19 @@ class FarmerDashboard {
                 statusKey = 'rejected';
             } else {
                 // Show availability status for approved products
-                statusLabel = !isAvailable ? 'Disabled' : (stock <= 0 ? 'No Stock' : 'Available');
-                statusKey = !isAvailable ? 'disabled' : (stock <= 0 ? 'no_stock' : 'available');
+                if (isAdminDisabled) {
+                    statusLabel = 'Disabled';
+                    statusKey = 'disabled';
+                } else if (!isAvailable) {
+                    statusLabel = 'Disabled';
+                    statusKey = 'disabled';
+                } else if (stock <= 0) {
+                    statusLabel = 'No Stock';
+                    statusKey = 'no_stock';
+                } else {
+                    statusLabel = 'Available';
+                    statusKey = 'available';
+                }
             }
             
             const reviewCount = Number(product.total_reviews || 0);
@@ -5455,10 +5711,16 @@ class FarmerDashboard {
             <tr>
                 <td>${thumb}${placeholder}</td>
                 <td class="text-muted">${product.id}</td>
-                <td class="fw-semibold">${this.escapeHtml(product.name)}</td>
+                <td class="fw-semibold">
+                    ${this.escapeHtml(product.name)}
+                    ${product.is_preorder ? '<span class="badge bg-warning text-dark ms-1">Preorder</span>' : ''}
+                </td>
                 <td class="text-muted">${this.escapeHtml(categoryName || '—')}</td>
                 <td>${this.fmtCurrency(product.price)}</td>
-                <td>${this.fmtNumber(stock)}</td>
+                <td>
+                    ${this.fmtNumber(stock)}
+                    ${product.is_preorder && product.reserved_quantity ? `<br><small class="text-muted">Reserved: ${this.fmtNumber(product.reserved_quantity)}</small>` : ''}
+                </td>
                 <td ${statusClickHandler}>${statusWithReason}</td>
                 <td class="text-muted">${reviewCount} (${avgRating}★)</td>
                 <td>
@@ -5478,22 +5740,166 @@ class FarmerDashboard {
         });
     }
 
+    renderAvailableProducts(products) {
+        const tbody = document.getElementById('available-products-tbody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = '';
+        
+        if (products.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4">No available products found</td></tr>';
+            return;
+        }
+        
+        products.forEach(product => {
+            const statusBadge = this.getAvailableStatusBadge(product);
+            const stock = Number(product.stock_quantity ?? 0);
+            const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+            const isAdminDisabled = (product.is_admin_disabled === true || product.is_admin_disabled === 't' || product.is_admin_disabled === 'true' || product.is_admin_disabled === 1 || product.is_admin_disabled === '1');
+            
+            // Normalize image URL
+            let productImageUrl = product.image_url || '';
+            if (productImageUrl && !productImageUrl.startsWith('http') && !productImageUrl.startsWith('/')) {
+                productImageUrl = '/' + productImageUrl;
+            }
+            if (!productImageUrl || productImageUrl === 'null' || productImageUrl === 'undefined') {
+                productImageUrl = '/images/logo.png';
+            }
+
+            const thumb = productImageUrl
+                ? `<img src="${this.escapeHtml(productImageUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">`
+                : '';
+            const placeholder = `<div style="width:48px;height:48px;background:#e9ecef;border-radius:6px;display:flex;align-items:center;justify-content:center;" ${productImageUrl ? 'style="display:none"' : ''}><i class="bi bi-image text-muted"></i></div>`;
+
+            const reviewCount = Number(product.total_reviews || 0);
+            const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            
+            const row = `
+                <tr>
+                    <td>${thumb}${placeholder}</td>
+                    <td class="small">${product.id}</td>
+                    <td>
+                        <div class="fw-semibold small">${this.escapeHtml(product.name)}</div>
+                    </td>
+                    <td class="small">${this.escapeHtml(product.category_name || 'N/A')}</td>
+                    <td class="small">₱${this.fmtNumber(product.price)}</td>
+                    <td class="small">${this.fmtNumber(stock)}</td>
+                    <td>${statusBadge}</td>
+                    <td class="small">${reviewCount} <i class="bi bi-star-fill text-warning"></i> ${avgRating}</td>
+                    <td class="col-actions">
+                        <button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger btn-action-disable" data-product-id="${product.id}"><i class="bi bi-x-lg"></i></button>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+    }
+
+    renderPreorderProducts(products) {
+        const tbody = document.getElementById('preorder-products-tbody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = '';
+        
+        if (products.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">No pre-order products found</td></tr>';
+            return;
+        }
+        
+        products.forEach(product => {
+            const statusBadge = this.getPreorderStatusBadge(product);
+            const progressPercent = product.max_preorder_quantity > 0 
+                ? (product.reserved_quantity / product.max_preorder_quantity) * 100 
+                : 0;
+            
+            // Normalize image URL
+            let productImageUrl = product.image_url || '';
+            if (productImageUrl && !productImageUrl.startsWith('http') && !productImageUrl.startsWith('/')) {
+                productImageUrl = '/' + productImageUrl;
+            }
+            if (!productImageUrl || productImageUrl === 'null' || productImageUrl === 'undefined') {
+                productImageUrl = '/images/logo.png';
+            }
+
+            const thumb = productImageUrl
+                ? `<img src="${this.escapeHtml(productImageUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">`
+                : '';
+            const placeholder = `<div style="width:48px;height:48px;background:#e9ecef;border-radius:6px;display:flex;align-items:center;justify-content:center;" ${productImageUrl ? 'style="display:none"' : ''}><i class="bi bi-image text-muted"></i></div>`;
+
+            const row = `
+                <tr>
+                    <td>${thumb}${placeholder}</td>
+                    <td class="small">${product.id}</td>
+                    <td>
+                        <div class="fw-semibold small">${this.escapeHtml(product.name)}</div>
+                    </td>
+                    <td class="small">${this.escapeHtml(product.category_name || 'N/A')}</td>
+                    <td class="small">${product.preorder_availability_date ? new Date(product.preorder_availability_date).toLocaleDateString() : 'N/A'}</td>
+                    <td>
+                        <div class="small">Reserved: ${this.fmtNumber(product.reserved_quantity)} / ${this.fmtNumber(product.max_preorder_quantity)}</div>
+                        <div class="progress" style="height:4px;margin-top:2px;">
+                            <div class="progress-bar bg-purple" style="width:${progressPercent}%"></div>
+                        </div>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td class="col-actions">
+                        <button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-success btn-action-harvest" data-product-id="${product.id}"><i class="bi bi-check-circle"></i></button>
+                        <button class="btn btn-sm btn-outline-danger btn-action-disable" data-product-id="${product.id}"><i class="bi bi-x-lg"></i></button>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+    }
+
+    getAvailableStatusBadge(product) {
+        const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+        const isAdminDisabled = (product.is_admin_disabled === true || product.is_admin_disabled === 't' || product.is_admin_disabled === 'true' || product.is_admin_disabled === 1 || product.is_admin_disabled === '1');
+        const stock = Number(product.stock_quantity ?? 0);
+        
+        if (!isAvailable || isAdminDisabled) {
+            return '<span class="badge bg-secondary">Disabled</span>';
+        }
+        if (stock <= 0) {
+            return '<span class="badge bg-warning text-dark">Out of Stock</span>';
+        }
+        return '<span class="badge bg-success">Active</span>';
+    }
+
+    getPreorderStatusBadge(product) {
+        const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+        const isAdminDisabled = (product.is_admin_disabled === true || product.is_admin_disabled === 't' || product.is_admin_disabled === 'true' || product.is_admin_disabled === 1 || product.is_admin_disabled === '1');
+        
+        if (!isAvailable || isAdminDisabled) {
+            return '<span class="badge bg-secondary">Disabled</span>';
+        }
+        if (product.preorder_availability_date && new Date(product.preorder_availability_date) <= new Date()) {
+            return '<span class="badge bg-success">Harvest Ready</span>';
+        }
+        return '<span class="badge bg-primary">Active</span>';
+    }
+
     updateProductKPIs(products) {
         const total = products.length;
         const active = products.filter(p => {
             const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+            const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
             const stock = Number(p.stock_quantity ?? 0);
-            return isAvailable && stock > 0;
+            return isAvailable && !isAdminDisabled && stock > 0;
         }).length;
         const lowStock = products.filter(p => {
             const stock = Number(p.stock_quantity ?? 0);
             const status = String(p.status || 'approved').toLowerCase().trim();
-            return status === 'approved' && stock > 0 && stock <= this.lowStockThreshold;
+            const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
+            return status === 'approved' && !isAdminDisabled && stock > 0 && stock <= this.lowStockThreshold;
         }).length;
         const noStock = products.filter(p => {
             const stock = Number(p.stock_quantity ?? 0);
             const status = String(p.status || 'approved').toLowerCase().trim();
-            return status === 'approved' && stock === 0;
+            const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
+            return status === 'approved' && !isAdminDisabled && stock === 0;
         }).length;
         const pending = products.filter(p => p.status === 'pending').length;
 
@@ -5810,11 +6216,14 @@ class FarmerDashboard {
         const category_id = categoryInput?.dataset.value || categoryInput?.value;
         const stock_quantity = document.getElementById('product-stock').value;
         const unitInput = document.getElementById('product-unit');
-        const unit = unitInput?.dataset.value || unitInput?.value;
+        const unit = unitInput?.value || 'kg'; // Use catalog default unit or fallback to kg
         const locationDisplay = document.getElementById('product-location-display');
         const location = locationDisplay?.value || document.getElementById('product-location').value;
         const harvestDate = document.getElementById('harvest-date').value;
         const expiryDate = document.getElementById('expiry-date').value;
+        const isPreorder = document.getElementById('is-preorder').checked;
+        const preorderAvailabilityDate = document.getElementById('preorder-availability-date').value;
+        const maxPreorderQuantity = document.getElementById('max-preorder-quantity').value;
 
         if (Number(price) < 0 || Number(stock_quantity) < 0) {
             this.showMessage('Price and stock must be zero or higher.', 'error');
@@ -5825,6 +6234,17 @@ class FarmerDashboard {
             harvestEl: document.getElementById('harvest-date'),
             expiryEl: document.getElementById('expiry-date')
         })) {
+            return;
+        }
+
+        // Validate pre-order fields
+        if (isPreorder && !preorderAvailabilityDate) {
+            this.showMessage('Pre-order availability date is required when listing as pre-order.', 'error');
+            return;
+        }
+
+        if (isPreorder && expiryDate && new Date(expiryDate) < new Date(preorderAvailabilityDate)) {
+            this.showMessage('Expiry date must be on or after pre-order availability date.', 'error');
             return;
         }
 
@@ -5859,6 +6279,11 @@ class FarmerDashboard {
         formData.append('location', location);
         formData.append('harvest_date', harvestDate);
         formData.append('expiry_date', expiryDate);
+        formData.append('is_preorder', isPreorder);
+        if (isPreorder) {
+            formData.append('preorder_availability_date', preorderAvailabilityDate);
+            if (maxPreorderQuantity) formData.append('max_preorder_quantity', maxPreorderQuantity);
+        }
         if (imageUrl) formData.append('image_url', imageUrl);
         if (typeof imagePublicId !== 'undefined' && imagePublicId) formData.append('cloudinary_public_id', imagePublicId);
 
@@ -5925,7 +6350,7 @@ class FarmerDashboard {
         const editUnitInput = document.getElementById('edit-product-unit');
         formData.append('category_id', editCategoryInput?.dataset.value || editCategoryInput?.value);
         formData.append('stock_quantity', document.getElementById('edit-product-stock').value);
-        formData.append('unit', editUnitInput?.dataset.value || editUnitInput?.value);
+        formData.append('unit', editUnitInput?.value || 'kg'); // Use catalog default unit or fallback to kg
         
         // Compose address from PSGC fields
         const zoneEl = document.getElementById('product-location-zone');
@@ -5949,6 +6374,9 @@ class FarmerDashboard {
 
         const harvestDate = document.getElementById('edit-harvest-date').value;
         const expiryDate = document.getElementById('edit-expiry-date').value;
+        const isPreorder = document.getElementById('edit-is-preorder').checked;
+        const preorderAvailabilityDate = document.getElementById('edit-preorder-availability-date').value;
+        const maxPreorderQuantity = document.getElementById('edit-max-preorder-quantity').value;
 
         const editPrice = Number(document.getElementById('edit-product-price').value);
         const editStock = Number(document.getElementById('edit-product-stock').value);
@@ -5964,8 +6392,24 @@ class FarmerDashboard {
             return;
         }
 
+        // Validate pre-order fields
+        if (isPreorder && !preorderAvailabilityDate) {
+            this.showMessage('Pre-order availability date is required when listing as pre-order.', 'error');
+            return;
+        }
+
+        if (isPreorder && expiryDate && new Date(expiryDate) < new Date(preorderAvailabilityDate)) {
+            this.showMessage('Expiry date must be on or after pre-order availability date.', 'error');
+            return;
+        }
+
         formData.append('harvest_date', harvestDate);
         formData.append('expiry_date', expiryDate);
+        formData.append('is_preorder', isPreorder);
+        if (isPreorder) {
+            formData.append('preorder_availability_date', preorderAvailabilityDate);
+            if (maxPreorderQuantity) formData.append('max_preorder_quantity', maxPreorderQuantity);
+        }
 
         const imageFile = document.getElementById('edit-product-image').files[0];
         if (imageFile) {
@@ -6120,9 +6564,7 @@ class FarmerDashboard {
                 document.getElementById('edit-product-price').value = product.price;
                 const editCategoryInput = document.getElementById('edit-product-category');
                 const editCategoryDropdown = document.getElementById('edit-product-category-dropdown');
-                const editUnitInput = document.getElementById('edit-product-unit');
-                const editUnitDropdown = document.getElementById('edit-product-unit-dropdown');
-                
+
                 // Set category value and label
                 if (editCategoryInput && editCategoryDropdown) {
                     const categoryOption = editCategoryDropdown.querySelector(`[data-value="${product.category_id}"]`);
@@ -6133,18 +6575,7 @@ class FarmerDashboard {
                         categoryOption.classList.add('selected');
                     }
                 }
-                
-                // Set unit value and label
-                if (editUnitInput && editUnitDropdown) {
-                    const unitOption = editUnitDropdown.querySelector(`[data-value="${product.unit}"]`);
-                    if (unitOption) {
-                        editUnitInput.value = unitOption.getAttribute('data-label');
-                        editUnitInput.dataset.value = product.unit;
-                        editUnitDropdown.querySelectorAll('.custom-select-option').forEach(opt => opt.classList.remove('selected'));
-                        unitOption.classList.add('selected');
-                    }
-                }
-                
+
                 document.getElementById('edit-product-stock').value = product.stock_quantity;
                 document.getElementById('edit-product-description').value = product.description || '';
                 
@@ -6764,10 +7195,10 @@ class FarmerDashboard {
     clearAllOrdersFromUI() {
         // Clear all in-memory caches
         this.lastOrdersById.clear();
-        this.lastOrdersByStatus = { pending: [], confirmed: [], preparing: [], out_for_delivery: [], delivered: [], cancelled: [] };
-        
+        this.lastOrdersByStatus = { pending: [], preorder_reserved: [], confirmed: [], preparing: [], scheduled: [], out_for_delivery: [], delivered: [], cancelled: [] };
+
         // Clear all order containers in UI
-        const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+        const statuses = ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery', 'delivered', 'cancelled'];
         statuses.forEach(status => {
             const container = document.getElementById(`${status}-orders-list`);
             if (container) {
@@ -6776,18 +7207,20 @@ class FarmerDashboard {
             }
         });
         this.updateOrdersTabCounts();
-        
+
         // Force reload from server
         this.loadMyOrders();
     }
 
     async loadMyOrders() {
-        // Load all 6 order statuses
+        // Load all order statuses including preorder_reserved and scheduled
         try {
             await Promise.all([
                 this.loadOrdersByStatus('pending'),
+                this.loadOrdersByStatus('preorder_reserved'),
                 this.loadOrdersByStatus('confirmed'),
                 this.loadOrdersByStatus('preparing'),
+                this.loadOrdersByStatus('scheduled'),
                 this.loadOrdersByStatus('out_for_delivery'),
                 this.loadOrdersByStatus('delivered'),
                 this.loadOrdersByStatus('cancelled')
@@ -6797,8 +7230,10 @@ class FarmerDashboard {
         }
     }
 
+    // loadPreorders removed - now using status-based loading with preorder_reserved
+
     updateOrdersTabCounts() {
-        const statuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+        const statuses = ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery', 'delivered', 'cancelled'];
         statuses.forEach((status) => {
             const tab = document.getElementById(`${status}-orders-tab`);
             const badge = document.getElementById(`${status}-orders-count`);
@@ -6861,8 +7296,10 @@ class FarmerDashboard {
     getOrderStatusBadge(status) {
         const statusMap = {
             pending: { class: 'pending', label: 'Pending' },
+            preorder_reserved: { class: 'preorder_reserved', label: 'Preorder Reserved' },
             confirmed: { class: 'confirmed', label: 'Confirmed' },
             preparing: { class: 'preparing', label: 'Preparing' },
+            scheduled: { class: 'scheduled', label: 'Scheduled' },
             out_for_delivery: { class: 'out_for_delivery', label: 'Out for Delivery' },
             delivered: { class: 'delivered', label: 'Delivered' },
             cancelled: { class: 'cancelled', label: 'Cancelled' }
@@ -6884,13 +7321,34 @@ class FarmerDashboard {
                     <i class="bi bi-x-lg me-1"></i>Cancel
                 </button>
             `;
+        } else if (status === 'preorder_reserved') {
+            return `
+                <button class="btn btn-sm btn-success order-confirm-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">
+                    <i class="bi bi-check-lg me-1"></i>Confirm
+                </button>
+                <button class="btn btn-sm btn-danger order-cancel-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">
+                    <i class="bi bi-x-lg me-1"></i>Cancel
+                </button>
+            `;
         } else if (status === 'confirmed') {
             return `
                 <button class="btn btn-sm btn-primary order-prepare-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="preparing">
                     <i class="bi bi-box-seam me-1"></i>Start Preparing
                 </button>
+                <button class="btn btn-sm btn-info order-schedule-btn" data-action="schedule-delivery" data-order-id="${orderId}">
+                    <i class="bi bi-calendar me-1"></i>Schedule Delivery
+                </button>
             `;
         } else if (status === 'preparing') {
+            return `
+                <button class="btn btn-sm btn-info order-schedule-btn" data-action="schedule-delivery" data-order-id="${orderId}">
+                    <i class="bi bi-calendar me-1"></i>Schedule Delivery
+                </button>
+                <button class="btn btn-sm btn-danger order-cancel-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">
+                    <i class="bi bi-x-lg me-1"></i>Cancel
+                </button>
+            `;
+        } else if (status === 'scheduled') {
             return `
                 <button class="btn btn-sm btn-info order-ship-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="out_for_delivery">
                     <i class="bi bi-truck me-1"></i>Mark as Out for Delivery
@@ -7128,7 +7586,8 @@ class FarmerDashboard {
             'preparing': 'Preparing',
             'out_for_delivery': 'Out for Delivery',
             'delivered': 'Delivered',
-            'cancelled': 'Cancelled'
+            'cancelled': 'Cancelled',
+            'preorder': 'Pre-orders'
         };
         return labels[status] || status;
     }
@@ -7349,6 +7808,82 @@ class FarmerDashboard {
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
         this.customerRatingDraft = { orderId: null, rating: 0, hasExisting: false };
+    }
+
+    openScheduleDeliveryModal(orderId) {
+        const modal = document.getElementById('schedule-delivery-modal');
+        const orderText = document.getElementById('schedule-delivery-order');
+        const dateInput = document.getElementById('delivery-date-input');
+        
+        if (modal && orderText && dateInput) {
+            orderText.textContent = `Order #${orderId}`;
+            // Set minimum date to today
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.min = today;
+            dateInput.value = today;
+            dateInput.required = true;
+            
+            this.currentScheduleOrderId = orderId;
+            modal.classList.add('open');
+            document.documentElement.classList.add('modal-open');
+            document.body.classList.add('modal-open');
+        }
+    }
+
+    closeScheduleDeliveryModal() {
+        const modal = document.getElementById('schedule-delivery-modal');
+        if (modal) modal.classList.remove('open');
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+        this.currentScheduleOrderId = null;
+    }
+
+    async submitScheduleDeliveryForm(e) {
+        e.preventDefault();
+        
+        const dateInput = document.getElementById('delivery-date-input');
+        const deliveryDate = dateInput?.value;
+        
+        if (!deliveryDate) {
+            this.showMessage('Please select a delivery date', 'error');
+            return;
+        }
+        
+        // Validate date is not in the past
+        const today = new Date().toISOString().split('T')[0];
+        if (deliveryDate < today) {
+            this.showMessage('Delivery date cannot be in the past', 'error');
+            return;
+        }
+        
+        if (!this.currentScheduleOrderId) {
+            this.showMessage('Order ID not found', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${this.apiBase}/orders/${this.currentScheduleOrderId}/delivery-date`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ delivery_date: deliveryDate })
+            });
+            
+            if (response.ok) {
+                this.showMessage('Delivery scheduled successfully', 'success');
+                this.closeScheduleDeliveryModal();
+                // Reload orders to reflect status change
+                this.loadMyOrders();
+            } else {
+                const errorData = await response.json();
+                this.showMessage(errorData.message || 'Failed to schedule delivery', 'error');
+            }
+        } catch (error) {
+            console.error('Schedule delivery error:', error);
+            this.showMessage('Error scheduling delivery', 'error');
+        }
     }
 
     showRejectionReason(reason) {
