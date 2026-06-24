@@ -556,12 +556,11 @@ class OrdersPage {
                             <div>${displayDate}</div>
                             <small>${displayTime}</small>
                         </div>
-                        <div class="order-id">${isPreorder ? 'Pre-order' : 'Order'} #${order.id}</div>
+                        <div class="order-id">${isPreorder ? 'Pre-order' : 'Order'} #${order.id}${isPreorder ? '<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem;">Pre-order</span>' : ''}</div>
                     </div>
                     <div class="order-status-line">
                         <strong>${isPreorder ? 'Pre-order' : 'Order'} Status:</strong>
                         <span style="font-weight: 600; color: ${this.getStatusColor(currentStatus)};">${this.formatStatusLabel(currentStatus)}</span>
-                        ${isPreorder ? '<span class="badge bg-warning text-dark ms-2">Pre-order</span>' : ''}
                     </div>
                 </div>
                 ${timelineHtml}
