@@ -145,4 +145,128 @@ test.describe('Farmer Shop Profile', () => {
     await expect(page.locator('#shop-profile-edit')).not.toBeVisible();
     await expect(page.locator('#shop-profile-view')).toBeVisible();
   });
+
+  test('unverified farmer can edit name fields in profile', async ({ page }) => {
+    // Mock unverified verification status and profile
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const apiBases = [baseUrl, 'http://localhost:3000'];
+    
+    apiBases.forEach(apiBase => {
+      page.route(`${apiBase}/api/farmers/me/verification-request`, route => {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            request: null,
+            history: []
+          })
+        });
+      });
+      
+      // Mock auth/profile endpoint to return unverified farmer
+      page.route(`${apiBase}/api/auth/profile`, route => {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            user: {
+              id: 1,
+              email: 'farmer@test.com',
+              username: 'testfarmer',
+              full_name: 'Test Farmer',
+              first_name: 'Test',
+              middle_name: '',
+              last_name: 'Farmer',
+              phone: '+639123456789',
+              shop_name: 'Test Shop',
+              role: 'farmer',
+              is_verified: false,
+              created_at: new Date().toISOString()
+            }
+          })
+        });
+      });
+    });
+    
+    await loginAsFarmer(page);
+    await page.goto('/farmer.html');
+    
+    // Navigate to profile section
+    await page.evaluate(() => {
+      if (window.farmerDashboard && window.farmerDashboard.showSection) {
+        window.farmerDashboard.showSection('profile');
+      }
+    });
+    
+    // Wait for profile section to load
+    await page.waitForTimeout(1000);
+    
+    // Click on Edit Profile tab
+    await page.click('button[data-bs-target="#profile-edit"]');
+    await page.waitForSelector('#profile-edit', { state: 'visible' });
+    
+    // Check that name fields are enabled
+    const firstNameInput = page.locator('#pe-firstname');
+    const middleNameInput = page.locator('#pe-middlename');
+    const lastNameInput = page.locator('#pe-lastname');
+    
+    await expect(firstNameInput).not.toBeDisabled();
+    await expect(middleNameInput).not.toBeDisabled();
+    await expect(lastNameInput).not.toBeDisabled();
+    
+    // Check that verified hint is hidden
+    await expect(page.locator('#pe-name-verified-hint')).not.toBeVisible();
+  });
+
+  test('verified farmer cannot edit name fields in profile', async ({ page }) => {
+    // Mock a verified farmer profile
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const apiBases = [baseUrl, 'http://localhost:3000'];
+    
+    apiBases.forEach(apiBase => {
+      page.route(`${apiBase}/api/farmers/me/verification-request`, route => {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            request: {
+              status: 'approved',
+              created_at: new Date().toISOString()
+            },
+            history: []
+          })
+        });
+      });
+    });
+    
+    await loginAsFarmer(page);
+    await page.goto('/farmer.html');
+    
+    // Navigate to profile section
+    await page.evaluate(() => {
+      if (window.farmerDashboard && window.farmerDashboard.showSection) {
+        window.farmerDashboard.showSection('profile');
+      }
+    });
+    
+    // Wait for profile section to load
+    await page.waitForTimeout(1000);
+    
+    // Click on Edit Profile tab
+    await page.click('button[data-bs-target="#profile-edit"]');
+    await page.waitForSelector('#profile-edit', { state: 'visible' });
+    
+    // Check that name fields are disabled
+    const firstNameInput = page.locator('#pe-firstname');
+    const middleNameInput = page.locator('#pe-middlename');
+    const lastNameInput = page.locator('#pe-lastname');
+    
+    await expect(firstNameInput).toBeDisabled();
+    await expect(middleNameInput).toBeDisabled();
+    await expect(lastNameInput).toBeDisabled();
+    
+    // Check that verified hint is visible
+    await expect(page.locator('#pe-name-verified-hint')).toBeVisible();
+    await expect(page.locator('#pe-name-verified-hint')).toContainText('Verified: name can\'t be edited');
+  });
 });

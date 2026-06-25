@@ -70,7 +70,19 @@ async function insertAddress(userId, payload) {
   pushField('user_id', userId);
   pushField('label', normalizeText(payload.label) || '');
   pushField('full_name', normalizeText(payload.full_name));
-  pushField('phone', normalizeText(payload.phone));
+  pushField('first_name', normalizeText(payload.first_name));
+  pushField('middle_name', normalizeText(payload.middle_name));
+  pushField('last_name', normalizeText(payload.last_name));
+  
+  // Validate phone number format
+  const phone = normalizeText(payload.phone);
+  if (phone) {
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+      throw new Error('Phone number must be 10 digits starting with 9');
+    }
+  }
+  pushField('phone', phone);
   pushField('address_line1', street);
   pushField('address_line2', barangay);
   pushField('city', city);
@@ -105,7 +117,19 @@ async function updateAddress(userId, id, payload) {
 
   setField('label', normalizeText(payload.label) || '');
   setField('full_name', normalizeText(payload.full_name));
-  setField('phone', normalizeText(payload.phone));
+  setField('first_name', normalizeText(payload.first_name));
+  setField('middle_name', normalizeText(payload.middle_name));
+  setField('last_name', normalizeText(payload.last_name));
+  
+  // Validate phone number format
+  const phone = normalizeText(payload.phone);
+  if (phone) {
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+      throw new Error('Phone number must be 10 digits starting with 9');
+    }
+  }
+  setField('phone', phone);
   setField('address_line1', street);
   setField('address_line2', barangay);
   setField('city', normalizeText(payload.city));
@@ -160,6 +184,9 @@ router.post('/', async (req, res) => {
     const {
       label,
       full_name,
+      first_name,
+      middle_name,
+      last_name,
       phone,
       street,
       barangay,
@@ -178,6 +205,9 @@ router.post('/', async (req, res) => {
     const inserted = await insertAddress(user.id, {
       label,
       full_name,
+      first_name,
+      middle_name,
+      last_name,
       phone,
       street,
       barangay,
@@ -205,6 +235,9 @@ router.put('/:id', async (req, res) => {
     const {
       label,
       full_name,
+      first_name,
+      middle_name,
+      last_name,
       phone,
       street,
       barangay,
@@ -223,6 +256,9 @@ router.put('/:id', async (req, res) => {
     await updateAddress(user.id, id, {
       label,
       full_name,
+      first_name,
+      middle_name,
+      last_name,
       phone,
       street,
       barangay,

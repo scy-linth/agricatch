@@ -1,10 +1,12 @@
 ﻿const express = require('express');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
 const { productUpload } = require('../middleware/upload');
 const { deleteFileIfExists, resolvePublicPath } = require('../utils/fileUtils');
 const { broadcastEvent } = require('../utils/realtime');
 const cloudinary = require('../utils/cloudinary');
-const { pool } = require('../utils/db');
+const { pool, getPlatformSetting } = require('../utils/db');
+const { getFeatureFlag } = require('../middleware/featureFlags');
 
 const router = express.Router();
 
@@ -357,6 +359,9 @@ router.post('/category-requests', async (req, res) => {
       return res.status(409).json({ message: 'You already have a pending request for this product name' });
     }
 
+    // Allow resubmission if previous request was rejected - only check for pending requests
+    // Rejected requests can be resubmitted with the same name
+
     const inserted = await pool.query(
       `INSERT INTO product_name_requests (category_id, requested_category_name, name, notes, requested_by)
        VALUES ($1, $2, $3, $4, $5)
@@ -439,7 +444,7 @@ router.get('/product-requests/mine', getMyProductRequestsHandler);
 // Get all products with pagination and filtering
 router.get('/', async (req, res) => {
   try {
-    const { category, search, sort = 'latest' } = req.query;
+    const { category, search, sort = 'latest', preorder } = req.query;
     const pageNumber = Math.max(Number.parseInt(req.query.page || '1', 10), 1);
     const limitNumber = Math.min(Math.max(Number.parseInt(req.query.limit || '12', 10), 1), 48);
     const offset = (pageNumber - 1) * limitNumber;
@@ -465,10 +470,17 @@ router.get('/', async (req, res) => {
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN users u ON p.farmer_id = u.id
       LEFT JOIN farmer_subscriptions fs ON fs.farmer_id = u.id AND fs.status = 'active' AND fs.expires_at > CURRENT_TIMESTAMP
+      LEFT JOIN (
+        SELECT product_id, COALESCE(SUM(quantity), 0)::int AS sold_qty
+        FROM orders
+        WHERE status = 'delivered'
+        GROUP BY product_id
+      ) s ON s.product_id = p.id
       WHERE p.is_available = true
         AND COALESCE(p.is_admin_disabled, false) = false
         AND COALESCE(u.is_disabled, false) = false
         AND ${NON_EXPIRED_PRODUCT_SQL}
+        AND (p.is_preorder = false OR p.is_preorder = true) -- Allow pre-order products
         AND (
           c.id IS NULL
           OR (COALESCE(c.is_disabled, false) = false
@@ -496,11 +508,15 @@ router.get('/', async (req, res) => {
 
     let selectClause = `
       SELECT p.*, c.name as category_name, COALESCE(u.shop_name, u.full_name) as farmer_name, p.location as farm_location,
+             p.city, p.province,
              COALESCE(u.is_verified, false) as farmer_verified,
+             COALESCE(fs.tier = 'premium' AND fs.status = 'active', false) as farmer_premium,
               COALESCE(u.average_rating, 0) as farmer_average_rating,
               COALESCE(u.total_reviews, 0) as farmer_total_reviews,
              (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) as average_rating,
-             (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) as total_reviews${wishlistSelect}
+             (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) as total_reviews,
+             COALESCE(s.sold_qty, 0)::int AS sold_qty,
+             p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity${wishlistSelect}
     `;
 
     let whereClause = '';
@@ -535,10 +551,21 @@ router.get('/', async (req, res) => {
       whereClause += ` AND (p.name ILIKE $${paramIndex} OR p.description ILIKE $${paramIndex})`;
       params.push(searchTerm);
       paramIndex++;
-      
+
       countWhereClause += ` AND (p.name ILIKE $${countParamIdx} OR p.description ILIKE $${countParamIdx})`;
       countParams.push(searchTerm);
       countParamIdx++;
+    }
+
+    // Add pre-order filter
+    if (preorder !== undefined) {
+      if (preorder === 'true') {
+        whereClause += ` AND p.is_preorder = true`;
+        countWhereClause += ` AND p.is_preorder = true`;
+      } else if (preorder === 'false') {
+        whereClause += ` AND p.is_preorder = false`;
+        countWhereClause += ` AND p.is_preorder = false`;
+      }
     }
 
     // Build final queries
@@ -580,15 +607,16 @@ router.get('/catalog/names', async (_req, res) => {
     const categoryId = Number(_req.query?.category_id || 0) || null;
 
     const result = await pool.query(
-      `SELECT c.name
+      `SELECT c.name, COALESCE(c.default_unit, 'kg') AS default_unit
        FROM product_name_catalog c
        WHERE c.is_approved = true
+         AND COALESCE(c.is_disabled, false) = false
          AND ($1::int IS NULL OR c.category_id = $1)
        ORDER BY c.name ASC`,
       [categoryId]
     );
 
-    const names = result.rows.map((row) => row.name).filter(Boolean);
+    const names = result.rows.map((row) => ({ name: row.name, default_unit: row.default_unit })).filter(Boolean);
     return res.json({ names });
   } catch (error) {
     console.error('Catalog names error:', error);
@@ -630,11 +658,12 @@ router.get('/pricing/suggestion', async (req, res) => {
           SELECT
             MIN(p.price)::numeric(10,2) AS lowest_price,
             AVG(p.price)::numeric(10,2) AS average_price,
-            COUNT(*)::int AS sample_count
+            COUNT(DISTINCT o.user_id)::int AS sample_count
           FROM orders o
           JOIN products p ON p.id = o.product_id
           LEFT JOIN categories c ON c.id = p.category_id
           WHERE o.status = 'delivered'
+            AND o.delivered_at >= NOW() - INTERVAL '60 days'
             AND (
               c.id IS NULL
               OR (COALESCE(LOWER(c.type), 'agricultural') <> 'fishery'
@@ -658,30 +687,56 @@ router.get('/pricing/suggestion', async (req, res) => {
       return result.rows?.[0] || {};
     };
 
-    // First try category+unit-scoped suggestion, then fall back to unit-only, then system-wide
+    // First try category+unit-scoped suggestion, then fall back to category-only, then unit-only, then system-wide
+    const MIN_SAMPLE_COUNT = 5;
     let row = await runSuggestionQuery({ withCategory: !!categoryId, withUnit: !!unit });
-    if (categoryId && Number(row.sample_count || 0) <= 0) {
+    if (categoryId && Number(row.sample_count || 0) < MIN_SAMPLE_COUNT) {
       row = await runSuggestionQuery({ withCategory: false, withUnit: !!unit });
     }
-    if (unit && Number(row.sample_count || 0) <= 0) {
+    if (unit && Number(row.sample_count || 0) < MIN_SAMPLE_COUNT) {
       row = await runSuggestionQuery({ withCategory: false, withUnit: false });
     }
 
     const normalizedKey = rawName.toLowerCase();
     const fallback = SUGGESTED_PRICE_BASELINE[normalizedKey] || null;
-    const hasSample = Number(row.sample_count || 0) > 0;
+    const hasSample = Number(row.sample_count || 0) >= MIN_SAMPLE_COUNT;
+
+    // Check if admin has set an average price for this product in the catalog (by category + unit)
+    let adminSetPrice = null;
+    try {
+      const catalogResult = await pool.query(
+        `SELECT admin_set_average_price FROM product_name_catalog WHERE LOWER(name) = LOWER($1)${categoryId ? ' AND category_id = $2' : ''}${unit ? ' AND default_unit = $3' : ''} LIMIT 1`,
+        categoryId && unit ? [rawName, Number(categoryId), unit] : (categoryId ? [rawName, Number(categoryId)] : (unit ? [rawName, unit] : [rawName]))
+      );
+      if (catalogResult.rows.length > 0 && catalogResult.rows[0].admin_set_average_price !== null) {
+        adminSetPrice = Number(catalogResult.rows[0].admin_set_average_price);
+      }
+    } catch (catalogError) {
+      console.error('Error fetching admin-set price from catalog:', catalogError);
+    }
+
+    // Priority: admin-set price > real data > baseline
+    const finalAveragePrice = adminSetPrice !== null
+      ? adminSetPrice
+      : (hasSample
+          ? (row.average_price ? Number(row.average_price) : null)
+          : (fallback ? fallback.average : null));
+
+    const finalLowestPrice = adminSetPrice !== null
+      ? null // Admin only sets average, not lowest
+      : (hasSample
+          ? (row.lowest_price ? Number(row.lowest_price) : null)
+          : (fallback ? fallback.lowest : null));
 
     return res.json({
       name: rawName,
       unit: unit || null,
-      suggested_lowest_price: hasSample
-        ? (row.lowest_price ? Number(row.lowest_price) : null)
-        : (fallback ? fallback.lowest : null),
-      average_price: hasSample
-        ? (row.average_price ? Number(row.average_price) : null)
-        : (fallback ? fallback.average : null),
+      suggested_lowest_price: finalLowestPrice,
+      average_price: finalAveragePrice,
       sample_count: Number(row.sample_count || 0),
-      is_baseline_estimate: !hasSample && !!fallback
+      is_baseline_estimate: !hasSample && !!fallback && adminSetPrice === null,
+      is_admin_set: adminSetPrice !== null,
+      admin_set_average_price: adminSetPrice
     });
   } catch (error) {
     console.error('Pricing suggestion error:', error);
@@ -707,7 +762,9 @@ router.get('/featured', async (req, res) => {
     // First try to get admin-curated featured products
     const featuredResult = await pool.query(
       `SELECT p.*, COALESCE(u.shop_name, u.full_name) AS farmer_name,
+              p.city, p.province,
               COALESCE(u.is_verified, false) as farmer_verified,
+              COALESCE(fs.tier = 'premium' AND fs.status = 'active', false) as farmer_premium,
               COALESCE(u.average_rating, 0) as farmer_average_rating,
               COALESCE(u.total_reviews, 0) as farmer_total_reviews,
               (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) AS average_rating,
@@ -716,13 +773,14 @@ router.get('/featured', async (req, res) => {
        FROM featured_products fp
        JOIN products p ON fp.product_id = p.id
        JOIN users u ON u.id = p.farmer_id
+       LEFT JOIN farmer_subscriptions fs ON fs.farmer_id = u.id AND fs.status = 'active' AND fs.expires_at > CURRENT_TIMESTAMP
        LEFT JOIN categories c ON c.id = p.category_id
        WHERE fp.is_active = true
          AND (fp.expires_at IS NULL OR fp.expires_at > CURRENT_TIMESTAMP)
          AND p.is_available = true
          AND COALESCE(p.is_admin_disabled, false) = false
          AND COALESCE(u.is_disabled, false) = false
-         AND p.stock_quantity > 0
+         AND (p.stock_quantity > 0 OR p.is_preorder = true) -- Allow pre-order products with 0 stock
          AND ${NON_EXPIRED_PRODUCT_SQL}
          AND (
            c.id IS NULL
@@ -751,7 +809,9 @@ router.get('/featured', async (req, res) => {
     const fallbackResult = await pool.query(
       `
         SELECT p.*, COALESCE(u.shop_name, u.full_name) AS farmer_name,
+               p.city, p.province,
                COALESCE(u.is_verified, false) as farmer_verified,
+               COALESCE(fs.tier = 'premium' AND fs.status = 'active', false) as farmer_premium,
                COALESCE(s.sold_qty, 0)::int AS sold_qty,
                COALESCE(u.average_rating, 0) as farmer_average_rating,
                COALESCE(u.total_reviews, 0) as farmer_total_reviews,
@@ -760,6 +820,7 @@ router.get('/featured', async (req, res) => {
                NULL as position
         FROM products p
         LEFT JOIN users u ON u.id = p.farmer_id
+        LEFT JOIN farmer_subscriptions fs ON fs.farmer_id = u.id AND fs.status = 'active' AND fs.expires_at > CURRENT_TIMESTAMP
         LEFT JOIN categories c ON c.id = p.category_id
         LEFT JOIN (
           SELECT product_id, COALESCE(SUM(quantity), 0)::int AS sold_qty
@@ -845,16 +906,24 @@ router.get('/:id', async (req, res) => {
     const result = await pool.query(`
       SELECT p.*, c.name as category_name, COALESCE(u.shop_name, u.full_name) as farmer_name,
              COALESCE(p.location, u.address) as farm_location,
+             p.city, p.province,
              COALESCE(u.is_verified, false) as farmer_verified,
              COALESCE(u.average_rating, 0) as farmer_average_rating,
              COALESCE(u.total_reviews, 0) as farmer_total_reviews,
              (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) as average_rating,
             (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) as total_reviews,
             p.cloudinary_public_id as cloudinary_public_id,
+            COALESCE(s.sold_qty, 0)::int AS sold_qty,
              ${userId ? `EXISTS (SELECT 1 FROM wishlist w WHERE w.user_id = $${params.length + 1} AND w.product_id = p.id)` : 'false'} as is_in_wishlist
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN users u ON p.farmer_id = u.id
+      LEFT JOIN (
+        SELECT product_id, COALESCE(SUM(quantity), 0)::int AS sold_qty
+        FROM orders
+        WHERE status = 'delivered'
+        GROUP BY product_id
+      ) s ON s.product_id = p.id
       ${whereClause}
     `, userId ? [...params, userId] : params);
 
@@ -874,6 +943,7 @@ router.get('/:id', async (req, res) => {
 router.get('/:id/similar-sellers', async (req, res) => {
   try {
     const { id } = req.params;
+    const { is_preorder } = req.query;
 
     const targetRes = await pool.query(
       `SELECT id, name, category_id, farmer_id FROM products WHERE id = $1`,
@@ -886,6 +956,19 @@ router.get('/:id/similar-sellers', async (req, res) => {
 
     const target = targetRes.rows[0];
 
+    // Build is_preorder filter if provided
+    let preorderFilter = '';
+    const queryParams = [id, target.farmer_id, target.name, `${String(target.name || '').split('(')[0].trim()}%`, target.category_id || null];
+    let paramIndex = 6;
+
+    if (is_preorder !== undefined) {
+      if (is_preorder === 'true') {
+        preorderFilter = `AND p.is_preorder = true`;
+      } else if (is_preorder === 'false') {
+        preorderFilter = `AND p.is_preorder = false AND p.stock_quantity > 0`;
+      }
+    }
+
     const similarRes = await pool.query(
       `
         SELECT p.id, p.name, p.price, p.unit, p.stock_quantity, p.sales_count, p.image_url,
@@ -894,7 +977,8 @@ router.get('/:id/similar-sellers', async (req, res) => {
                COALESCE(u.average_rating, 0) as farmer_average_rating,
                COALESCE(u.total_reviews, 0) as farmer_total_reviews,
                (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) AS average_rating,
-               (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) AS total_reviews
+               (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) AS total_reviews,
+               p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity
         FROM products p
         LEFT JOIN users u ON u.id = p.farmer_id
         LEFT JOIN (
@@ -908,8 +992,9 @@ router.get('/:id/similar-sellers', async (req, res) => {
           AND p.is_available = true
           AND COALESCE(p.is_admin_disabled, false) = false
           AND COALESCE(u.is_disabled, false) = false
-          AND p.stock_quantity > 0
+          AND (p.stock_quantity > 0 OR p.is_preorder = true)
           AND ${NON_EXPIRED_PRODUCT_SQL}
+          ${preorderFilter}
           AND (
             LOWER(p.name) = LOWER($3)
             OR p.name ILIKE $4
@@ -918,7 +1003,7 @@ router.get('/:id/similar-sellers', async (req, res) => {
         ORDER BY p.price ASC, COALESCE(s.sold_qty, 0) DESC
         LIMIT 3
       `,
-      [id, target.farmer_id, target.name, `${String(target.name || '').split('(')[0].trim()}%`, target.category_id || null]
+      queryParams
     );
 
     const rows = similarRes.rows || [];
@@ -1004,7 +1089,7 @@ router.get('/farmer/:farmerId', async (req, res) => {
 });
 
 // Add new product (for farmers)
-router.post('/', productUpload.single('image'), async (req, res) => {
+router.post('/', multer().none(), async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
 
@@ -1042,25 +1127,26 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       return res.status(403).json({ message: 'Please verify your account before adding products.' });
     }
 
-    // Free verified: max 10 products
+    // Free verified: max products per farmer (configurable via platform_settings)
     if (tier === 'free') {
+      const maxProducts = parseInt(await getPlatformSetting('max_products_per_farmer', '10'), 10);
       const count = await getFarmerProductCount(decoded.id);
-      if (count >= 10) {
+      if (count >= maxProducts) {
         try {
           await pool.query(
             `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
              VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
             [decoded.id, 'product_limit_reached', 'Product Limit Reached',
-             'You have reached the maximum of 10 products. Upgrade to Premium for unlimited listings.']
+             `You have reached the maximum of ${maxProducts} products. Upgrade to Premium for unlimited listings.`]
           );
           broadcastEvent('notification.created', { user_id: decoded.id });
         } catch (notifErr) {
           console.error('Failed to send product limit notification:', notifErr);
         }
         return res.status(403).json({
-          message: 'Free tier limit: 10 active products max. Upgrade to Premium for unlimited listings.',
+          message: `Free tier limit: ${maxProducts} active products max. Upgrade to Premium for unlimited listings.`,
           current_count: count,
-          limit: 10
+          limit: maxProducts
         });
       }
     }
@@ -1074,9 +1160,17 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       unit,
       image_url,
       location,
+      city,
+      province,
       harvest_date,
-      expiry_date
+      expiry_date,
+      is_preorder,
+      preorder_availability_date,
+      max_preorder_quantity
     } = req.body;
+
+    // Normalize boolean values from FormData strings
+    const isPreorderValue = is_preorder === true || is_preorder === 'true' || is_preorder === '1';
 
     const normalizedDescription = normalizeDescription(description);
 
@@ -1094,6 +1188,15 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'Invalid category. Fishery categories are not allowed.' });
     }
 
+    // Validate pre-order fields
+    if (isPreorderValue === true && !preorder_availability_date) {
+      return res.status(400).json({ message: 'preorder_availability_date is required when is_preorder is true' });
+    }
+
+    if (max_preorder_quantity !== undefined && max_preorder_quantity !== null && max_preorder_quantity <= 0) {
+      return res.status(400).json({ message: 'max_preorder_quantity must be positive' });
+    }
+
     await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS cloudinary_public_id VARCHAR(255)');
     await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT \'approved\'');
 
@@ -1103,26 +1206,6 @@ router.post('/', productUpload.single('image'), async (req, res) => {
     if (image_url && String(image_url).trim() !== '') {
       imageUrl = String(image_url).trim();
       imagePublicId = req.body?.cloudinary_public_id || extractCloudinaryPublicId(imageUrl) || null;
-    }
-
-    if (req.file && req.file.path) {
-      try {
-        const uploaded = await cloudinary.uploadFile(req.file.path, {
-          folder: 'agricatch/products/tmp',
-          resource_type: 'image',
-          transformation: [
-            { width: 1200, crop: 'limit', quality: 'auto:good' },
-            { fetch_format: 'auto' }
-          ]
-        });
-        imageUrl = uploaded.secure_url;
-        imagePublicId = uploaded.public_id;
-      } catch (uploadErr) {
-        deleteFileIfExists(req.file.path);
-        return res.status(500).json({ message: 'Cloudinary upload failed' });
-      } finally {
-        deleteFileIfExists(req.file.path);
-      }
     }
 
     // Auto-populate location with shop address if not provided
@@ -1135,14 +1218,38 @@ router.post('/', productUpload.single('image'), async (req, res) => {
     // Normalize optional date fields: treat empty strings as NULL
     const harvestDateValue = (harvest_date && String(harvest_date).trim() !== '') ? harvest_date : null;
     const expiryDateValue = (expiry_date && String(expiry_date).trim() !== '') ? expiry_date : null;
+    const preorderAvailabilityDateValue = (preorder_availability_date && String(preorder_availability_date).trim() !== '') ? preorder_availability_date : null;
+
+    // Validate pre-order date relationship
+    if (preorderAvailabilityDateValue && expiryDateValue) {
+      const availabilityDate = new Date(preorderAvailabilityDateValue);
+      const expiryDate = new Date(expiryDateValue);
+      if (expiryDate < availabilityDate) {
+        return res.status(400).json({ message: 'expiry_date must be after preorder_availability_date' });
+      }
+    }
+
+    // Normalize city and province: treat empty strings as NULL
+    const cityValue = (city && String(city).trim() !== '') ? city : null;
+    const provinceValue = (province && String(province).trim() !== '') ? province : null;
+
+    // Check if product approval is required via feature flag
+    const requireApproval = await getFeatureFlag('require_product_approval');
+    const initialStatus = requireApproval ? 'pending' : 'approved';
+    const initialIsAvailable = requireApproval ? false : true;
 
     const result = await pool.query(`
       INSERT INTO products (name, description, price, category_id, farmer_id, stock_quantity,
-                           unit, image_url, location, harvest_date, expiry_date, cloudinary_public_id, is_available, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                           unit, image_url, location, city, province, harvest_date, expiry_date, cloudinary_public_id, is_available, status,
+                           is_preorder, preorder_availability_date, reserved_quantity, max_preorder_quantity)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
       RETURNING *
     `, [name, normalizedDescription, price, category_id, decoded.id, stock_quantity,
-         unit, imageUrl, productLocation, harvestDateValue, expiryDateValue, imagePublicId, false, 'pending']);
+         unit || 'kg', imageUrl, productLocation, cityValue, provinceValue, harvestDateValue, expiryDateValue, imagePublicId, initialIsAvailable, initialStatus,
+         isPreorderValue || false,
+         preorderAvailabilityDateValue || null,
+         0, // reserved_quantity always starts at 0
+         max_preorder_quantity || null]);
 
     let createdProduct = result.rows[0];
 
@@ -1177,21 +1284,23 @@ router.post('/', productUpload.single('image'), async (req, res) => {
       farmer_id: Number(decoded.id)
     });
 
-    // Send notification to admin about new product submission
-    try {
-      const adminResult = await pool.query(
-        "SELECT id FROM users WHERE role IN ('admin', 'super_admin') LIMIT 1"
-      );
-      if (adminResult.rows.length > 0) {
-        await pool.query(
-          `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
-           VALUES ($1, $2, $3, $4, $5, false, CURRENT_TIMESTAMP)`,
-          [adminResult.rows[0].id, 'new_product_submitted', 'New Product Submitted', `A new product "${name}" has been submitted for approval.`, createdProduct.id]
+    // Send notification to admin about new product submission (only if approval is required)
+    if (requireApproval) {
+      try {
+        const adminResult = await pool.query(
+          "SELECT id FROM users WHERE role IN ('admin', 'super_admin') LIMIT 1"
         );
-        broadcastEvent('notification.created', { user_id: adminResult.rows[0].id });
+        if (adminResult.rows.length > 0) {
+          await pool.query(
+            `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+             VALUES ($1, $2, $3, $4, $5, false, CURRENT_TIMESTAMP)`,
+            [adminResult.rows[0].id, 'new_product_submitted', 'New Product Submitted', `A new product "${name}" has been submitted for approval.`, createdProduct.id]
+          );
+          broadcastEvent('notification.created', { user_id: adminResult.rows[0].id });
+        }
+      } catch (adminErr) {
+        console.error('Failed to send new product notification to admin:', adminErr);
       }
-    } catch (adminErr) {
-      console.error('Failed to send new product notification to admin:', adminErr);
     }
 
     res.status(201).json({
@@ -1206,7 +1315,7 @@ router.post('/', productUpload.single('image'), async (req, res) => {
 });
 
 // Update product (for farmers)
-router.put('/:id', productUpload.single('image'), async (req, res) => {
+router.put('/:id', multer().none(), async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
 
@@ -1240,9 +1349,14 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
       unit,
       image_url,
       location,
+      city,
+      province,
       harvest_date,
       expiry_date,
-      is_available
+      is_available,
+      is_preorder,
+      preorder_availability_date,
+      max_preorder_quantity
     } = req.body;
 
     const nextName = typeof name === 'undefined' ? current.name : name;
@@ -1252,9 +1366,15 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
     const nextStockQuantity = typeof stock_quantity === 'undefined' ? current.stock_quantity : stock_quantity;
     const nextUnit = typeof unit === 'undefined' ? current.unit : unit;
     const nextLocation = typeof location === 'undefined' ? current.location : location;
+    const nextCity = typeof city === 'undefined' ? current.city : (String(city).trim() === '' ? null : city);
+    const nextProvince = typeof province === 'undefined' ? current.province : (String(province).trim() === '' ? null : province);
     const nextHarvestDate = (typeof harvest_date === 'undefined') ? current.harvest_date : (String(harvest_date).trim() === '' ? null : harvest_date);
     const nextExpiryDate = (typeof expiry_date === 'undefined') ? current.expiry_date : (String(expiry_date).trim() === '' ? null : expiry_date);
     const nextIsAvailable = typeof is_available === 'undefined' ? current.is_available : is_available;
+    // Normalize boolean values from FormData strings
+    const nextIsPreorder = typeof is_preorder === 'undefined' ? current.is_preorder : (is_preorder === true || is_preorder === 'true' || is_preorder === '1');
+    const nextPreorderAvailabilityDate = (typeof preorder_availability_date === 'undefined') ? current.preorder_availability_date : (String(preorder_availability_date).trim() === '' ? null : preorder_availability_date);
+    const nextMaxPreorderQuantity = typeof max_preorder_quantity === 'undefined' ? current.max_preorder_quantity : max_preorder_quantity;
 
     if (nextDescription && String(nextDescription).length > PRODUCT_DESCRIPTION_MAX_LENGTH) {
       return res.status(400).json({ message: `Description must be ${PRODUCT_DESCRIPTION_MAX_LENGTH} characters or less.` });
@@ -1268,6 +1388,39 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
     // Farm-only system: block fishery categories
     if (!(await isAllowedFarmCategoryId(nextCategoryId))) {
       return res.status(400).json({ message: 'Invalid category. Fishery categories are not allowed.' });
+    }
+
+    // Validate pre-order fields
+    if (nextIsPreorder === true && !nextPreorderAvailabilityDate) {
+      return res.status(400).json({ message: 'preorder_availability_date is required when is_preorder is true' });
+    }
+
+    if (nextPreorderAvailabilityDate && nextExpiryDate) {
+      const availabilityDate = new Date(nextPreorderAvailabilityDate);
+      const expiryDate = new Date(nextExpiryDate);
+      if (expiryDate < availabilityDate) {
+        return res.status(400).json({ message: 'expiry_date must be after preorder_availability_date' });
+      }
+    }
+
+    if (nextMaxPreorderQuantity !== undefined && nextMaxPreorderQuantity !== null && nextMaxPreorderQuantity <= 0) {
+      return res.status(400).json({ message: 'max_preorder_quantity must be positive' });
+    }
+
+    // Block unsafe preorder edits when active preorders exist
+    if (current.reserved_quantity > 0) {
+      // Cannot disable preorder when there are active reservations
+      if (current.is_preorder === true && nextIsPreorder === false) {
+        return res.status(400).json({ message: 'Cannot disable pre-order status while there are active pre-order reservations' });
+      }
+      // Cannot reduce max_preorder_quantity below already reserved
+      if (nextMaxPreorderQuantity !== null && Number(nextMaxPreorderQuantity) < Number(current.reserved_quantity)) {
+        return res.status(400).json({ message: `Cannot reduce max pre-order quantity (${nextMaxPreorderQuantity}) below already reserved quantity (${current.reserved_quantity})` });
+      }
+      // Cannot remove preorder_availability_date when there are active reservations
+      if (current.is_preorder === true && nextIsPreorder === true && nextPreorderAvailabilityDate === null) {
+        return res.status(400).json({ message: 'Cannot remove pre-order availability date while there are active pre-order reservations' });
+      }
     }
 
     // Determine image URL: use explicit cloud URL if provided, otherwise keep current.
@@ -1322,52 +1475,6 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
       }
     }
 
-    if (req.file && req.file.path) {
-      let uploaded;
-      try {
-        uploaded = await cloudinary.uploadFile(req.file.path, {
-          public_id: targetPublicId,
-          overwrite: true,
-          invalidate: true,
-          tags: [
-            'app:agricatch',
-            'entity:product',
-            `entity_id:${id}`,
-            `category:${cloudinary.slugify(resolvedCategoryName)}`,
-            'role:primary'
-          ],
-          resource_type: 'image',
-          transformation: [
-            { width: 1200, crop: 'limit', quality: 'auto:good' },
-            { fetch_format: 'auto' }
-          ]
-        });
-      } catch (uploadErr) {
-        deleteFileIfExists(req.file.path);
-        return res.status(500).json({ message: 'Cloudinary upload failed' });
-      } finally {
-        deleteFileIfExists(req.file.path);
-      }
-
-      imageUrl = uploaded.secure_url;
-      imagePublicId = uploaded.public_id;
-
-      if (oldPublicId && oldPublicId !== imagePublicId) {
-        try {
-          await cloudinary.uploader.destroy(oldPublicId, { resource_type: 'image' });
-        } catch (destroyErr) {
-          console.warn('Failed to destroy previous Cloudinary asset:', oldPublicId, destroyErr && (destroyErr.message || destroyErr));
-        }
-      }
-
-      try {
-        const oldPath = resolvePublicPath(current.image_url);
-        if (oldPath) deleteFileIfExists(oldPath);
-      } catch (e) {
-        console.warn('Failed to delete old product image:', e.message || e);
-      }
-    }
-
     // If product was rejected, reset status to pending for resubmission
     // Note: is_available is already set in the main query, so we don't include it here
     const statusReset = current.status === 'rejected' ? ', status = \'pending\', is_admin_disabled = false, rejection_reason = NULL' : '';
@@ -1376,12 +1483,14 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
       UPDATE products SET
         name = $1, description = $2, price = $3, category_id = $4,
         stock_quantity = $5, unit = $6, image_url = $7, location = $8,
-        harvest_date = $9, expiry_date = $10, is_available = $11,
-        cloudinary_public_id = $12${statusReset},
+        city = $9, province = $10,
+        harvest_date = $11, expiry_date = $12, is_available = $13,
+        cloudinary_public_id = $14, is_preorder = $15, preorder_availability_date = $16, max_preorder_quantity = $17${statusReset},
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $13
+      WHERE id = $18
     `, [nextName, nextDescription, nextPrice, nextCategoryId, nextStockQuantity, nextUnit,
-         imageUrl, nextLocation, nextHarvestDate, nextExpiryDate, nextIsAvailable, imagePublicId, id]);
+         imageUrl, nextLocation, nextCity, nextProvince, nextHarvestDate, nextExpiryDate, nextIsAvailable, imagePublicId,
+         nextIsPreorder, nextPreorderAvailabilityDate, nextMaxPreorderQuantity, id]);
 
     // Check if product went from out of stock to in stock and notify wishlist customers
     const wasOutOfStock = Number(current.stock_quantity || 0) === 0;
@@ -1440,6 +1549,189 @@ router.put('/:id', productUpload.single('image'), async (req, res) => {
   } catch (error) {
     console.error('Update product error:', error);
     res.status(500).json({ message: 'Server error updating product' });
+  }
+});
+
+// Convert pre-orders to stock when harvest is ready
+router.post('/:id/convert-preorders', async (req, res) => {
+  try {
+    const productId = req.params.id;
+    const { harvest_quantity } = req.body;
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Parse and validate harvest_quantity
+    const harvestQuantity = Number.parseInt(harvest_quantity, 10);
+    if (!Number.isInteger(harvestQuantity) || harvestQuantity <= 0) {
+      return res.status(400).json({ message: 'Harvest quantity is required and must be a positive integer' });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Get product details with row lock to prevent concurrent modifications
+      const productResult = await client.query(
+        'SELECT farmer_id, is_preorder, reserved_quantity, stock_quantity FROM products WHERE id = $1 FOR UPDATE',
+        [productId]
+      );
+
+      if (productResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(404).json({ message: 'Product not found' });
+      }
+
+      const product = productResult.rows[0];
+
+      // Verify user is the farmer
+      if (Number(product.farmer_id) !== Number(decoded.id)) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(403).json({ message: 'You can only convert pre-orders for your own products' });
+      }
+
+      if (!product.is_preorder) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json({ message: 'This product is not a pre-order product' });
+      }
+
+      if (product.reserved_quantity === 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json({ message: 'No pre-orders to convert' });
+      }
+
+      // Calculate allocation and surplus
+      // Support partial harvest: harvest may be less than reserved
+      const allocatedQuantity = Math.min(harvestQuantity, product.reserved_quantity);
+      const surplusQuantity = Math.max(harvestQuantity - product.reserved_quantity, 0);
+      const shortageQuantity = Math.max(product.reserved_quantity - harvestQuantity, 0);
+
+      // Update product: add surplus to stock, reduce reserved by allocated amount
+      await client.query(`
+        UPDATE products
+        SET stock_quantity = stock_quantity + $1,
+            reserved_quantity = reserved_quantity - $2
+        WHERE id = $3
+      `, [surplusQuantity, allocatedQuantity, productId]);
+
+      // Get updated stock for response
+      const updatedProduct = await client.query(
+        'SELECT stock_quantity FROM products WHERE id = $1',
+        [productId]
+      );
+      const newStock = updatedProduct.rows[0].stock_quantity;
+
+      // Get active pre-order orders (not cancelled or delivered) ordered by creation date for FIFO allocation
+      const orderResult = await client.query(`
+        SELECT id, quantity, preorder_reserved_quantity FROM orders
+        WHERE product_id = $1
+          AND is_preorder = true
+          AND status NOT IN ('cancelled', 'delivered')
+        ORDER BY created_at ASC
+      `, [productId]);
+
+      // FIFO allocation: allocate harvest quantity to orders in order of creation
+      let remainingToAllocate = allocatedQuantity;
+      const fullyAllocatedOrderIds = [];
+      const partiallyAllocatedOrders = [];
+
+      for (const order of orderResult.rows) {
+        if (remainingToAllocate <= 0) break;
+        
+        const orderQuantity = order.quantity;
+        const allocateToOrder = Math.min(remainingToAllocate, orderQuantity);
+        
+        if (allocateToOrder > 0) {
+          await client.query(`
+            UPDATE orders
+            SET preorder_converted_at = CURRENT_TIMESTAMP,
+                preorder_fulfilled_quantity = $1,
+                preorder_reserved_quantity = preorder_reserved_quantity - $1,
+                status = 'confirmed'
+            WHERE id = $2
+          `, [allocateToOrder, order.id]);
+          
+          remainingToAllocate -= allocateToOrder;
+          
+          if (allocateToOrder === orderQuantity) {
+            fullyAllocatedOrderIds.push(order.id);
+          } else {
+            partiallyAllocatedOrders.push({ id: order.id, allocated: allocateToOrder, total: orderQuantity });
+          }
+
+          // Notify customer that pre-order is confirmed and ready for delivery scheduling
+          try {
+            await client.query(`
+              INSERT INTO notifications (user_id, type, title, message, order_id, product_id, is_read, created_at)
+              SELECT user_id, 'order_update', 'Pre-order Confirmed', 
+                     'Your pre-order #' || id || ' has been harvested and confirmed. The farmer will schedule delivery soon.',
+                     id, product_id, false, CURRENT_TIMESTAMP
+              FROM orders WHERE id = $1
+            `, [order.id]);
+            broadcastEvent('notification.created', { order_id: order.id });
+          } catch (notifErr) {
+            console.error('Failed to send pre-order confirmation notification:', notifErr);
+          }
+        }
+      }
+
+      const affectedOrderIds = [...fullyAllocatedOrderIds, ...partiallyAllocatedOrders.map(o => o.id)];
+
+      await client.query('COMMIT');
+
+      // Broadcast real-time order updates
+      for (const orderId of affectedOrderIds) {
+        try {
+          broadcastEvent('order.updated', {
+            order_id: orderId,
+            product_id: Number(productId),
+            farmer_id: Number(decoded.id),
+            new_status: 'confirmed',
+            old_status: 'preorder_reserved'
+          });
+        } catch (broadcastErr) {
+          console.error('Failed to broadcast order update:', broadcastErr);
+        }
+      }
+
+      res.json({
+        message: 'Pre-orders converted to stock successfully',
+        harvest_quantity: harvestQuantity,
+        allocated_quantity: allocatedQuantity,
+        surplus_quantity: surplusQuantity,
+        shortage_quantity: shortageQuantity,
+        new_stock_quantity: newStock,
+        affected_orders: affectedOrderIds,
+        fully_allocated: fullyAllocatedOrderIds.length,
+        partially_allocated: partiallyAllocatedOrders.length
+      });
+
+    } catch (error) {
+      if (client) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          console.error('Rollback error:', rollbackError);
+        }
+      }
+      throw error;
+    } finally {
+      if (client) {
+        client.release();
+      }
+    }
+
+  } catch (error) {
+    console.error('Convert pre-orders error:', error);
+    res.status(500).json({ message: 'Server error converting pre-orders' });
   }
 });
 

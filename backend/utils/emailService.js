@@ -94,14 +94,17 @@ if (!useResend) {
  * @param {string} to - Recipient email address
  * @param {string} otp - OTP code
  * @param {string} purpose - Purpose: 'login', 'register', 'reset_password'
+ * @param {string} firstName - Recipient's first name for personalization
  * @returns {Promise}
  */
-async function sendOtpEmail(to, otp, purpose = "login") {
+async function sendOtpEmail(to, otp, purpose = "login", firstName = null) {
   const purposeText = {
     login: "Login",
     register: "Registration",
     reset_password: "Password Reset",
   }[purpose] || "Verification";
+
+  const greeting = firstName ? `Hello ${firstName},` : "Hello,";
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -127,7 +130,7 @@ async function sendOtpEmail(to, otp, purpose = "login") {
           <p>${purposeText} Verification</p>
         </div>
         <div class="content">
-          <p>Hello,</p>
+          <p>${greeting}</p>
           <p>Your One-Time Password (OTP) for ${purposeText.toLowerCase()} is:</p>
           <div class="otp-box">
             <div class="otp-code">${otp}</div>
@@ -137,7 +140,7 @@ async function sendOtpEmail(to, otp, purpose = "login") {
           <p>If you didn\'t request this code, please ignore this email.</p>
         </div>
         <div class="footer">
-          <p>© ${new Date().getFullYear()} AgriCatch. All rights reserved.</p>
+          <p>© 2026 AgriCatch. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -146,6 +149,8 @@ async function sendOtpEmail(to, otp, purpose = "login") {
 
   const textContent = `
     AgriCatch - ${purposeText} Verification
+    
+    ${greeting}
     
     Your OTP code is: ${otp}
     
@@ -235,7 +240,492 @@ async function sendOtpEmail(to, otp, purpose = "login") {
   }
 }
 
+/**
+ * Send welcome email after successful registration
+ * @param {string} to - Recipient email address
+ * @param {string} firstName - Recipient's first name
+ * @param {string} role - User role (farmer, customer)
+ * @returns {Promise}
+ */
+async function sendWelcomeEmail(to, firstName, role = "customer") {
+  const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #2e7d32; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .logo-img { max-width: 120px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        .benefits { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .benefits ul { list-style: none; padding: 0; }
+        .benefits li { padding: 8px 0; }
+        .benefits li i { color: #2e7d32; margin-right: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
+          <h1>AgriCatch</h1>
+          <p>Welcome</p>
+        </div>
+        <div class="content">
+          <p>${greeting}</p>
+          <p>Welcome to AgriCatch! Your account has been successfully created.</p>
+          ${role === 'farmer' ? `
+          <div class="benefits">
+            <h3>Farmer Benefits:</h3>
+            <ul>
+              <li>✓ Complete your verification to start selling</li>
+              <li>✓ Add up to 10 products on the Free tier</li>
+              <li>✓ Upgrade to Premium for unlimited products</li>
+            </ul>
+          </div>
+          ` : `
+          <div class="benefits">
+            <h3>Customer Benefits:</h3>
+            <ul>
+              <li>✓ Browse fresh agricultural products</li>
+              <li>✓ Order directly from local farmers</li>
+              <li>✓ Track your orders in real-time</li>
+            </ul>
+          </div>
+          `}
+          <p>Thank you for joining our community!</p>
+        </div>
+        <div class="footer">
+          <p>© 2026 AgriCatch. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const textContent = `
+    AgriCatch - Welcome
+    
+    ${greeting}
+    
+    Welcome to AgriCatch! Your account has been successfully created.
+    
+    ${role === 'farmer' ? `
+    Farmer Benefits:
+    - Complete your verification to start selling
+    - Add up to 10 products on the Free tier
+    - Upgrade to Premium for unlimited products
+    ` : `
+    Customer Benefits:
+    - Browse fresh agricultural products
+    - Order directly from local farmers
+    - Track your orders in real-time
+    `}
+    
+    Thank you for joining our community!
+    
+    © 2026 AgriCatch. All rights reserved.
+  `;
+
+  return await sendEmail(to, "Welcome to AgriCatch!", htmlContent, textContent);
+}
+
+/**
+ * Send account verification email
+ * @param {string} to - Recipient email address
+ * @param {string} firstName - Recipient's first name
+ * @returns {Promise}
+ */
+async function sendVerificationEmail(to, firstName) {
+  const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #2e7d32; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .logo-img { max-width: 120px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        .benefits { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .benefits ul { list-style: none; padding: 0; }
+        .benefits li { padding: 8px 0; }
+        .benefits li i { color: #2e7d32; margin-right: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
+          <h1>AgriCatch</h1>
+          <p>Account Verification</p>
+        </div>
+        <div class="content">
+          <p>${greeting}</p>
+          <p>Congratulations! Your farmer account has been verified.</p>
+          <div class="benefits">
+            <h3>You can now:</h3>
+            <ul>
+              <li>✓ Sell products (up to 10 on the Free tier)</li>
+              <li>✓ Access basic analytics</li>
+              <li>✓ Receive customer orders</li>
+            </ul>
+          </div>
+          <div class="benefits">
+            <h3>Upgrade to Premium for:</h3>
+            <ul>
+              <li>✓ Unlimited products</li>
+              <li>✓ Priority search ranking</li>
+              <li>✓ Custom product names</li>
+              <li>✓ Advanced analytics</li>
+            </ul>
+          </div>
+          <p>Thank you for joining AgriCatch!</p>
+        </div>
+        <div class="footer">
+          <p>© 2026 AgriCatch. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const textContent = `
+    AgriCatch - Account Verification
+    
+    ${greeting}
+    
+    Congratulations! Your farmer account has been verified.
+    
+    You can now:
+    - Sell products (up to 10 on the Free tier)
+    - Access basic analytics
+    - Receive customer orders
+    
+    Upgrade to Premium for:
+    - Unlimited products
+    - Priority search ranking
+    - Custom product names
+    - Advanced analytics
+    
+    Thank you for joining AgriCatch!
+    
+    © 2026 AgriCatch. All rights reserved.
+  `;
+
+  return await sendEmail(to, "Your AgriCatch Account Has Been Verified!", htmlContent, textContent);
+}
+
+/**
+ * Send account unverification email
+ * @param {string} to - Recipient email address
+ * @param {string} firstName - Recipient's first name
+ * @param {string} reason - Reason for unverification
+ * @returns {Promise}
+ */
+async function sendUnverificationEmail(to, firstName, reason) {
+  const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #d32f2f; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .logo-img { max-width: 120px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
+          <h1>AgriCatch</h1>
+          <p>Account Status Update</p>
+        </div>
+        <div class="content">
+          <p>${greeting}</p>
+          <p>Your farmer account verification has been revoked.</p>
+          <div class="warning">
+            <strong>Reason:</strong> ${reason}
+          </div>
+          <p>Product creation and sales features are now disabled. If you believe this is an error, please contact our support team.</p>
+        </div>
+        <div class="footer">
+          <p>© 2026 AgriCatch. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const textContent = `
+    AgriCatch - Account Status Update
+    
+    ${greeting}
+    
+    Your farmer account verification has been revoked.
+    
+    Reason: ${reason}
+    
+    Product creation and sales features are now disabled. If you believe this is an error, please contact our support team.
+    
+    © 2026 AgriCatch. All rights reserved.
+  `;
+
+  return await sendEmail(to, "Important: Your AgriCatch Account Verification Has Been Revoked", htmlContent, textContent);
+}
+
+/**
+ * Send premium upgrade email
+ * @param {string} to - Recipient email address
+ * @param {string} firstName - Recipient's first name
+ * @returns {Promise}
+ */
+async function sendPremiumUpgradeEmail(to, firstName) {
+  const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #9333ea; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .logo-img { max-width: 120px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        .benefits { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .benefits ul { list-style: none; padding: 0; }
+        .benefits li { padding: 8px 0; }
+        .benefits li i { color: #9333ea; margin-right: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
+          <h1>AgriCatch</h1>
+          <p>Premium Upgrade</p>
+        </div>
+        <div class="content">
+          <p>${greeting}</p>
+          <p>Congratulations! You are now a Premium Partner.</p>
+          <div class="benefits">
+            <h3>Your Premium benefits:</h3>
+            <ul>
+              <li>✓ Unlimited products</li>
+              <li>✓ Priority search ranking</li>
+              <li>✓ Custom product names</li>
+              <li>✓ Advanced analytics</li>
+              <li>✓ Premium badge on customer page</li>
+            </ul>
+          </div>
+          <p>Thank you for your support!</p>
+        </div>
+        <div class="footer">
+          <p>© 2026 AgriCatch. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const textContent = `
+    AgriCatch - Premium Upgrade
+    
+    ${greeting}
+    
+    Congratulations! You are now a Premium Partner.
+    
+    Your Premium benefits:
+    - Unlimited products
+    - Priority search ranking
+    - Custom product names
+    - Advanced analytics
+    - Premium badge on customer page
+    
+    Thank you for your support!
+    
+    © 2026 AgriCatch. All rights reserved.
+  `;
+
+  return await sendEmail(to, "Welcome to AgriCatch Premium!", htmlContent, textContent);
+}
+
+/**
+ * Send premium expired email
+ * @param {string} to - Recipient email address
+ * @param {string} firstName - Recipient's first name
+ * @param {string} reason - Optional reason for expiration
+ * @returns {Promise}
+ */
+async function sendPremiumExpiredEmail(to, firstName, reason = null) {
+  const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #f57c00; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .logo-img { max-width: 120px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
+        .benefits { background: white; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .benefits ul { list-style: none; padding: 0; }
+        .benefits li { padding: 8px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
+          <h1>AgriCatch</h1>
+          <p>Premium Status Update</p>
+        </div>
+        <div class="content">
+          <p>${greeting}</p>
+          <p>Your Premium subscription has expired.</p>
+          ${reason ? `<div class="warning"><strong>Reason:</strong> ${reason}</div>` : ''}
+          <div class="benefits">
+            <h3>Your account has been downgraded to the Free tier:</h3>
+            <ul>
+              <li>• Product limit: 10 products</li>
+              <li>• Standard search ranking</li>
+              <li>• Basic analytics only</li>
+            </ul>
+          </div>
+          <p><strong>To restore Premium benefits:</strong></p>
+          <ul>
+            <li>• Renew your subscription from your dashboard</li>
+            <li>• Contact support if you believe this is an error</li>
+          </ul>
+          <p>Thank you for being part of AgriCatch!</p>
+        </div>
+        <div class="footer">
+          <p>© 2026 AgriCatch. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const textContent = `
+    AgriCatch - Premium Status Update
+    
+    ${greeting}
+    
+    Your Premium subscription has expired.
+    ${reason ? `Reason: ${reason}` : ''}
+    
+    Your account has been downgraded to the Free tier:
+    - Product limit: 10 products
+    - Standard search ranking
+    - Basic analytics only
+    
+    To restore Premium benefits:
+    - Renew your subscription from your dashboard
+    - Contact support if you believe this is an error
+    
+    Thank you for being part of AgriCatch!
+    
+    © 2026 AgriCatch. All rights reserved.
+  `;
+
+  return await sendEmail(to, "Your AgriCatch Premium Subscription Has Expired", htmlContent, textContent);
+}
+
+/**
+ * Generic email sender function (used by all email functions)
+ * @param {string} to - Recipient email address
+ * @param {string} subject - Email subject
+ * @param {string} html - HTML content
+ * @param {string} text - Plain text content
+ * @returns {Promise}
+ */
+async function sendEmail(to, subject, html, text) {
+  // Use Resend API if available (preferred for cloud)
+  if (useResend && Resend) {
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "AgriCatch <onboarding@resend.dev>";
+      
+      console.log(`📧 Sending email via Resend to: ${to}, subject: ${subject}`);
+      
+      const { data, error } = await resend.emails.send({
+        from: fromEmail,
+        to: [to],
+        subject: subject,
+        html: html,
+        text: text,
+        attachments: logoAttachmentResend ? [logoAttachmentResend] : undefined,
+      });
+
+      if (error) {
+        console.error("❌ Resend email error:", error);
+        const errorMessage = error.message || error.name || "Resend API error";
+        return { success: false, error: errorMessage };
+      }
+
+      console.log(`✅ Email sent via Resend to ${to}:`, data.id);
+      return { success: true, messageId: data.id };
+    } catch (error) {
+      console.error("❌ Resend API error:", error);
+      const errorMessage = error.message || "Unknown error";
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  // Fallback to SMTP
+  if (!transporter) {
+    return { success: false, error: "No email service configured. Set RESEND_API_KEY or SMTP credentials." };
+  }
+
+  const mailOptions = {
+    from: `"AgriCatch" <${process.env.SMTP_USER}>`,
+    to: to,
+    subject: subject,
+    html: html,
+    text: text,
+    attachments: logoAttachmentNodemailer ? [logoAttachmentNodemailer] : undefined,
+  };
+
+  try {
+    console.log(`📧 Sending email via SMTP to: ${to}, subject: ${subject}`);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Email sent to ${to}:`, info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error("❌ Error sending email:", error);
+    let errorMsg = error.message || "Unknown error";
+    if (error.code) {
+      errorMsg = `${errorMsg} (Code: ${error.code})`;
+    }
+    return { success: false, error: errorMsg };
+  }
+}
+
 module.exports = {
   sendOtpEmail,
+  sendWelcomeEmail,
+  sendVerificationEmail,
+  sendUnverificationEmail,
+  sendPremiumUpgradeEmail,
+  sendPremiumExpiredEmail,
   transporter,
 };

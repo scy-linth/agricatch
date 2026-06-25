@@ -124,7 +124,11 @@ router.post('/farmers/me/subscription/request', authenticateToken, paymentProofU
     const uploaded = await cloudinary.uploadFile(req.file.path, {
       public_id: publicId,
       folder: 'agricatch/payment-proofs',
-      tags: ['payment-proof', `farmer:${farmerId}`]
+      tags: ['payment-proof', `farmer:${farmerId}`],
+      transformation: [
+        { width: 1200, crop: 'limit', quality: 'auto:good' },
+        { fetch_format: 'auto' }
+      ]
     });
     const proofUrl = uploaded.secure_url;
 

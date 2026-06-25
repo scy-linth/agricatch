@@ -11,6 +11,52 @@
     { value: 'southluzon', label: 'South Luzon'   }
   ];
 
+  // Province to zone mapping
+  const PROVINCE_TO_ZONE = {
+    'Metro Manila': 'metro',
+    'metro': 'metro',
+    // North Luzon provinces
+    'Ilocos Norte': 'northluzon',
+    'Ilocos Sur': 'northluzon',
+    'La Union': 'northluzon',
+    'Pangasinan': 'northluzon',
+    'Benguet': 'northluzon',
+    'Mountain Province': 'northluzon',
+    'Ifugao': 'northluzon',
+    'Kalinga': 'northluzon',
+    'Apayao': 'northluzon',
+    'Abra': 'northluzon',
+    'Cagayan': 'northluzon',
+    'Isabela': 'northluzon',
+    'Nueva Vizcaya': 'northluzon',
+    'Quirino': 'northluzon',
+    'Batanes': 'northluzon',
+    // South Luzon provinces
+    'Aurora': 'southluzon',
+    'Bataan': 'southluzon',
+    'Bulacan': 'southluzon',
+    'Nueva Ecija': 'southluzon',
+    'Pampanga': 'southluzon',
+    'Tarlac': 'southluzon',
+    'Zambales': 'southluzon',
+    'Cavite': 'southluzon',
+    'Laguna': 'southluzon',
+    'Batangas': 'southluzon',
+    'Rizal': 'southluzon',
+    'Quezon': 'southluzon',
+    'Marinduque': 'southluzon',
+    'Occidental Mindoro': 'southluzon',
+    'Oriental Mindoro': 'southluzon',
+    'Palawan': 'southluzon',
+    'Romblon': 'southluzon',
+    'Albay': 'southluzon',
+    'Camarines Norte': 'southluzon',
+    'Camarines Sur': 'southluzon',
+    'Catanduanes': 'southluzon',
+    'Masbate': 'southluzon',
+    'Sorsogon': 'southluzon'
+  };
+
   const requestJson = async (path) => {
     const response = await fetch(`${API_BASE}${path}`, { cache: 'force-cache' });
     if (!response.ok) throw new Error(`PSGC request failed: ${response.status}`);
@@ -166,13 +212,9 @@
       result.province = parts[3];
     }
 
-    // Determine zone from province
-    if (result.province === 'Metro Manila' || result.province === 'metro') {
-      result.zone = 'metro';
-    } else if (result.province) {
-      // Try to determine zone from province (this is a simplified check)
-      // In a real implementation, you'd need a province-to-zone mapping
-      // For now, we'll just leave zone empty and let the user select it
+    // Determine zone from province using the mapping
+    if (result.province) {
+      result.zone = PROVINCE_TO_ZONE[result.province] || '';
     }
 
     return result;

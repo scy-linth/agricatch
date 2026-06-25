@@ -282,11 +282,24 @@ router.post('/announcements', requireSuperAdmin, requireAnnouncementsEnabled, as
       [title, message, roles]
     );
 
+    // Create announcement record for dismissible banner
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // Default 7 days
+    
+    await pool.query(
+      `INSERT INTO announcements (title, message, audience, is_active, is_dismissible, expires_at, created_at, updated_at)
+       VALUES ($1, $2, $3, true, true, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      [title, message, audience, expiresAt]
+    );
+
     // Broadcast notification.created event for each recipient
     const notifiedUserIds = insertRes.rows.map(row => row.user_id);
     for (const userId of notifiedUserIds) {
       broadcastEvent('notification.created', { user_id: userId });
     }
+    
+    // Broadcast announcement.created event for banner updates
+    broadcastEvent('announcement.created', { audience });
 
     await writeAdminAuditLog(pool, {
       actor_admin_id: req.user.id,
@@ -303,6 +316,28 @@ router.post('/announcements', requireSuperAdmin, requireAnnouncementsEnabled, as
   } catch (err) {
     console.error('Announcement broadcast error:', err);
     res.status(500).json({ message: 'Server error sending announcement' });
+  }
+});
+
+// ── GET /api/superadmin/announcements — get active announcements (public) ─────
+router.get('/announcements', async (req, res) => {
+  try {
+    const userRole = req.query?.role || 'customer';
+    
+    const result = await pool.query(
+      `SELECT id, title, message, audience, is_dismissible, expires_at 
+       FROM announcements 
+       WHERE is_active = true 
+         AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+         AND (audience = 'all' OR audience = $1)
+       ORDER BY created_at DESC`,
+      [userRole]
+    );
+    
+    res.json({ announcements: result.rows });
+  } catch (err) {
+    console.error('Get announcements error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -328,10 +363,21 @@ router.post('/users', requireSuperAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 8 characters' });
     }
 
-    // Derive display name
+    // Validate name lengths (40 characters max)
     const fn = String(first_name || '').trim();
     const mn = String(middle_name || '').trim();
     const ln = String(last_name || '').trim();
+    if (fn.length > 40) {
+      return res.status(400).json({ message: 'First name must be 40 characters or less' });
+    }
+    if (mn.length > 40) {
+      return res.status(400).json({ message: 'Middle name must be 40 characters or less' });
+    }
+    if (ln.length > 40) {
+      return res.status(400).json({ message: 'Last name must be 40 characters or less' });
+    }
+
+    // Derive display name
     const displayName = fn && ln
       ? `${fn}${mn ? ' ' + mn : ''} ${ln}`.trim()
       : String(full_name || '').trim() || cleanUsername;
@@ -386,6 +432,17 @@ router.put('/users/:id', requireSuperAdmin, async (req, res) => {
     if (!targetRes.rows.length) return res.status(404).json({ message: 'User not found' });
 
     const { first_name, middle_name, last_name, full_name, email, username, password, role } = req.body || {};
+
+    // Validate name length limits
+    if (typeof first_name !== 'undefined' && String(first_name || '').trim().length > 40) {
+      return res.status(400).json({ message: 'First name must be 40 characters or less' });
+    }
+    if (typeof middle_name !== 'undefined' && String(middle_name || '').trim().length > 40) {
+      return res.status(400).json({ message: 'Middle name must be 40 characters or less' });
+    }
+    if (typeof last_name !== 'undefined' && String(last_name || '').trim().length > 40) {
+      return res.status(400).json({ message: 'Last name must be 40 characters or less' });
+    }
 
     const updates = [];
     const values = [];

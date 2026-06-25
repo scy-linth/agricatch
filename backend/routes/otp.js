@@ -11,15 +11,42 @@ function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-function shouldExposeOtpForDebug() {
-  return process.env.NODE_ENV !== 'production' && process.env.DEV_EXPOSE_OTP === 'true';
+async function shouldExposeOtpForDebug() {
+  const { getPlatformSetting } = require('../utils/db');
+  // Check OTP mode - only expose in testing mode
+  const otpMode = await getPlatformSetting('otp_mode', 'strict');
+  return otpMode === 'testing';
+}
+
+async function getOtpBypassCode() {
+  const { getPlatformSetting } = require('../utils/db');
+  // Bypass code only works in testing mode
+  const otpMode = await getPlatformSetting('otp_mode', 'strict');
+  if (otpMode !== 'testing') {
+    return null; // No bypass code in strict or disabled mode
+  }
+  return await getPlatformSetting('otp_bypass_code', '789878');
+}
+
+async function isOtpEnabled() {
+  const { getPlatformSetting } = require('../utils/db');
+  const otpMode = await getPlatformSetting('otp_mode', 'strict');
+  return otpMode !== 'disabled';
 }
 
 router.post('/send', async (req, res) => {
   try {
     console.log('📧 OTP send request received:', { email: req.body.email, purpose: req.body.purpose });
+    
+    // Check if OTP is enabled via otp_mode setting
+    const otpEnabled = await isOtpEnabled();
+    if (!otpEnabled) {
+      return res.status(403).json({ message: 'OTP verification is currently disabled' });
+    }
+    
     const isResend = req.body?.resend === true || req.body?.resend === 'true';
-    if (!isResend) {
+    // Disable CAPTCHA verification in local development for testing
+    if (!isResend && process.env.NODE_ENV !== 'development') {
       const captcha = await verifyRecaptchaToken(req.body?.['g-recaptcha-response'] || req.body?.gRecaptchaResponse || '', {
         remoteip: req.ip || req.connection?.remoteAddress || undefined
       });
@@ -207,8 +234,8 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ message: 'Email and OTP are required' });
     }
 
-    // Secret bypass code for testing/development
-    const SECRET_BYPASS_OTP = '789878';
+    // Secret bypass code for testing/development (from platform settings)
+    const SECRET_BYPASS_OTP = await getOtpBypassCode();
     if (otp === SECRET_BYPASS_OTP) {
       console.log('🔓 Secret bypass OTP used for email:', email, 'purpose:', purpose);
       
@@ -219,12 +246,19 @@ router.post('/verify', async (req, res) => {
           [email, purpose]
         );
         
-        // Insert a new verified OTP record
+        // Insert a new verified OTP record (skip rate limit check for secret bypass)
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
         const insertResult = await pool.query(
           'INSERT INTO otps (email, otp_code, purpose, expires_at, is_used) VALUES ($1, $2, $3, $4, $5) RETURNING id',
           [email, SECRET_BYPASS_OTP, purpose, expiresAt, true]
         );
+        
+        // Auto-verify the user account when using secret bypass (for testing)
+        await pool.query(
+          'UPDATE users SET is_verified = true WHERE email = $1',
+          [email]
+        );
+        console.log('✅ Auto-verified user account for email:', email);
         
         await writeAdminAuditLog(pool, {
           actor_admin_id: null,
@@ -232,7 +266,7 @@ router.post('/verify', async (req, res) => {
           entity: 'otps',
           entity_id: insertResult.rows[0].id,
           before: null,
-          after: { email, purpose, method: 'secret_bypass' },
+          after: { email, purpose, method: 'secret_bypass', auto_verified: true },
           req
         });
       } catch (dbError) {

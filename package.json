@@ -7,9 +7,14 @@
     "install:backend": "npm --prefix backend install",
     "purge:fishery:dry": "node backend/scripts/purge-fishery.js --dry-run --verbose",
     "purge:fishery": "node backend/scripts/purge-fishery.js --apply --verbose",
-    "build:config": "node build-config.js"
+    "build:config": "node build-config.js",
+    "serve:frontend": "node scripts/serve-frontend.js",
+    "test:cart-perf": "node scripts/run-cart-perf-test.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0"
+  },
+  "dependencies": {
+    "pg": "^8.22.0"
   }
 }

@@ -7,7 +7,7 @@ class ChatUI {
             host.includes('agricatch.store') ||
             host === 'agricatch.page.dev';
         this.apiBase = window.API_BASE || (isCustomFrontendHost ? 'https://agricatch.onrender.com/api' : '/api');
-        this.token = localStorage.getItem('token');
+        this.token = this.normalizeAuthToken(localStorage.getItem('token'));
         this.currentConversation = null;
         this.pollInterval = null;
         this.conversationMeta = new Map();
@@ -31,6 +31,15 @@ class ChatUI {
         }
 
         this.init();
+    }
+
+    normalizeAuthToken(token) {
+        if (!token) return null;
+        try {
+            return token.replace(/^["']|["']$/g, '').trim();
+        } catch (e) {
+            return token;
+        }
     }
 
     async init() {
@@ -1027,11 +1036,6 @@ class ChatUI {
             this.renderMessages(data.messages || []);
 
             // Mark as read after rendering (throttled)
-            const now = Date.now();
-            if (now - (this._lastMarkReadAt || 0) > 2500) {
-                this._lastMarkReadAt = now;
-                await this.markConversationRead(conversationId);
-            }
         } catch (error) {
             console.error('Load messages error:', error);
             // Only show error if it's not a 404 (already handled above)
@@ -1053,6 +1057,11 @@ class ChatUI {
             // Refresh farmer dashboard unread badges immediately (if embedded)
             if (window.farmerDashboard && typeof window.farmerDashboard.loadFarmerStats === 'function') {
                 window.farmerDashboard.loadFarmerStats({ skipProducts: true });
+            }
+
+            // Refresh farmer dashboard messages dropdown and badges
+            if (window.farmerDashboard && typeof window.farmerDashboard.loadMessages === 'function') {
+                window.farmerDashboard.loadMessages();
             }
 
             // Refresh customer messages badge if on index.html
@@ -1270,6 +1279,11 @@ class ChatUI {
 
             // Reload conversations to update last message time
             await this.loadConversations();
+
+            // Update farmer dashboard messages dropdown and badges
+            if (window.farmerDashboard && typeof window.farmerDashboard.loadMessages === 'function') {
+                window.farmerDashboard.loadMessages();
+            }
         } catch (error) {
             console.error('Send message error:', error);
             this.showError(error.message || 'Failed to send message. Please try again.');
@@ -1310,7 +1324,9 @@ class ChatUI {
 
     handleDeepLink() {
         const params = new URLSearchParams(window.location.search);
+        const conversationIdParam = params.get('conversationId');
         const farmerIdParam = params.get('farmerId');
+        const farmerNameParam = params.get('farmerName');
         const customerIdParam = params.get('customerId');
         const orderIdParam = params.get('orderId');
         const productNameParam = params.get('productName');
@@ -1322,9 +1338,23 @@ class ChatUI {
         if (quantityParam > 0) subtitleParts.push(`Qty: ${quantityParam}`);
         const subtitleText = subtitleParts.join(' · ');
 
+        // If conversationId is provided directly, use it (most reliable)
+        if (conversationIdParam) {
+            // Find the conversation in loaded data to get metadata
+            const conv = (this._chatItems || []).find(c => c.conversation_id === conversationIdParam);
+            if (conv) {
+                const otherId = conv.farmer_id || conv.customer_id;
+                const otherName = conv.other_shop_name || conv.other_full_name || conv.other_username || 'User';
+                this.ensureConversationMeta(conversationIdParam, otherId, otherName);
+            }
+            this.openConversation(conversationIdParam);
+            return true;
+        }
+
         if (farmerIdParam && this.currentUserId) {
             const conversationId = `${farmerIdParam}_${this.currentUserId}`;
-            this.ensureConversationMeta(conversationId, parseInt(farmerIdParam, 10), 'Farmer');
+            const farmerName = farmerNameParam ? decodeURIComponent(farmerNameParam) : 'Farmer';
+            this.ensureConversationMeta(conversationId, parseInt(farmerIdParam, 10), farmerName);
             if (subtitleText) {
                 window.__chatContext = { subtitle: subtitleText };
             }

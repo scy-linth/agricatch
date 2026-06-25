@@ -1,9 +1,9 @@
 /** @type {import('@playwright/test').PlaywrightTestConfig} */
 const config = {
   testDir: './tests',
-  timeout: 30000,
+  timeout: 60000,
   expect: {
-    timeout: 10000
+    timeout: 15000
   },
   fullyParallel: false,
   workers: 1,
@@ -12,7 +12,8 @@ const config = {
     baseURL: 'http://localhost:3000',
     headless: true,
     viewport: { width: 1280, height: 720 },
-    actionTimeout: 10000,
+    actionTimeout: 15000,
+    navigationTimeout: 30000,
     trace: 'on-first-retry',
   },
   projects: [

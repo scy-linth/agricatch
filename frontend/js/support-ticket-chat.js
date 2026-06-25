@@ -80,7 +80,9 @@ class SupportTicketChat {
         const backBtn = document.getElementById('support-chat-back-btn');
         if (backBtn) {
             backBtn.addEventListener('click', () => {
-                if (window.farmerDashboard && typeof window.farmerDashboard.showSection === 'function') {
+                if (window.customerAccount && typeof window.customerAccount.showTab === 'function') {
+                    window.customerAccount.showTab('support-tickets');
+                } else if (window.farmerDashboard && typeof window.farmerDashboard.showSection === 'function') {
                     window.farmerDashboard.showSection('support-tickets');
                 }
             });
@@ -320,6 +322,14 @@ class SupportTicketChat {
         // Reload tickets to update unread counts (backend marks as read)
         await this.loadSupportTickets();
 
+        // Update parent badge (farmer or customer)
+        if (window.farmerDashboard && typeof window.farmerDashboard.updateSupportTicketsBadge === 'function') {
+            window.farmerDashboard.updateSupportTicketsBadge();
+        } else if (window.customerAccount && typeof window.customerAccount.updateSupportTicketsBadge === 'function') {
+            await window.customerAccount.loadSupportTicketsBadge();
+            window.customerAccount.updateSupportTicketsBadge();
+        }
+
         // Re-apply active class after re-render
         const activeElAfterRender = document.querySelector(`#support-chat-conversation-list .conversation-item[data-id="${ticketId}"]`);
         if (activeElAfterRender) {
@@ -331,17 +341,18 @@ class SupportTicketChat {
         }
         this.pollInterval = setInterval(() => {
             if (this.currentTicketId === ticketId) {
-                this.loadTicketMessages(ticketId);
+                this.loadTicketMessages(ticketId, false, false); // Don't mark as read during polling
             }
         }, 3000);
     }
 
-    async loadTicketMessages(ticketId, forceScroll = false) {
+    async loadTicketMessages(ticketId, forceScroll = false, markRead = true) {
         if (!ticketId) return;
 
         try {
-            // Call the ticket endpoint (/:id) instead of messages endpoint to trigger mark-as-read
-            const response = await fetch(`${this.apiBase}/support-tickets/${ticketId}`, {
+            // Call the messages endpoint with mark_read parameter to trigger backend mark-as-read
+            const markReadParam = markRead ? 'true' : 'false';
+            const response = await fetch(`${this.apiBase}/support-tickets/${ticketId}/messages?mark_read=${markReadParam}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
 
@@ -626,6 +637,15 @@ class SupportTicketChat {
 
             await this.loadTicketMessages(this.currentTicketId, true);
             await this.loadSupportTickets();
+            
+            // Update parent badge (farmer or customer)
+            if (window.farmerDashboard && typeof window.farmerDashboard.updateSupportTicketsBadge === 'function') {
+                window.farmerDashboard.updateSupportTicketsBadge();
+            } else if (window.customerAccount && typeof window.customerAccount.updateSupportTicketsBadge === 'function') {
+                await window.customerAccount.loadSupportTicketsBadge();
+                window.customerAccount.updateSupportTicketsBadge();
+            }
+            
             // Force scroll after everything is loaded using requestAnimationFrame
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => this.scrollToBottom());

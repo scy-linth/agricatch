@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile — AgriCatch</title>
+
+    <!-- Google Fonts (match farmer.html exactly) -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+
+    <!-- NiceAdmin base template CSS -->
+    <link rel="stylesheet" href="/css/nicemain.css">
+    <link rel="stylesheet" href="/vendor/simple-datatables/style.css">
+    <!-- AgriCatch SaaS overrides — loaded LAST -->
+    <link rel="stylesheet" href="/css/agricatch-admin.css?v=customer-rebuild-20260621">
+    <style>
+/* CUSTOMER ACCOUNT — PAGE-SCOPED OVERRIDES (complement agricatch-admin.css) */
+
+/* Topbar — gradient matching landing page header */
+.customer-account-topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1030;
+  height: 60px;
+  background: linear-gradient(135deg, #4ade80, #0ea5e9);
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  gap: 1rem;
+  backdrop-filter: blur(10px);
+}
+.customer-account-topbar .brand-name {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  color: #fff;
+}
+.customer-account-topbar .tagline {
+  font-size: .7rem;
+  color: rgba(255,255,255,.8);
+  margin: 0;
+  line-height: 1;
+}
+.customer-account-topbar .sidebar-toggle-btn {
+  background: rgba(255,255,255,.35);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.5);
+  font-size: 1rem;
+  padding: .4rem .6rem;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.customer-account-topbar .sidebar-toggle-btn:hover {
+  background: rgba(255,255,255,.5);
+  color: #fff;
+}
+.customer-account-topbar .back-btn {
+  background: rgba(255,255,255,.35);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.5);
+  font-size: .8rem;
+  font-weight: 600;
+  padding: .3rem .75rem;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  text-decoration: none;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.customer-account-topbar .back-btn:hover {
+  background: rgba(255,255,255,.5);
+  color: #fff;
+  text-decoration: none;
+}
+@media (max-width: 767px) {
+  .customer-account-topbar { padding: 0 .75rem; }
+}
+
+/* Sidebar toggle behavior (mirrors farmer.js pattern) */
+#customer-sidebar.sidebar {
+  background: var(--ac-sidebar-bg);
+  border-right: 1px solid var(--ac-sidebar-border);
+  width: 260px;
+  box-shadow: none;
+  transition: left 0.3s ease, width 0.3s ease;
+}
+
+@media (max-width: 1199px) {
+  #customer-sidebar.sidebar {
+    position: fixed !important;
+    top: 60px;
+    left: -300px !important;
+    bottom: 0;
+    width: 260px;
+    z-index: 996;
+    overflow-y: auto;
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 12px rgba(0,0,0,0.18);
+  }
+  body.toggle-sidebar #customer-sidebar.sidebar {
+    left: 0 !important;
+  }
+  body.toggle-sidebar #sidebar-overlay.sidebar-overlay {
+    display: block;
+  }
+}
+
+@media (min-width: 1200px) {
+  body.toggle-sidebar #customer-sidebar.sidebar {
+    left: -260px !important;
+  }
+  body.toggle-sidebar #main.main {
+    margin-left: 0 !important;
+  }
+}
+
+/* Profile Card */
+.profile-card {
+    background: #fff;
+    color: var(--ac-text, #1a2e1e);
+}
+.profile-avatar-lg img {
+    border: 3px solid rgba(255,255,255,0.3);
+}
+
+/* Modal overrides */
+.modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(15,23,42,.55); align-items:flex-start; justify-content:center; padding:1.5rem 1rem; overflow-y:auto; }
+.modal.open { display:flex; }
+.modal .modal-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:100%; max-width:620px; margin:auto; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+.modal .modal-header { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-bottom:1px solid var(--ac-border,#e2e8f0); background:#fff; position:sticky; top:0; z-index:2; }
+.modal .modal-header h3 { margin:0; font-size:1.05rem; font-weight:700; color:#fff; }
+.modal .close-btn { background:white; border:1px solid rgba(0,0,0,0.08); color:var(--ac-text-muted,#6b7e72); cursor:pointer; font-size:.9rem; padding:4px; border-radius:50%; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); transition:all .15s; }
+.modal .close-btn:hover { background:#f8f9fa; color:var(--ac-primary,#2d7a3a); }
+
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.status-open { background: #fef3c7; color: #92400e; }
+.status-in_progress { background: #dbeafe; color: #1e40af; }
+.status-resolved { background: #d1fae5; color: #065f46; }
+.status-closed { background: #f3f4f6; color: #4b5563; }
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-approved { background: #d1fae5; color: #065f46; }
+.status-rejected { background: #fee2e2; color: #991b1b; }
+.status-unverified { background: #fee2e2; color: #991b1b; }
+
+/* Chat character counter */
+.char-counter {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    color: #9ca3af;
+    pointer-events: none;
+    user-select: none;
+}
+.char-counter-warning {
+    color: #dc2626;
+    font-weight: 600;
+}
+.chat-input-wrap .chat-compose-input {
+    padding-right: 40px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Profile overview */
+.profile-overview-card {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+.profile-avatar-xl {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    color: #0284c7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    border: 2px solid #e2e8f0;
+}
+.profile-overview-info h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+.profile-overview-info p {
+    margin: 0.15rem 0 0;
+    color: var(--gray);
+    font-size: 0.95rem;
+}
+.profile-detail-row {
+    display: flex;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+.profile-detail-row:last-child {
+    border-bottom: none;
+}
+.profile-detail-label {
+    width: 140px;
+    font-weight: 600;
+    color: var(--gray);
+    flex-shrink: 0;
+}
+.profile-detail-value {
+    flex: 1;
+    color: var(--text-color);
+}
+
+/* Form styles */
+.form-group {
+    margin-bottom: 1rem;
+}
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+.required-indicator {
+    color: #dc2626;
+    font-weight: 700;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-dark);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+}
+.form-group input[readonly],
+.form-group textarea[readonly] {
+    background: #f8f9fa;
+    cursor: default;
+}
+.form-group input[disabled],
+.form-group select[disabled],
+.form-group textarea[disabled] {
+    background: #f8f9fa;
+    color: #6b7280;
+    cursor: not-allowed;
+}
+.phone-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.phone-prefix {
+    background: #f0f0f0;
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    font-weight: 600;
+    border: 1px solid #ddd;
+}
+.phone-input-wrapper input {
+    flex: 1;
+}
+.field-hint {
+    display: block;
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+.change-address-hint {
+    font-weight: 500;
+    color: #9ca3af !important;
+    margin-top: 0.75rem;
+}
+.password-input-wrapper {
+    position: relative;
+}
+.password-toggle {
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--gray);
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+.password-toggle:hover {
+    color: var(--text-color);
+}
+.readonly-display {
+    background: #f8f9fa;
+    resize: none;
+}
+
+/* Buttons */
+.btn-account {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-account.loading {
+    justify-content: center;
+}
+.btn-account.loading .spinner-border {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0 !important;
+}
+.btn-account.loading .btn-text {
+    visibility: hidden;
+    opacity: 0;
+}
+.btn-account-primary {
+    background: var(--ac-primary-dark);
+    color: #fff;
+}
+.btn-account-primary:hover {
+    background: var(--ac-primary);
+}
+.btn-account-outline {
+    background: #fff;
+    color: var(--ac-text);
+    border: 1px solid #ddd;
+}
+.btn-account-outline:hover {
+    background: #f8f9fa;
+}
+.btn-account-danger {
+    background: #dc2626;
+    color: #fff;
+}
+.btn-account-danger:hover {
+    background: #b91c1c;
+}
+
+/* Toast */
+.toast {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    padding: 0.9rem 1.25rem;
+    border-radius: 10px;
+    color: var(--white);
+    font-weight: 600;
+    z-index: 3000;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    animation: slideIn 0.25s ease;
+}
+.toast.success { background: var(--primary-dark); }
+.toast.error { background: #dc2626; }
+.toast.info { background: var(--secondary-color); }
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .profile-overview-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    .profile-detail-row {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .profile-detail-label {
+        width: auto;
+    }
+}
+
+/* Hide scrollbar from My Profile section */
+#profile-overview {
+    overflow: hidden;
+}
+#profile-overview::-webkit-scrollbar {
+    display: none;
+}
+#profile-overview {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Disable smooth scrolling for Edit Profile and Verification sections */
+#profile-edit,
+#profile-verification {
+    scroll-behavior: auto !important;
+}
+#profile-edit input:focus,
+#profile-edit select:focus,
+#profile-edit textarea:focus,
+#profile-verification input:focus,
+#profile-verification select:focus,
+#profile-verification textarea:focus {
+    scroll-margin-top: 0 !important;
+}
+    .header-nav .nav-icon .header-tooltip {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(8px) scale(0.92);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.96));
+    color: #ffffff;
+    border-radius: 10px;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 20px rgba(74, 222, 128, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 100000;
+}
+.header-nav .nav-icon:hover .header-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    pointer-events: auto;
+    visibility: visible;
+}
+.header-nav .nav-icon .header-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-bottom-color: rgba(30, 41, 59, 0.96);
+    pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<!-- Loading Screen (first child of body so z-index:9999 covers everything) -->
+<div id="admin-loading-screen" class="loading-screen">
+  <div class="loading-content">
+    <div class="loading-logo">
+      <img src="/images/logo.png" alt="AgriCatch Logo" class="loading-logo-img">
+      <h1 class="loading-title">
+        <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
+      </h1>
+    </div>
+    <div class="loading-spinner">
+      <div class="spinner-ring"></div>
+      <div class="spinner-ring"></div>
+      <div class="spinner-ring"></div>
+    </div>
+    <p class="loading-text">Loading...</p>
+  </div>
+</div>
+
+<!-- Mobile sidebar overlay backdrop -->
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     HEADER / TOPBAR
+══════════════════════════════════════════════════════════════════════ -->
+<header class="customer-account-topbar">
+    <button id="customer-sidebar-toggle" class="sidebar-toggle-btn d-md-none" type="button" aria-label="Toggle sidebar">
+        <i class="bi bi-list"></i>
+    </button>
+    <a href="/index.html" class="d-flex align-items-center gap-2" style="text-decoration:none;">
+        <img src="/images/logo.png" alt="AgriCatch" height="34" style="flex-shrink:0;">
+        <div>
+            <div class="brand-name">AgriCatch</div>
+            <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
+        </div>
+    </a>
+
+    <a href="/index.html" class="back-btn ms-auto" onclick="restoreLandingPagePosition(event)">
+        <i class="bi bi-arrow-left"></i>
+        <span>Back</span>
+    </a>
+</header><!-- /header -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     SIDEBAR
+    #customer-sidebar  → customer-account.js getElementById + querySelector('.admin-sidebar')
+    .sidebar          → NiceAdmin CSS layout
+    .admin-sidebar    → rebuilt persistent sidebar layout
+══════════════════════════════════════════════════════════════════════ -->
+<aside id="customer-sidebar" class="sidebar admin-sidebar">
+
+    <ul class="sidebar-nav" id="sidebar-nav">
+
+        <!-- ── Account ─────────────────────────────────────── -->
+        <li class="nav-heading">Account</li>
+
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#profile-overview" data-section="profile-overview">
+                <i class="bi bi-person"></i>
+                <span>My Profile</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#profile-edit" data-section="profile-edit">
+                <i class="bi bi-pencil-square"></i>
+                <span>Edit Profile</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#profile-password" data-section="profile-password">
+                <i class="bi bi-shield-lock"></i>
+                <span>Change Password</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link collapsed sidebar-link" href="#profile-verification" data-section="profile-verification">
+                <i class="bi bi-shield-check"></i>
+                <span>Verification</span>
+            </a>
+        </li>
+
+    </ul>
+</aside>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     MAIN CONTENT
+══════════════════════════════════════════════════════════════════════ -->
+<main id="main" class="main admin-main">
+    <div class="pagetitle">
+        <nav>
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Home</li>
+                <li class="breadcrumb-item active" id="breadcrumb-current">My Profile</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- My Profile -->
+    <section id="profile-overview" class="admin-section-card active">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-person-circle"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">My Profile</h4>
+                <p class="ac-section-hero__sub">View your personal account details and information.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                    <div class="profile-overview-card">
+                        <div class="profile-avatar-xl" id="overview-avatar">U</div>
+                        <div class="profile-overview-info">
+                            <h2 id="overview-name">—</h2>
+                            <p id="overview-email">—</p>
+                        </div>
+                    </div>
+                    <div class="profile-detail-row">
+                        <div class="profile-detail-label">Full Name</div>
+                        <div class="profile-detail-value" id="overview-fullname">—</div>
+                    </div>
+                    <div class="profile-detail-row">
+                        <div class="profile-detail-label">Username</div>
+                        <div class="profile-detail-value" id="overview-username">—</div>
+                    </div>
+                    <div class="profile-detail-row">
+                        <div class="profile-detail-label">Email</div>
+                        <div class="profile-detail-value" id="overview-email-detail">—</div>
+                    </div>
+                    <div class="profile-detail-row">
+                        <div class="profile-detail-label">Phone</div>
+                        <div class="profile-detail-value" id="overview-phone">—</div>
+                    </div>
+                    <div class="profile-detail-row">
+                        <div class="profile-detail-label">Address</div>
+                        <div class="profile-detail-value" id="overview-address">—</div>
+                    </div>
+                    <div class="profile-detail-row">
+                        <div class="profile-detail-label">Role</div>
+                        <div class="profile-detail-value" id="overview-role">—</div>
+                    </div>
+                    <div class="profile-detail-row">
+                        <div class="profile-detail-label">Joined</div>
+                        <div class="profile-detail-value" id="overview-joined">—</div>
+                    </div>
+                    <div class="profile-detail-row">
+                        <div class="profile-detail-label">Verification</div>
+                        <div class="profile-detail-value" id="overview-verification">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Edit Profile -->
+    <section id="profile-edit" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-pencil-square"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Edit Profile</h4>
+                <p class="ac-section-hero__sub">Update your personal information and contact details.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                    <form id="edit-profile-form">
+                        <div class="row">
+                            <div class="col-md-4 form-group">
+                                <label for="edit-firstname">First Name</label>
+                                <input type="text" id="edit-firstname" maxlength="40" required>
+                            </div>
+                            <div class="col-md-4 form-group">
+                                <label for="edit-middlename">Middle Name</label>
+                                <input type="text" id="edit-middlename" maxlength="40" placeholder="Optional">
+                            </div>
+                            <div class="col-md-4 form-group">
+                                <label for="edit-lastname">Last Name</label>
+                                <input type="text" id="edit-lastname" maxlength="40" required>
+                            </div>
+                        </div>
+                        <small class="field-hint" id="edit-name-verified-hint" style="display:none; color:#10b981; font-weight:500; margin-bottom: 1rem;">
+                            <i class="bi bi-check-circle-fill me-1"></i>Verified: name can't be edited
+                        </small>
+                        <div class="form-group">
+                            <label for="edit-phone">Phone Number</label>
+                            <div class="phone-input-wrapper">
+                                <span class="phone-prefix">+63</span>
+                                <input type="tel" id="edit-phone" maxlength="12" placeholder="9XX XXX XXXX" required>
+                            </div>
+                            <small class="field-hint">Enter 10 digits starting with 9 (e.g. 912 345 6789).</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Address</label>
+                            <small class="field-hint change-address-hint" style="color:#4b5563 !important; font-weight:400;">Zone</small>
+                            <select id="edit-zone" class="form-select">
+                                <option value="">Select Zone (Metro / North / South Luzon)</option>
+                            </select>
+                            <small class="field-hint change-address-hint" style="color:#4b5563 !important; font-weight:400;">Province</small>
+                            <select id="edit-province" class="form-select" disabled>
+                                <option value="">Select Province</option>
+                            </select>
+                            <small class="field-hint change-address-hint" style="color:#4b5563 !important; font-weight:400;">City / Municipality</small>
+                            <select id="edit-city" class="form-select" disabled>
+                                <option value="">Select City / Municipality</option>
+                            </select>
+                            <small class="field-hint change-address-hint" style="color:#4b5563 !important; font-weight:400;">Barangay</small>
+                            <select id="edit-barangay" class="form-select" disabled>
+                                <option value="">Select Barangay</option>
+                            </select>
+                            <small class="field-hint change-address-hint" style="color:#4b5563 !important; font-weight:400;">Street / Building / House No.</small>
+                            <input type="text" id="edit-street" class="form-input" placeholder="Enter street, building, or house number">
+                            <small class="field-hint change-address-hint" style="color:#4b5563 !important; font-weight:400;">Address Preview</small>
+                            <textarea id="edit-address-preview" class="readonly-display" rows="2" placeholder="Formatted address will appear here" readonly></textarea>
+                            <small class="field-hint">Street / Building, Barangay, City, Province</small>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn-account btn-account-primary" id="save-profile-btn">
+                                <span class="btn-text">Save Changes</span>
+                                <span class="spinner-border spinner-border-sm d-none ms-1" id="save-profile-spinner"></span>
+                            </button>
+                        </div>
+                    </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Change Password -->
+    <section id="profile-password" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-shield-lock"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Change Password</h4>
+                <p class="ac-section-hero__sub">Update your password to keep your account secure.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                    <form id="change-password-form">
+                        <div class="form-group">
+                            <label for="current-password">Current Password</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="current-password" autocomplete="current-password" required>
+                                <button type="button" class="password-toggle" id="toggle-current-password" aria-label="Show current password">
+                                    <i class="fas fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">New Password</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="new-password" autocomplete="new-password" required>
+                                <button type="button" class="password-toggle" id="toggle-new-password" aria-label="Show new password">
+                                    <i class="fas fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-password">Confirm New Password</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="confirm-password" autocomplete="new-password" required>
+                                <button type="button" class="password-toggle" id="toggle-confirm-password" aria-label="Show confirm password">
+                                    <i class="fas fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="password-error" class="alert alert-danger d-none small"></div>
+                        <button type="submit" class="btn-account btn-account-primary" id="change-password-submit-btn">
+                            <span class="btn-text">Change Password</span>
+                            <span class="spinner-border spinner-border-sm d-none ms-1" id="change-password-spinner"></span>
+                        </button>
+                    </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Verification -->
+    <section id="profile-verification" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-shield-check"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Account Verification</h4>
+                <p class="ac-section-hero__sub">Verify your account to become a trusted member.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                    <div id="verification-status-card" class="alert alert-info">
+                        <i class="bi bi-info-circle me-1"></i> <span id="verification-status-text">Loading verification status...</span>
+                    </div>
+                    <p id="verification-status-description" class="text-muted"></p>
+
+                    <div id="verification-benefits" style="display:none;">
+                        <h5 class="mb-3">Benefits of Verification</h5>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-12">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6><i class="bi bi-shield-check text-success me-1"></i> Verified Badge</h6>
+                                        <small class="text-muted">Show customers you are a trusted member of the marketplace.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="verification-form-section" style="display:none;">
+                        <h5 class="mb-3">Submit Verification Request</h5>
+                        <form id="verification-request-form">
+                            <div class="form-group">
+                                <label for="verification-document">Upload ID/Document (recommended)</label>
+                                <input type="file" id="verification-document" class="form-control" accept="image/jpeg,image/png">
+                                <small class="field-hint">JPG/PNG, max 5MB</small>
+                            </div>
+                            <div id="document-preview" class="form-group" style="display:none;">
+                                <label>Preview:</label>
+                                <img id="document-preview-img" style="max-width:100%; max-height:200px; border-radius:8px;">
+                            </div>
+                            <div class="form-group">
+                                <label for="verification-notes">Additional Notes (optional)</label>
+                                <textarea id="verification-notes" class="form-control" rows="3" placeholder="Any additional information..."></textarea>
+                            </div>
+                            <button type="submit" class="btn-account btn-account-primary" id="submit-verification-btn">
+                                <span class="btn-text">Submit Request</span>
+                                <span class="spinner-border spinner-border-sm d-none ms-1" id="verification-spinner"></span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div id="verification-status-display" style="display:none;">
+                        <h5 class="mb-3">Verification Status</h5>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <p><strong>Status:</strong> <span id="display-status"></span></p>
+                                <p><strong>Submitted:</strong> <span id="display-submitted-date"></span></p>
+                                <p><strong>Estimated Review:</strong> <span id="display-estimated-time"></span></p>
+                                <div id="display-admin-notes-wrap" style="display:none;">
+                                    <p><strong>Admin Notes:</strong> <span id="display-admin-notes"></span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="display-document-preview" style="display:none;">
+                            <h6 class="mb-2">Submitted Document</h6>
+                            <img id="display-document-img" style="max-width:100%; max-height:300px; border-radius:8px;">
+                        </div>
+                    </div>
+
+                    <!-- History Section -->
+                    <div id="verification-history-section" style="display:none;">
+                        <h5 class="mt-4 mb-3">Request History</h5>
+                        <div class="card">
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Status</th>
+                                                <th>Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="verification-history-table-body">
+                                            <!-- Populated by JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="verification-history-empty" class="text-center py-4" style="display:none;">
+                                    <i class="bi bi-clock-history text-muted" style="font-size:2rem;"></i>
+                                    <p class="text-muted mt-2">No verification history</p>
+                                </div>
+                            </div>
+                            <div class="card-footer d-flex justify-content-between align-items-center" id="verification-history-pagination" style="display:none;">
+                                <span class="text-muted small" id="verification-history-info">Showing 0 of 0</span>
+                                <nav>
+                                    <ul class="pagination pagination-sm mb-0">
+                                        <li class="page-item" id="verification-history-prev">
+                                            <a class="page-link" href="#" data-page="prev" style="color:var(--ac-primary,#2d7a3a);border-color:var(--ac-primary-light,#c8ecd0);"><i class="bi bi-chevron-left"></i></a>
+                                        </li>
+                                        <li class="page-item active">
+                                            <span class="page-link" id="verification-history-current" style="background-color:var(--ac-primary,#2d7a3a);border-color:var(--ac-primary,#2d7a3a);">1</span>
+                                        </li>
+                                        <li class="page-item" id="verification-history-next">
+                                            <a class="page-link" href="#" data-page="next" style="color:var(--ac-primary,#2d7a3a);border-color:var(--ac-primary-light,#c8ecd0);"><i class="bi bi-chevron-right"></i></a>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SUPPORT TICKETS SECTION -->
+    <section id="support-tickets" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-ticket-perforated"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Support Tickets</h4>
+                <p class="ac-section-hero__sub">Get help from our support team and track your requests.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button class="btn btn-sm ac-btn-primary" id="btn-create-support-ticket">
+                    <i class="bi bi-plus-lg me-1"></i>Create New Ticket
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table" id="support-tickets-table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th class="text-center">Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div id="support-tickets-pagination" class="d-flex justify-content-center mt-3"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SUPPORT TICKET CHAT SECTION -->
+    <section id="support-ticket-chat" class="admin-section-card">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-ticket-perforated"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Support Chat</h4>
+                <p class="ac-section-hero__sub">Chat with our support team about your tickets.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button id="support-chat-back-btn" class="btn btn-outline-secondary btn-sm" type="button">
+                    <i class="bi bi-arrow-left me-1"></i>Back to Tickets
+                </button>
+            </div>
+        </div>
+
+        <div id="support-chat-drawer" class="admin-chat-drawer chat-section-mode">
+            <div class="chat-sidebar-panel">
+                <div class="chat-sidebar-header">
+                    <div class="support-sidebar-header-row">
+                        <h3 class="chat-sidebar-title">
+                            <i class="bi bi-ticket-perforated"></i>
+                            My Tickets
+                        </h3>
+                        <span id="support-chat-conv-count" class="support-conv-count">0</span>
+                    </div>
+                    <div class="support-search-wrap">
+                        <i class="bi bi-search support-search-icon"></i>
+                        <input type="text" id="support-chat-search-input" class="support-search-input" placeholder="Search tickets…" autocomplete="off">
+                    </div>
+                </div>
+                <div id="support-chat-conversation-list" class="conversation-list"></div>
+                <div id="support-chat-empty-state" class="text-center py-5" style="display:none">
+                    <i class="bi bi-ticket-perforated text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">No support tickets found</p>
+                    <p class="text-muted small">Create a ticket to start chatting with support</p>
+                </div>
+                <div class="support-pagination" id="support-chat-pagination">
+                    <button class="support-page-btn" id="support-chat-prev-btn" disabled>
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <span id="support-chat-page-info" class="support-page-info">1–10 of 0</span>
+                    <button class="support-page-btn" id="support-chat-next-btn" disabled>
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="chat-main-panel">
+                <div id="support-chat-header" class="chat-thread-header">
+                    <div class="chat-thread-identity">
+                        <div class="chat-thread-avatar">
+                            <i class="bi bi-ticket-perforated"></i>
+                        </div>
+                        <div style="flex:1;">
+                            <div id="support-chat-header-title" class="chat-thread-name">
+                                Select a ticket
+                            </div>
+                            <div id="support-chat-header-reason" class="chat-thread-sub" style="display:none;">
+                                <strong>Reason:</strong> <span id="support-chat-reason-text"></span>
+                            </div>
+                            <div id="support-chat-header-subtitle" class="chat-thread-sub"></div>
+                        </div>
+                        <div id="support-chat-ticket-number" class="chat-thread-ticket-number" style="display:none;">
+                            #<span id="support-chat-ticket-id"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="support-chat-messages" class="chat-messages-feed"></div>
+
+                <form id="support-chat-form" class="chat-compose-bar">
+                    <div class="chat-input-wrap" style="flex:1;position:relative;">
+                        <input id="support-chat-input"
+                               class="chat-compose-input"
+                               type="text"
+                               placeholder="Type a message…"
+                               autocomplete="off"
+                               maxlength="500"
+                               required>
+                        <span id="support-chat-char-counter" class="char-counter">500</span>
+                    </div>
+                    <button type="submit" class="btn btn-primary chat-send-btn">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- Create Support Ticket Modal -->
+<div class="modal fade" id="create-support-ticket-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Support Ticket</h5>
+                <button class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="create-support-ticket-form">
+                    <div class="mb-3">
+                        <label class="form-label">Subject <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="support-ticket-subject" maxlength="200" required>
+                        <small class="text-muted" id="subject-char-count">0/200 characters</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="support-ticket-description" rows="4" maxlength="500" required></textarea>
+                        <small class="text-muted" id="description-char-count">0/500 characters</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-account btn-account-primary" id="btn-submit-support-ticket">
+                    <span class="btn-text">Submit Ticket</span>
+                    <span class="spinner-border spinner-border-sm d-none ms-1" id="submit-ticket-spinner"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <!-- Bootstrap 5 JS Bundle (required for modals) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script src="/js/psgc.js"></script>
+    <script src="/js/support-ticket-chat.js"></script>
+    <script src="/js/customer-account.js"></script>
+
+    <script>
+    // Authorization check - run immediately before page loads
+    (function() {
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+            // Guest - redirect to login immediately
+            window.location.href = '/index.html#login';
+            return;
+        }
+        
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const role = payload.role;
+            
+            // Only customers can access customer account page
+            if (role !== 'customer') {
+                // Redirect unauthorized users to their appropriate dashboard
+                if (role === 'farmer') {
+                    window.location.href = '/farmer.html';
+                } else if (role === 'admin' || role === 'super_admin') {
+                    window.location.href = '/admin.html';
+                } else {
+                    window.location.href = '/index.html';
+                }
+                return;
+            }
+        } catch (e) {
+            window.location.href = '/index.html';
+            return;
+        }
+    })();
+
+    // Restore landing page scroll position
+    function restoreLandingPagePosition(event) {
+        const scrollY = sessionStorage.getItem('landingPageScrollY');
+        const hash = sessionStorage.getItem('landingPageHash');
+        if (scrollY) {
+            sessionStorage.setItem('restoreScrollY', scrollY);
+            sessionStorage.setItem('restoreHash', hash || '#home');
+        }
+    }
+
+    // Hide loading screen when page is fully loaded
+    window.addEventListener('load', function() {
+        const loadingScreen = document.getElementById('admin-loading-screen');
+        const body = document.body;
+
+        if (loadingScreen) {
+            setTimeout(() => {
+                loadingScreen.classList.add('hidden');
+                body.classList.remove('loading');
+            }, 500);
+        }
+    });
+    </script>
+</body>
+</html>

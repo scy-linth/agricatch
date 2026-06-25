@@ -8,11 +8,20 @@ class NotificationsPage {
         if (host === 'agricatch.store' || host === 'www.agricatch.store') {
             this.apiBase = 'https://agricatch.onrender.com/api';
         }
-        this.token = localStorage.getItem('token');
+        this.token = this.normalizeAuthToken(localStorage.getItem('token'));
         this.currentPage = 1;
         this.limit = 20;
         this.total = 0;
         this.init();
+    }
+
+    normalizeAuthToken(token) {
+        if (!token) return null;
+        try {
+            return token.replace(/^["']|["']$/g, '').trim();
+        } catch (e) {
+            return token;
+        }
     }
 
     escapeHtml(value) {
@@ -23,11 +32,69 @@ class NotificationsPage {
 
     init() {
         if (!this.token) {
-            window.location.href = '/?login=1';
+            this.showGuestLoginPrompt();
             return;
         }
         document.getElementById('notif-mark-all-btn')?.addEventListener('click', () => this.markAllRead());
         this.loadPage(1);
+    }
+
+    showGuestLoginPrompt() {
+        // Show toast message
+        this.showToast('Please log in to view your notifications', 'info');
+        
+        // Store return URL
+        const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        
+        // Redirect to home with login prompt
+        setTimeout(() => {
+            window.location.href = `/?login=1&returnUrl=${returnUrl}`;
+        }, 1500);
+    }
+
+    showToast(message, type = 'info') {
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            padding: 12px 20px;
+            border-radius: 8px;
+            background: ${type === 'info' ? '#0ea5e9' : '#ef4444'};
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease;
+        `;
+        toast.textContent = message;
+        
+        // Add animation keyframes if not exists
+        if (!document.getElementById('toast-animations')) {
+            const style = document.createElement('style');
+            style.id = 'toast-animations';
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        document.body.appendChild(toast);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            toast.style.animation = 'slideOut 0.3s ease forwards';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
     async loadPage(page) {

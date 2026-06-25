@@ -9,6 +9,7 @@ const { productUpload } = require('../middleware/upload');
 const { deleteFileIfExists } = require('../utils/fileUtils');
 const { pool } = require('../utils/db');
 const cloudinary = require('../utils/cloudinary');
+const { sendVerificationEmail, sendUnverificationEmail, sendPremiumUpgradeEmail, sendPremiumExpiredEmail } = require('../utils/emailService');
 
 const router = express.Router();
 
@@ -220,6 +221,15 @@ const normalizeManagedUserPayload = (body = {}) => {
   const phone = String(body.phone || '').trim();
   const address = String(body.address || '').trim();
   const shopName = String(body.shop_name || '').trim();
+  
+  // Validate phone number format
+  if (phone) {
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+      throw new Error('Phone number must be 10 digits starting with 9');
+    }
+  }
+  
   const displayName = buildDisplayName({
     firstName,
     middleName,
@@ -245,6 +255,41 @@ const normalizeManagedUserPayload = (body = {}) => {
 };
 
 const CANCELLED_STATUSES = ['delivered', 'cancelled'];
+
+const cancelOrdersForProducts = async (client, productIds, reason) => {
+  if (!productIds || productIds.length === 0) return [];
+
+  const cancelled = await client.query(
+    `
+      UPDATE orders
+      SET status = 'cancelled',
+          cancelled_at = CURRENT_TIMESTAMP,
+          cancelled_by = 'admin',
+          cancellation_reason = $2
+      WHERE product_id = ANY($1)
+        AND status NOT IN ('delivered', 'cancelled')
+      RETURNING id, product_id, quantity, user_id AS customer_id
+    `,
+    [productIds, reason]
+  );
+
+  const rows = cancelled.rows || [];
+  for (const row of rows) {
+    await client.query('UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2', [row.quantity, row.product_id]);
+    const message = `Order #${row.id} was cancelled because the product was disabled by admin. Reason: ${reason}`;
+    await insertNotification(client, {
+      userId: row.customer_id,
+      type: 'order_update',
+      title: 'Order cancelled',
+      message,
+      orderId: row.id,
+      productId: row.product_id
+    });
+    broadcastEvent('notification.created', { user_id: row.customer_id });
+  }
+
+  return rows;
+};
 
 const cancelOrdersForFarmer = async (client, farmerId, reason) => {
   const cancelled = await client.query(
@@ -497,7 +542,7 @@ router.get('/users', requireAdmin, async (req, res) => {
     const verification = req.query.verification ? String(req.query.verification).trim() : null;
     const allowedRoles = req.user.role === 'super_admin'
       ? ['customer', 'farmer', 'admin', 'super_admin']
-      : ['customer', 'farmer', 'admin'];
+      : ['customer', 'farmer'];
 
     const whereParts = [];
     const whereValues = [];
@@ -533,7 +578,7 @@ router.get('/users', requireAdmin, async (req, res) => {
     }
     if (verification === 'verified') {
       whereParts.push(`COALESCE(is_verified, false) = true`);
-    } else if (verification === 'unverified') {
+    } else if (verification === 'unverified' || verification === 'pending') {
       whereParts.push(`COALESCE(is_verified, false) = false`);
     }
     const whereSql = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
@@ -594,6 +639,18 @@ router.post('/users', requireAdmin, async (req, res) => {
     }
     if (!normalized.displayName) {
       return res.status(400).json({ message: 'At least full_name or first_name/last_name is required' });
+    }
+    if (normalized.firstName.length > 40) {
+      return res.status(400).json({ message: 'First name must be 40 characters or less' });
+    }
+    if (normalized.middleName.length > 40) {
+      return res.status(400).json({ message: 'Middle name must be 40 characters or less' });
+    }
+    if (normalized.lastName.length > 40) {
+      return res.status(400).json({ message: 'Last name must be 40 characters or less' });
+    }
+    if (normalized.shopName.length > 40) {
+      return res.status(400).json({ message: 'Shop name must be 40 characters or less' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -674,6 +731,9 @@ router.get('/logs', requireAdmin, async (req, res) => {
     if (req.user.role === 'admin') {
       where.push(`actor_admin_id = $${idx++}`);
       values.push(req.user.id);
+      // Exclude security-sensitive actions for admin role
+      where.push(`action NOT IN ($${idx++}, $${idx++}, $${idx++})`);
+      values.push('login.success', 'login.failed', 'logout.success');
     }
 
     if (actor_admin_id) {
@@ -756,6 +816,20 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
 
     if (!targetUserId || targetUserId < 0) {
       return res.status(400).json({ message: 'Invalid user id' });
+    }
+
+    // Validate name/shop length limits before touching the database
+    if (first_name !== undefined && String(first_name).trim().length > 40) {
+      return res.status(400).json({ message: 'First name must be 40 characters or less' });
+    }
+    if (middle_name !== undefined && String(middle_name).trim().length > 40) {
+      return res.status(400).json({ message: 'Middle name must be 40 characters or less' });
+    }
+    if (last_name !== undefined && String(last_name).trim().length > 40) {
+      return res.status(400).json({ message: 'Last name must be 40 characters or less' });
+    }
+    if (shop_name !== undefined && String(shop_name).trim().length > 40) {
+      return res.status(400).json({ message: 'Shop name must be 40 characters or less' });
     }
 
     const targetResult = await pool.query(
@@ -846,6 +920,12 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
     }
 
     if (phone !== undefined) {
+      if (phone) {
+        const phoneDigits = String(phone).replace(/\D/g, '');
+        if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+          return res.status(400).json({ message: 'Phone number must be 10 digits starting with 9' });
+        }
+      }
       updates.push(`phone = $${paramIndex}`);
       values.push(phone);
       paramIndex++;
@@ -890,7 +970,7 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// Verify/unverify farmer
+// Verify/unverify user (customers and farmers only, not admins)
 router.put('/users/:id/verify', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -902,7 +982,7 @@ router.put('/users/:id/verify', requireAdmin, async (req, res) => {
 
     // Require reason when unverifying
     if (!is_verified && !reason) {
-      return res.status(400).json({ message: 'Reason is required when unverifying a farmer' });
+      return res.status(400).json({ message: 'Reason is required when unverifying a user' });
     }
 
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
@@ -910,12 +990,17 @@ router.put('/users/:id/verify', requireAdmin, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    if (userResult.rows[0].role !== 'farmer') {
-      return res.status(400).json({ message: 'Only farmers can be verified' });
+    const userRole = userResult.rows[0].role;
+
+    // Only allow verify/unverify for customers and farmers, not admins
+    if (userRole === 'admin' || userRole === 'super_admin') {
+      return res.status(400).json({ message: 'Admin users cannot be verified/unverified through this endpoint' });
     }
 
-    const beforeRes = await pool.query('SELECT id, role, is_verified FROM users WHERE id = $1', [id]);
+    const beforeRes = await pool.query('SELECT id, role, is_verified, email, first_name FROM users WHERE id = $1', [id]);
     const beforeVerified = beforeRes.rows[0].is_verified;
+    const userEmail = beforeRes.rows[0].email;
+    const userFirstName = beforeRes.rows[0].first_name;
     await pool.query('UPDATE users SET is_verified = $1 WHERE id = $2', [is_verified, id]);
     const afterRes = await pool.query('SELECT id, role, is_verified FROM users WHERE id = $1', [id]);
 
@@ -931,10 +1016,17 @@ router.put('/users/:id/verify', requireAdmin, async (req, res) => {
     });
     broadcastEvent('admin.audit', { action, entity: 'users', entity_id: parseInt(id, 10), actor_admin_id: req.user.id });
 
-    // Send notification to farmer about verification status change
-    const message = is_verified
-      ? 'Your farmer account has been verified! You can now sell products (up to 10 on the Free tier) and access basic analytics. Upgrade to Premium for unlimited products, priority search ranking, custom product names, and advanced analytics.'
-      : `Your farmer account verification has been revoked. Reason: ${reason}. Product creation and sales features are now disabled.`;
+    // Send notification to user about verification status change
+    let message;
+    if (userRole === 'farmer') {
+      message = is_verified
+        ? 'Your farmer account has been verified! You can now sell products (up to 10 on the Free tier) and access basic analytics. Upgrade to Premium for unlimited products, priority search ranking, custom product names, and advanced analytics.'
+        : `Your farmer account verification has been revoked. Reason: ${reason}. Product creation and sales features are now disabled.`;
+    } else {
+      message = is_verified
+        ? 'Your account has been verified! You now have full access to all platform features.'
+        : `Your account verification has been revoked. Reason: ${reason}. Some features may be restricted.`;
+    }
     
     await pool.query(
       `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
@@ -962,6 +1054,17 @@ router.put('/users/:id/verify', requireAdmin, async (req, res) => {
        VALUES ($1, $2, $3, $4)`,
       [id, is_verified ? 'verified' : 'unverified', req.user.id, reason || null]
     );
+
+    // Send verification/unverification email (non-blocking)
+    if (is_verified && !beforeVerified) {
+      sendVerificationEmail(userEmail, userFirstName).catch(err => {
+        console.error('Failed to send verification email:', err);
+      });
+    } else if (!is_verified) {
+      sendUnverificationEmail(userEmail, userFirstName, reason).catch(err => {
+        console.error('Failed to send unverification email:', err);
+      });
+    }
 
     res.json({ message: 'Farmer verification updated' });
   } catch (error) {
@@ -1010,7 +1113,7 @@ router.get('/verification-requests', requireAdmin, async (req, res) => {
     const result = await pool.query(
       `SELECT vr.*, 
               u.username, u.full_name, u.email, u.phone, u.address,
-              u.shop_name, u.shop_description, u.shop_avatar_url,
+              u.role, u.shop_name, u.shop_description, u.shop_avatar_url,
               (SELECT COUNT(*) FROM products WHERE farmer_id = u.id) as product_count,
               (SELECT COUNT(*) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.farmer_id = u.id AND o.status = 'delivered') as delivered_orders
        FROM verification_requests vr
@@ -1357,6 +1460,8 @@ router.get('/products', requireAdmin, async (req, res) => {
           whereParts.push(`COALESCE(p.is_admin_disabled, false) = true`);
         } else if (status === 'unavailable') {
           whereParts.push(`p.is_available = false`);
+        } else if (status === 'no_stock') {
+          whereParts.push(`p.stock_quantity <= 0`);
         } else if (status === 'pending') {
           whereParts.push(`p.status = 'pending'`);
         } else if (status === 'approved') {
@@ -1705,6 +1810,11 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
     });
     broadcastEvent('admin.audit', { action: 'product.update', entity: 'products', entity_id: id, actor_admin_id: req.user.id });
 
+    // Broadcast product update for realtime frontend refresh (especially landing page)
+    if (name !== undefined && name !== null && name !== "" && name !== current.name) {
+      broadcastEvent('product.updated', { product_id: id, name: name });
+    }
+
     res.json({ message: 'Product updated', product: updated.rows[0] });
   } catch (error) {
     console.error('Update product error:', error);
@@ -1837,16 +1947,16 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+    const validStatuses = ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
 
     // Status transition matrix - allow forward progression (skip ahead) and cancellation, but prevent going back
-    // Workflow order: pending → confirmed → preparing → out_for_delivery → delivered
-    const statusOrder = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered'];
+    // Workflow order: pending/preorder_reserved → confirmed → preparing → out_for_delivery → delivered
     const validTransitions = {
       pending: ['confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'],
+      preorder_reserved: ['confirmed', 'cancelled'],
       confirmed: ['preparing', 'out_for_delivery', 'delivered', 'cancelled'],
       preparing: ['out_for_delivery', 'delivered', 'cancelled'],
       out_for_delivery: ['delivered', 'cancelled'],
@@ -1879,7 +1989,7 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
     const ordUserId = beforeRes.rows[0]?.user_id;
     if (ordUserId) {
       const statusLabels = {
-        pending: 'Pending', confirmed: 'Confirmed', preparing: 'Preparing',
+        pending: 'Pending', preorder_reserved: 'Pre-order Reserved', confirmed: 'Confirmed', preparing: 'Preparing',
         out_for_delivery: 'Out for Delivery', delivered: 'Delivered', cancelled: 'Cancelled'
       };
       await insertNotification(pool, {
@@ -2369,6 +2479,39 @@ router.put('/categories/:id/disable', requireAdmin, async (req, res) => {
 
     await pool.query('UPDATE categories SET is_disabled = true WHERE id = $1', [id]);
 
+    // Cascade disable: disable all products in this category
+    const productsResult = await pool.query(
+      'UPDATE products SET is_admin_disabled = true, admin_disabled_at = CURRENT_TIMESTAMP WHERE category_id = $1 RETURNING id, farmer_id, name',
+      [id]
+    );
+
+    // Cancel orders for disabled products
+    const productIds = productsResult.rows.map(p => p.id);
+    const cancelledOrders = await cancelOrdersForProducts(pool, productIds, 'Category was disabled by admin');
+
+    // Cascade disable: disable all product_name_catalog entries in this category
+    await pool.query(
+      'UPDATE product_name_catalog SET is_disabled = true WHERE category_id = $1',
+      [id]
+    );
+
+    // Notify farmers whose products were disabled
+    const affectedFarmers = new Map();
+    productsResult.rows.forEach(p => {
+      if (!affectedFarmers.has(p.farmer_id)) {
+        affectedFarmers.set(p.farmer_id, []);
+      }
+      affectedFarmers.get(p.farmer_id).push(p.name);
+    });
+
+    for (const [farmerId, productNames] of affectedFarmers) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+        [farmerId, 'products_disabled', 'Products Disabled', `Your products have been disabled because their category was disabled by admin. Products: ${productNames.join(', ')}`]
+      );
+    }
+
     await writeAdminAuditLog(pool, {
       actor_admin_id: req.user.id,
       action: 'category.disable',
@@ -2380,7 +2523,12 @@ router.put('/categories/:id/disable', requireAdmin, async (req, res) => {
     });
     broadcastEvent('admin.audit', { action: 'category.disable', entity: 'categories', entity_id: id, actor_admin_id: req.user.id });
 
-    return res.json({ message: 'Category disabled' });
+    // Broadcast product updates for realtime frontend refresh
+    productsResult.rows.forEach(p => {
+      broadcastEvent('product.updated', { product_id: p.id, is_admin_disabled: true });
+    });
+
+    return res.json({ message: 'Category disabled', products_disabled: productsResult.rows.length });
   } catch (error) {
     console.error('Admin disable category error:', error);
     return res.status(500).json({ message: 'Server error disabling category' });
@@ -2418,14 +2566,53 @@ router.delete('/categories/:id', requireAdmin, async (req, res) => {
     );
 
     const inUseCount = Number(usage.product_count || 0) + Number(usage.request_count || 0) + Number(usage.catalog_count || 0);
-    if (inUseCount > 0) {
-      const reasons = [];
-      if (usage.product_count > 0 && farmersResult.rows.length > 0) {
-        const farmerNames = farmersResult.rows.map(f => f.full_name || f.username || f.email).join(', ');
-        reasons.push(`${usage.product_count} product(s) by: ${farmerNames}`);
-      } else if (usage.product_count > 0) {
-        reasons.push(`${usage.product_count} product(s)`);
+
+    // Cascade disable: disable all products in this category before deletion
+    let productsDisabled = 0;
+    if (usage.product_count > 0) {
+      const productsResult = await pool.query(
+        'UPDATE products SET is_admin_disabled = true, admin_disabled_at = CURRENT_TIMESTAMP WHERE category_id = $1 RETURNING id, farmer_id, name',
+        [id]
+      );
+      productsDisabled = productsResult.rows.length;
+
+      // Cancel orders for disabled products
+      const productIds = productsResult.rows.map(p => p.id);
+      const cancelledOrders = await cancelOrdersForProducts(pool, productIds, 'Category was deleted by admin');
+
+      // Notify farmers whose products were disabled
+      const affectedFarmers = new Map();
+      productsResult.rows.forEach(p => {
+        if (!affectedFarmers.has(p.farmer_id)) {
+          affectedFarmers.set(p.farmer_id, []);
+        }
+        affectedFarmers.get(p.farmer_id).push(p.name);
+      });
+
+      for (const [farmerId, productNames] of affectedFarmers) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+           VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+          [farmerId, 'products_disabled', 'Products Disabled', `Your products have been disabled because their category was deleted by admin. Products: ${productNames.join(', ')}`]
+        );
       }
+
+      // Broadcast product updates for realtime frontend refresh
+      productsResult.rows.forEach(p => {
+        broadcastEvent('product.updated', { product_id: p.id, is_admin_disabled: true });
+      });
+    }
+
+    // Cascade disable: disable all product_name_catalog entries in this category
+    await pool.query(
+      'UPDATE product_name_catalog SET is_disabled = true WHERE category_id = $1',
+      [id]
+    );
+
+    // For requests and catalog, we still block deletion to avoid data loss
+    const nonProductInUseCount = Number(usage.request_count || 0) + Number(usage.catalog_count || 0);
+    if (nonProductInUseCount > 0) {
+      const reasons = [];
       if (usage.request_count > 0) reasons.push(`${usage.request_count} request(s)`);
       if (usage.catalog_count > 0) reasons.push(`${usage.catalog_count} catalog name(s)`);
       return res.status(409).json({
@@ -2446,7 +2633,7 @@ router.delete('/categories/:id', requireAdmin, async (req, res) => {
     });
     broadcastEvent('admin.audit', { action: 'category.delete', entity: 'categories', entity_id: id, actor_admin_id: req.user.id });
 
-    return res.json({ message: 'Category deleted' });
+    return res.json({ message: 'Category deleted', products_disabled: productsDisabled });
   } catch (error) {
     console.error('Admin delete category error:', error);
     return res.status(500).json({ message: 'Server error deleting category' });
@@ -2515,7 +2702,7 @@ router.get('/catalog-names', requireAdmin, async (req, res) => {
     const totalRes = await pool.query(`SELECT COUNT(*)::int AS count FROM product_name_catalog c ${whereSql}`, whereValues);
     const result = await pool.query(
       `SELECT c.id, c.name, c.category_id, cat.name AS category_name, c.is_approved, c.source, c.created_at, COALESCE(c.is_disabled, false) AS is_disabled,
-              COALESCE(p.product_count, 0)::int AS product_count
+              COALESCE(p.product_count, 0)::int AS product_count, c.admin_set_average_price, COALESCE(c.default_unit, 'kg') AS default_unit
        FROM product_name_catalog c
        LEFT JOIN categories cat ON cat.id = c.category_id
        LEFT JOIN (
@@ -2540,6 +2727,10 @@ router.post('/catalog-names', requireAdmin, async (req, res) => {
     if (!name) return res.status(400).json({ message: 'Name is required' });
     if (!categoryId) return res.status(400).json({ message: 'Category is required' });
 
+    // Get category name for notification
+    const categoryResult = await pool.query('SELECT name FROM categories WHERE id = $1', [categoryId]);
+    const categoryName = categoryResult.rows[0]?.name || 'Unknown Category';
+
     const inserted = await pool.query(
       `INSERT INTO product_name_catalog (name, category_id, source, is_approved, reviewed_by, reviewed_at)
        VALUES ($1, $2, 'admin', true, $3, CURRENT_TIMESTAMP)
@@ -2558,6 +2749,19 @@ router.post('/catalog-names', requireAdmin, async (req, res) => {
     });
     broadcastEvent('admin.audit', { action: 'catalog_name.create', entity: 'product_name_catalog', entity_id: inserted.rows[0].id, actor_admin_id: req.user.id });
 
+    // Notify all farmers about new catalog name
+    const farmersResult = await pool.query(
+      `SELECT id FROM users WHERE role = 'farmer' AND is_disabled = false`
+    );
+    for (const farmer of farmersResult.rows) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+        [farmer.id, 'catalog_name_added', 'New Product Added to Catalog', `Admin added "${name}" to the ${categoryName} category. You can now use this product name for your products.`]
+      );
+      broadcastEvent('notification.created', { user_id: farmer.id });
+    }
+
     return res.status(201).json({ message: 'Catalog name added', item: inserted.rows[0] });
   } catch (error) {
     console.error('Admin add catalog name error:', error);
@@ -2570,6 +2774,8 @@ router.put('/catalog-names/:id', requireAdmin, async (req, res) => {
     const id = Number(req.params.id || 0);
     const name = String(req.body?.name || '').trim();
     const categoryId = Number(req.body?.category_id || 0);
+    const defaultUnit = String(req.body?.default_unit || 'kg').trim();
+    const adminSetAveragePrice = req.body?.admin_set_average_price !== undefined ? req.body.admin_set_average_price : null;
     if (!id) return res.status(400).json({ message: 'Invalid catalog id' });
     if (!name) return res.status(400).json({ message: 'Name is required' });
     if (!categoryId) return res.status(400).json({ message: 'Category is required' });
@@ -2579,10 +2785,10 @@ router.put('/catalog-names/:id', requireAdmin, async (req, res) => {
 
     const updated = await pool.query(
       `UPDATE product_name_catalog
-       SET name = $1, category_id = $2, reviewed_by = $3, reviewed_at = CURRENT_TIMESTAMP, is_approved = true
-       WHERE id = $4
-       RETURNING id, name, category_id`,
-      [name, categoryId, req.user.id || null, id]
+       SET name = $1, category_id = $2, default_unit = $3, reviewed_by = $4, reviewed_at = CURRENT_TIMESTAMP, is_approved = true, admin_set_average_price = $5
+       WHERE id = $6
+       RETURNING id, name, category_id, default_unit, admin_set_average_price`,
+      [name, categoryId, defaultUnit, req.user.id || null, adminSetAveragePrice, id]
     );
 
     if (!updated.rows.length) return res.status(404).json({ message: 'Catalog name not found' });
@@ -2615,6 +2821,7 @@ router.patch('/catalog-names/:id', requireAdmin, async (req, res) => {
     const beforeRes = await pool.query('SELECT * FROM product_name_catalog WHERE id = $1', [id]);
     if (!beforeRes.rows.length) return res.status(404).json({ message: 'Catalog name not found' });
 
+    const catalogName = beforeRes.rows[0].name;
     const updated = await pool.query(
       `UPDATE product_name_catalog
        SET is_disabled = $1
@@ -2624,6 +2831,72 @@ router.patch('/catalog-names/:id', requireAdmin, async (req, res) => {
     );
 
     if (!updated.rows.length) return res.status(404).json({ message: 'Catalog name not found' });
+
+    // Cascade: disable/enable farmer products with this catalog name
+    if (isDisabled) {
+      const productsResult = await pool.query(
+        `UPDATE products
+         SET is_admin_disabled = true, admin_disabled_at = CURRENT_TIMESTAMP
+         WHERE name = $1 AND is_admin_disabled = false
+         RETURNING id, farmer_id, name`,
+        [catalogName]
+      );
+
+      // Notify affected farmers
+      const affectedFarmers = new Map();
+      productsResult.rows.forEach(p => {
+        if (!affectedFarmers.has(p.farmer_id)) {
+          affectedFarmers.set(p.farmer_id, []);
+        }
+        affectedFarmers.get(p.farmer_id).push(p.name);
+      });
+
+      for (const [farmerId, productNames] of affectedFarmers) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+           VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+          [farmerId, 'products_disabled', 'Products Disabled', `Your products have been disabled because their catalog name was disabled by admin. Products: ${productNames.join(', ')}`]
+        );
+        broadcastEvent('notification.created', { user_id: farmerId });
+      }
+
+      // Broadcast updates for realtime frontend refresh
+      productsResult.rows.forEach(p => {
+        broadcastEvent('product.updated', { product_id: p.id, is_admin_disabled: true });
+      });
+    } else {
+      // Enable: re-enable farmer products that were disabled due to this catalog name
+      const productsResult = await pool.query(
+        `UPDATE products
+         SET is_admin_disabled = false, admin_disabled_at = NULL
+         WHERE name = $1 AND is_admin_disabled = true
+         RETURNING id, farmer_id, name`,
+        [catalogName]
+      );
+
+      // Notify affected farmers
+      const affectedFarmers = new Map();
+      productsResult.rows.forEach(p => {
+        if (!affectedFarmers.has(p.farmer_id)) {
+          affectedFarmers.set(p.farmer_id, []);
+        }
+        affectedFarmers.get(p.farmer_id).push(p.name);
+      });
+
+      for (const [farmerId, productNames] of affectedFarmers) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+           VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+          [farmerId, 'products_enabled', 'Products Enabled', `Your products have been re-enabled because their catalog name was enabled by admin. Products: ${productNames.join(', ')}`]
+        );
+        broadcastEvent('notification.created', { user_id: farmerId });
+      }
+
+      // Broadcast updates for realtime frontend refresh
+      productsResult.rows.forEach(p => {
+        broadcastEvent('product.updated', { product_id: p.id, is_admin_disabled: false });
+      });
+    }
 
     const action = isDisabled ? 'catalog_name.disable' : 'catalog_name.enable';
     await writeAdminAuditLog(pool, {
@@ -2644,6 +2917,46 @@ router.patch('/catalog-names/:id', requireAdmin, async (req, res) => {
   }
 });
 
+router.patch('/catalog-names/:id/average-price', requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id || 0);
+    const averagePrice = req.body?.average_price;
+    if (!id) return res.status(400).json({ message: 'Invalid catalog id' });
+    if (averagePrice === undefined || averagePrice === null || averagePrice === '') return res.status(400).json({ message: 'average_price is required' });
+    const numPrice = Number(averagePrice);
+    if (isNaN(numPrice) || numPrice < 0) return res.status(400).json({ message: 'average_price must be a valid number' });
+
+    const beforeRes = await pool.query('SELECT * FROM product_name_catalog WHERE id = $1', [id]);
+    if (!beforeRes.rows.length) return res.status(404).json({ message: 'Catalog name not found' });
+
+    const updated = await pool.query(
+      `UPDATE product_name_catalog
+       SET admin_set_average_price = $1
+       WHERE id = $2
+       RETURNING id, name, admin_set_average_price`,
+      [numPrice, id]
+    );
+
+    if (!updated.rows.length) return res.status(404).json({ message: 'Catalog name not found' });
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'catalog_name.set_average_price',
+      entity: 'product_name_catalog',
+      entity_id: id,
+      before: beforeRes.rows[0],
+      after: updated.rows[0],
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'catalog_name.set_average_price', entity: 'product_name_catalog', entity_id: id, actor_admin_id: req.user.id });
+
+    return res.json({ message: 'Average price updated', item: updated.rows[0] });
+  } catch (error) {
+    console.error('Admin set catalog average price error:', error);
+    return res.status(500).json({ message: 'Server error setting average price' });
+  }
+});
+
 router.delete('/catalog-names/:id', requireAdmin, async (req, res) => {
   try {
     if (req.user.role !== 'super_admin') {
@@ -2654,6 +2967,40 @@ router.delete('/catalog-names/:id', requireAdmin, async (req, res) => {
 
     const beforeRes = await pool.query('SELECT * FROM product_name_catalog WHERE id = $1', [id]);
     if (!beforeRes.rows.length) return res.status(404).json({ message: 'Catalog name not found' });
+
+    const catalogName = beforeRes.rows[0].name;
+
+    // Disable all farmer products using this catalog name before deletion
+    const productsResult = await pool.query(
+      `UPDATE products
+       SET is_admin_disabled = true, admin_disabled_at = CURRENT_TIMESTAMP
+       WHERE name = $1 AND is_admin_disabled = false
+       RETURNING id, farmer_id, name`,
+      [catalogName]
+    );
+
+    // Notify affected farmers that their products are disabled (not deleted)
+    const affectedFarmers = new Map();
+    productsResult.rows.forEach(p => {
+      if (!affectedFarmers.has(p.farmer_id)) {
+        affectedFarmers.set(p.farmer_id, []);
+      }
+      affectedFarmers.get(p.farmer_id).push(p.name);
+    });
+
+    for (const [farmerId, productNames] of affectedFarmers) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, $2, $3, $4, false, CURRENT_TIMESTAMP)`,
+        [farmerId, 'products_disabled', 'Products Disabled', `Your products have been disabled because their catalog name was deleted by admin. Products: ${productNames.join(', ')}`]
+      );
+      broadcastEvent('notification.created', { user_id: farmerId });
+    }
+
+    // Broadcast updates for realtime frontend refresh
+    productsResult.rows.forEach(p => {
+      broadcastEvent('product.updated', { product_id: p.id, is_admin_disabled: true });
+    });
 
     await pool.query('DELETE FROM product_name_catalog WHERE id = $1', [id]);
 
@@ -2909,23 +3256,37 @@ router.get('/orders/:id', requireAdmin, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const getPeriodFilter = (period, alias = 'o') => {
-  const col = alias ? `${alias}.created_at` : 'created_at';
+  // Use same time reference as farmer metrics: delivered orders use updated_at (delivery date)
+  const timeRef = alias ? `CASE WHEN ${alias}.status = 'delivered' THEN COALESCE(${alias}.updated_at, ${alias}.created_at) ELSE ${alias}.created_at END` : `CASE WHEN status = 'delivered' THEN COALESCE(updated_at, created_at) ELSE created_at END`;
   switch (period) {
-    case 'today':    return `DATE(${col}) = CURRENT_DATE`;
-    case 'week':     return `${col} >= DATE_TRUNC('week', CURRENT_DATE)`;
-    case 'month':    return `${col} >= DATE_TRUNC('month', CURRENT_DATE)`;
-    case 'year':     return `${col} >= DATE_TRUNC('year', CURRENT_DATE)`;
+    case 'today':    return `DATE(${timeRef}) = CURRENT_DATE`;
+    case 'week':     return `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE)`;
+    case 'month':    return `${timeRef} >= DATE_TRUNC('month', CURRENT_DATE)`;
+    case 'year':     return `${timeRef} >= DATE_TRUNC('year', CURRENT_DATE)`;
+    default:         return '1=1'; // all time
+  }
+};
+
+const getAuditLogPeriodFilter = (period, alias = 'al') => {
+  // Simple period filter for audit logs (just uses created_at)
+  const timeRef = alias ? `${alias}.created_at` : 'created_at';
+  switch (period) {
+    case 'today':    return `DATE(${timeRef}) = CURRENT_DATE`;
+    case 'week':     return `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE)`;
+    case 'month':    return `${timeRef} >= DATE_TRUNC('month', CURRENT_DATE)`;
+    case 'year':     return `${timeRef} >= DATE_TRUNC('year', CURRENT_DATE)`;
     default:         return '1=1'; // all time
   }
 };
 
 const getPrevPeriodFilter = (period, alias = 'o') => {
-  const col = alias ? `${alias}.created_at` : 'created_at';
+  // Use same time reference as farmer metrics: delivered orders use updated_at (delivery date)
+  const timeRef = alias ? `CASE WHEN ${alias}.status = 'delivered' THEN COALESCE(${alias}.updated_at, ${alias}.created_at) ELSE ${alias}.created_at END` : `CASE WHEN status = 'delivered' THEN COALESCE(updated_at, created_at) ELSE created_at END`;
   switch (period) {
-    case 'today':  return `DATE(${col}) = CURRENT_DATE - INTERVAL '1 day'`;
-    case 'week':   return `${col} >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '1 week' AND ${col} < DATE_TRUNC('week', CURRENT_DATE)`;
-    case 'month':  return `${col} >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' AND ${col} < DATE_TRUNC('month', CURRENT_DATE)`;
-    case 'year':   return `${col} >= DATE_TRUNC('year', CURRENT_DATE) - INTERVAL '1 year' AND ${col} < DATE_TRUNC('year', CURRENT_DATE)`;
+    case 'today':  return `DATE(${timeRef}) = CURRENT_DATE - INTERVAL '1 day'`;
+    case 'week':   return `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '1 week' AND ${timeRef} < DATE_TRUNC('week', CURRENT_DATE)`;
+    case 'month':  return `${timeRef} >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' AND ${timeRef} < DATE_TRUNC('month', CURRENT_DATE)`;
+    case 'year':   return `${timeRef} >= DATE_TRUNC('year', CURRENT_DATE) - INTERVAL '1 year' AND ${timeRef} < DATE_TRUNC('year', CURRENT_DATE)`;
     default:       return '1=0';
   }
 };
@@ -2936,7 +3297,8 @@ router.get('/dashboard/stats', requireAdmin, async (req, res) => {
   try {
     const period = req.query.period || 'all';
     const metric = req.query.metric || 'all';
-    const cacheKey = `dashboard_stats_${period}_${metric}`;
+    const cacheBust = req.query._t || '';
+    const cacheKey = `dashboard_stats_${period}_${metric}_${cacheBust}`;
     const cached = adminCache.get(cacheKey);
     if (cached) return res.json(cached);
 
@@ -2993,26 +3355,30 @@ router.get('/dashboard/stats', requireAdmin, async (req, res) => {
 router.get('/dashboard/report', requireAdmin, async (req, res) => {
   try {
     const period = req.query.period || 'today';
-    const cacheKey = `dashboard_report_${period}`;
+    const cacheBust = req.query._t || '';
+    const cacheKey = `dashboard_report_${period}_${cacheBust}`;
     const cached = adminCache.get(cacheKey);
     if (cached) return res.json(cached);
 
+    // Use same time reference as farmer metrics: delivered orders use updated_at (delivery date)
+    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.updated_at, o.created_at) ELSE o.created_at END`;
+
     let groupExpr, filterExpr;
     if (period === 'today') {
-      groupExpr = `DATE_TRUNC('hour', o.created_at)`;
-      filterExpr = `DATE(o.created_at) = CURRENT_DATE`;
+      groupExpr = `DATE_TRUNC('hour', ${timeRef})`;
+      filterExpr = `DATE(${timeRef}) = CURRENT_DATE`;
     } else if (period === 'week') {
-      groupExpr = `DATE(o.created_at)`;
-      filterExpr = `o.created_at >= DATE_TRUNC('week', CURRENT_DATE)`;
+      groupExpr = `DATE(${timeRef})`;
+      filterExpr = `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE)`;
     } else if (period === 'month') {
-      groupExpr = `DATE(o.created_at)`;
-      filterExpr = `o.created_at >= DATE_TRUNC('month', CURRENT_DATE)`;
+      groupExpr = `DATE(${timeRef})`;
+      filterExpr = `${timeRef} >= DATE_TRUNC('month', CURRENT_DATE)`;
     } else if (period === 'year') {
-      groupExpr = `DATE_TRUNC('month', o.created_at)`;
-      filterExpr = `o.created_at >= DATE_TRUNC('year', CURRENT_DATE)`;
+      groupExpr = `DATE_TRUNC('month', ${timeRef})`;
+      filterExpr = `${timeRef} >= DATE_TRUNC('year', CURRENT_DATE)`;
     } else {
       // 'all' - show all data grouped by month
-      groupExpr = `DATE_TRUNC('month', o.created_at)`;
+      groupExpr = `DATE_TRUNC('month', ${timeRef})`;
       filterExpr = '1=1';
     }
 
@@ -3061,7 +3427,8 @@ router.get('/dashboard/top-products', requireAdmin, async (req, res) => {
     const page = Math.max(parseInt(req.query.page || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '10', 10), 1), 100);
     const offset = (page - 1) * limit;
-    const cacheKey = `top_products_${period}_${page}_${limit}`;
+    const cacheBust = req.query._t || '';
+    const cacheKey = `top_products_${period}_${page}_${limit}_${cacheBust}`;
     const cached = adminCache.get(cacheKey);
     if (cached) return res.json(cached);
 
@@ -3115,7 +3482,8 @@ router.get('/dashboard/top-farmers', requireAdmin, async (req, res) => {
     const page = Math.max(parseInt(req.query.page || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '10', 10), 1), 100);
     const offset = (page - 1) * limit;
-    const cacheKey = `top_farmers_${period}_${page}_${limit}`;
+    const cacheBust = req.query._t || '';
+    const cacheKey = `top_farmers_${period}_${page}_${limit}_${cacheBust}`;
     const cached = adminCache.get(cacheKey);
     if (cached) return res.json(cached);
 
@@ -3174,21 +3542,30 @@ router.get('/dashboard/recent-activity', requireAdmin, async (req, res) => {
     const page = Math.max(parseInt(req.query.page || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '10', 10), 1), 100);
     const offset = (page - 1) * limit;
-    const cacheKey = `recent_activity_${period}_${page}_${limit}`;
+    const cacheBust = req.query._t || '';
+    const cacheKey = `recent_activity_${req.user.role}_${req.user.id}_${period}_${page}_${limit}_${cacheBust}`;
     const cached = adminCache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    const filterExpr = getPeriodFilter(period, 'al');
+    const filterExpr = getAuditLogPeriodFilter(period, 'al');
+    
+    // Admin role: only see own activity, exclude login/logout logs
+    // Superadmin role: see all activity
+    let roleFilter = '';
+    if (req.user.role === 'admin') {
+      roleFilter = `AND al.actor_admin_id = ${req.user.id} AND al.action NOT IN ('login.success', 'login.failed', 'logout.success')`;
+    }
+    
     const countSql = `
       SELECT COUNT(*)::int AS count
       FROM admin_audit_logs al
-      WHERE ${filterExpr}
+      WHERE ${filterExpr} ${roleFilter}
     `;
     const sql = `
       SELECT al.id, al.action, al.entity, al.entity_id, al.created_at,
              al.actor_admin_name, al.actor_admin_email
       FROM admin_audit_logs al
-      WHERE ${filterExpr}
+      WHERE ${filterExpr} ${roleFilter}
       ORDER BY al.created_at DESC
       LIMIT $1 OFFSET $2
     `;
@@ -3916,6 +4293,11 @@ router.put('/subscriptions/:id/approve', requireRole('admin', 'super_admin'), as
     const sub = subRes.rows[0];
     const before = { status: sub.status, farmer_id: sub.farmer_id, tier: sub.tier };
     const months = sub.plan_duration_months;
+
+    // Get farmer's email and first_name for email notification
+    const farmerRes = await pool.query('SELECT email, first_name FROM users WHERE id = $1', [sub.farmer_id]);
+    const farmerEmail = farmerRes.rows[0]?.email;
+    const farmerFirstName = farmerRes.rows[0]?.first_name;
     await pool.query(
       `UPDATE farmer_subscriptions
        SET status = 'active',
@@ -3950,6 +4332,14 @@ router.put('/subscriptions/:id/approve', requireRole('admin', 'super_admin'), as
     } catch (notifErr) {
       console.error('Notification error (non-fatal):', notifErr);
     }
+
+    // Send premium upgrade email (non-blocking)
+    if (farmerEmail) {
+      sendPremiumUpgradeEmail(farmerEmail, farmerFirstName).catch(err => {
+        console.error('Failed to send premium upgrade email:', err);
+      });
+    }
+
     res.json({ message: 'Subscription approved' });
   } catch (err) {
     console.error('Subscription approve error:', err);
@@ -4021,6 +4411,11 @@ router.put('/subscriptions/:id/expire', requireRole('admin', 'super_admin'), asy
     }
     const sub = subRes.rows[0];
     const before = { status: sub.status, farmer_id: sub.farmer_id, tier: sub.tier, expires_at: sub.expires_at };
+
+    // Get farmer's email and first_name for email notification
+    const farmerRes = await pool.query('SELECT email, first_name FROM users WHERE id = $1', [sub.farmer_id]);
+    const farmerEmail = farmerRes.rows[0]?.email;
+    const farmerFirstName = farmerRes.rows[0]?.first_name;
     await pool.query(
       `UPDATE farmer_subscriptions SET status = 'expired', expires_at = CURRENT_TIMESTAMP, expiry_reason = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
       [reason || null, id]
@@ -4050,6 +4445,14 @@ router.put('/subscriptions/:id/expire', requireRole('admin', 'super_admin'), asy
     } catch (notifErr) {
       console.error('Notification error (non-fatal):', notifErr);
     }
+
+    // Send premium expired email (non-blocking)
+    if (farmerEmail) {
+      sendPremiumExpiredEmail(farmerEmail, farmerFirstName, reason).catch(err => {
+        console.error('Failed to send premium expired email:', err);
+      });
+    }
+
     res.json({ message: 'Subscription expired' });
   } catch (err) {
     console.error('Subscription expire error:', err);

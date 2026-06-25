@@ -1,9 +1,9 @@
 -- Add shop_name, first_name, middle_name, last_name columns to users table
 ALTER TABLE users
-ADD COLUMN IF NOT EXISTS shop_name VARCHAR(100),
-ADD COLUMN IF NOT EXISTS first_name VARCHAR(50),
-ADD COLUMN IF NOT EXISTS middle_name VARCHAR(50),
-ADD COLUMN IF NOT EXISTS last_name VARCHAR(50);
+ADD COLUMN IF NOT EXISTS shop_name VARCHAR(40),
+ADD COLUMN IF NOT EXISTS first_name VARCHAR(40),
+ADD COLUMN IF NOT EXISTS middle_name VARCHAR(40),
+ADD COLUMN IF NOT EXISTS last_name VARCHAR(40);
 
 -- Migrate existing data: split full_name into first_name, middle_name, last_name
 -- For farmers: set shop_name = full_name (as default)

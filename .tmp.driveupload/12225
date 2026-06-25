@@ -1,0 +1,3276 @@
+DEBUG: RESEND_API_KEY detected. Length: 36
+✅ Using Resend API for emails (cloud-friendly)
+📧 Resend From Email: AgriCatch <noreply@agricatch.store>
+✅ Resend API is configured - SMTP will not be used
+âœ… OTP route loaded successfully
+âœ… Superadmin route loaded successfully
+âœ… Subscriptions route loaded successfully
+âœ… Payment accounts route loaded successfully
+âœ… Settings route loaded successfully
+[startup] PSGC preload ok {
+  initialized: true,
+  dataDir: 'D:\\Codings\\AgriCatch\\backend\\PSGC2-MASTER',
+  loadError: null,
+  checkedPaths: [
+    {
+      path: 'D:\\Codings\\AgriCatch\\backend\\PSGC2-MASTER',
+      missingFiles: []
+    },
+    {
+      path: 'D:\\Codings\\AgriCatch\\backend\\PSGC2-MASTER',
+      missingFiles: []
+    },
+    {
+      path: 'D:\\Codings\\AgriCatch\\backend\\backend\\PSGC2-MASTER',
+      missingFiles: [Array]
+    }
+  ]
+}
+[startup] PSGC route mounted on /api/psgc
+✓ Support tickets route loaded successfully
+Server running on port 3000
+Connected to PostgreSQL database
+âœ… OTP table verified/created
+âœ… Password reset table verified/created
+âœ… Chat tables verified/created
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/orders, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/report, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/recent-activity, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/top-products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/top-farmers, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/orders, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/orders, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/report, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/recent-activity, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/top-products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/top-farmers, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/orders, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/orders, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/recent-activity, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/top-products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/report, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/top-farmers, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/orders, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+DEBUG login attempt: {
+  email: 'dhelhilis@gmail.com',
+  hasRecaptcha: false,
+  recaptchaLength: undefined
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[Get Orders] User 20: Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+DEBUG login attempt: {
+  email: 'dhelhilis@gmail.com',
+  hasRecaptcha: false,
+  recaptchaLength: undefined
+}
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/report, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/recent-activity, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/top-products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/top-farmers, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/orders, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[Get Orders] User 5: Found 0 orders
+[Get Orders] User 5: Found 0 orders
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/stats, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/report, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/recent-activity, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/dashboard/top-products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/dashboard/top-farmers, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/orders, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/products, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/subscriptions, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+GET /api/admin/subscriptions - User role: super_admin Query status: pending
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole START] Path=/users, Allowed=[admin, super_admin]
+[requireRole] Token decoded: {
+  id: 5,
+  username: 'scy_linth',
+  role: 'super_admin',
+  full_name: 'Super Administrator',
+  email: 'scy@linth',
+  iat: 1782362756,
+  exp: 1782449156
+}
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[requireRole] User role=super_admin, Allowed roles=[admin, super_admin]
+[requireRole] ACCESS GRANTED
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: pending, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preorder_reserved, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: preparing, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: confirmed, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: scheduled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: out_for_delivery, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: cancelled, Found 0 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: all, Found 2 orders
+[Farmer Orders] Farmer ID: 20, Status: delivered, Found 2 orders

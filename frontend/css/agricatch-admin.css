@@ -40,6 +40,8 @@
   --s-confirmed-bg:   #eff6ff;
   --s-preparing:      #7c3aed;
   --s-preparing-bg:   #f5f3ff;
+  --s-preorder_reserved:     #9333ea;
+  --s-preorder_reserved-bg:  #faf5ff;
   --s-ready:          #059669;
   --s-ready-bg:       #ecfdf5;
   --s-delivered:      #2d7a3a;
@@ -1190,6 +1192,7 @@ body.sidebar-collapsed #main.main {
 .status-pill.pending    { background: var(--s-pending-bg);   color: var(--s-pending);   }
 .status-pill.confirmed  { background: var(--s-confirmed-bg); color: var(--s-confirmed); }
 .status-pill.preparing  { background: var(--s-preparing-bg); color: var(--s-preparing); }
+.status-pill.preorder_reserved { background: var(--s-preorder_reserved-bg); color: var(--s-preorder_reserved); }
 .status-pill.ready      { background: var(--s-ready-bg);     color: var(--s-ready);     }
 .status-pill.delivered  { background: var(--s-delivered-bg); color: var(--s-delivered); }
 .status-pill.completed  { background: var(--s-completed-bg); color: var(--s-completed); }

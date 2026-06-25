@@ -31,6 +31,8 @@ router.get('/', async (req, res) => {
              p.unit,
              p.image_url,
              p.farmer_id,
+             p.is_preorder,
+             p.preorder_availability_date,
             COALESCE(f.shop_name, f.full_name) as farmer_name,
             f.address as farm_location
       FROM orders o
@@ -52,6 +54,7 @@ router.get('/', async (req, res) => {
       price: row.price,
       total_amount: row.total_amount,
       status: row.status,
+      is_preorder: row.is_preorder,
       delivered_at: row.delivered_at,
       delivery_address: row.delivery_address,
       delivery_date: row.delivery_date,
@@ -68,6 +71,8 @@ router.get('/', async (req, res) => {
         farmer_id: row.farmer_id,
         farmer_name: row.farmer_name,
         farm_location: row.farm_location,
+        is_preorder: row.is_preorder,
+        preorder_availability_date: row.preorder_availability_date,
         status: row.status,
         delivered_at: row.delivered_at,
         cancellation_reason: row.cancellation_reason
@@ -121,13 +126,17 @@ router.get('/farmer/:farmerId', async (req, res) => {
         o.cancellation_reason,
         o.created_at,
         o.updated_at,
+        o.is_preorder,
+        o.preorder_converted_at,
         u.full_name as customer_name,
         o.user_id as customer_id,
         COALESCE(u.customer_average_rating, 0) as customer_average_rating,
         COALESCE(u.customer_total_ratings, 0) as customer_total_ratings,
+        COALESCE(u.is_verified, false) as customer_is_verified,
         p.name as product_name,
         p.unit,
         p.image_url,
+        p.preorder_availability_date,
         o.price,
         o.quantity
       FROM orders o
@@ -172,6 +181,9 @@ router.get('/farmer/:farmerId', async (req, res) => {
       product_image: row.image_url,
       price: row.price,
       unit: row.unit,
+      is_preorder: row.is_preorder,
+      preorder_converted_at: row.preorder_converted_at,
+      preorder_availability_date: row.preorder_availability_date,
       items: [{
         order_item_id: row.id, // Use order id as item id for compatibility
         product_id: row.product_id,
@@ -256,12 +268,15 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
       return res.status(400).json({ message: 'Delivered orders cannot be updated' });
     }
 
-    // Strict status transition matrix - enforce workflow: pending â†’ confirmed â†’ preparing â†’ out_for_delivery â†’ delivered
-    // Cancellation allowed from any status except delivered
+    // Strict status transition matrix - enforce workflow
+    // Regular orders: pending â†’ confirmed â†’ preparing â†’ scheduled â†’ out_for_delivery â†’ delivered
+    // Preorders: preorder_reserved â†’ confirmed â†’ preparing â†’ scheduled â†’ out_for_delivery â†’ delivered
     const validTransitions = {
       pending: ['confirmed', 'cancelled'],
+      preorder_reserved: ['confirmed', 'cancelled'],
       confirmed: ['preparing', 'cancelled'],
-      preparing: ['out_for_delivery', 'cancelled'],
+      preparing: ['scheduled', 'cancelled'],
+      scheduled: ['out_for_delivery', 'cancelled'],
       out_for_delivery: ['delivered', 'cancelled'],
       delivered: [], // Terminal state - no transitions allowed
       cancelled: [] // Terminal state - no transitions allowed
@@ -276,9 +291,21 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
         });
       }
     } else {
-      // Cancellation allowed from any status except delivered
+      // Cancellation rules based on user role
+      // Customer can cancel only: pending, confirmed
+      // Farmer can cancel only: pending, confirmed, preparing
+      // Neither can cancel: scheduled, out_for_delivery, delivered
       if (order.status === 'delivered') {
         return res.status(400).json({ message: 'Cannot cancel a delivered order' });
+      }
+      if (order.status === 'scheduled' || order.status === 'out_for_delivery') {
+        return res.status(400).json({ message: `Cannot cancel order in ${order.status} status` });
+      }
+      
+      // Check if user is customer (not farmer/admin)
+      const isCustomer = decoded.role === 'customer';
+      if (isCustomer && order.status !== 'pending' && order.status !== 'confirmed') {
+        return res.status(400).json({ message: 'Customers can only cancel pending or confirmed orders' });
       }
     }
 
@@ -313,9 +340,38 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
       }
 
       if (status === 'cancelled' && order.status !== 'cancelled') {
-        await client.query(`
-          UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2
-        `, [order.quantity, order.product_id]);
+        // Idempotent inventory restoration based on order type and conversion state
+        if (order.is_preorder) {
+          // Preorder cancellation
+          if (order.preorder_converted_at) {
+            // Already converted: restore allocated quantity to stock
+            if (order.preorder_fulfilled_quantity > 0) {
+              await client.query(`
+                UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2
+              `, [order.preorder_fulfilled_quantity, order.product_id]);
+              // Reset fulfilled quantity to prevent double restoration
+              await client.query(`
+                UPDATE orders SET preorder_fulfilled_quantity = 0 WHERE id = $1
+              `, [actualOrderId]);
+            }
+          } else {
+            // Not yet converted: release reservation
+            if (order.preorder_reserved_quantity > 0) {
+              await client.query(`
+                UPDATE products SET reserved_quantity = GREATEST(reserved_quantity - $1, 0) WHERE id = $2
+              `, [order.preorder_reserved_quantity, order.product_id]);
+              // Reset reserved quantity to prevent double release
+              await client.query(`
+                UPDATE orders SET preorder_reserved_quantity = 0 WHERE id = $1
+              `, [actualOrderId]);
+            }
+          }
+        } else {
+          // Regular order cancellation: restore stock
+          await client.query(`
+            UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2
+          `, [order.quantity, order.product_id]);
+        }
       }
 
       const message = `Order #${orderId} is now ${status}.`;
@@ -439,16 +495,32 @@ router.post('/', async (req, res) => {
       delivery_address,
       delivery_date,
       special_instructions,
+      recipient_firstname,
+      recipient_middlename,
+      recipient_lastname,
+      recipient_phone,
       sessionId: payloadSessionId
     } = req.body;
     const sessionId = payloadSessionId || null;
 
+    // Validate phone number format if provided
+    if (recipient_phone) {
+      const phoneDigits = String(recipient_phone).replace(/\D/g, '');
+      if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+        return res.status(400).json({ message: 'Phone number must be 10 digits starting with 9' });
+      }
+    }
+
+    // Construct delivery_address from separate name fields if provided
+    // This maintains backward compatibility while allowing separate fields
+    if (recipient_firstname && recipient_lastname && recipient_phone) {
+      const fullName = [recipient_firstname, recipient_middlename, recipient_lastname].filter(Boolean).join(' ').trim();
+      delivery_address = `${fullName} | +63${recipient_phone.replace(/\D/g, '')} | ${delivery_address || 'Trabajo Market, M. Dela Fuente St., Sampaloc, Manila, Metro Manila'}`;
+    }
+
     // Validate required fields
     if (!delivery_address || !delivery_address.trim()) {
       return res.status(400).json({ message: 'Delivery address is required' });
-    }
-    if (!delivery_date) {
-      return res.status(400).json({ message: 'Delivery date is required' });
     }
 
     // Start transaction early to ensure consistency
@@ -461,7 +533,8 @@ router.post('/', async (req, res) => {
       const userCartQuery = `
         SELECT c.id as cart_id, c.quantity, p.id as product_id, p.price, p.stock_quantity, p.name,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
-               p.expiry_date, COALESCE(u.is_disabled, false) as farmer_is_disabled
+               p.expiry_date, COALESCE(u.is_disabled, false) as farmer_is_disabled,
+               p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity
         FROM cart c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN users u ON p.farmer_id = u.id
@@ -470,7 +543,8 @@ router.post('/', async (req, res) => {
       const sessionCartQuery = `
         SELECT c.id as cart_id, c.quantity, p.id as product_id, p.price, p.stock_quantity, p.name,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
-               p.expiry_date, COALESCE(u.is_disabled, false) as farmer_is_disabled
+               p.expiry_date, COALESCE(u.is_disabled, false) as farmer_is_disabled,
+               p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity
         FROM cart c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN users u ON p.farmer_id = u.id
@@ -510,20 +584,57 @@ router.post('/', async (req, res) => {
           console.error('[Create Order] Invalid cart item:', item);
           await client.query('ROLLBACK');
           client.release();
-          return res.status(400).json({ 
-            message: 'Invalid cart item. Please refresh your cart and try again.' 
+          return res.status(400).json({
+            message: 'Invalid cart item. Please refresh your cart and try again.'
           });
         }
       }
 
-      // Check stock availability
+      // Mixed order prevention removed - regular and pre-order products can now be mixed
+
+      // Customer never sets delivery date - always set to NULL
+      // Farmer will set delivery date later
+      const finalDeliveryDate = null;
+
+      // Check and update stock availability atomically to prevent race conditions
       for (const item of cartResult.rows) {
-        if (item.quantity > item.stock_quantity) {
-          await client.query('ROLLBACK');
-          client.release();
-          return res.status(400).json({
-            message: `Not enough stock for ${item.name}. Available: ${item.stock_quantity}`
-          });
+        if (item.is_preorder) {
+          // Pre-order: atomic check and increment reserved_quantity
+          const stockResult = await client.query(`
+            UPDATE products 
+            SET reserved_quantity = reserved_quantity + $1 
+            WHERE id = $2 
+              AND (max_preorder_quantity IS NULL OR reserved_quantity + $1 <= max_preorder_quantity)
+            RETURNING reserved_quantity, farmer_id, name
+          `, [item.quantity, item.product_id]);
+          
+          if (stockResult.rowCount === 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return res.status(400).json({
+              message: `Pre-order limit exceeded for ${item.name}. Maximum: ${item.max_preorder_quantity || 'unlimited'}`
+            });
+          }
+          // Store result for later use (notification)
+          item.stockUpdateResult = stockResult.rows[0];
+        } else {
+          // Regular order: atomic check and deduct stock_quantity
+          const stockResult = await client.query(`
+            UPDATE products 
+            SET stock_quantity = stock_quantity - $1 
+            WHERE id = $2 AND stock_quantity >= $1
+            RETURNING stock_quantity, farmer_id, name
+          `, [item.quantity, item.product_id]);
+          
+          if (stockResult.rowCount === 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return res.status(400).json({
+              message: `Not enough stock for ${item.name}. Please try again later.`
+            });
+          }
+          // Store result for later use (low stock notification)
+          item.stockUpdateResult = stockResult.rows[0];
         }
       }
 
@@ -544,9 +655,12 @@ router.post('/', async (req, res) => {
         console.log(`[Create Order] Creating order for item: Product ${item.product_id}, Qty: ${item.quantity}, Price: ${item.price}, Total: ${itemTotal}`);
         
         // Create order for this item
+        // Regular orders: status = 'pending', delivery_date = NULL
+        // Preorders: status = 'preorder_reserved', delivery_date = NULL
+        const initialStatus = item.is_preorder ? 'preorder_reserved' : 'pending';
         const orderResult = await client.query(`
-          INSERT INTO orders (user_id, product_id, quantity, price, total_amount, delivery_address, delivery_date, special_instructions)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          INSERT INTO orders (user_id, product_id, quantity, price, total_amount, delivery_address, delivery_date, special_instructions, is_preorder, preorder_reserved_quantity, status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           RETURNING id
         `, [
           decoded.id,
@@ -555,23 +669,21 @@ router.post('/', async (req, res) => {
           item.price,
           itemTotal,
           delivery_address,
-          delivery_date || null,
-          special_instructions || null
+          finalDeliveryDate,
+          special_instructions || null,
+          item.is_preorder || false,
+          item.is_preorder ? item.quantity : 0,
+          initialStatus
         ]);
 
         const orderId = orderResult.rows[0].id;
         createdOrderIds.push(orderId);
         console.log(`[Create Order] Order #${orderId} created for product ${item.product_id}`);
 
-        // Update product stock
-        const stockResult = await client.query(`
-          UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2 RETURNING stock_quantity, farmer_id, name
-        `, [item.quantity, item.product_id]);
-        console.log(`[Create Order] Stock updated for product ${item.product_id}, rows affected: ${stockResult.rowCount}`);
-
-        // Check if stock is low (below 15) and send alert to farmer
-        if (stockResult.rows.length > 0) {
-          const productInfo = stockResult.rows[0];
+        // Stock/reservation already updated atomically above
+        // Now handle low stock notification for regular orders
+        if (!item.is_preorder && item.stockUpdateResult) {
+          const productInfo = item.stockUpdateResult;
           const lowStockThreshold = 15;
           if (productInfo.stock_quantity <= lowStockThreshold && productInfo.stock_quantity > 0) {
             try {
@@ -814,11 +926,28 @@ router.put('/:id/status', async (req, res) => {
         WHERE id = $2
       `, [status, orderId]);
 
-      // Restore stock if cancelled
+      // Restore stock or reservation if cancelled
       if (status === 'cancelled' && currentStatus !== 'cancelled') {
-        await client.query(`
-          UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2
-        `, [orderData.quantity, orderData.product_id]);
+        // Check if this is a preorder order
+        const orderPreorderCheck = await client.query(`
+          SELECT is_preorder, preorder_reserved_quantity FROM orders WHERE id = $1
+        `, [orderId]);
+        const isPreorder = orderPreorderCheck.rows[0]?.is_preorder === true;
+        
+        if (isPreorder) {
+          // Preorder: decrement reserved_quantity and preorder_reserved_quantity
+          await client.query(`
+            UPDATE products SET reserved_quantity = GREATEST(reserved_quantity - $1, 0) WHERE id = $2
+          `, [orderData.quantity, orderData.product_id]);
+          await client.query(`
+            UPDATE orders SET preorder_reserved_quantity = GREATEST(preorder_reserved_quantity - $1, 0) WHERE id = $1
+          `, [orderData.quantity, orderId]);
+        } else {
+          // Regular order: restore stock_quantity
+          await client.query(`
+            UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2
+          `, [orderData.quantity, orderData.product_id]);
+        }
       }
 
       // Send notification to customer
@@ -940,13 +1069,33 @@ router.put('/:id/cancel', async (req, res) => {
         ['cancelled', reason || null, 'customer', id]
       );
 
-      // Restore product stock (per-item order)
-      await client.query(`
-        UPDATE products
-        SET stock_quantity = stock_quantity + o.quantity
-        FROM orders o
-        WHERE o.id = $1 AND products.id = o.product_id
+      // Restore product stock or reservation (per-item order)
+      // Check if this is a preorder order
+      const orderPreorderCheck = await client.query(`
+        SELECT is_preorder, preorder_reserved_quantity FROM orders WHERE id = $1
       `, [id]);
+      const isPreorder = orderPreorderCheck.rows[0]?.is_preorder === true;
+      
+      if (isPreorder) {
+        // Preorder: decrement reserved_quantity and preorder_reserved_quantity
+        await client.query(`
+          UPDATE products
+          SET reserved_quantity = GREATEST(reserved_quantity - o.quantity, 0)
+          FROM orders o
+          WHERE o.id = $1 AND products.id = o.product_id
+        `, [id]);
+        await client.query(`
+          UPDATE orders SET preorder_reserved_quantity = GREATEST(preorder_reserved_quantity - quantity, 0) WHERE id = $1
+        `, [id]);
+      } else {
+        // Regular order: restore stock_quantity
+        await client.query(`
+          UPDATE products
+          SET stock_quantity = stock_quantity + o.quantity
+          FROM orders o
+          WHERE o.id = $1 AND products.id = o.product_id
+        `, [id]);
+      }
 
       await client.query('COMMIT');
 
@@ -978,6 +1127,137 @@ router.put('/:id/cancel', async (req, res) => {
   } catch (error) {
     console.error('Cancel order error:', error);
     res.status(500).json({ message: 'Server error cancelling order' });
+  }
+});
+
+// Set delivery date (for farmers/admin)
+router.put('/:id/delivery-date', async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id, 10);
+    const { delivery_date } = req.body;
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    if (!orderId) {
+      return res.status(400).json({ message: 'Invalid order id' });
+    }
+
+    if (!delivery_date) {
+      return res.status(400).json({ message: 'Delivery date is required' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Validate delivery date format and that it's not in the past
+    const today = new Date().toISOString().split('T')[0];
+    if (delivery_date < today) {
+      return res.status(400).json({ message: 'Delivery date cannot be in the past' });
+    }
+
+    // Check if user is admin or farmer who owns the product in the order
+    const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
+    const userRole = userResult.rows[0]?.role;
+
+    if (userRole !== 'admin' && userRole !== 'super_admin') {
+      // Check if user is a farmer who owns the product in this order
+      const farmerCheck = await pool.query(`
+        SELECT p.farmer_id, o.status
+        FROM orders o
+        JOIN products p ON o.product_id = p.id
+        WHERE o.id = $1
+      `, [orderId]);
+
+      if (farmerCheck.rows.length === 0) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      const isFarmer = Number(farmerCheck.rows[0].farmer_id) === Number(decoded.id);
+
+      if (!isFarmer) {
+        return res.status(403).json({ message: 'Only farmers and admins can set delivery date' });
+      }
+    }
+
+    // Get order details
+    const orderResult = await pool.query(`
+      SELECT o.*, p.farmer_id
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      WHERE o.id = $1
+    `, [orderId]);
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    const order = orderResult.rows[0];
+
+    // Validate order status - only allow scheduling for certain statuses
+    const allowedStatuses = ['pending', 'preorder_reserved', 'confirmed', 'preparing'];
+    if (!allowedStatuses.includes(order.status)) {
+      return res.status(400).json({ 
+        message: `Cannot schedule delivery for order in ${order.status} status` 
+      });
+    }
+
+    // Update order with delivery date and set status to scheduled
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(`
+        UPDATE orders
+        SET delivery_date = $1,
+            status = 'scheduled',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `, [delivery_date, orderId]);
+
+      // Send notification to customer
+      const message = `Your order #${orderId} has been scheduled for delivery on ${delivery_date}.`;
+      await client.query(`
+        INSERT INTO notifications (user_id, type, title, message, order_id, product_id)
+        VALUES ($1, 'order_update', 'Delivery Scheduled', $2, $3, $4)
+      `, [order.user_id, message, orderId, order.product_id]);
+      broadcastEvent('notification.created', { user_id: order.user_id });
+
+      await client.query('COMMIT');
+
+      // Broadcast real-time event
+      broadcastEvent('order.updated', {
+        order_id: orderId,
+        customer_id: order.user_id,
+        farmer_ids: [Number(order.farmer_id)],
+        new_status: 'scheduled',
+        old_status: order.status
+      });
+
+      res.json({
+        message: 'Delivery date scheduled successfully',
+        order_id: orderId,
+        delivery_date,
+        status: 'scheduled'
+      });
+    } catch (error) {
+      if (client) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          console.error('Rollback error:', rollbackError);
+        }
+      }
+      throw error;
+    } finally {
+      if (client) {
+        client.release();
+      }
+    }
+  } catch (error) {
+    console.error('Set delivery date error:', error);
+    res.status(500).json({ message: 'Server error setting delivery date' });
   }
 });
 
@@ -1040,13 +1320,33 @@ router.put('/:id/cancel-farmer', async (req, res) => {
         ['cancelled', reason || null, 'farmer', id]
       );
 
-      // Restore product stock (per-item order)
-      await client.query(`
-        UPDATE products
-        SET stock_quantity = stock_quantity + o.quantity
-        FROM orders o
-        WHERE o.id = $1 AND products.id = o.product_id
+      // Restore product stock or reservation (per-item order)
+      // Check if this is a preorder order
+      const orderPreorderCheck = await client.query(`
+        SELECT is_preorder, preorder_reserved_quantity FROM orders WHERE id = $1
       `, [id]);
+      const isPreorder = orderPreorderCheck.rows[0]?.is_preorder === true;
+      
+      if (isPreorder) {
+        // Preorder: decrement reserved_quantity and preorder_reserved_quantity
+        await client.query(`
+          UPDATE products
+          SET reserved_quantity = GREATEST(reserved_quantity - o.quantity, 0)
+          FROM orders o
+          WHERE o.id = $1 AND products.id = o.product_id
+        `, [id]);
+        await client.query(`
+          UPDATE orders SET preorder_reserved_quantity = GREATEST(preorder_reserved_quantity - quantity, 0) WHERE id = $1
+        `, [id]);
+      } else {
+        // Regular order: restore stock_quantity
+        await client.query(`
+          UPDATE products
+          SET stock_quantity = stock_quantity + o.quantity
+          FROM orders o
+          WHERE o.id = $1 AND products.id = o.product_id
+        `, [id]);
+      }
 
       await client.query('COMMIT');
     } catch (error) {

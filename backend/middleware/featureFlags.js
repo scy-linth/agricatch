@@ -94,10 +94,20 @@ async function requirePriceDropAlertsEnabled(req, res, next) {
   next();
 }
 
+// Middleware to check if product approval is required
+async function requireProductApprovalEnabled(req, res, next) {
+  const enabled = await getFeatureFlag('require_product_approval');
+  if (!enabled) {
+    return res.status(403).json({ message: 'Product approval is currently disabled' });
+  }
+  next();
+}
+
 module.exports = {
   getFeatureFlag,
   requireRegistrationsEnabled,
   checkMaintenanceMode,
   requireAnnouncementsEnabled,
-  requirePriceDropAlertsEnabled
+  requirePriceDropAlertsEnabled,
+  requireProductApprovalEnabled
 };

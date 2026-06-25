@@ -144,7 +144,8 @@ router.post('/', async (req, res) => {
 
     // Check if product exists and is available
     const productResult = await pool.query(
-      `SELECT p.id, p.stock_quantity, p.is_available, p.expiry_date,
+      `SELECT p.id, p.stock_quantity, p.is_available, p.expiry_date, p.is_preorder,
+              p.reserved_quantity, p.max_preorder_quantity,
               COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
               COALESCE(u.is_disabled, false) as farmer_is_disabled
        FROM products p
@@ -174,10 +175,27 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Product is already expired' });
     }
 
-    if (quantity > product.stock_quantity) {
-      return res.status(400).json({ message: 'Not enough stock available' });
+    // Validate stock/reservation based on product type
+    if (product.is_preorder) {
+      // Preorder: check capacity
+      const availableCapacity = product.max_preorder_quantity 
+        ? product.max_preorder_quantity - product.reserved_quantity 
+        : Infinity;
+      if (quantity > availableCapacity) {
+        return res.status(400).json({ 
+          message: `Not enough preorder capacity available. Maximum: ${product.max_preorder_quantity || 'unlimited'}` 
+        });
+      }
+    } else {
+      // Regular product: check stock
+      if (quantity > product.stock_quantity) {
+        return res.status(400).json({ message: 'Not enough stock available' });
+      }
     }
 
+    // Mixed cart prevention removed - regular and pre-order products can now be mixed
+    
+    // Get userId from token
     let userId = null;
     if (token) {
       try {
@@ -191,27 +209,38 @@ router.post('/', async (req, res) => {
     if (userId) {
       // Logged in user - check if item already in cart
       const existingItem = await pool.query(
-        'SELECT id, quantity FROM cart WHERE user_id = $1 AND product_id = $2',
+        'SELECT id, quantity, is_preorder FROM cart WHERE user_id = $1 AND product_id = $2',
         [userId, productId]
       );
 
       if (existingItem.rows.length > 0) {
         // Update quantity
         const newQuantity = existingItem.rows[0].quantity + quantity;
-        if (newQuantity > product.stock_quantity) {
-          return res.status(400).json({ message: 'Not enough stock available' });
+        if (product.is_preorder) {
+          const availableCapacity = product.max_preorder_quantity 
+            ? product.max_preorder_quantity - product.reserved_quantity 
+            : Infinity;
+          if (newQuantity > availableCapacity) {
+            return res.status(400).json({ 
+              message: `Not enough preorder capacity available. Maximum: ${product.max_preorder_quantity || 'unlimited'}` 
+            });
+          }
+        } else {
+          if (newQuantity > product.stock_quantity) {
+            return res.status(400).json({ message: 'Not enough stock available' });
+          }
         }
 
         await pool.query(
-          'UPDATE cart SET quantity = $1 WHERE id = $2',
-          [newQuantity, existingItem.rows[0].id]
+          'UPDATE cart SET quantity = $1, is_preorder = $2 WHERE id = $3',
+          [newQuantity, product.is_preorder, existingItem.rows[0].id]
         );
       } else {
         // Add new item - handle possible race condition using upsert fallback
         try {
           await pool.query(
-            'INSERT INTO cart (user_id, product_id, quantity) VALUES ($1, $2, $3)',
-            [userId, productId, quantity]
+            'INSERT INTO cart (user_id, product_id, quantity, is_preorder) VALUES ($1, $2, $3, $4)',
+            [userId, productId, quantity, product.is_preorder]
           );
         } catch (err) {
           // If another request inserted the same row concurrently, update quantity instead
@@ -219,10 +248,21 @@ router.post('/', async (req, res) => {
             const existing = await pool.query('SELECT id, quantity FROM cart WHERE user_id = $1 AND product_id = $2', [userId, productId]);
             if (existing.rows.length > 0) {
               const newQuantity = existing.rows[0].quantity + quantity;
-              if (newQuantity > product.stock_quantity) {
-                return res.status(400).json({ message: 'Not enough stock available' });
+              if (product.is_preorder) {
+                const availableCapacity = product.max_preorder_quantity 
+                  ? product.max_preorder_quantity - product.reserved_quantity 
+                  : Infinity;
+                if (newQuantity > availableCapacity) {
+                  return res.status(400).json({ 
+                    message: `Not enough preorder capacity available. Maximum: ${product.max_preorder_quantity || 'unlimited'}` 
+                  });
+                }
+              } else {
+                if (newQuantity > product.stock_quantity) {
+                  return res.status(400).json({ message: 'Not enough stock available' });
+                }
               }
-              await pool.query('UPDATE cart SET quantity = $1 WHERE id = $2', [newQuantity, existing.rows[0].id]);
+              await pool.query('UPDATE cart SET quantity = $1, is_preorder = $2 WHERE id = $3', [newQuantity, product.is_preorder, existing.rows[0].id]);
             }
           } else {
             throw err;
@@ -232,37 +272,59 @@ router.post('/', async (req, res) => {
     } else if (sessionId) {
       // Guest user - check if item already in cart
       const existingItem = await pool.query(
-        'SELECT id, quantity FROM cart WHERE session_id = $1 AND product_id = $2',
+        'SELECT id, quantity, is_preorder FROM cart WHERE session_id = $1 AND product_id = $2',
         [sessionId, productId]
       );
 
       if (existingItem.rows.length > 0) {
         // Update quantity
         const newQuantity = existingItem.rows[0].quantity + quantity;
-        if (newQuantity > product.stock_quantity) {
-          return res.status(400).json({ message: 'Not enough stock available' });
+        if (product.is_preorder) {
+          const availableCapacity = product.max_preorder_quantity 
+            ? product.max_preorder_quantity - product.reserved_quantity 
+            : Infinity;
+          if (newQuantity > availableCapacity) {
+            return res.status(400).json({ 
+              message: `Not enough preorder capacity available. Maximum: ${product.max_preorder_quantity || 'unlimited'}` 
+            });
+          }
+        } else {
+          if (newQuantity > product.stock_quantity) {
+            return res.status(400).json({ message: 'Not enough stock available' });
+          }
         }
 
         await pool.query(
-          'UPDATE cart SET quantity = $1 WHERE id = $2',
-          [newQuantity, existingItem.rows[0].id]
+          'UPDATE cart SET quantity = $1, is_preorder = $2 WHERE id = $3',
+          [newQuantity, product.is_preorder, existingItem.rows[0].id]
         );
       } else {
         // Add new item - handle race with upsert fallback
         try {
           await pool.query(
-            'INSERT INTO cart (session_id, product_id, quantity) VALUES ($1, $2, $3)',
-            [sessionId, productId, quantity]
+            'INSERT INTO cart (session_id, product_id, quantity, is_preorder) VALUES ($1, $2, $3, $4)',
+            [sessionId, productId, quantity, product.is_preorder]
           );
         } catch (err) {
           if (err && err.code === '23505') {
             const existing = await pool.query('SELECT id, quantity FROM cart WHERE session_id = $1 AND product_id = $2', [sessionId, productId]);
             if (existing.rows.length > 0) {
               const newQuantity = existing.rows[0].quantity + quantity;
-              if (newQuantity > product.stock_quantity) {
-                return res.status(400).json({ message: 'Not enough stock available' });
+              if (product.is_preorder) {
+                const availableCapacity = product.max_preorder_quantity 
+                  ? product.max_preorder_quantity - product.reserved_quantity 
+                  : Infinity;
+                if (newQuantity > availableCapacity) {
+                  return res.status(400).json({ 
+                    message: `Not enough preorder capacity available. Maximum: ${product.max_preorder_quantity || 'unlimited'}` 
+                  });
+                }
+              } else {
+                if (newQuantity > product.stock_quantity) {
+                  return res.status(400).json({ message: 'Not enough stock available' });
+                }
               }
-              await pool.query('UPDATE cart SET quantity = $1 WHERE id = $2', [newQuantity, existing.rows[0].id]);
+              await pool.query('UPDATE cart SET quantity = $1, is_preorder = $2 WHERE id = $3', [newQuantity, product.is_preorder, existing.rows[0].id]);
             }
           } else {
             throw err;
@@ -273,7 +335,87 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Session ID required for guest users' });
     }
 
-    res.json({ message: 'Item added to cart successfully' });
+    // Fetch updated cart data to return to client
+    let getQuery, getParams;
+    if (userId) {
+      getQuery = `
+        SELECT c.id, c.quantity, c.added_at,
+               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+               p.expiry_date,
+               COALESCE(f.is_disabled, false) as farmer_is_disabled,
+               COALESCE(f.shop_name, f.full_name) as farmer_name, p.location as farm_location,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN false
+                 WHEN COALESCE(f.is_disabled, false) THEN false
+                 WHEN p.is_available = false THEN false
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN false
+                 ELSE true
+               END AS is_available_for_checkout,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN 'admin_disabled'
+                 WHEN COALESCE(f.is_disabled, false) THEN 'farmer_disabled'
+                 WHEN p.is_available = false THEN 'farmer_unavailable'
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN 'expired'
+                 ELSE 'available'
+               END AS availability_status
+        FROM cart c
+        JOIN products p ON c.product_id = p.id
+        LEFT JOIN users f ON p.farmer_id = f.id
+        WHERE c.user_id = $1
+        ORDER BY c.added_at DESC
+      `;
+      getParams = [userId];
+    } else if (sessionId) {
+      getQuery = `
+        SELECT c.id, c.quantity, c.added_at,
+               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+               p.expiry_date,
+               COALESCE(f.is_disabled, false) as farmer_is_disabled,
+               COALESCE(f.shop_name, f.full_name) as farmer_name, p.location as farm_location,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN false
+                 WHEN COALESCE(f.is_disabled, false) THEN false
+                 WHEN p.is_available = false THEN false
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN false
+                 ELSE true
+               END AS is_available_for_checkout,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN 'admin_disabled'
+                 WHEN COALESCE(f.is_disabled, false) THEN 'farmer_disabled'
+                 WHEN p.is_available = false THEN 'farmer_unavailable'
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN 'expired'
+                 ELSE 'available'
+               END AS availability_status
+        FROM cart c
+        JOIN products p ON c.product_id = p.id
+        LEFT JOIN users f ON p.farmer_id = f.id
+        WHERE c.session_id = $1
+        ORDER BY c.added_at DESC
+      `;
+      getParams = [sessionId];
+    } else {
+      return res.json({ message: 'Item added to cart successfully', cartItems: [], summary: { itemCount: 0, subtotal: '0.00' } });
+    }
+
+    const updatedCartResult = await pool.query(getQuery, getParams);
+    const cartItems = updatedCartResult.rows;
+    const availableItems = cartItems.filter(item => item.is_available_for_checkout);
+    const subtotal = availableItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const unavailableCount = cartItems.filter(item => !item.is_available_for_checkout).length;
+
+    res.json({
+      message: 'Item added to cart successfully',
+      cartItems,
+      summary: {
+        subtotal: subtotal.toFixed(2),
+        itemCount: cartItems.length,
+        totalQuantity: cartItems.reduce((sum, item) => sum + item.quantity, 0),
+        has_unavailable_items: unavailableCount > 0,
+        unavailable_count: unavailableCount
+      }
+    });
 
   } catch (error) {
     console.error('Add to cart error:', error);
@@ -352,7 +494,87 @@ router.put('/:id', async (req, res) => {
 
     await pool.query('UPDATE cart SET quantity = $1 WHERE id = $2', [quantity, id]);
 
-    res.json({ message: 'Cart item updated successfully' });
+    // Fetch updated cart data to return to client
+    let getQuery, getParams;
+    if (userId) {
+      getQuery = `
+        SELECT c.id, c.quantity, c.added_at,
+               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+               p.expiry_date,
+               COALESCE(f.is_disabled, false) as farmer_is_disabled,
+               COALESCE(f.shop_name, f.full_name) as farmer_name, p.location as farm_location,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN false
+                 WHEN COALESCE(f.is_disabled, false) THEN false
+                 WHEN p.is_available = false THEN false
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN false
+                 ELSE true
+               END AS is_available_for_checkout,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN 'admin_disabled'
+                 WHEN COALESCE(f.is_disabled, false) THEN 'farmer_disabled'
+                 WHEN p.is_available = false THEN 'farmer_unavailable'
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN 'expired'
+                 ELSE 'available'
+               END AS availability_status
+        FROM cart c
+        JOIN products p ON c.product_id = p.id
+        LEFT JOIN users f ON p.farmer_id = f.id
+        WHERE c.user_id = $1
+        ORDER BY c.added_at DESC
+      `;
+      getParams = [userId];
+    } else if (sessionId) {
+      getQuery = `
+        SELECT c.id, c.quantity, c.added_at,
+               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+               p.expiry_date,
+               COALESCE(f.is_disabled, false) as farmer_is_disabled,
+               COALESCE(f.shop_name, f.full_name) as farmer_name, p.location as farm_location,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN false
+                 WHEN COALESCE(f.is_disabled, false) THEN false
+                 WHEN p.is_available = false THEN false
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN false
+                 ELSE true
+               END AS is_available_for_checkout,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN 'admin_disabled'
+                 WHEN COALESCE(f.is_disabled, false) THEN 'farmer_disabled'
+                 WHEN p.is_available = false THEN 'farmer_unavailable'
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN 'expired'
+                 ELSE 'available'
+               END AS availability_status
+        FROM cart c
+        JOIN products p ON c.product_id = p.id
+        LEFT JOIN users f ON p.farmer_id = f.id
+        WHERE c.session_id = $1
+        ORDER BY c.added_at DESC
+      `;
+      getParams = [sessionId];
+    } else {
+      return res.json({ message: 'Cart item updated successfully', cartItems: [], summary: { itemCount: 0, subtotal: '0.00' } });
+    }
+
+    const updatedCartResult = await pool.query(getQuery, getParams);
+    const cartItems = updatedCartResult.rows;
+    const availableItems = cartItems.filter(item => item.is_available_for_checkout);
+    const subtotal = availableItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const unavailableCount = cartItems.filter(item => !item.is_available_for_checkout).length;
+
+    res.json({
+      message: 'Cart item updated successfully',
+      cartItems,
+      summary: {
+        subtotal: subtotal.toFixed(2),
+        itemCount: cartItems.length,
+        totalQuantity: cartItems.reduce((sum, item) => sum + item.quantity, 0),
+        has_unavailable_items: unavailableCount > 0,
+        unavailable_count: unavailableCount
+      }
+    });
 
   } catch (error) {
     console.error('Update cart error:', error);
@@ -398,7 +620,87 @@ router.delete('/:id', async (req, res) => {
 
     await pool.query('DELETE FROM cart WHERE id = $1', [id]);
 
-    res.json({ message: 'Item removed from cart successfully' });
+    // Fetch updated cart data to return to client
+    let getQuery, getParams;
+    if (userId) {
+      getQuery = `
+        SELECT c.id, c.quantity, c.added_at,
+               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+               p.expiry_date,
+               COALESCE(f.is_disabled, false) as farmer_is_disabled,
+               COALESCE(f.shop_name, f.full_name) as farmer_name, p.location as farm_location,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN false
+                 WHEN COALESCE(f.is_disabled, false) THEN false
+                 WHEN p.is_available = false THEN false
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN false
+                 ELSE true
+               END AS is_available_for_checkout,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN 'admin_disabled'
+                 WHEN COALESCE(f.is_disabled, false) THEN 'farmer_disabled'
+                 WHEN p.is_available = false THEN 'farmer_unavailable'
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN 'expired'
+                 ELSE 'available'
+               END AS availability_status
+        FROM cart c
+        JOIN products p ON c.product_id = p.id
+        LEFT JOIN users f ON p.farmer_id = f.id
+        WHERE c.user_id = $1
+        ORDER BY c.added_at DESC
+      `;
+      getParams = [userId];
+    } else if (sessionId) {
+      getQuery = `
+        SELECT c.id, c.quantity, c.added_at,
+               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
+               p.expiry_date,
+               COALESCE(f.is_disabled, false) as farmer_is_disabled,
+               COALESCE(f.shop_name, f.full_name) as farmer_name, p.location as farm_location,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN false
+                 WHEN COALESCE(f.is_disabled, false) THEN false
+                 WHEN p.is_available = false THEN false
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN false
+                 ELSE true
+               END AS is_available_for_checkout,
+               CASE
+                 WHEN COALESCE(p.is_admin_disabled, false) THEN 'admin_disabled'
+                 WHEN COALESCE(f.is_disabled, false) THEN 'farmer_disabled'
+                 WHEN p.is_available = false THEN 'farmer_unavailable'
+                 WHEN p.expiry_date IS NOT NULL AND p.expiry_date < CURRENT_DATE THEN 'expired'
+                 ELSE 'available'
+               END AS availability_status
+        FROM cart c
+        JOIN products p ON c.product_id = p.id
+        LEFT JOIN users f ON p.farmer_id = f.id
+        WHERE c.session_id = $1
+        ORDER BY c.added_at DESC
+      `;
+      getParams = [sessionId];
+    } else {
+      return res.json({ message: 'Item removed from cart successfully', cartItems: [], summary: { itemCount: 0, subtotal: '0.00' } });
+    }
+
+    const updatedCartResult = await pool.query(getQuery, getParams);
+    const cartItems = updatedCartResult.rows;
+    const availableItems = cartItems.filter(item => item.is_available_for_checkout);
+    const subtotal = availableItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const unavailableCount = cartItems.filter(item => !item.is_available_for_checkout).length;
+
+    res.json({
+      message: 'Item removed from cart successfully',
+      cartItems,
+      summary: {
+        subtotal: subtotal.toFixed(2),
+        itemCount: cartItems.length,
+        totalQuantity: cartItems.reduce((sum, item) => sum + item.quantity, 0),
+        has_unavailable_items: unavailableCount > 0,
+        unavailable_count: unavailableCount
+      }
+    });
 
   } catch (error) {
     console.error('Remove from cart error:', error);
@@ -464,18 +766,26 @@ router.post('/migrate', async (req, res) => {
         [userId, item.product_id]
       );
 
+      // Get current stock for this product
+      const productStock = await pool.query(
+        'SELECT stock_quantity FROM products WHERE id = $1',
+        [item.product_id]
+      );
+      const maxStock = productStock.rows[0]?.stock_quantity || 0;
+
       if (existingItem.rows.length > 0) {
-        // Update existing item quantity
-        const newQuantity = existingItem.rows[0].quantity + item.quantity;
+        // Update existing item quantity, but cap at max stock
+        const newQuantity = Math.min(existingItem.rows[0].quantity + item.quantity, maxStock);
         await pool.query(
           'UPDATE cart SET quantity = $1 WHERE id = $2',
           [newQuantity, existingItem.rows[0].id]
         );
       } else {
-        // Add new item
+        // Add new item, but cap at max stock
+        const newQuantity = Math.min(item.quantity, maxStock);
         await pool.query(
           'INSERT INTO cart (user_id, product_id, quantity) VALUES ($1, $2, $3)',
-          [userId, item.product_id, item.quantity]
+          [userId, item.product_id, newQuantity]
         );
       }
     }

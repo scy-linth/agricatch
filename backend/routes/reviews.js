@@ -543,7 +543,8 @@ router.get('/mine', async (req, res) => {
       `SELECT r.id, r.rating, r.comment, r.created_at,
               p.name AS product_name, p.id AS product_id,
               u.username AS customer_name,
-              u.first_name, u.last_name
+              u.first_name, u.last_name,
+              COALESCE(u.is_verified, false) AS customer_is_verified
        FROM reviews r
        JOIN products p ON p.id = r.product_id
        JOIN users u ON u.id = r.user_id

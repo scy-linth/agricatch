@@ -107,12 +107,64 @@ async function getFarmerToken() {
         throw new Error('No farmer user found in database');
       }
       const user = fallbackResult.rows[0];
+      
+      // Mark farmer as verified for testing
+      await pool.query(
+        `UPDATE users SET is_verified = true WHERE id = $1`,
+        [user.id]
+      );
+      
       const token = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
         jwtSecret,
         { expiresIn: '1h' }
       );
       return { token, user };
+    }
+
+    const user = result.rows[0];
+    
+    // Mark farmer as verified for testing
+    await pool.query(
+      `UPDATE users SET is_verified = true WHERE id = $1`,
+      [user.id]
+    );
+    
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      jwtSecret,
+      { expiresIn: '1h' }
+    );
+
+    return { token, user };
+  } finally {
+    await pool.end();
+  }
+}
+
+async function getCustomerToken() {
+  const env = loadEnv();
+  const jwtSecret = env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET not found in .env');
+  }
+
+  const pool = new Pool({
+    host: env.DB_HOST,
+    port: parseInt(env.DB_PORT || '5432'),
+    database: env.DB_NAME,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    ssl: env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+  });
+
+  try {
+    // Get any customer user for testing
+    const result = await pool.query(
+      `SELECT id, email, username, role, full_name FROM users WHERE role = 'customer' LIMIT 1`
+    );
+    if (result.rows.length === 0) {
+      throw new Error('No customer user found in database');
     }
 
     const user = result.rows[0];
@@ -146,4 +198,4 @@ async function loginAsFarmer(page) {
   await page.reload();
 }
 
-module.exports = { getAdminToken, getFarmerToken, loginAsAdmin, loginAsFarmer };
+module.exports = { getAdminToken, getFarmerToken, getCustomerToken, loginAsAdmin, loginAsFarmer };

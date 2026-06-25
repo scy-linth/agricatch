@@ -215,7 +215,11 @@ app.use(checkMaintenanceMode);
             username VARCHAR(50) UNIQUE NOT NULL,
             email VARCHAR(100) UNIQUE NOT NULL,
             password VARCHAR(255) NOT NULL,
-            full_name VARCHAR(100),
+            full_name VARCHAR(130),
+            first_name VARCHAR(40),
+            middle_name VARCHAR(40),
+            last_name VARCHAR(40),
+            shop_name VARCHAR(40),
             phone VARCHAR(20),
             address TEXT,
             role VARCHAR(20) DEFAULT 'customer',
@@ -713,24 +717,48 @@ pool.connect((err, client, release) => {
 
 // Routes
 // Rate limiters for sensitive endpoints
-const authRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    const path = String(req.path || '').toLowerCase();
-    return !(req.method === 'POST' && (path === '/login' || path === '/recover-admin'));
-  },
-  message: { error: 'Too many requests. Please try again later.' }
-});
-const otpRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many OTP requests. Please try again later.' }
-});
+// Dynamic rate limiters that read from platform settings
+// Settings are environment-aware (local vs production)
+function createAuthRateLimit() {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: async (req) => {
+      const { getPlatformSetting } = require('./utils/db');
+      const isDev = process.env.NODE_ENV === 'development';
+      const key = isDev ? 'auth_rate_limit_local' : 'auth_rate_limit_production';
+      const limit = await getPlatformSetting(key, isDev ? '100' : '20');
+      const parsed = parseInt(limit, 10);
+      return isNaN(parsed) || parsed === 0 ? (isDev ? 100 : 20) : parsed;
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => {
+      const path = String(req.path || '').toLowerCase();
+      return !(req.method === 'POST' && (path === '/login' || path === '/recover-admin'));
+    },
+    message: { error: 'Too many requests. Please try again later.' }
+  });
+}
+
+function createOtpRateLimit() {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: async (req) => {
+      const { getPlatformSetting } = require('./utils/db');
+      const isDev = process.env.NODE_ENV === 'development';
+      const key = isDev ? 'otp_rate_limit_local' : 'otp_rate_limit_production';
+      const limit = await getPlatformSetting(key, isDev ? '50' : '10');
+      const parsed = parseInt(limit, 10);
+      return isNaN(parsed) || parsed === 0 ? (isDev ? 50 : 10) : parsed;
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many OTP requests. Please try again later.' }
+  });
+}
+
+const authRateLimit = createAuthRateLimit();
+const otpRateLimit = createOtpRateLimit();
 
 // #region agent log
 sendIngest({location:'server.js:47',message:'Loading routes',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B'});
@@ -989,16 +1017,19 @@ app.get('/api/test-db', async (req, res) => {
 
 // Server-Sent Events (SSE) endpoint for real-time updates
 // Note: EventSource cannot send Authorization headers reliably, so we accept token via query param.
+// For public users (landing page), token is optional - they only receive product updates.
 app.get('/api/events', async (req, res) => {
   try {
     const token = req.query.token || req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).end();
+    let decoded = null;
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded?.id !== -1) {
-      const result = await pool.query('SELECT is_disabled FROM users WHERE id = $1', [decoded.id]);
-      if (result.rows.length && result.rows[0].is_disabled) {
-        return res.status(403).end();
+    if (token) {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded?.id !== -1) {
+        const result = await pool.query('SELECT is_disabled FROM users WHERE id = $1', [decoded.id]);
+        if (result.rows.length && result.rows[0].is_disabled) {
+          return res.status(403).end();
+        }
       }
     }
 
@@ -1013,7 +1044,7 @@ app.get('/api/events', async (req, res) => {
 
     // Initial handshake event
     res.write(`event: connected\n`);
-    res.write(`data: ${JSON.stringify({ user_id: decoded.id })}\n\n`);
+    res.write(`data: ${JSON.stringify({ user_id: decoded?.id || null, is_public: !decoded })}\n\n`);
 
     // Heartbeat (keeps proxies from closing the stream)
     const heartbeat = setInterval(() => {
@@ -1053,10 +1084,6 @@ app.get('/farmer.html', (req, res) => {
 
 app.get('/orders.html', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'frontend', 'orders.html'));
-});
-
-app.get('/addresses.html', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'frontend', 'addresses.html'));
 });
 
 app.get('/clear_cache.html', (req, res) => {

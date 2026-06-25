@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../utils/db');
 const { writeAdminAuditLog } = require('../utils/auditLog');
+const { broadcastEvent } = require('../utils/realtime');
 
 function getUserFromToken(req) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -20,7 +21,7 @@ router.post('/', async (req, res) => {
   try {
     const user = getUserFromToken(req);
     if (!user) return res.status(401).json({ message: 'Authentication required' });
-    if (user.role !== 'farmer') return res.status(403).json({ message: 'Only farmers can create tickets' });
+    if (!['farmer', 'customer'].includes(user.role)) return res.status(403).json({ message: 'Only farmers and customers can create tickets' });
 
     const { subject, description, priority } = req.body;
     if (!subject || !description) {
@@ -32,15 +33,14 @@ router.post('/', async (req, res) => {
     if (description.length > 500) {
       return res.status(400).json({ message: 'Description exceeds maximum length of 500 characters' });
     }
-    if (!['low', 'medium', 'high'].includes(priority)) {
-      return res.status(400).json({ message: 'Priority must be low, medium, or high' });
-    }
+    // Priority is optional - default to 'medium' if not provided
+    const ticketPriority = (priority && ['low', 'medium', 'high'].includes(priority)) ? priority : 'medium';
 
     const result = await pool.query(
       `INSERT INTO support_tickets (farmer_id, subject, description, priority, status)
        VALUES ($1, $2, $3, $4, 'open')
        RETURNING id, status`,
-      [user.id, subject.trim(), description.trim(), priority || 'medium']
+      [user.id, subject.trim(), description.trim(), ticketPriority]
     );
 
     res.status(201).json({ ticket_id: result.rows[0].id, status: result.rows[0].status });
@@ -99,11 +99,36 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Get unread message count for admin badge
+router.get('/unread-count', async (req, res) => {
+  try {
+    const user = getUserFromToken(req);
+    if (!user) return res.status(401).json({ message: 'Authentication required' });
+    if (!['admin', 'staff', 'super_admin'].includes(user.role)) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    // Count distinct tickets with unread messages from farmers or customers
+    const result = await pool.query(`
+      SELECT COUNT(DISTINCT sm.ticket_id) as unread_count
+      FROM support_messages sm
+      JOIN users u ON u.id = sm.sender_id
+      WHERE sm.is_read = false
+      AND u.role IN ('farmer', 'customer')
+    `);
+
+    res.json({ unread_count: result.rows[0]?.unread_count || 0 });
+  } catch (error) {
+    console.error('Get unread count error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.get('/my', async (req, res) => {
   try {
     const user = getUserFromToken(req);
     if (!user) return res.status(401).json({ message: 'Authentication required' });
-    if (user.role !== 'farmer') return res.status(403).json({ message: 'Farmer access required' });
+    if (!['farmer', 'customer'].includes(user.role)) return res.status(403).json({ message: 'Farmer or customer access required' });
 
     const { page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
@@ -152,17 +177,9 @@ router.get('/:id', async (req, res) => {
 
     const ticket = result.rows[0];
 
-    // Check access: farmer can only see own tickets, admin can see all
-    if (user.role === 'farmer' && ticket.farmer_id !== user.id) {
+    // Check access: farmer/customer can only see own tickets, admin can see all
+    if (['farmer', 'customer'].includes(user.role) && ticket.farmer_id !== user.id) {
       return res.status(403).json({ message: 'Access denied' });
-    }
-
-    // Mark messages as read if farmer is viewing
-    if (user.role === 'farmer') {
-      await pool.query(
-        'UPDATE support_messages SET is_read = true WHERE ticket_id = $1 AND sender_id != $2',
-        [id, user.id]
-      );
     }
 
     // Get messages
@@ -260,7 +277,7 @@ router.post('/:id/messages', async (req, res) => {
     }
     const ticket = ticketResult.rows[0];
 
-    if (user.role === 'farmer' && ticket.farmer_id !== user.id) {
+    if (['farmer', 'customer'].includes(user.role) && ticket.farmer_id !== user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -277,7 +294,7 @@ router.post('/:id/messages', async (req, res) => {
       [id]
     );
 
-    // If admin sends message, create notification for farmer
+    // If admin sends message, create notification for ticket owner
     if (['admin', 'staff', 'super_admin'].includes(user.role)) {
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
@@ -298,6 +315,9 @@ router.post('/:id/messages', async (req, res) => {
       } catch (auditErr) {
         console.error('Audit log error (non-fatal):', auditErr);
       }
+    } else {
+      // Ticket owner sent message - broadcast to admins
+      broadcastEvent('support.message', { ticket_id: id, user_id: user.id });
     }
 
     res.status(201).json({ message: 'Message sent' });
@@ -313,7 +333,7 @@ router.get('/:id/messages', async (req, res) => {
     if (!user) return res.status(401).json({ message: 'Authentication required' });
 
     const { id } = req.params;
-    const { page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 50, mark_read = 'true' } = req.query;
     const offset = (page - 1) * limit;
 
     // Check ticket exists and user has access
@@ -323,8 +343,26 @@ router.get('/:id/messages', async (req, res) => {
     }
     const ticket = ticketResult.rows[0];
 
-    if (user.role === 'farmer' && ticket.farmer_id !== user.id) {
+    if (['farmer', 'customer'].includes(user.role) && ticket.farmer_id !== user.id) {
       return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Mark messages as read only when mark_read=true (first load, not polling)
+    if (mark_read === 'true') {
+      if (['farmer', 'customer'].includes(user.role)) {
+        await pool.query(
+          'UPDATE support_messages SET is_read = true WHERE ticket_id = $1 AND sender_id != $2',
+          [id, user.id]
+        );
+      } else if (['admin', 'staff', 'super_admin'].includes(user.role)) {
+        // Admin viewing: mark farmer/customer messages as read
+        await pool.query(
+          'UPDATE support_messages SET is_read = true WHERE ticket_id = $1 AND sender_id IN (SELECT id FROM users WHERE role = ANY($2))',
+          [id, ['farmer', 'customer']]
+        );
+        // Notify admins to refresh badge
+        broadcastEvent('support.read', { ticket_id: id });
+      }
     }
 
     const countResult = await pool.query(

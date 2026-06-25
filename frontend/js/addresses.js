@@ -1,8 +1,17 @@
 class AddressesPage {
     constructor() {
         this.apiBase = '/api';
-        this.token = localStorage.getItem('token');
+        this.token = this.normalizeAuthToken(localStorage.getItem('token'));
         this.init();
+    }
+
+    normalizeAuthToken(token) {
+        if (!token) return null;
+        try {
+            return token.replace(/^["']|["']$/g, '').trim();
+        } catch (e) {
+            return token;
+        }
     }
 
     async init() {
@@ -124,12 +133,14 @@ class AddressesPage {
                 phoneDisplay = '+63' + phoneDisplay;
             }
 
+            const displayName = [addr.first_name, addr.middle_name, addr.last_name].filter(Boolean).join(' ') || addr.full_name || 'Unnamed';
+
             return `
             <div class="address-card ${addr.is_default ? 'default-address' : ''}">
                 <div class="address-card-content">
                     ${addr.is_default ? '<span class="default-badge"><i class="fas fa-star"></i> Default Address</span>' : ''}
                     <div class="address-info">
-                        <h4>${addr.full_name || 'Unnamed'}</h4>
+                        <h4>${displayName}</h4>
                         <p class="address-phone"><i class="fas fa-phone"></i> ${phoneDisplay}</p>
                         <p class="address-text"><i class="fas fa-map-marker-alt"></i> ${fullAddress || 'No address provided'}</p>
                     </div>
@@ -153,19 +164,24 @@ class AddressesPage {
     async saveAddress(e) {
         e.preventDefault();
         
-        const fullName = document.getElementById('address-fullname').value.trim();
+        const firstName = document.getElementById('address-firstname').value.trim();
+        const middleName = document.getElementById('address-middlename').value.trim();
+        const lastName = document.getElementById('address-lastname').value.trim();
+        const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim();
         const phone = document.getElementById('address-phone').value.trim();
         const { province, city, barangay, street } = this.getFormAddress();
         const formattedAddress = window.PSGC.formatAddress({ province, city, barangay, street });
         
-        if (!fullName) {
-            this.showMessage('Please enter your full name', 'error');
-            document.getElementById('address-fullname').focus();
+        if (!firstName || !lastName) {
+            this.showMessage('Please enter your first name and last name', 'error');
+            if (!firstName) document.getElementById('address-firstname').focus();
+            else document.getElementById('address-lastname').focus();
             return;
         }
         
-        if (!phone || phone.length !== 10) {
-            this.showMessage('Please enter a valid 10-digit phone number', 'error');
+        const phoneDigits = phone.replace(/\D/g, '');
+        if (!phone || phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+            this.showMessage('Please enter a valid contact number (10 digits starting with 9).', 'error');
             document.getElementById('address-phone').focus();
             return;
         }
@@ -185,6 +201,9 @@ class AddressesPage {
         const payload = {
             label: '',
             full_name: fullName,
+            first_name: firstName,
+            middle_name: middleName,
+            last_name: lastName,
             phone: phoneWithPrefix,
             street,
             barangay,
@@ -255,7 +274,9 @@ class AddressesPage {
                 
                 // Set form values
                 document.getElementById('address-id').value = addr.id;
-                document.getElementById('address-fullname').value = addr.full_name || '';
+                document.getElementById('address-firstname').value = addr.first_name || '';
+                document.getElementById('address-middlename').value = addr.middle_name || '';
+                document.getElementById('address-lastname').value = addr.last_name || '';
 
                 let phone = addr.phone || '';
                 if (phone.startsWith('+63')) {

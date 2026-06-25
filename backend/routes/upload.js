@@ -192,7 +192,8 @@ router.post('/verification-document', ensureAuth, verificationUpload.single('doc
       resource_type: 'image',
       tags: ['app:agricatch', 'entity:verification', `entity_id:${req.user?.id || 'unknown'}`, 'role:document'],
       transformation: [
-        { quality: 'auto', fetch_format: 'auto' }
+        { width: 2000, crop: 'limit', quality: 'auto:good' },
+        { fetch_format: 'auto' }
       ]
     });
 

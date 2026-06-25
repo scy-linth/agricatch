@@ -814,46 +814,80 @@
 
         <div class="card">
             <div class="card-body">
-                <!-- Filter Bar -->
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); border-left: 4px solid #9333ea;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small" style="font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Pre-order Reserved</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #9333ea;" id="orders-preorder-reserved-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Pending</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="orders-pending-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Confirmed</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #146c43;" id="orders-confirmed-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-left: 4px solid #0d6efd;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Preparing</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #0a58ca;" id="orders-preparing-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 100%); border-left: 4px solid #6f42c1;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Out for Delivery</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #59359a;" id="orders-out_for_delivery-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a8d5ba 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Delivered</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #0f5132;" id="orders-delivered-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Cancelled</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="orders-cancelled-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
-                    <div class="col-md-1 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Show</label>
-                        <select class="form-select form-select-sm" data-entries-section="orders" style="min-width: 60px;">
-                            <option value="10">10</option>
-                            <option value="25">25</option>
-                            <option value="50" selected>50</option>
-                            <option value="100">100</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Price Range</label>
-                        <select id="order-price-filter" class="form-select form-select-sm">
-                            <option value="">Any price</option>
-                            <option value="0-500">₱0 – ₱500</option>
-                            <option value="500-1500">₱500 – ₱1,500</option>
-                            <option value="1500-3000">₱1,500 – ₱3,000</option>
-                            <option value="3000+">₱3,000+</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 col-sm-6">
-                        <label class="form-label small fw-semibold mb-1">Sort</label>
-                        <select id="order-sort-filter" class="form-select form-select-sm">
-                            <option value="date_desc">Newest first</option>
-                            <option value="date_asc">Oldest first</option>
-                            <option value="total_desc">Highest total</option>
-                            <option value="total_asc">Lowest total</option>
-                        </select>
-                    </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm flex-grow-1">
-                                <input type="text" id="order-search-input" class="form-control me-2" placeholder="Order ID, customer name or email…">
-                                <button id="order-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;">
+                                <input type="text" id="order-search-input" class="form-control me-2"
+                                       placeholder="Order ID, product name, or customer…">
+                                <button id="order-search-btn" class="btn btn-sm btn-ac-green" type="button">
                                     <i class="bi bi-search me-1"></i>Search
                                 </button>
                             </div>
-                            <button id="order-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh orders"><i class="bi bi-arrow-clockwise"></i></button>
+                            <button id="order-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -861,8 +895,8 @@
                 <!-- Status Tabs -->
                 <div class="verification-tabs order-tabs mb-3">
                     <button class="tab-btn active" data-status="">All</button>
-                    <button class="tab-btn" data-status="pending">Pending</button>
                     <button class="tab-btn" data-status="preorder_reserved">Pre-order Reserved</button>
+                    <button class="tab-btn" data-status="pending">Pending</button>
                     <button class="tab-btn" data-status="confirmed">Confirmed</button>
                     <button class="tab-btn" data-status="preparing">Preparing</button>
                     <button class="tab-btn" data-status="out_for_delivery">Out for Delivery</button>
@@ -927,6 +961,33 @@
 
         <div class="card">
             <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a8d5ba 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Active</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #0f5132;" id="users-active-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Disabled</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #842029;" id="users-disabled-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #cfe2ff 0%, #9ec5fe 100%); border-left: 4px solid #0d6efd;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Verified</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #052c65;" id="users-verified-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -966,6 +1027,7 @@
                                 <th>Full Name</th>
                                 <th>Username</th>
                                 <th>Email</th>
+                                <th>Verification</th>
                                 <th>Status</th>
                                 <th>Joined</th>
                                 <th class="col-actions">Actions</th>
@@ -973,7 +1035,7 @@
                         </thead>
                         <tbody id="users-tbody">
                             <tr>
-                                <td colspan="7">
+                                <td colspan="8">
                                     <div class="skeleton-row"></div>
                                     <div class="skeleton-row"></div>
                                     <div class="skeleton-row"></div>
@@ -1007,6 +1069,42 @@
 
         <div class="card">
             <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a8d5ba 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Active</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #0f5132;" id="products-active-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Disabled</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #842029;" id="products-disabled-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); border-left: 4px solid #ffc107;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">No Stock</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="products-no-stock-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%); border-left: 4px solid #6c757d;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Total</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #343a40;" id="products-total-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
                     <div class="col-md-1 col-sm-6">
@@ -1041,6 +1139,7 @@
                     <button class="tab-btn active" data-status="">All</button>
                     <button class="tab-btn" data-status="available">Active</button>
                     <button class="tab-btn" data-status="disabled">Disabled</button>
+                    <button class="tab-btn" data-status="no_stock">No Stocks</button>
                 </div>
 
                 <div class="table-responsive">
@@ -1263,6 +1362,33 @@
 
         <div class="card">
             <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a8d5ba 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Active</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #0f5132;" id="farmers-active-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Disabled</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #842029;" id="farmers-disabled-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #cfe2ff 0%, #9ec5fe 100%); border-left: 4px solid #0d6efd;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Verified</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #052c65;" id="farmers-verified-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Filter Bar -->
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
@@ -1647,6 +1773,26 @@
 
         <div class="card">
             <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a8d5ba 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Active</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #0f5132;" id="admin-active-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Disabled</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #842029;" id="admin-disabled-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
                     <div class="col-md-1 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Show</label>
@@ -1734,6 +1880,34 @@
 
         <div class="card">
             <div class="card-body">
+                <!-- Stats Dashboard -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a8d5ba 100%); border-left: 4px solid #198754;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Active</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #0f5132;" id="all-users-active-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border-left: 4px solid #dc3545;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Disabled</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #842029;" id="all-users-disabled-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #cfe2ff 0%, #9ec5fe 100%); border-left: 4px solid #0d6efd;">
+                            <div class="card-body py-2">
+                                <h6 class="text-muted mb-0 small">Verified</h6>
+                                <h4 class="mb-0 fw-bold" style="color: #052c65;" id="all-users-verified-count">0</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
                     <div class="col-md-1 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Show</label>
@@ -1783,13 +1957,14 @@
                                 <th>Username</th>
                                 <th>Email</th>
                                 <th>Role</th>
+                                <th>Verification</th>
                                 <th>Status</th>
                                 <th>Joined</th>
                                 <th class="col-actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="all-users-tbody">
-                            <tr><td colspan="8" class="text-center text-muted py-4">
+                            <tr><td colspan="9" class="text-center text-muted py-4">
                                 <span class="spinner-border spinner-border-sm"></span>
                             </td></tr>
                         </tbody>
@@ -1877,6 +2052,111 @@
                 </div>
             </div>
 
+            <!-- Security Settings -->
+            <div class="col-12 mt-3">
+                <div class="card ac-data-card">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-shield-lock"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Security Configuration</h6>
+                                <p class="ac-data-card__subtitle">Control security settings. Settings apply to both environments unless specified.</p>
+                            </div>
+                        </div>
+                        <div>
+                            <span id="security-env-indicator" class="badge bg-secondary">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3">
+                        <!-- reCAPTCHA Settings -->
+                        <div class="mb-4 p-3 border rounded" style="background: #f8f9fa;">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-recaptcha me-2"></i>Google reCAPTCHA v2</h6>
+                                <span class="badge bg-info">Both Environments</span>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small text-muted fw-semibold">reCAPTCHA Mode:</label>
+                                <select class="form-select platform-setting-input" id="setting-recaptcha-mode" data-key="recaptcha_mode">
+                                    <option value="auto">🔄 Auto Mode (Local: OFF, Production: ON)</option>
+                                    <option value="always_on">🔒 Always ON (Both Environments)</option>
+                                    <option value="always_off">⚠️ Always OFF (Both Environments)</option>
+                                </select>
+                                <small class="text-muted" style="font-size: 11px;">Auto: Automatically OFF in local, ON in production</small>
+                            </div>
+                            <small class="text-muted d-block">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <strong>Purpose:</strong> Prevents automated bot attacks on registration, login, and password reset. <strong>Auto mode</strong> automatically sets OFF for local testing and ON for production security.
+                            </small>
+                        </div>
+
+                        <!-- Rate Limiting Settings -->
+                        <div class="mb-4 p-3 border rounded" style="background: #f8f9fa;">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-speedometer2 me-2"></i>Rate Limiting</h6>
+                                <span class="badge bg-info">Environment-Aware</span>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">Auth Requests (Local)</label>
+                                    <input type="number" class="form-control platform-setting-input" id="setting-auth-rate-limit-local" data-key="auth_rate_limit_local" min="1" max="1000" placeholder="100">
+                                    <small class="text-muted" style="font-size: 11px;">Recommended: 100 (local testing)</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">Auth Requests (Production)</label>
+                                    <input type="number" class="form-control platform-setting-input" id="setting-auth-rate-limit-production" data-key="auth_rate_limit_production" min="1" max="1000" placeholder="20">
+                                    <small class="text-muted" style="font-size: 11px;">Recommended: 20 (production)</small>
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">OTP Requests (Local)</label>
+                                    <input type="number" class="form-control platform-setting-input" id="setting-otp-rate-limit-local" data-key="otp_rate_limit_local" min="1" max="1000" placeholder="50">
+                                    <small class="text-muted" style="font-size: 11px;">Recommended: 50 (local testing)</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">OTP Requests (Production)</label>
+                                    <input type="number" class="form-control platform-setting-input" id="setting-otp-rate-limit-production" data-key="otp_rate_limit_production" min="1" max="1000" placeholder="10">
+                                    <small class="text-muted" style="font-size: 11px;">Recommended: 10 (production)</small>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <strong>Purpose:</strong> Limits API requests per 15 minutes per IP address to prevent abuse. Separate settings for local and production environments allow different limits for testing vs production security.
+                            </small>
+                        </div>
+
+                        <!-- OTP Settings -->
+                        <div class="mb-3 p-3 border rounded" style="background: #f8f9fa;">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-key me-2"></i>OTP Verification Mode</h6>
+                                <span class="badge bg-info">Both Environments</span>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small text-muted fw-semibold">Select OTP Mode:</label>
+                                <select class="form-select platform-setting-input" id="setting-otp-mode" data-key="otp_mode">
+                                    <option value="strict">🔒 Strict Mode (Production Recommended)</option>
+                                    <option value="testing">🧪 Testing Mode (Local Recommended)</option>
+                                    <option value="disabled">⚠️ Disabled (Not Recommended)</option>
+                                </select>
+                            </div>
+                            <div class="mb-2" id="otp-bypass-container">
+                                <label class="form-label small text-muted">OTP Bypass Code (for Testing Mode)</label>
+                                <input type="text" class="form-control platform-setting-input" id="setting-otp-bypass-code" data-key="otp_bypass_code" placeholder="789878">
+                            </div>
+                            <small class="text-muted d-block">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <strong>Modes:</strong><br>
+                                - <strong>🔒 Strict Mode:</strong> OTP required for registration, login, and password reset. No bypass code. Use for production security.<br>
+                                - <strong>🧪 Testing Mode:</strong> OTP required for all flows, but bypass code works. Use for local development and AI testing.<br>
+                                - <strong>⚠️ Disabled:</strong> No OTP required for registration and login. <strong>Password reset will be disabled</strong> because it requires OTP verification. Not recommended for security. Applies to both environments.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Delivery Address Settings -->
             <div class="col-12 mt-3">
                 <div class="card ac-data-card">
@@ -1893,7 +2173,7 @@
                     </div>
                     <div class="px-3 pb-3">
                         <div class="form-check form-switch mb-3">
-                            <input class="form-check-input" type="checkbox" id="setting-use-default-delivery-address" checked>
+                            <input class="form-check-input platform-setting-input" type="checkbox" id="setting-use-default-delivery-address" data-key="use_default_delivery_address" checked>
                             <label class="form-check-label" for="setting-use-default-delivery-address">
                                 <strong>Use Default Delivery Address (Trabajo Market)</strong>
                             </label>
@@ -1902,6 +2182,46 @@
                             <i class="bi bi-info-circle me-1"></i>
                             When ON: All orders use the fixed address "Trabajo Market, M. Dela Fuente St., Sampaloc, Manila, Metro Manila"<br>
                             When OFF: Customers can select custom addresses using PSGC dropdowns
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Farmer Product Limits -->
+            <div class="col-12 mt-3">
+                <div class="card ac-data-card">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-box-seam"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Farmer Product Limits</h6>
+                                <p class="ac-data-card__subtitle">Control maximum products for free-tier farmers</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Max Products per Farmer (Free Tier)</label>
+                                <input type="number" class="form-control platform-setting-input" id="setting-max-products-per-farmer" data-key="max_products_per_farmer" min="1" max="1000" placeholder="10">
+                                <small class="text-muted" style="font-size: 11px;">Default: 10 (adjust for development testing)</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Max Products per Name (Available Now)</label>
+                                <input type="number" class="form-control platform-setting-input" id="setting-max-products-per-name-available" data-key="max_products_per_name_available" min="1" max="100" placeholder="1">
+                                <small class="text-muted" style="font-size: 11px;">Default: 1 (same product name limit for available products)</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Max Products per Name (Pre-order)</label>
+                                <input type="number" class="form-control platform-setting-input" id="setting-max-products-per-name-preorder" data-key="max_products_per_name_preorder" min="1" max="100" placeholder="1">
+                                <small class="text-muted" style="font-size: 11px;">Default: 1 (same product name limit for pre-order products)</small>
+                            </div>
+                        </div>
+                        <small class="text-muted d-block mt-2">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Purpose:</strong> Controls the maximum number of products a free-tier farmer can list, and limits how many times the same product name can be used per order type (Available Now vs Pre-order). Premium farmers have unlimited products. Lower these values for testing, increase for production.
                         </small>
                     </div>
                 </div>

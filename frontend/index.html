@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AgriCatch - Freshly Harvested! Pre-ordered for you!</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/css/styles.css?v=4">
+    <link rel="stylesheet" href="/css/styles.css?v=7">
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="preload" href="/images/logo.png" as="image">
     <style>
         /* Prevent scroll during initial load */
         html.initial-load {
@@ -29,7 +30,8 @@
     <div id="loading-screen" class="loading-screen">
         <div class="loading-content">
             <div class="loading-logo">
-                <img src="/images/logo.png" alt="AgriCatch Logo" class="loading-logo-img">
+                <img src="/images/logo.png" alt="AgriCatch Logo" class="loading-logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="loading-logo-fallback" style="display:none; align-items:center; justify-content:center; width:60px; height:60px; background:rgba(255,255,255,0.2); border-radius:50%; font-size:1.5rem; font-weight:bold; color:white;">AC</div>
                 <h1 class="loading-title">
                     <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
                 </h1>
@@ -42,6 +44,10 @@
             <p class="loading-text">Loading...</p>
         </div>
     </div>
+    
+    <!-- Announcement Banner Container -->
+    <div id="announcement-banner-container"></div>
+    
     <!-- Header -->
     <header class="header">
         <div class="container">
@@ -50,11 +56,14 @@
                     <i class="fas fa-bars"></i>
                 </button>
                 <div class="logo">
-                    <div class="logo-and-title">
-                        <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
-                        <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
-                    </div>
-                    <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
+                    <a href="/index.html" class="logo-link">
+                        <div class="logo-and-title">
+                            <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="logo-fallback" style="display:none; align-items:center; justify-content:center; width:40px; height:40px; background:rgba(255,255,255,0.2); border-radius:50%; font-size:1rem; font-weight:bold; color:white;">AC</div>
+                            <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
+                        </div>
+                        <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
+                    </a>
                 </div>
                 <nav class="nav" id="main-nav">
                     <a href="#home" class="nav-link active" data-section="home">
@@ -65,7 +74,7 @@
                         <i class="fas fa-star"></i>
                         <span>Featured</span>
                     </a>
-                    <a href="#products" class="nav-link" data-section="products">
+                    <a href="#available-now" class="nav-link" data-section="available-now">
                         <i class="fas fa-shopping-bag"></i>
                         <span>Products</span>
                     </a>
@@ -83,34 +92,60 @@
                         <i class="fas fa-shield-alt"></i>
                         <span>Admin Panel</span>
                     </a>
-                    <a href="/orders.html" id="my-orders-btn" class="orders-btn" style="display: none;" aria-label="My Orders">
-                        <i class="fas fa-shopping-bag"></i>
-                        <span id="orders-count" class="cart-count" style="display: none;">0</span>
-                        <span class="header-tooltip" aria-hidden="true">My Orders</span>
-                    </a>
-                    <a href="/chat.html" id="customer-messages-btn" class="orders-btn" style="display: none;" aria-label="Messages">
-                        <i class="fas fa-comments"></i>
-                        <span id="customer-messages-badge" class="cart-count" style="display: none;">0</span>
-                        <span class="header-tooltip" aria-hidden="true">Messages</span>
-                    </a>
-                    <div id="customer-notifications" class="dropdown" style="display: none;">
-                        <a class="nav-link nav-icon" href="#" id="customer-notif-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
-                            <i class="fas fa-bell"></i>
-                            <span id="customer-notif-badge" class="badge bg-danger badge-number" style="display:none">0</span>
-                            <span class="header-tooltip">Notifications</span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications" id="customer-notif-dropdown" style="min-width:360px;">
-                            <li class="dropdown-header">
-                                You have <span id="customer-notif-count">0</span> new notifications
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <div id="customer-notif-list"><!-- populated by app.js --></div>
-                            <li><hr class="dropdown-divider"></li>
-                            <li class="dropdown-footer">
-                                <a href="/notifications.html" id="customer-show-all-notifications">Show all notifications</a>
-                            </li>
-                        </ul>
-                    </div>
+                    <ul class="d-flex align-items-center list-unstyled mb-0" style="gap: 10px;">
+                        <!-- My Orders -->
+                        <li class="nav-item" id="my-orders-li" style="display: none;">
+                            <a href="/orders.html" id="my-orders-btn" class="orders-btn" aria-label="My Orders">
+                                <i class="fas fa-shopping-bag"></i>
+                                <span id="orders-count" class="cart-count" style="display: none;">0</span>
+                                <span class="header-tooltip" aria-hidden="true">My Orders</span>
+                            </a>
+                        </li>
+
+                        <!-- Messages dropdown -->
+                        <li class="nav-item dropdown" id="customer-messages" style="display: none;">
+                            <a class="nav-link nav-icon" href="javascript:void(0)" id="customer-chat-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Messages" style="position:relative;">
+                                <i class="bi bi-chat-dots"></i>
+                                <span id="customer-messages-badge" class="badge bg-danger badge-number" style="display:none">0</span>
+                                <span class="header-tooltip" aria-hidden="true">Messages</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications" id="customer-chat-dropdown" style="min-width:320px;max-width:400px;">
+                                <li class="dropdown-header">
+                                    You have <span id="customer-chat-unread-count">0</span> unread messages
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <div id="customer-chat-dropdown-loading" class="text-center py-3" style="display:none;">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                    <span class="ms-2 small text-muted">Loading...</span>
+                                </div>
+                                <div id="customer-chat-dropdown-list"></div>
+                                <li><hr class="dropdown-divider"></li>
+                                <li class="dropdown-footer">
+                                    <a href="/chat.html" id="customer-show-all-messages">View all messages</a>
+                                </li>
+                            </ul>
+                        </li><!-- End Messages Nav -->
+
+                        <!-- Notifications dropdown -->
+                        <li class="nav-item dropdown" id="customer-notifications" style="display: none;">
+                            <a class="nav-link nav-icon" href="javascript:void(0)" id="customer-notif-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications" style="position:relative;">
+                                <i class="bi bi-bell"></i>
+                                <span id="customer-notif-badge" class="badge bg-danger badge-number" style="display:none">0</span>
+                                <span class="header-tooltip" aria-hidden="true">Notifications</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications" id="customer-notif-dropdown" style="min-width:320px;max-width:400px;">
+                                <li class="dropdown-header">
+                                    You have <span id="customer-notif-count">0</span> new notifications
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <div id="customer-notif-list"><!-- populated by app.js --></div>
+                                <li><hr class="dropdown-divider"></li>
+                                <li class="dropdown-footer">
+                                    <a href="/notifications.html" id="customer-show-all-notifications">Show all notifications</a>
+                                </li>
+                            </ul>
+                        </li><!-- End Notifications Nav -->
+                    </ul>
                     <div id="user-menu" class="user-menu">
                         <button id="login-btn" class="btn btn-secondary" type="button">Login</button>
                         <button id="register-btn" class="btn btn-primary" type="button">Register</button>
@@ -186,10 +221,13 @@
     <!-- Hero Section -->
     <section id="home" class="hero">
         <div class="hero-video-wrapper">
+            <div class="hero-video-fallback" aria-hidden="true"></div>
+            <img class="hero-video-placeholder" id="hero-video-placeholder" src="/images/lettuce.jpg" alt="" aria-hidden="true">
+            <div class="hero-video-loader" id="hero-video-loader" aria-hidden="true">
+                <div class="spinner"></div>
+            </div>
             <video class="hero-video" autoplay muted loop playsinline preload="metadata" id="hero-video">
                 <source src="/landing_page_top.mp4" type="video/mp4">
-                <!-- Fallback if video doesn't load -->
-                Your browser does not support the video tag.
             </video>
         </div>
         <div class="hero-overlay"></div>
@@ -198,56 +236,86 @@
                 <h2>Fresh Harvest, Direct from Farms!</h2>
                 <p>Discover the finest agricultural products directly from local farmers. Quality guaranteed, farm-fresh delivery.</p>
                 <div class="hero-buttons">
-                    <button id="shop-now-btn" class="btn btn-primary btn-large">Shop Now</button>
+                    <button id="shop-now-btn" class="btn btn-hero-primary btn-large">
+                        <i class="fas fa-store me-2"></i>Shop Available Products
+                    </button>
+                    <button id="browse-preorders-btn" class="btn btn-hero-outline btn-large">
+                        <i class="bi bi-calendar-check me-2"></i>Browse Preorders
+                    </button>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="featured" class="products">
+    <section id="featured" class="products featured-section">
         <div class="container">
             <div class="products-header">
-                <h2 class="section-title">Featured / Best Selling</h2>
+                <h2 class="section-title">🔥 Best Selling This Week</h2>
             </div>
-            <div id="featured-grid" class="products-grid">
-                <!-- Featured products will be loaded here -->
+            <div class="featured-carousel-wrapper" id="featured-carousel-wrapper">
+                <div class="featured-carousel-viewport">
+                    <div class="featured-carousel-track" id="featured-grid">
+                        <!-- Featured cards injected by loadFeaturedProducts() -->
+                    </div>
+                </div>
+            </div>
+            <div class="carousel-dots" id="featured-dots"></div>
+        </div>
+    </section>
+
+    <!-- Global Marketplace Filter -->
+    <section id="marketplace-filter" class="marketplace-filter-section">
+        <div class="container">
+            <div class="marketplace-filter-header">
+                <h2 class="marketplace-filter-title">Browse Marketplace</h2>
+                <p class="marketplace-filter-subtitle">Browse fresh agricultural products directly from local farmers.</p>
+            </div>
+            <div class="marketplace-filter-bar">
+                <div class="mf-search-wrap">
+                    <i class="fas fa-search mf-search-icon"></i>
+                    <input type="text" id="global-search-input" class="mf-search-input" placeholder="Search products..." autocomplete="off">
+                </div>
+                <div class="mf-categories-wrap" id="global-category-tabs"></div>
+                <div class="mf-sort-wrap">
+                    <label class="mf-sort-label" for="global-sort-select">Sort by:</label>
+                    <select id="global-sort-select" class="mf-sort-select">
+                        <option value="latest">Latest</option>
+                        <option value="top_sales">Top Sales</option>
+                        <option value="price_low_high">Price: Low to High</option>
+                        <option value="price_high_low">Price: High to Low</option>
+                    </select>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Products Section -->
-    <section id="products" class="products">
+    <!-- Available Now Section -->
+    <section id="available-now" class="products">
         <div class="container">
             <div class="products-header">
-                <h2 class="section-title">Products</h2>
-                <div class="products-filters">
-                    <div class="products-sort-bar" aria-label="Sort products">
-                        <span class="sort-label">Sort by</span>
-                        <div class="sort-button-group" role="group" aria-label="Primary sort options">
-                            <button type="button" class="sort-option-btn active" data-sort-option="latest">Latest</button>
-                            <button type="button" class="sort-option-btn" data-sort-option="top_sales">Top Sales</button>
-                            <button type="button" class="sort-option-btn" data-sort-option="harvest_date">Expected Harvest Date</button>
-                            <button type="button" class="sort-option-btn" data-sort-option="expiry_date">Best Before</button>
-                        </div>
-                        <div class="filter-select-wrapper sort-price-select-wrapper">
-                            <select id="products-price-sort" class="filter-select" aria-label="Sort by price">
-                                <option value="">Price</option>
-                                <option value="price_low_high">Price: Low to High</option>
-                                <option value="price_high_low">Price: High to Low</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="search-input-wrapper">
-                        <input type="text" id="search-input" placeholder="Search products..." class="search-input">
-                        <button type="button" id="search-clear-btn" class="search-clear-btn" aria-label="Clear search">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
+                <h2 class="section-title">🌾 Fresh Products Ready for Delivery</h2>
+                <button id="refresh-available-btn" class="btn btn-sm section-refresh-btn" type="button" aria-label="Refresh available products">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
             </div>
-            <div class="products-category-tabs" id="products-category-tabs" aria-label="Product categories"></div>
-            <div id="products-grid" class="products-grid">
-                <!-- Products will be loaded here -->
+            <div id="available-grid" class="products-grid">
+                <!-- Available products will be loaded here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Preorder Section -->
+    <section id="preorder" class="products">
+        <div class="container">
+            <div class="products-header">
+                <h2 class="section-title preorder-section-title">📅 Reserve Before Harvest</h2>
+                <p class="preorder-subtitle">Secure products before they are harvested.</p>
+                <button id="refresh-preorder-btn" class="btn btn-sm section-refresh-btn" type="button" aria-label="Refresh preorder products">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+            <div id="preorder-grid" class="products-grid">
+                <!-- Preorder products will be loaded here -->
             </div>
         </div>
     </section>
@@ -302,7 +370,7 @@
                         <div class="pd-meta-item">
                             <span class="pd-meta-icon"><i class="bi bi-box-seam-fill"></i></span>
                             <div class="pd-meta-body">
-                                <span class="pd-meta-label">Available Stock</span>
+                                <span class="pd-meta-label" id="product-details-stock-label">Available Stock</span>
                                 <span class="pd-meta-value" id="product-details-stock"></span>
                             </div>
                         </div>
@@ -1059,17 +1127,22 @@
     <script src="/js/config.js"></script>
     <script src="/js/app.js?v=4"></script>
     <script>
-        // Handle hero video loading - ensure full video loads before playing
+        // Handle hero video loading - keep fallback visible until the video can play
         (function() {
             const heroVideo = document.getElementById('hero-video');
+            const heroLoader = document.getElementById('hero-video-loader');
             const heroSection = document.querySelector('.hero');
             
             if (!heroVideo) return;
             
-            // Ensure video is visible
-            heroVideo.style.display = 'block';
-            heroVideo.style.opacity = '1';
-            heroVideo.style.visibility = 'visible';
+            function hideLoader() {
+                if (heroLoader) heroLoader.classList.add('hidden');
+            }
+            
+            function markVideoReady() {
+                heroVideo.classList.add('ready');
+                hideLoader();
+            }
             
             // Ensure loop is enabled
             heroVideo.loop = true;
@@ -1090,21 +1163,17 @@
                     heroVideo.addEventListener('canplaythrough', () => {
                         if (!hasStartedPlaying) {
                             hasStartedPlaying = true;
-                            heroVideo.classList.remove('loading');
-                            heroVideo.classList.add('ready');
+                            markVideoReady();
                             
                             // Start playing
-                            heroVideo.play().then(() => {
-                                if (heroSection) {
-                                    heroSection.style.background = 'transparent';
-                                }
-                            }).catch(error => {
+                            heroVideo.play().catch(error => {
                                 console.log('Video autoplay prevented:', error);
                             });
                         }
                     }, { once: true });
                 } else {
                     console.warn('Video duration seems incorrect:', videoDuration);
+                    hideLoader();
                 }
             }, { once: true });
             
@@ -1115,12 +1184,8 @@
                     setTimeout(() => {
                         if (!hasStartedPlaying) {
                             hasStartedPlaying = true;
-                            heroVideo.classList.remove('loading');
-                            heroVideo.classList.add('ready');
+                            markVideoReady();
                             heroVideo.play().catch(() => {});
-                            if (heroSection) {
-                                heroSection.style.background = 'transparent';
-                            }
                         }
                     }, 500);
                 }
@@ -1148,6 +1213,14 @@
             // Reload video to start fresh
             heroVideo.load();
             
+            // Hide loader after a short timeout so slow connections don't show a spinner forever
+            setTimeout(() => {
+                if (!hasStartedPlaying) {
+                    console.warn('Video is taking too long to load, showing fallback');
+                    hideLoader();
+                }
+            }, 6000);
+            
             // Handle errors with retry logic
             let retryCount = 0;
             const maxRetries = 3;
@@ -1166,6 +1239,7 @@
                     }, 1000 * retryCount);
                 } else {
                     console.error('Max retries reached, using fallback background');
+                    hideLoader();
                     if (heroSection) {
                         heroSection.style.background = 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))';
                     }
@@ -1273,9 +1347,21 @@
                 setTimeout(() => {
                     loadingScreen.classList.add('hidden');
                     body.classList.remove('loading');
-                }, 500); // Small delay for smooth transition
+                }, 50); // Small delay for smooth transition
             }
         });
+
+        // Fallback: Hide loading screen after 2 seconds even if page doesn't fully load
+        setTimeout(function() {
+            const loadingScreen = document.getElementById('loading-screen');
+            const body = document.body;
+
+            if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
+                console.warn('Loading screen timeout - forcing hide');
+                loadingScreen.classList.add('hidden');
+                body.classList.remove('loading');
+            }
+        }, 2000);
 
         // Add loading class to body immediately
         document.body.classList.add('loading');

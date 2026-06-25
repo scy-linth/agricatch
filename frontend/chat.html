@@ -25,12 +25,63 @@
 <body>
 <style>
 /* CHAT PAGE — PAGE-SCOPED OVERRIDES (complement agricatch-admin.css) */
+
+/* Topbar — gradient matching landing page header */
+.chat-topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1030;
+  height: 60px;
+  background: linear-gradient(135deg, #4ade80, #0ea5e9);
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  gap: 1rem;
+  backdrop-filter: blur(10px);
+}
+.chat-topbar .brand-name {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  color: #fff;
+}
+.chat-topbar .tagline {
+  font-size: .7rem;
+  color: rgba(255,255,255,.8);
+  margin: 0;
+  line-height: 1;
+}
+.chat-topbar .back-btn {
+  background: rgba(255,255,255,.35);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.5);
+  font-size: .8rem;
+  font-weight: 600;
+  padding: .3rem .75rem;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  text-decoration: none;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.chat-topbar .back-btn:hover {
+  background: rgba(255,255,255,.5);
+  color: #fff;
+  text-decoration: none;
+}
+
 /* No sidebar on chat page — remove the sidebar margin offset */
 #main.main { margin-left: 0 !important; }
 /* Ensure chat section fills the viewport height properly */
 #chat.admin-section-card.active {
   height: calc(100vh - 60px) !important;
   max-height: calc(100vh - 60px) !important;
+}
+@media (max-width: 767px) {
+  .chat-topbar { padding: 0 .75rem; }
 }
 /* Compose bar must span the full width of the main panel */
 #chat .chat-compose-bar {
@@ -99,6 +150,21 @@
 .panel-close { background:none; border:none; font-size:1.3rem; cursor:pointer; position:absolute; top:.75rem; right:.75rem; color:var(--ac-text-muted); transition:color .15s; }
 .panel-close:hover { color:var(--ac-danger,#dc2626); }
 .panel-content { margin-top:2rem; }
+
+/* Unread badge for conversation list */
+.conversation-item .unread-badge {
+    display: inline-flex;
+    min-width: 28px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    background: #3b82f6;
+    color: white;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
 </style>
     <!-- Loading Screen -->
     <div id="admin-loading-screen" class="admin-loading-screen">
@@ -113,15 +179,20 @@
     <!-- Mobile sidebar overlay -->
     <div id="sidebar-overlay"></div>
 
-    <!-- Header -->
-    <header id="header" class="header fixed-top d-flex align-items-center">
-        <div class="d-flex align-items-center justify-content-between w-100 px-3">
-            <a href="/" class="logo d-flex align-items-center" style="gap:4px;">
-                <img src="/images/logo.png" alt="AgriCatch">
-                <span>AgriCatch</span>
-            </a>
-            <a href="/customer-account.html" class="btn btn-sm btn-secondary">Back to Account</a>
-        </div>
+    <!-- ── Top bar ───────────────────────────────────────────────────────── -->
+    <header class="chat-topbar">
+        <a href="/index.html" class="d-flex align-items-center gap-2" style="text-decoration:none;">
+            <img src="/images/logo.png" alt="AgriCatch" height="34" style="flex-shrink:0;">
+            <div>
+                <div class="brand-name">AgriCatch</div>
+                <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
+            </div>
+        </a>
+
+        <a href="/index.html" class="back-btn ms-auto" onclick="restoreLandingPagePosition(event)">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back</span>
+        </a>
     </header>
 
     <!-- Main Content -->
@@ -153,11 +224,12 @@
                             Conversations
                         </h3>
                     </div>
-                    <div id="conversation-list" class="conversation-list"></div>
-                    <div id="chat-empty-state" class="text-center py-5" style="display:none">
-                        <i class="bi bi-chat-dots text-muted" style="font-size: 3rem;"></i>
-                        <p class="text-muted mt-3">No conversations yet</p>
-                        <p class="text-muted small">Messages from farmers will appear here</p>
+                    <div id="conversation-list" class="conversation-list">
+                        <div id="chat-empty-state" class="text-center py-5" style="display:none">
+                            <i class="bi bi-chat-dots text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-3">No conversations yet</p>
+                            <p class="text-muted small">Messages from farmers will appear here</p>
+                        </div>
                     </div>
                 </div>
 
@@ -201,6 +273,16 @@
     <!-- Scripts -->
     <script src="/js/chat.js"></script>
     <script>
+        // Restore landing page scroll position
+        function restoreLandingPagePosition(event) {
+            const scrollY = sessionStorage.getItem('landingPageScrollY');
+            const hash = sessionStorage.getItem('landingPageHash');
+            if (scrollY) {
+                sessionStorage.setItem('restoreScrollY', scrollY);
+                sessionStorage.setItem('restoreHash', hash || '#home');
+            }
+        }
+
         // Hide loading screen when page is fully loaded
         window.addEventListener('load', function() {
             const loadingScreen = document.getElementById('admin-loading-screen');

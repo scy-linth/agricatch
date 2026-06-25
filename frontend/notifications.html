@@ -4,85 +4,244 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notifications - AgriCatch</title>
-    <link rel="stylesheet" href="/css/styles.css">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+
+    <!-- NiceAdmin base -->
+    <link rel="stylesheet" href="/css/nicemain.css">
+    <!-- AgriCatch SaaS overrides -->
+    <link rel="stylesheet" href="/css/agricatch-admin.css">
+
+<style>
+/* ── Notifications page — standalone customer view ───────────────── */
+
+/* Topbar — gradient matching landing page header */
+.notifications-topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1030;
+  height: 60px;
+  background: linear-gradient(135deg, #4ade80, #0ea5e9);
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  gap: 1rem;
+  backdrop-filter: blur(10px);
+}
+.notifications-topbar .brand-name {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  color: #fff;
+}
+.notifications-topbar .tagline {
+  font-size: .7rem;
+  color: rgba(255,255,255,.8);
+  margin: 0;
+  line-height: 1;
+}
+.notifications-topbar .back-btn {
+  background: rgba(255,255,255,.35);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.5);
+  font-size: .8rem;
+  font-weight: 600;
+  padding: .3rem .75rem;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  text-decoration: none;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.notifications-topbar .back-btn:hover {
+  background: rgba(255,255,255,.5);
+  color: #fff;
+  text-decoration: none;
+}
+.notifications-topbar .user-badge {
+  background: rgba(255,255,255,.18);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 20px;
+  font-size: .75rem;
+  font-weight: 600;
+  padding: .25rem .7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  white-space: nowrap;
+}
+
+/* Main area */
+#notifications-main {
+  margin-top: 60px;
+  padding: 1.5rem 1.75rem 3rem;
+  min-height: calc(100vh - 60px);
+  background: var(--ac-bg, #f5f7f5);
+}
+@media (max-width: 767px) {
+  #notifications-main { padding: 1rem .75rem 2.5rem; }
+  .notifications-topbar { padding: 0 .75rem; }
+}
+
+/* Notifications list visibility */
+.notifications-list {
+  display: flex !important;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.notifications-list:empty {
+  display: none !important;
+}
+</style>
 </head>
-<body>
-    <header class="header">
-        <div class="container">
-            <div class="header-content">
-                <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle menu">
-                    <i class="fas fa-bars"></i>
+
+<body class="loading" style="background:var(--ac-bg,#f5f7f5);">
+
+<!-- Loading Screen -->
+<div id="loading-screen" class="loading-screen">
+    <div class="loading-content">
+        <div class="loading-logo">
+            <img src="/images/logo.png" alt="AgriCatch Logo" class="loading-logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="loading-logo-fallback" style="display:none; align-items:center; justify-content:center; width:60px; height:60px; background:rgba(255,255,255,0.2); border-radius:50%; font-size:1.5rem; font-weight:bold; color:white;">AC</div>
+            <h1 class="loading-title">
+                <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
+            </h1>
+        </div>
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+        </div>
+        <p class="loading-text">Loading...</p>
+    </div>
+</div>
+
+<!-- ── Top bar ───────────────────────────────────────────────────────── -->
+<header class="notifications-topbar">
+    <a href="/index.html" class="d-flex align-items-center gap-2" style="text-decoration:none;">
+        <img src="/images/logo.png" alt="AgriCatch" height="34" style="flex-shrink:0;">
+        <div>
+            <div class="brand-name">AgriCatch</div>
+            <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
+        </div>
+    </a>
+
+    <a href="/index.html" id="back-to-origin-btn" class="back-btn ms-auto" onclick="restoreLandingPagePosition(event)">
+        <i class="bi bi-arrow-left"></i>
+        <span>Back</span>
+    </a>
+</header>
+
+<!-- ── Main content ──────────────────────────────────────────────────── -->
+<main id="notifications-main">
+
+    <!-- Breadcrumb -->
+    <div class="pagetitle">
+        <nav>
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Home</li>
+                <li class="breadcrumb-item active">Notifications</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Notifications section -->
+    <section id="notifications" class="admin-section-card active">
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-bell"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Notifications</h4>
+                <p class="ac-section-hero__sub">System alerts and account activity notifications.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <button class="btn btn-sm ac-btn-outline-muted" id="customer-notif-mark-all-btn">
+                    <i class="bi bi-check2-all me-1"></i>Mark All Read
                 </button>
-                <div class="logo">
-                    <div class="logo-and-title">
-                        <img src="/images/logo.png" alt="AgriCatch Logo" class="inline-logo">
-                        <h1><span class="agri-green">Agri</span><span class="catch-blue">Catch</span></h1>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div id="customer-notifications-list" class="notifications-list">
+                    <div class="text-center py-4">
+                        <span class="spinner-border spinner-border-sm text-success"></span>
                     </div>
-                    <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
                 </div>
-                <nav class="nav" id="main-nav">
-                    <a href="/" class="nav-link">Home</a>
-                    <a href="/#products" class="nav-link">Products</a>
-                    <a href="/orders.html" class="nav-link">My Orders</a>
-                </nav>
-                <div class="header-actions">
-                    <a href="/" class="btn btn-secondary">Back to Shop</a>
+                <div id="customer-notifications-empty-state" class="text-center py-5" style="display:none">
+                    <i class="bi bi-bell-slash text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">No notifications yet</p>
+                    <p class="text-muted small">You'll see system alerts and account activity here</p>
                 </div>
+                <div id="customer-notifications-pagination" class="pagination-container"></div>
             </div>
         </div>
-    </header>
+    </section>
+</main>
 
-    <main class="notifications-page" style="padding:32px 0 64px;">
-        <div class="container">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;">
-                <div>
-                    <h2 style="margin:0 0 4px;"><i class="fas fa-bell" style="color:#3b82f6;margin-right:8px;"></i>Notifications</h2>
-                    <p style="color:#6b7280;margin:0;" id="notif-page-subtitle">Loading...</p>
-                </div>
-                <button id="notif-mark-all-btn" class="btn btn-secondary" type="button">
-                    <i class="fas fa-check-double"></i> Mark All as Read
-                </button>
-            </div>
-
-            <div id="notifications-page-list" style="display:flex;flex-direction:column;gap:10px;">
-                <div class="empty-state" style="text-align:center;padding:32px;">Loading notifications...</div>
-            </div>
-
-            <div id="notif-pagination" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:24px;"></div>
-        </div>
-    </main>
-
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h3>AgriCatch</h3>
-                    <p>Freshly Harvested! Pre-ordered for you! Your trusted source for fresh farm products.</p>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2024 AgriCatch. All rights reserved.</p>
-            </div>
-        </div>
-    </footer>
-
-    <script src="/js/format.js"></script>
-    <script src="/js/notifications-page.js"></script>
+    <script src="/js/app.js"></script>
     <script>
-        // Mobile menu toggle
-        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-        const mainNav = document.getElementById('main-nav');
-        if (mobileMenuToggle && mainNav) {
-            mobileMenuToggle.addEventListener('click', () => {
-                mainNav.classList.toggle('open');
-                const icon = mobileMenuToggle.querySelector('i');
-                if (icon) {
-                    icon.classList.toggle('fa-bars');
-                    icon.classList.toggle('fa-times');
+        // Customer notifications page specific logic
+        document.addEventListener('DOMContentLoaded', () => {
+            // Wait for app to be initialized
+            const checkApp = setInterval(() => {
+                if (window.app) {
+                    clearInterval(checkApp);
+                    const app = window.app;
+
+                    // Load notifications
+                    app.loadCustomerNotificationsPage();
+
+                    // Mark all read button
+                    const markAllBtn = document.getElementById('customer-notif-mark-all-btn');
+                    if (markAllBtn) {
+                        markAllBtn.addEventListener('click', () => app.markAllCustomerNotificationsRead());
+                    }
                 }
-            });
+            }, 100);
+
+            // Timeout after 5 seconds
+            setTimeout(() => clearInterval(checkApp), 5000);
+        });
+    </script>
+
+    <script>
+    // Restore landing page scroll position
+    function restoreLandingPagePosition(event) {
+        const scrollY = sessionStorage.getItem('landingPageScrollY');
+        const hash = sessionStorage.getItem('landingPageHash');
+        if (scrollY) {
+            sessionStorage.setItem('restoreScrollY', scrollY);
+            sessionStorage.setItem('restoreHash', hash || '#home');
         }
+    }
+
+    // Hide loading screen when page is fully loaded
+    window.addEventListener('load', function() {
+        const loadingScreen = document.getElementById('loading-screen');
+        const body = document.body;
+
+        if (loadingScreen) {
+            setTimeout(() => {
+                loadingScreen.classList.add('hidden');
+                body.classList.remove('loading');
+            }, 50);
+        }
+    });
     </script>
 </body>
 </html>

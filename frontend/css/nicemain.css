@@ -1227,7 +1227,39 @@ h6 {
 
 .footer .credits {
   padding-top: 5px;
-  text-align: center;
-  font-size: 13px;
-  color: #012970;
+}
+
+/*--------------------------------------------------------------
+# Product Type Tabs
+--------------------------------------------------------------*/
+.product-type-tabs {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  margin-top: 0.5rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.product-type-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.product-type-tab .tab-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.product-type-tab.active {
+  opacity: 1;
+}
+
+.product-type-tab:not(.active) {
+  opacity: 0.7;
 }

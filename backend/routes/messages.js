@@ -1,6 +1,7 @@
 ﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
+const { broadcastEvent } = require('../utils/realtime');
 
 const router = express.Router();
 
@@ -38,7 +39,13 @@ router.get('/conversations', async (req, res) => {
                WHERE m.conversation_id = c.conversation_id
                  AND m.receiver_id = $1
                  AND m.is_read = false
-             )::int AS unread_count
+             )::int AS unread_count,
+             (
+               SELECT m.message FROM messages m
+               WHERE m.conversation_id = c.conversation_id
+               ORDER BY m.created_at DESC
+               LIMIT 1
+             ) AS last_message
       FROM conversations c
       LEFT JOIN users u ON u.id = CASE
         WHEN c.farmer_id = $1 THEN c.customer_id
@@ -122,6 +129,13 @@ router.put('/conversation/:conversationId/read', async (req, res) => {
        WHERE conversation_id = $1 AND receiver_id = $2 AND is_read = false`,
       [conversationId, user.id]
     );
+
+    if ((update.rowCount || 0) > 0) {
+      broadcastEvent('chat.read', {
+        conversation_id: conversationId,
+        reader_id: user.id
+      });
+    }
 
     res.json({ message: 'Conversation marked as read', updated: update.rowCount || 0 });
   } catch (error) {
@@ -209,6 +223,14 @@ router.post('/send', async (req, res) => {
       VALUES ($1, $2, $3, $4, $5)
     `, [conversationId, user.id, receiver_id, trimmedMessage, product_id || null]);
 
+    broadcastEvent('chat.message', {
+      conversation_id: conversationId,
+      sender_id: user.id,
+      receiver_id: Number(receiver_id),
+      farmer_id: Number(farmerId),
+      customer_id: Number(customerId)
+    });
+
     res.status(201).json({ message: 'Message sent' });
   } catch (error) {
     console.error('Send message error:', error);
@@ -223,10 +245,16 @@ router.put('/:id/read', async (req, res) => {
     if (!user) return res.status(401).json({ message: 'Authentication required' });
 
     const { id } = req.params;
-    await pool.query(
-      'UPDATE messages SET is_read = true WHERE id = $1 AND receiver_id = $2',
+    const update = await pool.query(
+      'UPDATE messages SET is_read = true WHERE id = $1 AND receiver_id = $2 RETURNING conversation_id',
       [id, user.id]
     );
+    if ((update.rowCount || 0) > 0) {
+      broadcastEvent('chat.read', {
+        conversation_id: update.rows[0].conversation_id,
+        reader_id: user.id
+      });
+    }
     res.json({ message: 'Message marked as read' });
   } catch (error) {
     console.error('Read message error:', error);

@@ -15,9 +15,9 @@ const pool = new Pool({
 async function addNameColumns() {
   try {
     console.log('Adding first_name, middle_name, last_name to users...');
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100)`);
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS middle_name VARCHAR(100)`);
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100)`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(40)`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS middle_name VARCHAR(40)`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(40)`);
     console.log('✅ Name columns added (if not existing)');
     process.exit(0);
   } catch (err) {

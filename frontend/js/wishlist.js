@@ -9,10 +9,19 @@ class WishlistPage {
         if (host === 'agricatch.store' || host === 'www.agricatch.store') {
             this.apiBase = 'https://agricatch.onrender.com/api';
         }
-        this.token = localStorage.getItem('token');
+        this.token = this.normalizeAuthToken(localStorage.getItem('token'));
         this._items = [];
         this._savedPrices = this._loadSavedPrices();
         this.init();
+    }
+
+    normalizeAuthToken(token) {
+        if (!token) return null;
+        try {
+            return token.replace(/^["']|["']$/g, '').trim();
+        } catch (e) {
+            return token;
+        }
     }
 
     _loadSavedPrices() {

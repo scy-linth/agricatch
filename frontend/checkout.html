@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout — AgriCatch</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
+
+    <!-- NiceAdmin base -->
+    <link rel="stylesheet" href="/css/nicemain.css">
+    <!-- AgriCatch SaaS overrides — loaded LAST -->
+    <link rel="stylesheet" href="/css/agricatch-admin.css">
+
+<style>
+/* ── Checkout page ──────────────────────────────────────── */
+
+/* Topbar */
+.checkout-topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1030;
+  height: 60px;
+  background: linear-gradient(135deg, #4ade80, #0ea5e9);
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  gap: 1rem;
+}
+.checkout-topbar .brand-name {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  color: #fff;
+}
+.checkout-topbar .tagline {
+  font-size: .7rem;
+  color: rgba(255,255,255,.8);
+  margin: 0;
+  line-height: 1;
+}
+.checkout-topbar .back-btn {
+  background: rgba(255,255,255,.35);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.5);
+  font-size: .8rem;
+  font-weight: 600;
+  padding: .3rem .75rem;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  text-decoration: none;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.checkout-topbar .back-btn:hover {
+  background: rgba(255,255,255,.5);
+  color: #fff;
+}
+.checkout-topbar .user-badge {
+  background: rgba(255,255,255,.18);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 20px;
+  font-size: .75rem;
+  font-weight: 600;
+  padding: .25rem .7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  white-space: nowrap;
+}
+
+/* Main area */
+#checkout-main {
+  margin-top: 60px;
+  padding: 1.5rem 1.75rem 3rem;
+  min-height: calc(100vh - 60px);
+  background: var(--ac-bg, #f5f7f5);
+}
+@media (max-width: 767px) {
+  #checkout-main { padding: 1rem .75rem 2.5rem; }
+  .checkout-topbar { padding: 0 .75rem; }
+}
+
+/* Section card */
+.co-card {
+  background: #fff;
+  border: 1px solid var(--ac-border, #e2e8e4);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+.co-card-header {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .75rem 1.25rem;
+  background: var(--ac-primary-light, #e8f5e9);
+  border-bottom: 1px solid var(--ac-border, #e2e8e4);
+}
+.co-card-header h5 {
+  margin: 0;
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--ac-primary-dark, #1e5429);
+}
+.co-card-header i {
+  color: var(--ac-primary, #2d7a3a);
+  font-size: 1rem;
+}
+.co-card-body {
+  padding: 1.5rem 1.5rem 1.5rem 1.5rem;
+}
+
+/* Order item row */
+.co-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--ac-border-light, #eef2ef);
+}
+
+/* Items list scroll */
+#checkout-items-list {
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 1rem;
+}
+#checkout-items-list::-webkit-scrollbar {
+  width: 6px;
+}
+#checkout-items-list::-webkit-scrollbar-track {
+  background: var(--ac-bg, #f5f7f5);
+  border-radius: 3px;
+}
+#checkout-items-list::-webkit-scrollbar-thumb {
+  background: var(--ac-primary-muted, #c8e6c9);
+  border-radius: 3px;
+}
+#checkout-items-list::-webkit-scrollbar-thumb:hover {
+  background: var(--ac-primary, #2d7a3a);
+}
+.co-item:last-child { border-bottom: none; }
+.co-item img {
+  width: 75px;
+  height: 75px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  border: 1px solid var(--ac-border-light, #eef2ef);
+  background: var(--ac-bg, #f5f7f5);
+}
+.co-item-info { flex: 1; min-width: 0; }
+.co-item-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ac-text, #1a2e1e);
+  margin-bottom: .15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.co-item-meta {
+  font-size: .9rem;
+  color: #4ade80;
+  margin-bottom: .3rem;
+  font-weight: 600;
+}
+.co-item-farmer {
+  font-size: .7rem;
+  color: var(--ac-text-muted, #6b7e72);
+}
+.co-item-stock {
+  font-size: .8rem;
+  color: var(--ac-text, #1a2e1e);
+}
+.co-item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: .4rem;
+  flex-shrink: 0;
+}
+.co-item-total {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #4ade80;
+  white-space: nowrap;
+}
+
+/* Quantity controls */
+.co-qty {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+}
+.co-qty-btn {
+  background: var(--ac-primary-light, #e8f5e9);
+  border: 1px solid var(--ac-primary-muted, #c8e6c9);
+  color: var(--ac-primary-dark, #1e5429);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: .9rem;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.co-qty-btn:hover:not(:disabled) {
+  background: var(--ac-primary-muted, #c8e6c9);
+}
+.co-qty-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.co-qty-input {
+  width: 48px;
+  height: 32px;
+  border: 1px solid var(--ac-border, #e2e8e4);
+  border-radius: 6px;
+  text-align: center;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--ac-text, #1a2e1e);
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.co-qty-input::-webkit-inner-spin-button,
+.co-qty-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+.co-remove-btn-qty {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: .9rem;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.co-remove-btn-qty:hover {
+  background: #fecaca;
+}
+
+.co-remove-btn {
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-size: .75rem;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  opacity: .75;
+  transition: opacity .15s;
+}
+.co-remove-btn:hover { opacity: 1; }
+
+/* Price breakdown */
+.co-price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1rem;
+  color: var(--ac-text-muted, #6b7e72);
+  padding: .3rem 0;
+}
+.co-price-row.total-row {
+  border-top: 2px solid var(--ac-border, #e2e8e4);
+  margin-top: .35rem;
+  padding-top: .6rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #4ade80;
+}
+
+/* Form labels */
+.co-label {
+  display: block;
+  font-size: .9rem;
+  font-weight: 600;
+  margin-bottom: .3rem;
+  color: var(--ac-text, #1a2e1e);
+}
+.co-required { color: #dc2626; }
+
+/* Form inputs in delivery section */
+.co-card-body .form-control {
+  font-size: .9rem;
+}
+.co-card-body .form-control-sm {
+  font-size: .9rem;
+}
+.co-card-body .text-muted {
+  font-size: .8rem;
+}
+
+/* Address notice */
+.co-address-notice {
+  background: var(--ac-primary-light, #e8f5e9);
+  border: 1px solid var(--ac-primary-muted, #c8e6c9);
+  border-radius: 8px;
+  padding: .65rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  font-size: .9rem;
+  color: var(--ac-primary-dark, #1e5429);
+  margin-bottom: 1rem;
+}
+.co-address-notice i { flex-shrink: 0; margin-top: .1rem; }
+
+.co-address-content {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  flex: 1;
+}
+
+.co-set-address-btn {
+  background: linear-gradient(135deg, #2d7a3a 0%, #1e5429 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: .5rem .85rem;
+  font-size: .85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(45, 122, 58, 0.2);
+  flex-shrink: 0;
+}
+.co-set-address-btn:hover {
+  background: linear-gradient(135deg, #3a8f4a 0%, #2a6635 100%);
+  box-shadow: 0 4px 12px rgba(45, 122, 58, 0.3);
+  transform: translateY(-1px);
+}
+.co-set-address-btn:active {
+  transform: translateY(0);
+}
+.co-set-address-btn i {
+  font-size: .9rem;
+}
+
+/* Modal styles */
+.modal { display:none; position:fixed; inset:0; z-index:1070; background:rgba(15,23,42,.55); align-items:center; justify-content:center; padding:1.5rem 1rem; overflow-y:auto; }
+.modal.open { display:flex; }
+.modal .modal-content { background:#fff; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.18); width:100%; max-width:550px; margin:auto; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+.modal .modal-header { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.5rem; border-bottom:1px solid var(--ac-border,#e2e8f0); background:var(--ac-primary,#2d7a3a); position:sticky; top:0; z-index:2; }
+.modal .modal-header h3 { margin:0; font-size:1.1rem; font-weight:700; color:#fff; display:flex; align-items:center; gap:.5rem; }
+.modal .close-btn { background:none; border:none; color:#fff; font-size:1.75rem; cursor:pointer; padding:0; line-height:1; opacity:.8; transition:opacity .15s; width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:6px; }
+.modal .close-btn:hover { opacity:1; background:rgba(255,255,255,.1); }
+.modal .modal-body { padding:1.5rem; overflow-y:auto; flex:1; max-height:60vh; }
+.modal .modal-footer { padding:1rem 1.5rem; border-top:1px solid var(--ac-border,#e2e8f0); display:flex; justify-content:flex-end; gap:.75rem; background:#f8fafc; }
+
+/* Address form styles */
+.address-form-floating .form-group { margin-bottom: 1.25rem; }
+.address-form-floating label { display:block; margin-bottom:.5rem; font-weight:600; font-size:.9rem; color:var(--ac-text,#1a2e1e); }
+.address-form-floating .form-select, .address-form-floating .form-input { width:100%; padding:.75rem 1rem; border:1px solid var(--ac-border,#e2e8e4); border-radius:8px; font-size:.95rem; transition:border-color .15s, box-shadow .15s; background:#fff; }
+.address-form-floating .form-select:focus, .address-form-floating .form-input:focus { outline:none; border-color:var(--ac-primary,#2d7a3a); box-shadow:0 0 0 3px rgba(45,122,58,.1); }
+.address-form-floating .form-select:disabled { background:#f1f5f1; cursor:not-allowed; opacity:.7; }
+.address-form-floating .form-textarea { width:100%; padding:.75rem 1rem; border:1px solid var(--ac-border,#e2e8e4); border-radius:8px; font-size:.95rem; font-family:inherit; resize:vertical; min-height:80px; background:#f8fafc; }
+.address-form-floating .readonly-display { background:#f1f5f1; cursor:not-allowed; }
+.address-form-floating .required { color:#dc2626; }
+.address-form-floating .form-hint { display:block; margin-top:.4rem; font-size:.8rem; color:var(--ac-text-muted,#6b7e72); }
+.address-form-floating .form-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.5rem; }
+.address-form-floating .btn { padding:.75rem 1.5rem; border-radius:8px; font-weight:600; font-size:.95rem; transition:all .2s; }
+.address-form-floating .btn-primary { background:linear-gradient(135deg,#2d7a3a 0%,#1e5429 100%); color:#fff; border:none; box-shadow:0 2px 8px rgba(45,122,58,.2); }
+.address-form-floating .btn-primary:hover { background:linear-gradient(135deg,#3a8f4a 0%,#2a6635 100%); box-shadow:0 4px 12px rgba(45,122,58,.3); transform:translateY(-1px); }
+.address-form-floating .btn-secondary { background:#f8fafc; color:var(--ac-text,#1a2e1e); border:1px solid var(--ac-border,#e2e8e4); }
+.address-form-floating .btn-secondary:hover { background:#e2e8e4; }
+
+/* Payment card */
+.co-payment-card {
+  background: var(--ac-primary-light, #e8f5e9);
+  border: 1px solid var(--ac-primary-muted, #c8e6c9);
+  border-radius: 8px;
+  padding: .75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .75rem;
+}
+.co-payment-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--ac-primary, #2d7a3a);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.co-payment-label { font-size: .95rem; font-weight: 700; color: var(--ac-primary-dark, #1e5429); }
+.co-payment-sub { font-size: .85rem; color: var(--ac-text-muted, #6b7e72); }
+
+/* Policy notice */
+.co-policy-notice {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: .65rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  font-size: .85rem;
+  color: #92400e;
+}
+.co-policy-notice i { flex-shrink: 0; margin-top: .1rem; color: #d97706; }
+
+#checkout-main {
+  padding-bottom: 3rem;
+}
+.co-total-label {
+  font-size: .8rem;
+  color: var(--ac-text-muted, #6b7e72);
+  display: block;
+  margin-bottom: .1rem;
+}
+.co-total-amount {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--ac-primary, #2d7a3a);
+  font-family: 'Nunito', sans-serif;
+}
+
+/* Buttons */
+.btn-co-primary {
+  background: #4ade80;
+  color: #fff;
+  border: 1px solid #4ade80;
+  font-weight: 700;
+  padding: .75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.btn-co-primary:hover {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
+}
+.btn-co-blue {
+  background: #0ea5e9;
+  color: #fff;
+  border: 1px solid #0ea5e9;
+  font-weight: 700;
+  padding: .75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.btn-co-blue:hover {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #fff;
+}
+.btn-co-secondary {
+  background: #fff;
+  color: var(--ac-text, #1a2e1e);
+  border: 1px solid var(--ac-border, #e2e8e4);
+  font-weight: 600;
+  padding: .5rem 1.2rem;
+  border-radius: 8px;
+  font-size: .9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.btn-co-secondary:hover {
+  background: var(--ac-primary-light, #e8f5e9);
+  border-color: var(--ac-primary-muted, #c8e6c9);
+  color: var(--ac-primary-dark, #1e5429);
+}
+
+/* Empty items state */
+.co-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--ac-text-muted, #6b7e72);
+  font-size: .875rem;
+}
+.co-empty i {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: .5rem;
+  color: var(--ac-primary-muted, #c8e6c9);
+}
+
+/* Loading overlay */
+#checkout-loading {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--ac-text-muted, #6b7e72);
+}
+
+@media (max-width: 575px) {
+  .co-item img { width: 48px; height: 48px; }
+  .co-action-bar { flex-direction: column; align-items: stretch; }
+  .co-action-bar .btn-group { display: flex; flex-direction: column; gap: .5rem; }
+  .btn-co-primary, .btn-co-secondary { justify-content: center; }
+}
+</style>
+</head>
+
+<body class="loading" style="background:var(--ac-bg,#f5f7f5);">
+
+<!-- Loading Screen -->
+<div id="loading-screen" class="loading-screen">
+    <div class="loading-content">
+        <div class="loading-logo">
+            <img src="/images/logo.png" alt="AgriCatch Logo" class="loading-logo-img">
+            <h1 class="loading-title">
+                <span class="agri-green">Agri</span><span class="catch-blue">Catch</span>
+            </h1>
+        </div>
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+        </div>
+        <p class="loading-text">Loading...</p>
+    </div>
+</div>
+
+<!-- ── Top bar ───────────────────────────────────────────────────────── -->
+<header class="checkout-topbar">
+    <div class="d-flex align-items-center gap-2">
+        <img src="/images/logo.png" alt="AgriCatch" height="34" style="flex-shrink:0;">
+        <div>
+            <div class="brand-name">AgriCatch</div>
+            <p class="tagline">Freshly Harvested! Pre-ordered for you!</p>
+        </div>
+    </div>
+
+    <div class="ms-auto d-flex align-items-center gap-2">
+        <a href="/index.html#products" class="back-btn" id="back-to-shop-btn">
+            <i class="bi bi-arrow-left"></i>
+            <span class="d-none d-sm-inline">Shop</span>
+        </a>
+    </div>
+</header>
+
+<!-- ── Main content ──────────────────────────────────────────────────── -->
+<main id="checkout-main">
+
+    <!-- Hero -->
+    <section>
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon"><i class="bi bi-bag-check"></i></div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Complete Your Order</h4>
+                <p class="ac-section-hero__sub">Review your items and fill in delivery details.</p>
+            </div>
+        </div>
+
+        <div id="checkout-loading" style="display:none;">
+            <div class="spinner-border spinner-border-sm text-success me-2" role="status"></div>
+            Loading your cart…
+        </div>
+
+        <form id="checkout-form">
+            <div class="row g-3">
+
+                <!-- Left: Delivery + Payment -->
+                <div class="col-lg-8" style="flex: 0 0 70%; max-width: 70%;">
+
+                    <!-- Delivery Information -->
+                    <div class="co-card">
+                        <div class="co-card-header">
+                            <i class="fas fa-truck"></i>
+                            <h5>Delivery Information</h5>
+                        </div>
+                        <div class="co-card-body">
+                            <div class="co-address-notice" id="checkout-address-notice">
+                                <button type="button" id="set-address-btn" class="co-set-address-btn" style="display: none;" onclick="window.checkoutPage.openAddressModal()">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    <span>Set Address</span>
+                                </button>
+                                <div class="co-address-content">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    <div>
+                                        <strong>Trabajo Market</strong>
+                                        <span class="d-block">M. Dela Fuente St., Sampaloc, Manila, Metro Manila</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-sm-4">
+                                    <label class="co-label" for="checkout-firstname">First Name <span class="co-required">*</span></label>
+                                    <input type="text" id="checkout-firstname" class="form-control form-control-sm" placeholder="First name" maxlength="40" required>
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="co-label" for="checkout-middlename">Middle Name</label>
+                                    <input type="text" id="checkout-middlename" class="form-control form-control-sm" placeholder="Optional" maxlength="40">
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="co-label" for="checkout-lastname">Last Name <span class="co-required">*</span></label>
+                                    <input type="text" id="checkout-lastname" class="form-control form-control-sm" placeholder="Last name" maxlength="40" required>
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-sm-6">
+                                    <label class="co-label" for="checkout-phone">Phone Number <span class="co-required">*</span></label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">+63</span>
+                                        <input type="tel" id="checkout-phone" class="form-control" placeholder="912 345 6789" maxlength="12" required>
+                                    </div>
+                                    <small class="text-muted" style="font-size:.73rem;">Enter 10 digits starting with 9 (e.g. 912 345 6789)</small>
+                                </div>
+                            </div>
+
+                            <div class="mb-0">
+                                <label class="co-label" for="special-instructions">Special Instructions for Farmer <span style="font-weight:400;color:var(--ac-text-muted,#6b7e72);">(optional)</span></label>
+                                <textarea id="special-instructions" class="form-control form-control-sm" rows="2" maxlength="200" placeholder="Any notes for the farmer or delivery person…"></textarea>
+                                <small class="text-muted" style="font-size:.73rem;">Max 200 characters</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Method -->
+                    <div class="co-card">
+                        <div class="co-card-header">
+                            <i class="fas fa-credit-card"></i>
+                            <h5>Payment Method</h5>
+                        </div>
+                        <div class="co-card-body">
+                            <div class="co-payment-card">
+                                <div class="co-payment-icon">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <div>
+                                    <div class="co-payment-label">Cash on Delivery</div>
+                                    <div class="co-payment-sub">Pay when your pre-order arrives</div>
+                                </div>
+                            </div>
+                            <div class="co-policy-notice">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span><strong>No Refund Policy:</strong> Due to the perishable nature of fresh produce, all sales are final once the order is placed.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right: Order summary -->
+                <div class="col-lg-4" style="flex: 0 0 30%; max-width: 30%;">
+                    <div class="co-card">
+                        <div class="co-card-header">
+                            <i class="fas fa-shopping-bag"></i>
+                            <h5>Order Summary</h5>
+                        </div>
+                        <div class="co-card-body">
+                            <div id="checkout-items-list">
+                                <!-- Items injected by checkout.js -->
+                            </div>
+                            <!-- Price breakdown -->
+                            <div style="margin-top:.75rem;">
+                                <div class="co-price-row">
+                                    <span>Subtotal</span>
+                                    <span>₱<span id="checkout-subtotal">0.00</span></span>
+                                </div>
+                                <div class="co-price-row" id="checkout-delivery-fee-row">
+                                    <span>Delivery Fee</span>
+                                    <span>₱<span id="checkout-delivery-fee">35.00</span></span>
+                                </div>
+                                <div class="co-price-row total-row">
+                                    <span>Total</span>
+                                    <span>₱<span id="checkout-total-footer">0.00</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div class="d-flex gap-3 mt-4">
+                        <button type="button" class="btn-co-blue flex-grow-1" id="shop-more-btn">
+                            <i class="bi bi-shop"></i> Shop More
+                        </button>
+                        <button type="submit" class="btn-co-primary flex-grow-1" id="place-order-btn">
+                            <i class="bi bi-bag-check-fill"></i> Place Pre-order
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </form>
+    </section>
+
+</main>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="border-radius: 20px; border: none; overflow: hidden;">
+            <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); padding: 2rem; text-align: center;">
+                <div style="width: 64px; height: 64px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);">
+                    <i class="fas fa-trash-alt" style="color: #dc2626; font-size: 1.5rem;"></i>
+                </div>
+                <h5 style="margin: 0; font-weight: 700; font-size: 1.35rem; color: #7f1d1d;">Remove Item?</h5>
+            </div>
+            <div style="padding: 1.5rem 2rem 2rem; text-align: center;">
+                <p style="margin: 0 0 1.5rem; color: var(--ac-text-muted, #6b7e72); font-size: 0.95rem; line-height: 1.6;">This action cannot be undone. Are you sure you want to remove this item from your cart?</p>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button type="button" class="btn" data-bs-dismiss="modal" style="flex: 1; padding: 0.85rem; border-radius: 12px; font-weight: 600; font-size: 0.9rem; background: #f8fafc; color: var(--ac-text, #1a2e1e); border: 1px solid #e2e8e4; transition: all 0.2s;">Cancel</button>
+                    <button type="button" class="btn" id="confirm-delete-btn" style="flex: 1; padding: 0.85rem; border-radius: 12px; font-weight: 600; font-size: 0.9rem; background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: #fff; border: none; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3); transition: all 0.2s;">Remove</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Set Delivery Address Modal (PSGC) -->
+<div id="add-address-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-map-marker-alt"></i> Set Delivery Address</h3>
+            <button class="close-btn" id="close-add-address-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="add-address-form" class="address-form-floating">
+                <div class="form-group">
+                    <label for="floating-address-zone">
+                        Zone <span class="required">*</span>
+                    </label>
+                    <select id="floating-address-zone" class="form-select" required>
+                        <option value="">Select Zone (Metro / North / South Luzon)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-province">
+                        Province <span class="required">*</span>
+                    </label>
+                    <select id="floating-address-province" class="form-select" disabled required>
+                        <option value="">Select Province</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-city">
+                        City / Municipality <span class="required">*</span>
+                    </label>
+                    <select id="floating-address-city" class="form-select" disabled required>
+                        <option value="">Select City / Municipality</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-barangay">
+                        Barangay <span class="required">*</span>
+                    </label>
+                    <select id="floating-address-barangay" class="form-select" disabled required>
+                        <option value="">Select Barangay</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-street">
+                        Street / Building / House No. <span class="required">*</span>
+                    </label>
+                    <input type="text" id="floating-address-street" class="form-input" placeholder="Enter street, building, or house number" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="floating-address-full">
+                        Address Preview
+                    </label>
+                    <textarea id="floating-address-full" class="form-textarea readonly-display" rows="3" placeholder="Formatted address will appear here" readonly></textarea>
+                    <small class="form-hint">Street / Building / House No., Barangay, City / Municipality, Province</small>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="cancel-add-address">
+                Cancel
+            </button>
+            <button type="submit" class="btn btn-primary" form="add-address-form">
+                <i class="fas fa-check"></i> Set Address
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- PSGC JS for address dropdowns -->
+<script src="/js/psgc.js"></script>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/checkout.js"></script>
+
+<script>
+// Authorization check before hiding loading screen
+function checkAuthorization() {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+        // Guest - redirect to login immediately
+        window.location.href = '/index.html#login';
+        return false;
+    }
+    
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const role = payload.role;
+        
+        // Only customers can access checkout page
+        if (role !== 'customer') {
+            // Redirect unauthorized users to their appropriate dashboard
+            if (role === 'farmer') {
+                window.location.href = '/farmer.html';
+            } else if (role === 'admin' || role === 'super_admin') {
+                window.location.href = '/admin.html';
+            } else {
+                window.location.href = '/index.html';
+            }
+            return false;
+        }
+        
+        return true;
+    } catch (e) {
+        window.location.href = '/index.html';
+        return false;
+    }
+}
+
+// Hide loading screen when page is fully loaded
+window.addEventListener('load', function() {
+    // Check authorization first
+    if (!checkAuthorization()) {
+        return; // Don't hide loading screen if redirecting
+    }
+    
+    const loadingScreen = document.getElementById('loading-screen');
+    const body = document.body;
+
+    if (loadingScreen) {
+        setTimeout(() => {
+            loadingScreen.classList.add('hidden');
+            body.classList.remove('loading');
+        }, 500);
+    }
+});
+</script>
+</body>
+</html>

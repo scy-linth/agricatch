@@ -8,7 +8,11 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    full_name VARCHAR(100),
+    full_name VARCHAR(130),
+    first_name VARCHAR(40),
+    middle_name VARCHAR(40),
+    last_name VARCHAR(40),
+    shop_name VARCHAR(40),
     phone VARCHAR(20),
     address TEXT,
     role VARCHAR(20) DEFAULT 'customer', -- 'customer', 'farmer', 'admin', 'super_admin'
@@ -192,6 +196,9 @@ CREATE TABLE IF NOT EXISTS user_addresses (
     user_id INTEGER REFERENCES users(id),
     label VARCHAR(50),
     full_name VARCHAR(100),
+    first_name VARCHAR(40),
+    middle_name VARCHAR(40),
+    last_name VARCHAR(40),
     phone VARCHAR(20),
     address_line1 TEXT NOT NULL,
     address_line2 TEXT,
@@ -250,6 +257,21 @@ ON CONFLICT (name) DO NOTHING;
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_farmer ON products(farmer_id);
 CREATE INDEX IF NOT EXISTS idx_cart_session ON cart(session_id);
+
+-- Settings table for app-wide configuration
+CREATE TABLE IF NOT EXISTS settings (
+    id SERIAL PRIMARY KEY,
+    key VARCHAR(100) UNIQUE NOT NULL,
+    value TEXT,
+    description TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert default settings
+INSERT INTO settings (key, value, description) VALUES
+('use_default_delivery_address', 'true', 'Use default delivery address (Trabajo Market) or allow custom PSGC addresses')
+ON CONFLICT (key) DO NOTHING;
 CREATE INDEX IF NOT EXISTS idx_cart_user ON cart(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_product ON orders(product_id);

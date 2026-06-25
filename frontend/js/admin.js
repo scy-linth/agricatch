@@ -19,6 +19,12 @@ class AdminDashboard {
         this.currentUserId = null;
         this.lastUsers = [];
         this.lastFarmers = [];
+        this.allOrders = [];
+        this.allProducts = [];
+        this.allUsers = [];
+        this.allFarmers = [];
+        this.allAdmins = [];
+        this.allAllUsers = [];
         this.pendingOrderStatus = new Map();
         this.sortableTables = {};
         this.searchQuery = '';
@@ -776,20 +782,27 @@ class AdminDashboard {
 
         // Load data when navigating to sections
         if (sectionId === 'orders') {
+            this.loadOrdersAll();
             this.loadOrders();
         } else if (sectionId === 'users') {
+            this.loadUsersAll();
             this.loadUsers();
         } else if (sectionId === 'products') {
+            this.loadProductsAll();
             this.loadProducts();
         } else if (sectionId === 'categories') {
             this.loadCategories();
         } else if (sectionId === 'catalog-products') {
+            this.loadProductsAll();
             this.loadProducts();
         } else if (sectionId === 'farmers') {
+            this.loadFarmersAll();
             this.loadFarmers('all');
         } else if (sectionId === 'admin') {
+            this.loadAdminAll();
             this.loadAdmin();
         } else if (sectionId === 'all-users') {
+            this.loadAllUsersAll();
             this.loadAllUsers();
         } else if (sectionId === 'suspicious-patterns') {
             this.loadSuspiciousPatterns();
@@ -1314,10 +1327,11 @@ class AdminDashboard {
         
         // Order status tabs
         document.querySelectorAll('.order-tabs .tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 document.querySelectorAll('.order-tabs .tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.resetPaginationPage('orders');
+                await this.loadOrdersAll();
                 this.loadOrders(1);
             });
         });
@@ -1345,10 +1359,11 @@ class AdminDashboard {
         
         // Users status tabs
         document.querySelectorAll('.users-tabs .tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 document.querySelectorAll('.users-tabs .tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.resetPaginationPage('users');
+                await this.loadUsersAll();
                 this.loadUsers(1);
             });
         });
@@ -1363,10 +1378,11 @@ class AdminDashboard {
         
         // Products status tabs
         document.querySelectorAll('.products-tabs .tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 document.querySelectorAll('.products-tabs .tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.resetPaginationPage('products');
+                await this.loadProductsAll();
                 this.loadProducts(1);
             });
         });
@@ -1382,10 +1398,11 @@ class AdminDashboard {
         
         // Farmers status tabs
         document.querySelectorAll('.farmers-tabs .tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 document.querySelectorAll('.farmers-tabs .tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.resetPaginationPage('farmers');
+                await this.loadFarmersAll();
                 this.loadFarmers('all', 1);
             });
         });
@@ -1409,7 +1426,7 @@ class AdminDashboard {
         if (logsDateTo)   logsDateTo.addEventListener('change', () => this.loadAuditLogs());
 
         // ── Clear + Refresh buttons ─────────────────────────────────────────
-        document.getElementById('orders-refresh-btn')?.addEventListener('click', () => {
+        document.getElementById('orders-refresh-btn')?.addEventListener('click', async () => {
             ['order-price-filter','order-sort-filter','order-search-input'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
@@ -1417,11 +1434,12 @@ class AdminDashboard {
             // Reset order tabs to first tab (All)
             document.querySelectorAll('.order-tabs .tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('.order-tabs .tab-btn')?.classList.add('active');
+            await this.loadOrdersAll();
             this.loadOrders();
             this.showToast('Orders refreshed', 'success');
         });
 
-        document.getElementById('products-refresh-btn')?.addEventListener('click', () => {
+        document.getElementById('products-refresh-btn')?.addEventListener('click', async () => {
             const searchInput = document.getElementById('products-search-input');
             const categoryFilter = document.getElementById('products-category-filter');
             if (searchInput) searchInput.value = '';
@@ -1430,6 +1448,7 @@ class AdminDashboard {
             document.querySelectorAll('.products-tabs .tab-btn').forEach(b => b.classList.remove('active'));
             const defaultTab = document.querySelector('.products-tabs .tab-btn[data-status=""]');
             if (defaultTab) defaultTab.classList.add('active');
+            await this.loadProductsAll();
             this.loadProducts();
             this.showToast('Listings refreshed', 'success');
         });
@@ -1453,7 +1472,7 @@ class AdminDashboard {
             this.showToast('Catalog refreshed', 'success');
         });
 
-        document.getElementById('users-refresh-btn')?.addEventListener('click', () => {
+        document.getElementById('users-refresh-btn')?.addEventListener('click', async () => {
             ['users-search-input'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
@@ -1461,6 +1480,7 @@ class AdminDashboard {
             // Reset users tabs to first tab (All)
             document.querySelectorAll('.users-tabs .tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('.users-tabs .tab-btn')?.classList.add('active');
+            await this.loadUsersAll();
             this.loadUsers();
             this.showToast('Customers refreshed', 'success');
         });
@@ -1472,10 +1492,11 @@ class AdminDashboard {
         
         // Admin status tabs
         document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 document.querySelectorAll('.admin-tabs .tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.resetPaginationPage('admin');
+                await this.loadAdminAll();
                 this.loadAdmin(1);
             });
         });
@@ -1484,7 +1505,7 @@ class AdminDashboard {
         if (adminSearchInput) adminSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadAdmin(1); });
         if (adminVerificationFilter) adminVerificationFilter.addEventListener('change', () => this.loadAdmin(1));
 
-        document.getElementById('admin-refresh-btn')?.addEventListener('click', () => {
+        document.getElementById('admin-refresh-btn')?.addEventListener('click', async () => {
             ['admin-search-input','admin-verification-filter'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
@@ -1492,6 +1513,7 @@ class AdminDashboard {
             // Reset admin tabs to first tab (All)
             document.querySelectorAll('.admin-tabs .tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('.admin-tabs .tab-btn')?.classList.add('active');
+            await this.loadAdminAll();
             this.loadAdmin();
             this.showToast('Admin refreshed', 'success');
         });
@@ -1504,10 +1526,11 @@ class AdminDashboard {
         
         // All Users status tabs
         document.querySelectorAll('.all-users-tabs .tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 document.querySelectorAll('.all-users-tabs .tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.resetPaginationPage('all-users');
+                await this.loadAllUsersAll();
                 this.loadAllUsers(1);
             });
         });
@@ -1517,7 +1540,7 @@ class AdminDashboard {
         if (allUsersRoleFilter) allUsersRoleFilter.addEventListener('change', () => this.loadAllUsers(1));
         if (allUsersVerificationFilter) allUsersVerificationFilter.addEventListener('change', () => this.loadAllUsers(1));
 
-        document.getElementById('all-users-refresh-btn')?.addEventListener('click', () => {
+        document.getElementById('all-users-refresh-btn')?.addEventListener('click', async () => {
             ['all-users-search-input','all-users-role-filter','all-users-verification-filter'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
@@ -1525,11 +1548,12 @@ class AdminDashboard {
             // Reset all-users tabs to first tab (All)
             document.querySelectorAll('.all-users-tabs .tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('.all-users-tabs .tab-btn')?.classList.add('active');
+            await this.loadAllUsersAll();
             this.loadAllUsers();
             this.showToast('All users refreshed', 'success');
         });
 
-        document.getElementById('farmers-refresh-btn')?.addEventListener('click', () => {
+        document.getElementById('farmers-refresh-btn')?.addEventListener('click', async () => {
             ['farmers-search-input','farmers-verification-filter'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
@@ -1537,6 +1561,7 @@ class AdminDashboard {
             // Reset farmers tabs to first tab (All)
             document.querySelectorAll('.farmers-tabs .tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('.farmers-tabs .tab-btn')?.classList.add('active');
+            await this.loadFarmersAll();
             this.loadFarmers();
             this.showToast('Farmers refreshed', 'success');
         });
@@ -2500,6 +2525,108 @@ class AdminDashboard {
     // Kept for backward compat (called by realtime events etc.)
     renderUsersFiltered() { this.applyUsersFilter(); }
 
+    async loadOrdersAll() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/orders?limit=10000`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.allOrders = data.orders || [];
+                this.updateOrderStats(this.allOrders);
+            }
+        } catch (error) {
+            console.error('Error loading all orders:', error);
+        }
+    }
+
+    async loadUsersAll() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/users?role=customer&limit=10000`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.allUsers = data.users || [];
+                this.updateUserStats(this.allUsers);
+            }
+        } catch (error) {
+            console.error('Error loading all users:', error);
+        }
+    }
+
+    async loadProductsAll() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/products?limit=10000`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.allProducts = data.products || [];
+                this.updateProductStats(this.allProducts);
+            }
+        } catch (error) {
+            console.error('Error loading all products:', error);
+        }
+    }
+
+    async loadFarmersAll() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/users?role=farmer&limit=10000`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.allFarmers = data.users || [];
+                this.updateFarmerStats(this.allFarmers);
+            }
+        } catch (error) {
+            console.error('Error loading all farmers:', error);
+        }
+    }
+
+    async loadAdminAll() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/users?role=admin&limit=10000`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.allAdmins = data.users || [];
+                this.updateAdminStats(this.allAdmins);
+            }
+        } catch (error) {
+            console.error('Error loading all admins:', error);
+        }
+    }
+
+    async loadAllUsersAll() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/users?limit=10000`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.allAllUsers = data.users || [];
+                this.updateAllUsersStats(this.allAllUsers);
+            }
+        } catch (error) {
+            console.error('Error loading all all-users:', error);
+        }
+    }
+
     async loadOrders(page = 1) {
         try {
             const pg = this.pagination?.orders || { page: 1, total: 0, limit: 50 };
@@ -2673,8 +2800,8 @@ class AdminDashboard {
         }
 
         if (!sortedUsers.length) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No users found</td></tr>`;
-            this.refreshSortableTable('users-table', { columns: [{ select: 6, sortable: false }] });
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No users found</td></tr>`;
+            this.refreshSortableTable('users-table', { columns: [{ select: 7, sortable: false }] });
             return;
         }
         tbody.innerHTML = sortedUsers.map(user => {
@@ -2685,9 +2812,12 @@ class AdminDashboard {
                 ? user.id !== this.currentUserId && !isSuperAdmin
                 : user.role !== 'admin' && user.id !== this.currentUserId && !isSuperAdmin;
             const isDisabled = !!user.is_disabled;
+            const isVerified = !!user.is_verified;
 
             const statusBadge = isSuperAdmin ? '' :
                 this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
+
+            const verificationBadge = this.renderStatus(isVerified ? 'Verified' : 'Unverified', isVerified ? 'verified' : 'unverified');
 
             const fullName = user.full_name || '—';
 
@@ -2701,6 +2831,7 @@ class AdminDashboard {
                     </td>
                     <td style="color:#777171f0">${this.escapeHtml(user.username || '—')}</td>
                     <td>${this.escapeHtml(user.email)}</td>
+                    <td class="text-center">${verificationBadge}</td>
                     <td class="text-center">
                         <div class="d-flex flex-column gap-1 align-items-center">
                             ${statusBadge}
@@ -2714,7 +2845,7 @@ class AdminDashboard {
             `;
         }).join('');
 
-        this.refreshSortableTable('users-table', { columns: [{ select: 6, sortable: false }] });
+        this.refreshSortableTable('users-table', { columns: [{ select: 7, sortable: false }] });
     }
 
     formatRole(role) {
@@ -2960,11 +3091,15 @@ class AdminDashboard {
                             valA = (a.role || '').toLowerCase();
                             valB = (b.role || '').toLowerCase();
                             break;
-                        case 5: // status (is_disabled)
+                        case 5: // verification (is_verified)
+                            valA = a.is_verified ? 1 : 0;
+                            valB = b.is_verified ? 1 : 0;
+                            break;
+                        case 6: // status (is_disabled)
                             valA = a.is_disabled ? 1 : 0;
                             valB = b.is_disabled ? 1 : 0;
                             break;
-                        case 6: // created_at
+                        case 7: // created_at
                             const dateA = new Date(a.created_at || 0);
                             const dateB = new Date(b.created_at || 0);
                             valA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
@@ -2981,14 +3116,16 @@ class AdminDashboard {
         }
 
         if (!sortedUsers.length) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No users found</td></tr>`;
-            this.refreshSortableTable('all-users-table', { columns: [{ select: 7, sortable: false }] });
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No users found</td></tr>`;
+            this.refreshSortableTable('all-users-table', { columns: [{ select: 8, sortable: false }] });
             return;
         }
         tbody.innerHTML = sortedUsers.map(user => {
             const isSuperAdmin = user.role === 'super_admin';
             const isDisabled = !!user.is_disabled;
+            const isVerified = !!user.is_verified;
             const statusBadge = isSuperAdmin ? '' : this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
+            const verificationBadge = this.renderStatus(isVerified ? 'Verified' : 'Unverified', isVerified ? 'verified' : 'unverified');
 
             const actions = `<button class="btn btn-sm py-0 px-2 btn-ac-green all-users-view-btn" data-user-id="${user.id}">View</button>`;
 
@@ -3003,6 +3140,7 @@ class AdminDashboard {
                     <td style="color:#777171f0">${this.escapeHtml(user.username || '—')}</td>
                     <td>${this.escapeHtml(user.email)}</td>
                     <td>${this.formatRole(user.role)}</td>
+                    <td class="text-center">${verificationBadge}</td>
                     <td class="text-center">
                         <div class="d-flex flex-column gap-1 align-items-center">
                             ${statusBadge}
@@ -3014,7 +3152,7 @@ class AdminDashboard {
             `;
         }).join('');
 
-        this.refreshSortableTable('all-users-table', { columns: [{ select: 7, sortable: false }] });
+        this.refreshSortableTable('all-users-table', { columns: [{ select: 8, sortable: false }] });
     }
 
     applyAllUsersFilter() {
@@ -3490,6 +3628,10 @@ class AdminDashboard {
                     </div>
                 `;
             }
+            // Skip security settings and internal fields - they have dedicated UI elements or should not be displayed
+            if (['recaptcha_mode', 'recaptcha_enabled', 'auth_rate_limit', 'auth_rate_limit_local', 'auth_rate_limit_production', 'otp_rate_limit', 'otp_rate_limit_local', 'otp_rate_limit_production', 'otp_mode', 'otp_bypass_code', 'otp_enabled', 'dev_expose_otp', 'use_default_delivery_address', 'max_products_per_farmer', 'max_products_per_name_available', 'max_products_per_name_preorder', 'updates'].includes(key)) {
+                return '';
+            }
             return `
                 <div class="mb-3">
                     <label class="form-label fw-semibold">${this.escapeHtml(key)}</label>
@@ -3505,7 +3647,111 @@ class AdminDashboard {
         const useDefaultAddressCheckbox = document.getElementById('setting-use-default-delivery-address');
         if (useDefaultAddressCheckbox) {
             useDefaultAddressCheckbox.checked = settings.use_default_delivery_address?.value === 'true';
-            useDefaultAddressCheckbox.addEventListener('change', () => this.saveDeliveryAddressSetting());
+            // Removed immediate save - will save via Save All button
+        }
+
+        // Handle security settings
+        this.renderSecuritySettings(settings);
+    }
+
+    renderSecuritySettings(settings) {
+        // Detect environment from API base or assume based on hostname
+        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        
+        // reCAPTCHA mode
+        const recaptchaMode = document.getElementById('setting-recaptcha-mode');
+        if (recaptchaMode) {
+            recaptchaMode.value = settings.recaptcha_mode?.value || 'auto';
+            // Removed immediate save - will save via Save All button
+        }
+
+        // Rate limiting - environment-aware
+        const authRateLimitLocal = document.getElementById('setting-auth-rate-limit-local');
+        if (authRateLimitLocal) {
+            authRateLimitLocal.value = settings.auth_rate_limit_local?.value || '100';
+            // Removed immediate save - will save via Save All button
+        }
+
+        const authRateLimitProduction = document.getElementById('setting-auth-rate-limit-production');
+        if (authRateLimitProduction) {
+            authRateLimitProduction.value = settings.auth_rate_limit_production?.value || '20';
+            // Removed immediate save - will save via Save All button
+        }
+
+        const otpRateLimitLocal = document.getElementById('setting-otp-rate-limit-local');
+        if (otpRateLimitLocal) {
+            otpRateLimitLocal.value = settings.otp_rate_limit_local?.value || '50';
+            // Removed immediate save - will save via Save All button
+        }
+
+        const otpRateLimitProduction = document.getElementById('setting-otp-rate-limit-production');
+        if (otpRateLimitProduction) {
+            otpRateLimitProduction.value = settings.otp_rate_limit_production?.value || '10';
+            // Removed immediate save - will save via Save All button
+        }
+
+        // Max products per farmer
+        const maxProductsPerFarmer = document.getElementById('setting-max-products-per-farmer');
+        if (maxProductsPerFarmer) {
+            maxProductsPerFarmer.value = settings.max_products_per_farmer?.value || '10';
+            // Removed immediate save - will save via Save All button
+        }
+
+        // Max products per name (available)
+        const maxProductsPerNameAvailable = document.getElementById('setting-max-products-per-name-available');
+        if (maxProductsPerNameAvailable) {
+            maxProductsPerNameAvailable.value = settings.max_products_per_name_available?.value || '1';
+            // Removed immediate save - will save via Save All button
+        }
+
+        // Max products per name (preorder)
+        const maxProductsPerNamePreorder = document.getElementById('setting-max-products-per-name-preorder');
+        if (maxProductsPerNamePreorder) {
+            maxProductsPerNamePreorder.value = settings.max_products_per_name_preorder?.value || '1';
+            // Removed immediate save - will save via Save All button
+        }
+
+        // OTP mode (single selection)
+        const otpMode = document.getElementById('setting-otp-mode');
+        if (otpMode) {
+            otpMode.value = settings.otp_mode?.value || 'strict';
+            // Removed immediate save - will save via Save All button
+        }
+
+        const otpBypassCode = document.getElementById('setting-otp-bypass-code');
+        if (otpBypassCode) {
+            otpBypassCode.value = settings.otp_bypass_code?.value || '789878';
+            // Removed immediate save - will save via Save All button
+        }
+        
+        // Show environment indicator
+        const envIndicator = document.getElementById('security-env-indicator');
+        if (envIndicator) {
+            envIndicator.textContent = isDevelopment ? 'Development Mode' : 'Production Mode';
+            envIndicator.className = isDevelopment ? 'badge bg-warning text-dark' : 'badge bg-success';
+        }
+    }
+
+    async saveSecuritySetting(key, value) {
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ [key]: typeof value === 'boolean' ? (value ? 'true' : 'false') : String(value) })
+            });
+
+            if (response.ok) {
+                this.showMessage(`${key} updated successfully`, 'success');
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || `Failed to update ${key}`, 'error');
+            }
+        } catch (error) {
+            console.error(`Error saving ${key}:`, error);
+            this.showMessage(`Failed to update ${key}`, 'error');
         }
     }
 
@@ -3546,7 +3792,8 @@ class AdminDashboard {
         const inputs = document.querySelectorAll('.platform-setting-input');
         const updates = {};
         inputs.forEach(input => {
-            updates[input.dataset.key] = input.value;
+            const value = input.type === 'checkbox' ? (input.checked ? 'true' : 'false') : input.value;
+            updates[input.dataset.key] = value;
         });
 
         try {
@@ -3599,12 +3846,15 @@ class AdminDashboard {
         const container = document.getElementById('feature-flags-list');
         if (!container) return;
 
-        if (!flags.length) {
+        // Filter out price_drop_alerts flag from UI
+        const visibleFlags = flags.filter(flag => flag.key !== 'price_drop_alerts');
+
+        if (!visibleFlags.length) {
             container.innerHTML = `<div class="text-center text-muted py-4">No feature flags found</div>`;
             return;
         }
 
-        container.innerHTML = flags.map(flag => `
+        container.innerHTML = visibleFlags.map(flag => `
             <div class="ac-flag-row">
                 <div class="flex-grow-1 min-width-0">
                     <div class="ac-flag-name">${this.escapeHtml(flag.name)}</div>
@@ -3685,9 +3935,11 @@ class AdminDashboard {
             if (response.ok) {
                 const data = await response.json();
                 this.lastProducts = data.products || [];
+                this.allProducts = data.products || [];
                 pg.total = Number(data.total || 0);
                 this.renderProducts(this.lastProducts);
                 this.renderPagination('products-pagination', pg, (p) => this.loadProducts(p));
+                this.updateProductStats(this.allProducts);
             } else {
                 const tbody = document.getElementById('products-tbody');
                 if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="text-center text-danger py-3">Failed to load products. Please try again.</td></tr>`;
@@ -5062,7 +5314,7 @@ class AdminDashboard {
     }
 
     populateCategoryFilters() {
-        const categories = this.lastCategories || [];
+        const categories = (this.lastCategories || []).filter(c => !c.is_disabled);
         const filters = [
             'products-category-filter',
             'catalog-category-filter-bar'
@@ -5171,7 +5423,7 @@ class AdminDashboard {
         const filterCatSel = document.getElementById('catalog-category-filter-bar');
         if (filterCatSel) {
             filterCatSel.innerHTML = ['<option value="">All categories</option>']
-                .concat((this.lastCategories || []).map(c => `<option value="${c.id}">${this.escapeHtml(c.name || '')}</option>`))
+                .concat((this.lastCategories || []).filter(c => !c.is_disabled).map(c => `<option value="${c.id}">${this.escapeHtml(c.name || '')}</option>`))
                 .join('');
         }
     }
@@ -6412,6 +6664,7 @@ class AdminDashboard {
 
         tbody.innerHTML = filtered.map((request) => {
             const date   = request.created_at ? new Date(request.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+            const dateOrder = request.created_at ? new Date(request.created_at).getTime() : 0;
             const status = request.status || 'pending';
             const requesterName = this.escapeHtml(request.requested_by_shop_name || request.requested_by_full_name || request.requested_by_username || 'Farmer');
             const requesterSub = request.requested_by_full_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(request.requested_by_full_name)}</div>` : '';
@@ -6423,7 +6676,7 @@ class AdminDashboard {
                 <td class="fw-semibold">${this.escapeHtml(request.name || '')}</td>
                 <td>${this.escapeHtml(request.category_name || request.requested_category_name || '—')}</td>
                 <td><div class="fw-semibold">${requesterName}${requesterUser}</div>${requesterSub}${requesterEmail}</td>
-                <td class="text-muted">${date}</td>
+                <td class="text-muted" data-order="${dateOrder}">${date}</td>
                 <td>${this.renderStatus(this.formatStatus(status), status)}</td>
                 <td>
                     <button class="btn btn-sm py-0 px-2 btn-ac-green category-request-review-btn" data-request-id="${request.id}">Review</button>
@@ -6438,18 +6691,23 @@ class AdminDashboard {
         this.refreshSortableTable('category-requests-table', { columns: [{ select: 6, sortable: false }] });
     }
 
-    openCategoryRequestPanel(requestId) {
+    async openCategoryRequestPanel(requestId) {
         const request = (this.lastCategoryRequests || []).find((item) => Number(item.id) === Number(requestId));
         if (!request) return;
 
         // Store current request ID for context restoration after adding new category
         this._currentCategoryRequestId = requestId;
 
+        // Ensure categories are loaded before opening the panel
+        if (!this.lastCategories || this.lastCategories.length === 0) {
+            await this.loadCategories();
+        }
+
         const panel = document.getElementById('category-detail-panel');
         const content = document.getElementById('category-detail-content');
         if (!panel || !content) return;
 
-        const categoryOptions = ['<option value="">Select category</option>'].concat((this.lastCategories || []).map((category) => {
+        const categoryOptions = ['<option value="">Select category</option>'].concat((this.lastCategories || []).filter(c => !c.is_disabled).map((category) => {
             const selected = Number(category.id) === Number(request.category_id) ? 'selected' : '';
             return `<option value="${category.id}" ${selected}>${this.escapeHtml(category.name)}</option>`;
         })).join('');
@@ -6898,6 +7156,7 @@ class AdminDashboard {
 
     getStatusClass(status) {
         if (['pending'].includes(status)) return 'pending';
+        if (['preorder_reserved'].includes(status)) return 'preorder_reserved';
         if (['confirmed'].includes(status)) return 'confirmed';
         if (['preparing', 'out_for_delivery'].includes(status)) return 'preparing';
         if (status === 'delivered') return 'delivered';
@@ -6910,6 +7169,7 @@ class AdminDashboard {
         if (!status) return 'Pending';
         const map = {
             pending: 'Pending',
+            preorder_reserved: 'Pre-order Reserved',
             confirmed: 'Confirmed',
             preparing: 'Preparing',
             out_for_delivery: 'Out for Delivery',
@@ -6924,6 +7184,7 @@ class AdminDashboard {
     getStatusColor(status) {
         const colors = {
             pending: '#f59e0b',
+            preorder_reserved: '#9333ea',
             confirmed: '#2563eb',
             preparing: '#f97316',
             out_for_delivery: '#8b5cf6',
@@ -8889,6 +9150,74 @@ class AdminDashboard {
         document.getElementById('verification-approved-count').textContent = approved;
         document.getElementById('verification-rejected-count').textContent = rejected;
         document.getElementById('verification-unverified-count').textContent = unverified;
+    }
+
+    updateOrderStats(orders) {
+        const pending = orders.filter(o => o.status === 'pending').length;
+        const preorderReserved = orders.filter(o => o.status === 'preorder_reserved').length;
+        const confirmed = orders.filter(o => o.status === 'confirmed').length;
+        const preparing = orders.filter(o => o.status === 'preparing').length;
+        const outForDelivery = orders.filter(o => o.status === 'out_for_delivery').length;
+        const delivered = orders.filter(o => o.status === 'delivered').length;
+        const cancelled = orders.filter(o => o.status === 'cancelled').length;
+
+        document.getElementById('orders-pending-count').textContent = pending;
+        document.getElementById('orders-preorder-reserved-count').textContent = preorderReserved;
+        document.getElementById('orders-confirmed-count').textContent = confirmed;
+        document.getElementById('orders-preparing-count').textContent = preparing;
+        document.getElementById('orders-out_for_delivery-count').textContent = outForDelivery;
+        document.getElementById('orders-delivered-count').textContent = delivered;
+        document.getElementById('orders-cancelled-count').textContent = cancelled;
+    }
+
+    updateProductStats(products) {
+        const active = products.filter(p => p.status === 'approved' && p.is_available && !p.is_admin_disabled && !p.farmer_is_disabled).length;
+        const disabled = products.filter(p => p.is_admin_disabled || p.farmer_is_disabled || !p.is_available).length;
+        const noStock = products.filter(p => p.stock_quantity === 0).length;
+        const total = products.length;
+
+        document.getElementById('products-active-count').textContent = active;
+        document.getElementById('products-disabled-count').textContent = disabled;
+        document.getElementById('products-no-stock-count').textContent = noStock;
+        document.getElementById('products-total-count').textContent = total;
+    }
+
+    updateUserStats(users) {
+        const active = users.filter(u => !u.is_disabled).length;
+        const disabled = users.filter(u => u.is_disabled).length;
+        const verified = users.filter(u => u.is_verified).length;
+
+        document.getElementById('users-active-count').textContent = active;
+        document.getElementById('users-disabled-count').textContent = disabled;
+        document.getElementById('users-verified-count').textContent = verified;
+    }
+
+    updateFarmerStats(farmers) {
+        const active = farmers.filter(f => !f.is_disabled).length;
+        const disabled = farmers.filter(f => f.is_disabled).length;
+        const verified = farmers.filter(f => f.is_verified).length;
+
+        document.getElementById('farmers-active-count').textContent = active;
+        document.getElementById('farmers-disabled-count').textContent = disabled;
+        document.getElementById('farmers-verified-count').textContent = verified;
+    }
+
+    updateAdminStats(admins) {
+        const active = admins.filter(a => !a.is_disabled).length;
+        const disabled = admins.filter(a => a.is_disabled).length;
+
+        document.getElementById('admin-active-count').textContent = active;
+        document.getElementById('admin-disabled-count').textContent = disabled;
+    }
+
+    updateAllUsersStats(users) {
+        const active = users.filter(u => !u.is_disabled).length;
+        const disabled = users.filter(u => u.is_disabled).length;
+        const verified = users.filter(u => u.is_verified).length;
+
+        document.getElementById('all-users-active-count').textContent = active;
+        document.getElementById('all-users-disabled-count').textContent = disabled;
+        document.getElementById('all-users-verified-count').textContent = verified;
     }
 
     async loadSubscriptionStats() {

@@ -4,12 +4,24 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { pool } = require('../utils/db');
 
-const { sendOtpEmail } = require('../utils/emailService');
+const { sendOtpEmail, sendWelcomeEmail } = require('../utils/emailService');
 const { verifyRecaptchaToken } = require('../utils/recaptcha');
 const { writeAdminAuditLog } = require('../utils/auditLog');
 const { requireRegistrationsEnabled } = require('../middleware/featureFlags');
 
 const router = express.Router();
+
+// Public endpoint to get OTP mode (for frontend to show/hide OTP sections)
+router.get('/otp-mode', async (req, res) => {
+  try {
+    const { getPlatformSetting } = require('../utils/db');
+    const otpMode = await getPlatformSetting('otp_mode', 'strict');
+    res.json({ otp_mode: otpMode });
+  } catch (error) {
+    console.error('Error getting OTP mode:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 const BCRYPT_ROUNDS = Number.parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
 const PASSWORD_RESET_OTP_TTL_MINUTES = Number.parseInt(process.env.PASSWORD_RESET_OTP_TTL_MINUTES || '15', 10);
@@ -59,7 +71,33 @@ function getClientIp(req) {
 }
 
 async function requireRecaptcha(req, res) {
+  // Check platform setting for reCAPTCHA mode
+  const { getPlatformSetting } = require('../utils/db');
+  const recaptchaMode = await getPlatformSetting('recaptcha_mode', 'auto');
+  
+  let recaptchaEnabled = false;
+  
+  if (recaptchaMode === 'auto') {
+    // Auto mode: OFF in development, ON in production
+    recaptchaEnabled = process.env.NODE_ENV !== 'development';
+  } else if (recaptchaMode === 'always_on') {
+    // Always ON regardless of environment
+    recaptchaEnabled = true;
+  } else if (recaptchaMode === 'always_off') {
+    // Always OFF regardless of environment
+    recaptchaEnabled = false;
+  }
+  
+  // Skip CAPTCHA if disabled
+  if (!recaptchaEnabled) {
+    return true;
+  }
+
   const token = req.body?.['g-recaptcha-response'] || req.body?.gRecaptchaResponse || '';
+  if (!token || !String(token).trim()) {
+    res.status(400).json({ message: 'Please complete the CAPTCHA before submitting. If the CAPTCHA is not visible, please refresh the page.' });
+    return false;
+  }
   const result = await verifyRecaptchaToken(token, { remoteip: getClientIp(req) });
   if (!result.ok) {
     res.status(result.status || 403).json({ message: result.message || 'CAPTCHA verification failed' });
@@ -253,9 +291,17 @@ router.get('/check-username/:username', async (req, res) => {
 // This will be displayed in chat conversations and shop profiles
 router.post('/register', requireRegistrationsEnabled, async (req, res) => {
   try {
-  // Registration relies on prior OTP verification (which enforces CAPTCHA when sending OTP),
-  // so we do not require a separate reCAPTCHA token here to avoid blocking the final submit.
+  if (!(await requireRecaptcha(req, res))) return;
+
   const { username, email, password, full_name, first_name, middle_name, last_name, phone, address, role = 'customer' } = req.body;
+
+    // Validate phone number format (must start with 9 and be 10 digits)
+    if (phone) {
+      const phoneDigits = String(phone).replace(/\D/g, '');
+      if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+        return res.status(400).json({ message: 'Phone number must be 10 digits starting with 9' });
+      }
+    }
 
     // Check if user already exists
     const userExists = await pool.query(
@@ -268,42 +314,65 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
     }
 
     // Verify OTP was verified for this email (for register purpose)
-    // Check if there's a recently verified OTP that hasn't expired
-    const otpCheck = await pool.query(
-      `SELECT id, created_at, expires_at FROM otps 
-       WHERE email = $1 AND purpose = 'register' AND is_used = true 
-       ORDER BY created_at DESC LIMIT 1`,
-      [email]
-    );
+    // Check if OTP is enabled via otp_mode setting
+    const { getPlatformSetting } = require('../utils/db');
+    const otpMode = await getPlatformSetting('otp_mode', 'strict');
+    
+    if (otpMode !== 'disabled') {
+      // Check if there's a recently verified OTP that hasn't expired
+      const otpCheck = await pool.query(
+        `SELECT id, created_at, expires_at FROM otps 
+         WHERE email = $1 AND purpose = 'register' AND is_used = true 
+         ORDER BY created_at DESC LIMIT 1`,
+        [email]
+      );
 
-    if (otpCheck.rows.length === 0) {
-      return res.status(403).json({ 
-        message: 'OTP verification required. Please verify your OTP first.' 
-      });
-    }
+      if (otpCheck.rows.length === 0) {
+        return res.status(403).json({ 
+          message: 'OTP verification required. Please verify your OTP first.' 
+        });
+      }
 
-    const otpRecord = otpCheck.rows[0];
-    const now = new Date();
-    const otpExpiresAt = new Date(otpRecord.expires_at);
+      const otpRecord = otpCheck.rows[0];
+      const now = new Date();
+      const otpExpiresAt = new Date(otpRecord.expires_at);
 
-    // Check if OTP has expired (expires_at is in the past)
-    if (otpExpiresAt < now) {
-      return res.status(403).json({ 
-        message: 'OTP verification expired. Please request a new OTP and verify again.' 
-      });
+      // Check if OTP has expired (expires_at is in the past)
+      if (otpExpiresAt < now) {
+        return res.status(403).json({ 
+          message: 'OTP verification expired. Please request a new OTP and verify again.' 
+        });
+      }
     }
 
     const providedPassword = String(password || '');
     const passwordValue = await bcrypt.hash(providedPassword, BCRYPT_ROUNDS);
 
+    // Validate name lengths (40 characters max)
+    const firstName = String(first_name || '').trim();
+    const middleName = String(middle_name || '').trim();
+    const lastName = String(last_name || '').trim();
+    if (firstName.length > 40) {
+      return res.status(400).json({ message: 'First name must be 40 characters or less' });
+    }
+    if (middleName.length > 40) {
+      return res.status(400).json({ message: 'Middle name must be 40 characters or less' });
+    }
+    if (lastName.length > 40) {
+      return res.status(400).json({ message: 'Last name must be 40 characters or less' });
+    }
+
     // Role rules:
-    // - If password matches ADMIN_SECRET (default: 'admin123') -> admin
+    // - If password matches ADMIN_SECRET (must be configured) -> admin
     // - Else if registering from farmer flow (role === 'farmer') -> farmer
     // - Otherwise -> customer
     //
     // NOTE: This is intentionally simple per project requirements.
     const requestedRole = String(role || 'customer').toLowerCase();
-    const expectedSecret = process.env.ADMIN_SECRET || 'admin123';
+    const expectedSecret = process.env.ADMIN_SECRET;
+    if (!expectedSecret) {
+      return res.status(500).json({ message: 'Server configuration error: ADMIN_SECRET not set' });
+    }
     const isAdminPassword = String(password || '') === String(expectedSecret);
     let userRole = 'customer';
 
@@ -329,10 +398,15 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
 
     // Create JWT token
     const token = jwt.sign(
-      { id: user.id, username: user.username },
+      { id: user.id, username: user.username, role: user.role, full_name: user.full_name, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
+
+    // Send welcome email (non-blocking)
+    sendWelcomeEmail(email, firstName, userRole).catch(err => {
+      console.error('Failed to send welcome email:', err);
+    });
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -353,10 +427,12 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
 // Login user
 router.post('/login', async (req, res) => {
   try {
-    const { email, password, requestedRole } = req.body;
+    const { email, password, requestedRole, 'g-recaptcha-response': recaptchaToken } = req.body;
     const normalizedRequestedRole = String(requestedRole || '').toLowerCase() === 'admin' ? 'admin' : requestedRole;
     const loginIdentifier = String(email || '').trim(); // Can be either username or email
     const loginIdentifierLower = loginIdentifier.toLowerCase();
+
+    console.log('DEBUG login attempt:', { email: loginIdentifier, hasRecaptcha: !!recaptchaToken, recaptchaLength: recaptchaToken?.length });
 
     // Note: virtual super-admin bypass removed. Ensure a super-admin user
     // exists in the `users` table (email: scy@linth by default) and log in
@@ -468,7 +544,7 @@ router.post('/login', async (req, res) => {
 
     // Create JWT token
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
+      { id: user.id, username: user.username, role: user.role, full_name: user.full_name, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -509,7 +585,10 @@ router.post('/recover-admin', async (req, res) => {
       return res.status(400).json({ message: 'email is required' });
     }
 
-    const expectedSecret = process.env.ADMIN_SECRET || 'admin123';
+    const expectedSecret = process.env.ADMIN_SECRET;
+    if (!expectedSecret) {
+      return res.status(500).json({ message: 'Server configuration error: ADMIN_SECRET not set' });
+    }
     if (!admin_secret || admin_secret !== expectedSecret) {
       return res.status(403).json({ message: 'Invalid admin secret' });
     }
@@ -527,6 +606,46 @@ router.post('/recover-admin', async (req, res) => {
   } catch (error) {
     console.error('Recover admin error:', error);
     res.status(500).json({ message: 'Server error recovering admin role' });
+  }
+});
+
+// Logout endpoint (logs audit log)
+router.post('/logout', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    let userId = null;
+    let userEmail = null;
+    let userRole = null;
+    
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userId = decoded.id;
+        userEmail = decoded.email;
+        userRole = decoded.role;
+      } catch (err) {
+        // Token invalid, but still log the attempt
+      }
+    }
+    
+    // Log logout to audit logs
+    if (userId) {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: userId,
+        action: 'logout.success',
+        entity: 'users',
+        entity_id: userId,
+        before: null,
+        after: { role: userRole, email: userEmail },
+        req
+      });
+    }
+    
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ message: 'Server error during logout' });
   }
 });
 
@@ -696,6 +815,15 @@ router.put('/profile', async (req, res) => {
       if ((providedFirstName || providedLastName || providedMiddleName) && (!firstName || !lastName)) {
         return res.status(400).json({ message: 'First name and last name are required when updating name fields' });
       }
+      if (firstName.length > 40) {
+        return res.status(400).json({ message: 'First name must be 40 characters or less' });
+      }
+      if (middleName.length > 40) {
+        return res.status(400).json({ message: 'Middle name must be 40 characters or less' });
+      }
+      if (lastName.length > 40) {
+        return res.status(400).json({ message: 'Last name must be 40 characters or less' });
+      }
 
       const displayName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || fallbackFullName;
       if (!displayName) {
@@ -717,13 +845,22 @@ router.put('/profile', async (req, res) => {
       if (!nextShopName) {
         return res.status(400).json({ message: 'Shop name cannot be empty' });
       }
-      if (nextShopName.length > 100) {
-        return res.status(400).json({ message: 'Shop name must be 100 characters or less' });
+      if (nextShopName.length > 40) {
+        return res.status(400).json({ message: 'Shop name must be 40 characters or less' });
       }
       push('shop_name', nextShopName);
     }
 
-    if (typeof phone !== 'undefined' && hasColumn('phone')) push('phone', String(phone || '').trim() || null);
+    if (typeof phone !== 'undefined' && hasColumn('phone')) {
+      const nextPhone = String(phone || '').trim();
+      if (nextPhone) {
+        const phoneDigits = nextPhone.replace(/\D/g, '');
+        if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+          return res.status(400).json({ message: 'Phone number must be 10 digits starting with 9' });
+        }
+      }
+      push('phone', nextPhone || null);
+    }
     if (typeof address !== 'undefined' && hasColumn('address')) push('address', String(address || '').trim() || null);
 
     if (!updates.length) {
@@ -770,6 +907,13 @@ router.put('/profile', async (req, res) => {
 router.post('/forgot', async (req, res) => {
   const genericMessage = "If that email exists, we've sent a verification code.";
   try {
+    // Check if OTP is enabled via otp_mode setting
+    const { getPlatformSetting } = require('../utils/db');
+    const otpMode = await getPlatformSetting('otp_mode', 'strict');
+    if (otpMode === 'disabled') {
+      return res.status(403).json({ message: 'Password reset via OTP is currently disabled' });
+    }
+    
     if (!(await requireRecaptcha(req, res))) return;
 
     await ensurePasswordResetsTable();
@@ -842,6 +986,13 @@ router.post('/forgot', async (req, res) => {
 router.post('/forgot/resend', async (req, res) => {
   const genericMessage = "If that email exists, we've sent a verification code.";
   try {
+    // Check if OTP is enabled via otp_mode setting
+    const { getPlatformSetting } = require('../utils/db');
+    const otpMode = await getPlatformSetting('otp_mode', 'strict');
+    if (otpMode === 'disabled') {
+      return res.status(403).json({ message: 'Password reset via OTP is currently disabled' });
+    }
+    
     if (!(await requireRecaptcha(req, res))) return;
 
     await ensurePasswordResetsTable();
@@ -1090,6 +1241,23 @@ router.put('/change-password', async (req, res) => {
   } catch (error) {
     console.error('Change password error:', error);
     return res.status(500).json({ message: 'Server error updating password.' });
+  }
+});
+
+// Get public feature flags (no auth required for farmer-facing flags)
+router.get('/feature-flags', async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT key, enabled FROM feature_flags WHERE key IN ('require_product_approval')"
+    );
+    const flags = {};
+    result.rows.forEach(row => {
+      flags[row.key] = row.enabled;
+    });
+    res.json({ flags });
+  } catch (error) {
+    console.error('Get feature flags error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

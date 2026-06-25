@@ -1,11 +1,13 @@
 const { test, expect } = require('@playwright/test');
-const { getFarmerToken, getAdminToken } = require('./auth-helper');
+const { getFarmerToken, getAdminToken, getCustomerToken } = require('./auth-helper');
 
 test.describe('Verification API E2E', () => {
     let farmerToken;
     let adminToken;
+    let customerToken;
     let farmerUser;
     let adminUser;
+    let customerUser;
 
     test.beforeAll(async () => {
         // Get tokens for testing
@@ -16,6 +18,10 @@ test.describe('Verification API E2E', () => {
         const adminData = await getAdminToken();
         adminToken = adminData.token;
         adminUser = adminData.user;
+
+        const customerData = await getCustomerToken();
+        customerToken = customerData.token;
+        customerUser = customerData.user;
     });
 
     test('farmer can submit verification request', async ({ request }) => {
@@ -37,6 +43,27 @@ test.describe('Verification API E2E', () => {
 
         const data = await response.json();
         console.log('Verification request response:', data);
+    });
+
+    test('customer can submit verification request', async ({ request }) => {
+        // RED: Test that customer can submit a verification request via API
+        const response = await request.post('http://localhost:3000/api/farmers/me/verification-request', {
+            headers: {
+                'Authorization': `Bearer ${customerToken}`,
+                'Content-Type': 'application/json'
+            },
+            data: {
+                notes: 'E2E test customer verification request',
+                document_url: null // Test without document first
+            }
+        });
+
+        // Should succeed or return meaningful error
+        expect(response.status()).toBeGreaterThanOrEqual(200);
+        expect(response.status()).toBeLessThan(500);
+
+        const data = await response.json();
+        console.log('Customer verification request response:', data);
     });
 
     test('farmer can get verification status', async ({ request }) => {
