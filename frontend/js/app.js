@@ -4614,20 +4614,27 @@ class AgricultureMarket {
                 localStorage.removeItem('last_otp_email');
                 this.clearAuthForm();
                 this.closeAuthFlow();
+
+                // Show loading screen
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.classList.remove('hidden');
+                }
+
                 // Redirect based on created role
                 const role = data.user?.role || 'customer';
                 if (role === 'admin' || role === 'super_admin') {
                     this.showMessage('Admin registration successful! Redirecting...', 'success');
                     setTimeout(() => {
                         window.location.href = '/admin.html';
-                    }, 800);
+                    }, 2000);
                     return;
                 }
                 if (role === 'farmer') {
                     this.showMessage('Farmer registration successful! Redirecting...', 'success');
                     setTimeout(() => {
                         window.location.href = '/farmer.html';
-                    }, 800);
+                    }, 2000);
                     return;
                 }
 
@@ -4638,7 +4645,7 @@ class AgricultureMarket {
                 if (this.returnUrl) {
                     setTimeout(() => {
                         window.location.href = this.returnUrl;
-                    }, 1000);
+                    }, 2000);
                 }
             } else {
                 this.setButtonLoading('register-submit-btn', false);
