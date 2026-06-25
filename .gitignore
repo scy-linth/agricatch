@@ -48,6 +48,8 @@ build/
 *.temp
 *.bak
 *.backup
+.tmp.drivedownload/
+.tmp.driveupload/
 
 # Sensitive documentation
 LOGIN_CREDENTIALS.md
