@@ -291,8 +291,6 @@ router.get('/check-username/:username', async (req, res) => {
 // This will be displayed in chat conversations and shop profiles
 router.post('/register', requireRegistrationsEnabled, async (req, res) => {
   try {
-  if (!(await requireRecaptcha(req, res))) return;
-
   const { username, email, password, full_name, first_name, middle_name, last_name, phone, address, role = 'customer' } = req.body;
 
     // Validate phone number format (must start with 9 and be 10 digits)
