@@ -317,19 +317,19 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
     // Check if OTP is enabled via otp_mode setting
     const { getPlatformSetting } = require('../utils/db');
     const otpMode = await getPlatformSetting('otp_mode', 'strict');
-    
+
     if (otpMode !== 'disabled') {
       // Check if there's a recently verified OTP that hasn't expired
       const otpCheck = await pool.query(
-        `SELECT id, created_at, expires_at FROM otps 
-         WHERE email = $1 AND purpose = 'register' AND is_used = true 
+        `SELECT id, created_at, expires_at FROM otps
+         WHERE email = $1 AND purpose = 'register' AND is_used = true
          ORDER BY created_at DESC LIMIT 1`,
         [email]
       );
 
       if (otpCheck.rows.length === 0) {
-        return res.status(403).json({ 
-          message: 'OTP verification required. Please verify your OTP first.' 
+        return res.status(403).json({
+          message: 'OTP verification required. Please verify your OTP first.'
         });
       }
 
@@ -337,10 +337,16 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
       const now = new Date();
       const otpExpiresAt = new Date(otpRecord.expires_at);
 
-      // Check if OTP has expired (expires_at is in the past)
-      if (otpExpiresAt < now) {
-        return res.status(403).json({ 
-          message: 'OTP verification expired. Please request a new OTP and verify again.' 
+      // In development, use 30 minutes expiration for easier testing
+      // In production, use the original 10 minutes
+      const isDev = process.env.NODE_ENV === 'development';
+      const expirationMinutes = isDev ? 30 : 10;
+      const effectiveExpiresAt = new Date(otpRecord.created_at.getTime() + expirationMinutes * 60 * 1000);
+
+      // Check if OTP has expired
+      if (effectiveExpiresAt < now) {
+        return res.status(403).json({
+          message: `OTP verification expired. Please request a new OTP and verify again. (Expires after ${expirationMinutes} minutes)`
         });
       }
     }

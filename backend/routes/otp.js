@@ -20,10 +20,10 @@ async function shouldExposeOtpForDebug() {
 
 async function getOtpBypassCode() {
   const { getPlatformSetting } = require('../utils/db');
-  // Bypass code only works in testing mode
+  // Bypass code works in all modes for easier testing
   const otpMode = await getPlatformSetting('otp_mode', 'strict');
-  if (otpMode !== 'testing') {
-    return null; // No bypass code in strict or disabled mode
+  if (otpMode === 'disabled') {
+    return null; // No bypass code if OTP is completely disabled
   }
   return await getPlatformSetting('otp_bypass_code', '789878');
 }

@@ -98,6 +98,8 @@ class AdminDashboard {
                 this.rejectProduct(Number(btn.dataset.productId));
             } else if (btn.matches('.flagged-unflag-btn')) {
                 this.unflagUser(Number(btn.dataset.userId));
+            } else if (btn.matches('.debug-mode-toggle')) {
+                this.toggleDebugMode(Number(btn.dataset.userId), btn.checked);
             }
         }, true);
     }
@@ -3127,6 +3129,17 @@ class AdminDashboard {
             const statusBadge = isSuperAdmin ? '' : this.renderStatus(isDisabled ? 'Disabled' : 'Active', isDisabled ? 'disabled' : 'active');
             const verificationBadge = this.renderStatus(isVerified ? 'Verified' : 'Unverified', isVerified ? 'verified' : 'unverified');
 
+            let debugToggle = '';
+            if (this.currentUserRole === 'super_admin') {
+                debugToggle = `
+                    <div class="form-check form-switch mb-0" style="transform: scale(0.85); transform-origin: left center;">
+                        <input class="form-check-input debug-mode-toggle" type="checkbox" 
+                               data-user-id="${user.id}" 
+                               ${user.is_debug_account ? 'checked' : ''}>
+                    </div>
+                `;
+            }
+
             const actions = `<button class="btn btn-sm py-0 px-2 btn-ac-green all-users-view-btn" data-user-id="${user.id}">View</button>`;
 
             return `
@@ -3146,13 +3159,14 @@ class AdminDashboard {
                             ${statusBadge}
                         </div>
                     </td>
+                    <td class="text-center">${debugToggle}</td>
                     <td class="text-muted">${user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                     <td>${actions}</td>
                 </tr>
             `;
         }).join('');
 
-        this.refreshSortableTable('all-users-table', { columns: [{ select: 8, sortable: false }] });
+        this.refreshSortableTable('all-users-table', { columns: [{ select: 9, sortable: false }] });
     }
 
     applyAllUsersFilter() {
@@ -3410,6 +3424,36 @@ class AdminDashboard {
         } catch (error) {
             console.error('Error unflagging user:', error);
             this.showMessage('Failed to unflag user', 'error');
+        }
+    }
+
+    async toggleDebugMode(userId, enabled) {
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/users/${userId}/debug-mode`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ enabled })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.showMessage(`Debug mode ${enabled ? 'enabled' : 'disabled'} for user`, 'success');
+                // Refresh the users list to show updated state
+                this.loadAllUsers();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to toggle debug mode', 'error');
+                // Revert checkbox on failure
+                this.loadAllUsers();
+            }
+        } catch (error) {
+            console.error('Error toggling debug mode:', error);
+            this.showMessage('Failed to toggle debug mode', 'error');
+            // Revert checkbox on failure
+            this.loadAllUsers();
         }
     }
 

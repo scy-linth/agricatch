@@ -1,6 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { pool } = require('../utils/db');
+const { pool, clearSettingsCache } = require('../utils/db');
 const { writeAdminAuditLog } = require('../utils/auditLog');
 const { broadcastEvent } = require('../utils/realtime');
 const requireRole = require('../middleware/requireRole');
@@ -604,10 +604,56 @@ router.put('/settings', requireSuperAdmin, async (req, res) => {
     });
     broadcastEvent('admin.audit', { action: 'settings.update', entity: 'platform_settings', actor_admin_id: req.user.id });
 
+    // Clear settings cache so changes take effect immediately
+    clearSettingsCache();
+
     res.json({ message: 'Settings updated' });
   } catch (err) {
     console.error('Superadmin update settings error:', err);
     res.status(500).json({ message: 'Server error updating settings' });
+  }
+});
+
+// ── PUT /api/superadmin/users/:id/debug-mode ─────────────────────────────────────
+// Toggle debug mode for a user (superadmin only)
+router.put('/users/:id/debug-mode', requireSuperAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    const { enabled } = req.body;
+
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled must be a boolean' });
+    }
+
+    // Check if user exists
+    const userCheck = await pool.query('SELECT id, email, is_debug_account FROM users WHERE id = $1', [userId]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const before = { is_debug_account: userCheck.rows[0].is_debug_account };
+
+    // Update debug mode
+    await pool.query('UPDATE users SET is_debug_account = $1 WHERE id = $2', [enabled, userId]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'user.debug_mode_toggle',
+      entity: 'users',
+      entity_id: userId,
+      before,
+      after: { is_debug_account: enabled },
+      req
+    });
+
+    res.json({ message: 'Debug mode updated', is_debug_account: enabled });
+  } catch (err) {
+    console.error('Toggle debug mode error:', err);
+    res.status(500).json({ message: 'Server error updating debug mode' });
   }
 });
 

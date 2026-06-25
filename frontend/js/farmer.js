@@ -15,6 +15,8 @@ class FarmerDashboard {
             localStorage.removeItem('token');
         }
         this.userId = this.getUserId();
+        this.isDebugAccount = false;
+        this.debugUserInfo = null;
         this.lastOrdersById = new Map();
         this.lastOrdersByStatus = { pending: [], preorder_reserved: [], confirmed: [], preparing: [], scheduled: [], out_for_delivery: [], delivered: [], cancelled: [] };
         this.ordersCountByStatus = { pending: 0, preorder_reserved: 0, confirmed: 0, preparing: 0, scheduled: 0, out_for_delivery: 0, delivered: 0, cancelled: 0 };
@@ -532,6 +534,7 @@ class FarmerDashboard {
         };
         this.showDeniedBanner();
         await this.checkFarmerAuth();
+        await this.checkDebugMode();
         await this.loadVerificationStatus();
         await this.loadPlatformSettings();
         this.setupEventListeners();
@@ -601,12 +604,13 @@ class FarmerDashboard {
     }
 
     async openAddProductModal() {
+        this.debugLog('Modal Open', { modal: 'add-product-modal' });
         const modal = document.getElementById('add-product-modal');
         if (!modal) return;
-        
+
         // Reload platform settings to get latest limits
         await this.loadPlatformSettings();
-        
+
         modal.classList.add('open');
         document.documentElement.classList.add('modal-open');
         document.body.classList.add('modal-open');
@@ -647,6 +651,7 @@ class FarmerDashboard {
     }
 
     async openAddAvailableModal() {
+        this.debugLog('Modal Open', { modal: 'add-available-modal' });
         const modal = document.getElementById('add-available-modal');
         if (!modal) return;
         
@@ -691,6 +696,7 @@ class FarmerDashboard {
     }
 
     closeAddAvailableModal() {
+        this.debugLog('Modal Close', { modal: 'add-available-modal' });
         const modal = document.getElementById('add-available-modal');
         if (!modal) return;
         modal.classList.remove('open');
@@ -699,6 +705,7 @@ class FarmerDashboard {
     }
 
     async openAddPreorderModal() {
+        this.debugLog('Modal Open', { modal: 'add-preorder-modal' });
         const modal = document.getElementById('add-preorder-modal');
         if (!modal) return;
         
@@ -743,6 +750,7 @@ class FarmerDashboard {
     }
 
     closeAddPreorderModal() {
+        this.debugLog('Modal Close', { modal: 'add-preorder-modal' });
         const modal = document.getElementById('add-preorder-modal');
         if (!modal) return;
         modal.classList.remove('open');
@@ -780,6 +788,7 @@ class FarmerDashboard {
     }
 
     closeAddProductModal(forceClose = false) {
+        this.debugLog('Modal Close', { modal: 'add-product-modal', forceClose });
         if (this.isSubmittingAddProduct && !forceClose) {
             return;
         }
@@ -817,6 +826,7 @@ class FarmerDashboard {
                     notes
                 })
             });
+            this.debugLog('API Call', { method: 'POST', endpoint: '/products/category-requests', action: 'submit_category_request', name });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
                 this.showMessage(data.message || 'Unable to submit request', 'error');
@@ -840,6 +850,7 @@ class FarmerDashboard {
     }
 
     async loadRequestHistory() {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/products/requests/mine', action: 'load_request_history' });
         try {
             const res = await fetch(`${this.apiBase}/products/requests/mine`, {
                 headers: { Authorization: `Bearer ${this.token}` }
@@ -885,6 +896,7 @@ class FarmerDashboard {
     }
 
     async loadRequestsTable() {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/products/product-requests/mine', action: 'load_requests_table' });
         try {
             const res = await fetch(`${this.apiBase}/products/product-requests/mine`, {
                 headers: { Authorization: `Bearer ${this.token}` }
@@ -971,6 +983,7 @@ class FarmerDashboard {
             `;
 
             if (requestType === 'product_request') {
+                this.debugLog('API Call', { method: 'GET', endpoint: `/products/${requestId}`, action: 'load_request_details', requestId });
                 const res = await fetch(`${this.apiBase}/products/${requestId}`, {
                     headers: { 'Authorization': `Bearer ${this.token}` }
                 });
@@ -1045,6 +1058,7 @@ class FarmerDashboard {
     }
 
     async resubmitProductRequest(productId) {
+        this.debugLog('API Call', { method: 'GET', endpoint: `/products/${productId}`, action: 'resubmit_product_request', productId });
         try {
             // Fetch the rejected product details
             const res = await fetch(`${this.apiBase}/products/${productId}`, {
@@ -1226,6 +1240,32 @@ class FarmerDashboard {
         }
     }
 
+    async checkDebugMode() {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/auth/me', action: 'check_debug_mode' });
+        try {
+            if (!this.userId) return;
+            const response = await fetch(`${this.apiBase}/auth/me`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                this.isDebugAccount = !!data.is_debug_account;
+                this.debugUserInfo = data;
+                if (this.isDebugAccount) {
+                    console.log('[DEBUG FARMER] Debug mode enabled for user:', data.email);
+                }
+            }
+        } catch (error) {
+            console.error('Error checking debug mode:', error);
+        }
+    }
+
+    debugLog(action, data = {}) {
+        if (this.isDebugAccount) {
+            console.log(`[DEBUG FARMER] ${action}`, data);
+        }
+    }
+
     showDeniedBanner() {
         try {
             const params = new URLSearchParams(window.location.search);
@@ -1286,6 +1326,7 @@ class FarmerDashboard {
     }
 
     async checkFarmerAuth() {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/auth/profile', action: 'check_farmer_auth' });
         try {
             const attemptedBase = this.apiBase;
             const response = await fetch(`${this.apiBase}/auth/profile`, {
@@ -1440,6 +1481,7 @@ class FarmerDashboard {
 
         // Pre-order checkbox toggle for add product form
         document.getElementById('is-preorder')?.addEventListener('change', (e) => {
+            this.debugLog('Dropdown Change', { element: 'is-preorder', value: e.target.checked });
             const preorderFields = document.getElementById('preorder-fields');
             if (preorderFields) {
                 preorderFields.style.display = e.target.checked ? 'block' : 'none';
@@ -1448,6 +1490,7 @@ class FarmerDashboard {
 
         // Pre-order checkbox toggle for edit product form
         document.getElementById('edit-is-preorder')?.addEventListener('change', (e) => {
+            this.debugLog('Dropdown Change', { element: 'edit-is-preorder', value: e.target.checked });
             const preorderFields = document.getElementById('edit-preorder-fields');
             if (preorderFields) {
                 preorderFields.style.display = e.target.checked ? 'block' : 'none';
@@ -1553,6 +1596,7 @@ class FarmerDashboard {
             const harvestBtn = e.target.closest('.btn-action-harvest');
             if (harvestBtn) {
                 const productId = harvestBtn.dataset.productId;
+                this.debugLog('Button Click', { action: 'harvest', productId });
                 if (productId) {
                     document.getElementById('confirm-harvest-btn').dataset.productId = productId;
                     document.getElementById('harvest-confirm-modal').classList.add('open');
@@ -1564,6 +1608,7 @@ class FarmerDashboard {
             const convertBtn = e.target.closest('.btn-action-convert');
             if (convertBtn) {
                 const productId = convertBtn.dataset.productId;
+                this.debugLog('Button Click', { action: 'convert', productId });
                 if (productId) {
                     document.getElementById('confirm-convert-btn').dataset.productId = productId;
                     document.getElementById('convert-confirm-modal').classList.add('open');
@@ -1753,6 +1798,7 @@ class FarmerDashboard {
         });
 
         document.getElementById('support-tickets-entries')?.addEventListener('change', (e) => {
+            this.debugLog('Dropdown Change', { element: 'support-tickets-entries', value: e.target.value });
             this.supportTicketsPerPage = parseInt(e.target.value);
             this.supportTicketsCurrentPage = 1;
             this.loadSupportTickets();
@@ -1796,7 +1842,8 @@ class FarmerDashboard {
         });
 
         // Requests status filter
-        document.getElementById('request-status-filter')?.addEventListener('change', () => {
+        document.getElementById('request-status-filter')?.addEventListener('change', (e) => {
+            this.debugLog('Dropdown Change', { element: 'request-status-filter', value: e.target.value });
             this.filterRequests();
         });
 
@@ -1811,7 +1858,8 @@ class FarmerDashboard {
         });
 
         // Approval category filter
-        document.getElementById('approval-category-filter')?.addEventListener('change', () => {
+        document.getElementById('approval-category-filter')?.addEventListener('change', (e) => {
+            this.debugLog('Dropdown Change', { element: 'approval-category-filter', value: e.target.value });
             this.filterRequests();
         });
 
@@ -2144,7 +2192,8 @@ class FarmerDashboard {
 
         // Entries-per-page change handlers
         document.querySelectorAll('select[data-entries-section]').forEach(sel => {
-            sel.addEventListener('change', () => {
+            sel.addEventListener('change', (e) => {
+                this.debugLog('Dropdown Change', { element: e.target.id, value: e.target.value, section: sel.dataset.entriesSection });
                 const section = sel.dataset.entriesSection;
                 const pg = this.pagination[section];
                 if (pg) {
@@ -2160,8 +2209,12 @@ class FarmerDashboard {
         });
 
         // Tab switching
-        document.getElementById('list-products-tab')?.addEventListener('click', () => this.switchTab('list-products'));
+        document.getElementById('list-products-tab')?.addEventListener('click', () => {
+            this.debugLog('Tab Click', { tab: 'list-products' });
+            this.switchTab('list-products');
+        });
         document.getElementById('add-product-tab')?.addEventListener('click', () => {
+            this.debugLog('Button Click', { action: 'open_add_product_modal' });
             if (!this.isVerified()) {
                 this.showMessage('Please verify your account before adding products.', 'error');
                 return;
@@ -2305,8 +2358,14 @@ class FarmerDashboard {
         document.getElementById('btn-submit-subscription')?.addEventListener('click', () => this.submitSubscriptionRequest());
 
         // Available products filters
-        document.getElementById('available-category-filter')?.addEventListener('change', () => this.filterAvailableProducts());
-        document.getElementById('available-status-filter')?.addEventListener('change', () => this.filterAvailableProducts());
+        document.getElementById('available-category-filter')?.addEventListener('change', (e) => {
+            this.debugLog('Dropdown Change', { element: 'available-category-filter', value: e.target.value });
+            this.filterAvailableProducts();
+        });
+        document.getElementById('available-status-filter')?.addEventListener('change', (e) => {
+            this.debugLog('Dropdown Change', { element: 'available-status-filter', value: e.target.value });
+            this.filterAvailableProducts();
+        });
         document.getElementById('available-search-btn')?.addEventListener('click', () => this.filterAvailableProducts());
         document.getElementById('available-refresh-btn')?.addEventListener('click', () => this.loadMyProducts());
         
@@ -2321,8 +2380,14 @@ class FarmerDashboard {
         }
         
         // Preorder products filters
-        document.getElementById('preorder-category-filter')?.addEventListener('change', () => this.filterPreorderProducts());
-        document.getElementById('preorder-status-filter')?.addEventListener('change', () => this.filterPreorderProducts());
+        document.getElementById('preorder-category-filter')?.addEventListener('change', (e) => {
+            this.debugLog('Dropdown Change', { element: 'preorder-category-filter', value: e.target.value });
+            this.filterPreorderProducts();
+        });
+        document.getElementById('preorder-status-filter')?.addEventListener('change', (e) => {
+            this.debugLog('Dropdown Change', { element: 'preorder-status-filter', value: e.target.value });
+            this.filterPreorderProducts();
+        });
         document.getElementById('preorder-search-btn')?.addEventListener('click', () => this.filterPreorderProducts());
         document.getElementById('preorder-refresh-btn')?.addEventListener('click', () => this.loadMyProducts());
         
@@ -2539,6 +2604,7 @@ class FarmerDashboard {
             const editBtn = e.target.closest('.btn-action-edit');
             if (editBtn) {
                 const productId = Number(editBtn.getAttribute('data-product-id'));
+                this.debugLog('Button Click', { action: 'edit_product', productId });
                 if (productId && !isNaN(productId)) {
                     this.editProduct(productId);
                 }
@@ -2617,6 +2683,7 @@ class FarmerDashboard {
     }
 
     async loadProductCatalogNames(categoryId = null) {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/products/catalog/names', action: 'load_catalog_names', categoryId });
         try {
             const fetchNames = async (targetCategoryId = null, retryOn404 = true) => {
                 const params = new URLSearchParams();
@@ -2647,6 +2714,7 @@ class FarmerDashboard {
     }
 
     async loadFeatureFlags() {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/auth/feature-flags', action: 'load_feature_flags' });
         try {
             const response = await fetch(`${this.apiBase}/auth/feature-flags`);
             if (response.ok) {
@@ -2993,6 +3061,7 @@ class FarmerDashboard {
     }
 
     async loadCategories() {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/products/categories', action: 'load_categories' });
         try {
             const response = await fetch(`${this.apiBase}/products/categories`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -3258,6 +3327,7 @@ class FarmerDashboard {
         }
 
         try {
+            this.debugLog('API Call', { method: 'POST', endpoint: '/products/category-requests', action: 'submit_category_request', categoryId, name });
             const response = await fetch(`${this.apiBase}/products/category-requests`, {
                 method: 'POST',
                 headers: {
@@ -3325,6 +3395,7 @@ class FarmerDashboard {
             if (categoryId) params.set('category_id', categoryId);
             if (unit) params.set('unit', unit);
 
+            this.debugLog('API Call', { method: 'GET', endpoint: '/products/pricing/suggestion', action: 'get_price_suggestion', name, categoryId, unit });
             const response = await fetch(`${this.apiBase}/products/pricing/suggestion?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
@@ -3533,6 +3604,7 @@ class FarmerDashboard {
         }
 
         this.activeSection = safeSection;
+        this.debugLog('Navigation', { from: this.activeSection, to: safeSection });
         // Save current section to localStorage
         localStorage.setItem('farmerActiveSection', safeSection);
 
@@ -3755,6 +3827,7 @@ class FarmerDashboard {
             if (!skipProducts) {
                 if (!this.farmerId) return;
                 // Load my products count
+                this.debugLog('API Call', { method: 'GET', endpoint: `/products/farmer/${this.farmerId}`, action: 'load_farmer_stats' });
                 const productsResponse = await fetch(`${this.apiBase}/products/farmer/${this.farmerId}`, {
                     headers: {
                         'Authorization': `Bearer ${this.token}`
@@ -3828,6 +3901,7 @@ class FarmerDashboard {
     }
 
     async loadShopProfile() {
+        this.debugLog('API Call', { method: 'GET', endpoint: `/farmers/${this.farmerId}/profile`, action: 'load_shop_profile' });
         try {
             const response = await fetch(`${this.apiBase}/farmers/${this.farmerId}/profile`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -3923,6 +3997,7 @@ class FarmerDashboard {
     }
 
     async loadProfile() {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/auth/profile', action: 'load_profile' });
         try {
             const response = await fetch(`${this.apiBase}/auth/profile`, {
                 method: 'GET',
@@ -4024,6 +4099,7 @@ class FarmerDashboard {
 
     // ── Subscription Methods ─────────────────────────────────────────────────
     async loadSubscription() {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/subscriptions/farmers/me/subscription', action: 'load_subscription' });
         try {
             const [subRes, userRes] = await Promise.all([
                 fetch(`${this.apiBase}/subscriptions/farmers/me/subscription`, {
@@ -4052,6 +4128,7 @@ class FarmerDashboard {
     }
 
     async loadSubscriptionHistory() {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/subscriptions/farmers/me/subscription/history', action: 'load_subscription_history' });
         try {
             const res = await fetch(`${this.apiBase}/subscriptions/farmers/me/subscription/history`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -4134,6 +4211,7 @@ class FarmerDashboard {
     }
 
     async showSubscriptionDetails(subscriptionId) {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/subscriptions/farmers/me/subscription/history', action: 'show_subscription_details', subscriptionId });
         try {
             const res = await fetch(`${this.apiBase}/subscriptions/farmers/me/subscription/history`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -4428,6 +4506,7 @@ class FarmerDashboard {
         formData.append('expected_amount', document.getElementById('sub-amount-total').dataset.amount || '');
 
         try {
+            this.debugLog('API Call', { method: 'POST', endpoint: '/subscriptions/farmers/me/subscription/request', action: 'submit_subscription_request' });
             const res = await fetch(`${this.apiBase}/subscriptions/farmers/me/subscription/request`, {
                 method: 'POST', headers: { 'Authorization': `Bearer ${this.token}` }, body: formData
             });
@@ -4490,6 +4569,7 @@ class FarmerDashboard {
         btnText.textContent = 'Saving...';
 
         try {
+            this.debugLog('API Call', { method: 'PUT', endpoint: '/auth/profile', action: 'update_profile' });
             const response = await fetch(`${this.apiBase}/auth/profile`, {
                 method: 'PUT',
                 headers: {
@@ -4550,6 +4630,7 @@ class FarmerDashboard {
         errorEl.classList.add('d-none');
 
         try {
+            this.debugLog('API Call', { method: 'POST', endpoint: '/auth/change-password', action: 'change_password' });
             const response = await fetch(`${this.apiBase}/auth/change-password`, {
                 method: 'POST',
                 headers: {
@@ -5269,6 +5350,7 @@ class FarmerDashboard {
         }
 
         try {
+            this.debugLog('API Call', { method: 'PUT', endpoint: '/farmers/profile', action: 'update_profile', payload });
             const response = await fetch(`${this.apiBase}/farmers/profile`, {
                 method: 'PUT',
                 headers: {
@@ -5343,6 +5425,7 @@ class FarmerDashboard {
     async loadMyProducts() {
         try {
             if (!this.farmerId) return;
+            this.debugLog('API Call', { method: 'GET', endpoint: `/products/farmer/${this.farmerId}`, action: 'load_my_products' });
             const response = await fetch(`${this.apiBase}/products/farmer/${this.farmerId}`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
@@ -5948,6 +6031,7 @@ class FarmerDashboard {
                 return;
             }
 
+            this.debugLog('API Call', { method: 'GET', endpoint: '/farmers/me/report', action: 'load_reports_chart', period });
             const res = await fetch(`${this.apiBase}/farmers/me/report?period=${period}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
@@ -6138,6 +6222,7 @@ class FarmerDashboard {
     }
 
     async loadRecentOrders(period) {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/farmers/me/metrics', action: 'load_recent_orders', period });
         try {
             const response = await fetch(`${this.apiBase}/farmers/me/metrics?range=${period}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -6166,6 +6251,7 @@ class FarmerDashboard {
     }
 
     async loadTopProducts(period) {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/farmers/me/metrics', action: 'load_top_products', period });
         try {
             const response = await fetch(`${this.apiBase}/farmers/me/metrics?range=${period}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -7084,6 +7170,7 @@ class FarmerDashboard {
     }
 
     async handleAddAvailable(e) {
+        this.debugLog('Form Submit', { form: 'add-available-form' });
         e.preventDefault();
 
         if (this.isSubmittingAddProduct) {
@@ -7183,6 +7270,7 @@ class FarmerDashboard {
     }
 
     async handleAddPreorder(e) {
+        this.debugLog('Form Submit', { form: 'add-preorder-form' });
         e.preventDefault();
 
         if (this.isSubmittingAddProduct) {
@@ -7289,6 +7377,7 @@ class FarmerDashboard {
 
 
     async handleEditProduct(e) {
+        this.debugLog('Form Submit', { form: 'edit-product-form' });
         e.preventDefault();
 
         if (this.isSubmittingEditProduct) {
@@ -7513,6 +7602,7 @@ class FarmerDashboard {
     }
 
     async handleHarvestFulfill(productId, quantity) {
+        this.debugLog('API Call', { method: 'POST', endpoint: `/products/${productId}/convert-preorders`, action: 'harvest_fulfill', productId, quantity });
         try {
             const response = await fetch(`${this.apiBase}/products/${productId}/convert-preorders`, {
                 method: 'POST',
@@ -7711,6 +7801,8 @@ class FarmerDashboard {
     }
 
     async editProduct(productId) {
+        this.debugLog('Modal Open', { modal: 'edit-product-modal', productId });
+        this.debugLog('API Call', { method: 'GET', endpoint: `/products/${productId}`, action: 'load_product_for_edit', productId });
         try {
             const response = await fetch(`${this.apiBase}/products/${productId}`, {
                 headers: {
@@ -7996,6 +8088,7 @@ class FarmerDashboard {
     }
 
     closeEditModal(forceClose = false) {
+        this.debugLog('Modal Close', { modal: 'edit-product-modal', forceClose });
         if (this.isSubmittingEditProduct && !forceClose) {
             return;
         }
@@ -8033,6 +8126,7 @@ class FarmerDashboard {
     }
 
     switchTab(tabName) {
+        this.debugLog('Tab Switch', { tab: tabName });
         // Product tabs only (avoid touching order tabs)
         document.querySelectorAll('[data-tab-scope="products"].tab-content').forEach(content => content.classList.remove('active'));
         document.querySelectorAll('.product-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -8469,6 +8563,7 @@ class FarmerDashboard {
         }
 
         try {
+            this.debugLog('API Call', { method: 'PUT', endpoint: '/auth/change-password', action: 'change_password' });
             const response = await fetch(`${this.apiBase}/auth/change-password`, {
                 method: 'PUT',
                 headers: {
@@ -8518,6 +8613,7 @@ class FarmerDashboard {
     }
 
     async loadOrdersByStatus(status) {
+        this.debugLog('API Call', { method: 'GET', endpoint: `/orders/farmer/${this.farmerId}`, action: 'load_orders_by_status', status });
         try {
             if (!this.farmerId) return;
             const response = await fetch(`${this.apiBase}/orders/farmer/${this.farmerId}?status=${status}&t=${Date.now()}`, {
@@ -8645,6 +8741,7 @@ class FarmerDashboard {
     }
 
     switchOrderTab(status, skipLoad = false) {
+        this.debugLog('Order Tab Switch', { status, skipLoad });
         const ordersEl = document.getElementById('orders');
         const scope = ordersEl || document;
         this.activeOrderStatus = status;
@@ -9288,6 +9385,7 @@ class FarmerDashboard {
                 },
                 body: JSON.stringify({ status: newStatus, note })
             });
+            this.debugLog('API Call', { method: 'PUT', endpoint: `/orders/${orderId}/items/${actualOrderItemId}/status`, action: 'update_order_item_status', orderId, orderItemId, newStatus });
 
             if (response.ok) {
                 this.showMessage(`Pre-order status updated to ${newStatus}!`, 'success');
@@ -9325,6 +9423,7 @@ class FarmerDashboard {
     async rateCustomerForOrder(orderId) {
         if (!orderId) return;
 
+        this.debugLog('API Call', { method: 'GET', endpoint: `/orders/${orderId}/customer-rating/eligibility`, action: 'check_rating_eligibility', orderId });
         try {
             const eligibilityRes = await fetch(`${this.apiBase}/orders/${orderId}/customer-rating/eligibility`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -9433,6 +9532,7 @@ class FarmerDashboard {
         }
         
         try {
+            this.debugLog('API Call', { method: 'PUT', endpoint: `/orders/${this.currentScheduleOrderId}/delivery-date`, action: 'schedule_delivery', orderId: this.currentScheduleOrderId, deliveryDate });
             const response = await fetch(`${this.apiBase}/orders/${this.currentScheduleOrderId}/delivery-date`, {
                 method: 'PUT',
                 headers: {
@@ -9510,6 +9610,7 @@ class FarmerDashboard {
             }
 
             const method = this.customerRatingDraft.hasExisting ? 'PUT' : 'POST';
+            this.debugLog('API Call', { method, endpoint: `/orders/${orderId}/customer-rating`, action: 'submit_customer_rating', orderId, rating });
             const response = await fetch(`${this.apiBase}/orders/${orderId}/customer-rating`, {
                 method,
                 headers: {
@@ -9722,6 +9823,7 @@ class FarmerDashboard {
     }
 
     async loadVerificationStatus() {
+        this.debugLog('API Call', { method: 'GET', endpoint: '/farmers/me/verification-request', action: 'load_verification_status' });
         try {
             const response = await fetch(`${this.apiBase}/farmers/me/verification-request`, {
                 headers: {

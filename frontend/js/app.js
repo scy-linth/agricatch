@@ -88,6 +88,8 @@ class AgricultureMarket {
         this.recaptchaWidgetIds = { authLogin: null, authRegister: null, forgot: null };
         this.messagesPollInterval = null;
         this.otpMode = 'strict'; // Default to strict mode
+        this.isDebugAccount = false;
+        this.debugUserInfo = null;
 
         try { window.agriCatchApp = this; } catch (e) {}
 
@@ -145,6 +147,32 @@ class AgricultureMarket {
             }
         } catch (error) {
             console.error('Error fetching OTP mode:', error);
+        }
+    }
+
+    async checkDebugMode() {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            const response = await fetch(`${this.apiBase}/auth/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                this.isDebugAccount = !!data.is_debug_account;
+                this.debugUserInfo = data;
+                if (this.isDebugAccount) {
+                    console.log('[DEBUG LANDING] Debug mode enabled for user:', data.email);
+                }
+            }
+        } catch (error) {
+            console.error('Error checking debug mode:', error);
+        }
+    }
+
+    debugLog(action, data = {}) {
+        if (this.isDebugAccount) {
+            console.log(`[DEBUG LANDING] ${action}`, data);
         }
     }
 
@@ -394,6 +422,9 @@ class AgricultureMarket {
     init() {
         try {
             console.log('AgriCatch app initialized');
+
+            // Check debug mode
+            this.checkDebugMode();
 
             // Fetch OTP mode from backend
             this.fetchOtpMode();
@@ -994,11 +1025,17 @@ class AgricultureMarket {
         // Auth modals
         const loginBtn = document.getElementById('login-btn');
         if (loginBtn) {
-            loginBtn.addEventListener('click', () => this.openAuthFlow({ mode: 'login' }));
+            loginBtn.addEventListener('click', () => {
+                this.debugLog('Button Click', { action: 'open_login_modal' });
+                this.openAuthFlow({ mode: 'login' });
+            });
         }
         const registerBtn = document.getElementById('register-btn');
         if (registerBtn) {
-            registerBtn.addEventListener('click', () => this.openAuthFlow({ mode: 'register' }));
+            registerBtn.addEventListener('click', () => {
+                this.debugLog('Button Click', { action: 'open_register_modal' });
+                this.openAuthFlow({ mode: 'register' });
+            });
         }
         const superAdminPanelBtn = document.getElementById('super-admin-panel-btn');
         if (superAdminPanelBtn) {
@@ -3610,16 +3647,16 @@ class AgricultureMarket {
                 if (userRole === 'super_admin' || userRole === 'admin') {
                     setTimeout(() => {
                         window.location.href = '/admin.html';
-                    }, 1000);
+                    }, 2000);
                 } else if (userRole === 'farmer') {
                     setTimeout(() => {
                         window.location.href = '/farmer.html';
-                    }, 1000);
+                    }, 2000);
                 } else {
                     // Customer or unknown role: refresh page to show loading screen
                     setTimeout(() => {
                         window.location.reload();
-                    }, 1000);
+                    }, 2000);
                 }
 
                 return;
@@ -4530,22 +4567,7 @@ class AgricultureMarket {
         // Ensure reCAPTCHA widgets are attempted to render (OTP step already enforces CAPTCHA).
         try { this.renderRecaptchaWidgets('register'); } catch (err) { /* noop */ }
 
-        // If OTP not sent yet, send it
-        if (!this.otpSent) {
-            await this.sendOtp();
-            return;
-        }
-
-        // If OTP sent but not verified, verify it first
-        if (!this.otpVerified) {
-            const verified = await this.verifyOtp();
-            if (!verified) {
-                return;
-            }
-        }
-
-        // OTP verified, proceed with registration
-
+        // OTP verification is handled in step 1 - proceed directly with registration
         const recaptchaResponse = this.getRecaptchaResponse('auth');
         // Disable CAPTCHA verification in local development for testing
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -6111,6 +6133,7 @@ class AgricultureMarket {
 
     // Cart functionality
     async addToCart(productId, quantity = 1) {
+        this.debugLog('Button Click', { action: 'add_to_cart', productId, quantity });
         // Validate productId before making API call
         if (!productId || productId === 'null' || productId === 'undefined') {
             console.error('[ERROR] Invalid productId in addToCart:', productId);
@@ -6122,6 +6145,7 @@ class AgricultureMarket {
         const addToCartBtn = event?.target?.closest('.add-to-cart-btn');
 
         try {
+            this.debugLog('API Call', { method: 'POST', endpoint: '/cart', action: 'add_to_cart', productId, quantity });
             const response = await fetch(`${this.apiBase}/cart`, {
                 method: 'POST',
                 headers: {
