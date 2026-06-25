@@ -1822,6 +1822,11 @@ class AgricultureMarket {
         this.stopForgotCooldown();
         this.resetRecaptcha('forgot');
 
+        // Render reCAPTCHA widget for forgot password
+        setTimeout(() => {
+            this.renderRecaptchaWidgets('forgot');
+        }, 300);
+
         const stepEmail = document.getElementById('forgot-step-email');
         const stepOtp = document.getElementById('forgot-step-otp');
         const stepPassword = document.getElementById('forgot-step-password');
