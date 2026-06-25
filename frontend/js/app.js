@@ -4564,19 +4564,9 @@ class AgricultureMarket {
             return;
         }
 
-        // Ensure reCAPTCHA widgets are attempted to render (OTP step already enforces CAPTCHA).
-        try { this.renderRecaptchaWidgets('register'); } catch (err) { /* noop */ }
-
-        // OTP verification is handled in step 1 - proceed directly with registration
-        const recaptchaResponse = this.getRecaptchaResponse('auth');
-        // Disable CAPTCHA verification in local development for testing
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        if (!recaptchaResponse && !isLocalhost) {
-            this.setRecaptchaError('auth', 'Please complete the CAPTCHA before registering.');
-            this.setButtonLoading('register-submit-btn', false);
-            this.showMessage('Please complete the CAPTCHA before registering.', 'error');
-            return;
-        }
+        // OTP verification in step 1 already required CAPTCHA, so skip CAPTCHA check here
+        // The backend will verify the OTP was properly verified before allowing registration
+        const recaptchaResponse = this.getRecaptchaResponse('auth') || '';
 
         const formData = {
             username: username,
