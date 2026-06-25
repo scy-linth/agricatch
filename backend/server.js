@@ -22,6 +22,9 @@ if (!process.env.SESSION_SECRET) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy for Render deployment (fixes express-rate-limit X-Forwarded-For warning)
+app.set('trust proxy', true);
+
 // Health route for uptime pings
 const healthRouter = require('./routes/health');
 const supportTicketsRouter = require('./routes/support-tickets');
