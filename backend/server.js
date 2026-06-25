@@ -266,6 +266,7 @@ app.use(checkMaintenanceMode);
       await safeQuery('users.disabled_reason column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled_reason TEXT');
       await safeQuery('users.customer_total_ratings column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_total_ratings INTEGER DEFAULT 0');
       await safeQuery('users.customer_average_rating column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_average_rating DECIMAL(3,2) DEFAULT 0');
+      await safeQuery('users.is_debug_account column', 'ALTER TABLE users ADD COLUMN IF NOT EXISTS is_debug_account BOOLEAN DEFAULT false');
 
       await safeQuery('users username unique index', 'CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users (username)');
 

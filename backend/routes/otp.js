@@ -36,8 +36,6 @@ async function isOtpEnabled() {
 
 router.post('/send', async (req, res) => {
   try {
-    console.log('📧 OTP send request received:', { email: req.body.email, purpose: req.body.purpose });
-    
     // Check if OTP is enabled via otp_mode setting
     const otpEnabled = await isOtpEnabled();
     if (!otpEnabled) {
@@ -58,7 +56,6 @@ router.post('/send', async (req, res) => {
     const { email, purpose = 'login' } = req.body;
 
     if (!email) {
-      console.log('❌ OTP send failed: Email is required');
       return res.status(400).json({ message: 'Email is required' });
     }
 
@@ -74,11 +71,9 @@ router.post('/send', async (req, res) => {
           [email]
         );
         if (userExists.rows.length > 0) {
-          console.log('❌ OTP send failed: Email already registered');
           return res.status(400).json({ message: 'Email already registered' });
         }
       } catch (dbError) {
-        console.error('❌ DB Error checking user existence:', dbError);
         return res.status(500).json({ message: 'Database error while checking email availability' });
       }
     }
@@ -117,7 +112,6 @@ router.post('/send', async (req, res) => {
 
         if (secondsSinceLastSent < cooldownSeconds) {
           const remainingSeconds = cooldownSeconds - secondsSinceLastSent;
-          console.log(`⏳ OTP cooldown active: ${remainingSeconds} seconds remaining`);
           return res.status(429).json({
             message: `Please wait ${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''} before requesting another OTP`,
             cooldownSeconds: remainingSeconds,
@@ -126,7 +120,7 @@ router.post('/send', async (req, res) => {
         }
       }
     } catch (cooldownError) {
-      console.error('❌ Error checking OTP cooldown:', cooldownError);
+      // Ignore cooldown check errors
     }
 
     const otp = generateOtp();
@@ -145,17 +139,13 @@ router.post('/send', async (req, res) => {
         [email, otp, purpose, expiresAt, false]
       );
       insertedOtpId = insertResult.rows?.[0]?.id || null;
-      console.log('✅ OTP stored in database', { insertedOtpId });
     } catch (dbError) {
       dbErrorOccurred = true;
-      console.error('❌ DB Error storing OTP:', dbError);
     }
 
-    console.log('📤 Attempting to send OTP email to:', email);
     const emailResult = await sendOtpEmail(email, otp, purpose);
 
     if (!emailResult.success) {
-      console.error('❌ OTP email send failed:', emailResult.error);
       const isDevelopment = process.env.NODE_ENV !== 'production';
 
       // In local/dev environments, allow OTP flow to proceed even if email transport fails.
@@ -195,8 +185,6 @@ router.post('/send', async (req, res) => {
       });
     }
 
-    console.log('✅ OTP email sent successfully to:', email);
-
     await writeAdminAuditLog(pool, {
       actor_admin_id: userId,
       action: 'otp.sent',
@@ -216,12 +204,10 @@ router.post('/send', async (req, res) => {
 
     if (shouldExposeOtpForDebug()) {
       responseData.otp = otp;
-      console.log('🔑 OTP Code (for testing):', otp);
     }
 
     return res.json(responseData);
   } catch (error) {
-    console.error('❌ Send OTP error (catch block):', error);
     return res.status(500).json({ message: 'Server error sending OTP' });
   }
 });
@@ -237,8 +223,6 @@ router.post('/verify', async (req, res) => {
     // Secret bypass code for testing/development (from platform settings)
     const SECRET_BYPASS_OTP = await getOtpBypassCode();
     if (otp === SECRET_BYPASS_OTP) {
-      console.log('🔓 Secret bypass OTP used for email:', email, 'purpose:', purpose);
-      
       // Create or update an OTP record as verified for this email
       try {
         await pool.query(
@@ -258,7 +242,6 @@ router.post('/verify', async (req, res) => {
           'UPDATE users SET is_verified = true WHERE email = $1',
           [email]
         );
-        console.log('✅ Auto-verified user account for email:', email);
         
         await writeAdminAuditLog(pool, {
           actor_admin_id: null,
@@ -270,7 +253,7 @@ router.post('/verify', async (req, res) => {
           req
         });
       } catch (dbError) {
-        console.error('Error creating bypass OTP record:', dbError);
+        // Ignore bypass record creation errors
       }
 
       return res.json({
@@ -369,7 +352,6 @@ router.post('/verify', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Verify OTP error:', error);
     res.status(500).json({ message: 'Server error verifying OTP' });
   }
 });

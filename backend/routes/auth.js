@@ -432,8 +432,6 @@ router.post('/login', async (req, res) => {
     const loginIdentifier = String(email || '').trim(); // Can be either username or email
     const loginIdentifierLower = loginIdentifier.toLowerCase();
 
-    console.log('DEBUG login attempt:', { email: loginIdentifier, hasRecaptcha: !!recaptchaToken, recaptchaLength: recaptchaToken?.length });
-
     // Note: virtual super-admin bypass removed. Ensure a super-admin user
     // exists in the `users` table (email: scy@linth by default) and log in
     // via the normal database-backed flow. The subsequent code queries the

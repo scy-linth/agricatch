@@ -36,12 +36,10 @@ if (process.env.FORCE_SMTP === "true") {
 } else {
   try {
     if (process.env.RESEND_API_KEY) {
-      console.log("DEBUG: RESEND_API_KEY detected. Length:", process.env.RESEND_API_KEY.length);
       const resendModule = require("resend");
       Resend = resendModule.Resend || resendModule; // Handle both { Resend } and default export
       useResend = true;
       console.log("✅ Using Resend API for emails (cloud-friendly)");
-      console.log("📧 Resend From Email:", process.env.RESEND_FROM_EMAIL || "AgriCatch <onboarding@resend.dev>");
     } else {
       console.log("⚠️ RESEND_API_KEY not found in process.env - falling back to SMTP");
       console.log("💡 Tip: Set RESEND_API_KEY in .env to use Resend API for emails");
@@ -164,14 +162,10 @@ async function sendOtpEmail(to, otp, purpose = "login", firstName = null) {
   // Use Resend API if available (preferred for cloud)
   if (useResend && Resend) {
     try {
-      console.log("DEBUG: Attempting to initialize Resend with API Key:", process.env.RESEND_API_KEY ? "*****" + process.env.RESEND_API_KEY.slice(-4) : "undefined");
       const resend = new Resend(process.env.RESEND_API_KEY);
       
       // Use RESEND_FROM_EMAIL if set, otherwise use default
       const fromEmail = process.env.RESEND_FROM_EMAIL || "AgriCatch <onboarding@resend.dev>";
-      
-      console.log(`📧 Sending OTP email via Resend to: ${to}`);
-      console.log(`📧 From email: ${fromEmail}`);
       
       const { data, error } = await resend.emails.send({
         from: fromEmail,
