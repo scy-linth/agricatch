@@ -3685,13 +3685,16 @@ class AdminDashboard {
             `;
         }).join('');
 
-        // Individual save button listeners
-        document.getElementById('btn-save-core-settings')?.addEventListener('click', () => this.saveCoreSettings());
-        document.getElementById('btn-save-delivery-address-settings')?.addEventListener('click', () => this.saveDeliveryAddressSettings());
-        document.getElementById('btn-save-recaptcha-settings')?.addEventListener('click', () => this.saveRecaptchaSettings());
-        document.getElementById('btn-save-rate-limit-settings')?.addEventListener('click', () => this.saveRateLimitSettings());
-        document.getElementById('btn-save-otp-settings')?.addEventListener('click', () => this.saveOtpSettings());
-        document.getElementById('btn-save-product-limits-settings')?.addEventListener('click', () => this.saveProductLimitsSettings());
+        // Individual save button listeners - use flag to prevent duplicate listeners
+        if (!this._platformSettingsListenersAttached) {
+            document.getElementById('btn-save-core-settings')?.addEventListener('click', () => this.saveCoreSettings());
+            document.getElementById('btn-save-delivery-address-settings')?.addEventListener('click', () => this.saveDeliveryAddressSettings());
+            document.getElementById('btn-save-recaptcha-settings')?.addEventListener('click', () => this.saveRecaptchaSettings());
+            document.getElementById('btn-save-rate-limit-settings')?.addEventListener('click', () => this.saveRateLimitSettings());
+            document.getElementById('btn-save-otp-settings')?.addEventListener('click', () => this.saveOtpSettings());
+            document.getElementById('btn-save-product-limits-settings')?.addEventListener('click', () => this.saveProductLimitsSettings());
+            this._platformSettingsListenersAttached = true;
+        }
 
         // Handle delivery address setting separately
         const useDefaultAddressCheckbox = document.getElementById('setting-use-default-delivery-address');
