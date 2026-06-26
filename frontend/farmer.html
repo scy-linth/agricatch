@@ -89,10 +89,10 @@
 .modal[data-no-close-on-backdrop="true"] { pointer-events: auto; }
 .modal[data-no-close-on-backdrop="true"] .modal-content { pointer-events: auto; }
 /* Order Details Modal - Agricultural Theme */
-.order-details-modal-content {
-  max-width: 900px;
+.modal .order-details-modal-content {
+  max-width: 1400px !important;
   width: 95%;
-  max-height: 90vh;
+  max-height: 85vh;
   border: 2px solid #2d7a3a;
   border-radius: 12px;
   overflow: hidden;
@@ -143,8 +143,8 @@
 }
 .order-details-layout {
   display: grid;
-  grid-template-columns: 1.3fr 1fr;
-  gap: 1.5rem;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 2rem;
 }
 .order-product-card,
 .order-info-card {
@@ -363,14 +363,14 @@
   font-size: 0.9rem;
 }
 /* Mobile responsive */
-@media (max-width: 767.98px) {
+@media (max-width: 1199.98px) {
   .order-details-modal-content {
-    max-width: 600px;
+    max-width: 95%;
     width: 95%;
-    max-height: 95vh;
+    max-height: 90vh;
   }
   .order-details-body {
-    max-height: calc(95vh - 58px);
+    max-height: calc(90vh - 58px);
     padding: 1rem;
   }
   .order-details-layout {
@@ -2154,6 +2154,7 @@
                         <thead>
                             <tr>
                                 <th>Subject</th>
+                                <th class="text-center">Ticket Number</th>
                                 <th class="text-center">Status</th>
                                 <th>Date</th>
                                 <th>Actions</th>

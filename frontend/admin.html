@@ -1991,11 +1991,8 @@
                 <p class="ac-section-hero__sub">Configure delivery fees, service integrations, and core platform behaviour.</p>
             </div>
             <div class="ac-section-hero__actions">
-                <button type="button" class="btn btn-sm ac-btn-outline-muted me-2" id="refresh-settings-btn">
+                <button type="button" class="btn btn-sm ac-btn-outline-muted" id="refresh-settings-btn">
                     <i class="bi bi-arrow-clockwise me-1"></i>Refresh Cache
-                </button>
-                <button class="btn btn-sm ac-btn-primary" id="save-settings-btn" type="button">
-                    <i class="bi bi-floppy me-1"></i>Save All
                 </button>
             </div>
         </div>
@@ -2031,7 +2028,7 @@
                 </div>
             </div>
 
-            <!-- Settings form column -->
+            <!-- Core Platform Settings -->
             <div class="col-lg-8">
                 <div class="card ac-data-card">
                     <div class="ac-data-card__header">
@@ -2040,15 +2037,82 @@
                                 <i class="bi bi-sliders"></i>
                             </span>
                             <div>
-                                <h6 class="ac-data-card__title">Configuration</h6>
-                                <p class="ac-data-card__subtitle">Editable platform parameters</p>
+                                <h6 class="ac-data-card__title">Core Platform Settings</h6>
+                                <p class="ac-data-card__subtitle">Delivery fee, subscription pricing, and address configuration</p>
                             </div>
                         </div>
                     </div>
-                    <div class="px-3 pb-3" id="settings-form">
-                        <div class="text-center py-5">
-                            <span class="spinner-border spinner-border-sm text-success"></span>
+                    <div class="px-3 pb-3">
+                        <!-- Subscription Pricing -->
+                        <div class="mb-4 p-3 border rounded" style="background: #f8f9fa;">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-currency-dollar me-2"></i>Subscription Pricing</h6>
+                                <span class="badge bg-info">Premium Features</span>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-4">
+                                    <label class="form-label small text-muted">Monthly Platform Fee (₱)</label>
+                                    <input type="number" class="form-control" id="setting-premium-monthly-price" value="299">
+                                    <small class="text-muted" style="font-size: 11px;"><code>premium_monthly_price</code> - Current: <span id="value-premium_monthly_price" class="badge bg-secondary">—</span></small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small text-muted">3-Month Discount (%)</label>
+                                    <input type="number" class="form-control" id="setting-discount-3m" value="10">
+                                    <small class="text-muted" style="font-size: 11px;"><code>premium_3month_discount_pct</code> - Current: <span id="value-premium_3month_discount_pct" class="badge bg-secondary">—</span></small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small text-muted">6-Month Discount (%)</label>
+                                    <input type="number" class="form-control" id="setting-discount-6m" value="20">
+                                    <small class="text-muted" style="font-size: 11px;"><code>premium_6month_discount_pct</code> - Current: <span id="value-premium_6month_discount_pct" class="badge bg-secondary">—</span></small>
+                                </div>
+                            </div>
+                            <button class="btn ac-btn-primary btn-sm" id="btn-save-subscription-settings">
+                                <i class="bi bi-check-lg me-1"></i>Save Subscription Pricing
+                            </button>
                         </div>
+                        <!-- Delivery Fee and Other Settings -->
+                        <div id="settings-form">
+                            <div class="text-center py-5">
+                                <span class="spinner-border spinner-border-sm text-success"></span>
+                            </div>
+                        </div>
+                        <button class="btn ac-btn-primary btn-sm mt-3" id="btn-save-core-settings">
+                            <i class="bi bi-check-lg me-1"></i>Save Core Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delivery Address Settings -->
+            <div class="col-12 mt-3">
+                <div class="card ac-data-card">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-geo-alt"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Delivery Address Configuration</h6>
+                                <p class="ac-data-card__subtitle">Control how customers select delivery addresses</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input platform-setting-input" type="checkbox" id="setting-use-default-delivery-address" data-key="use_default_delivery_address" checked>
+                            <label class="form-check-label" for="setting-use-default-delivery-address">
+                                <strong>Use Default Delivery Address (Trabajo Market)</strong>
+                            </label>
+                        </div>
+                        <small class="text-muted" style="font-size: 11px;"><code>use_default_delivery_address</code> - Current: <span id="value-use_default_delivery_address" class="badge bg-secondary">—</span></small>
+                        <small class="text-muted d-block">
+                            <i class="bi bi-info-circle me-1"></i>
+                            When ON: All orders use the fixed address "Trabajo Market, M. Dela Fuente St., Sampaloc, Manila, Metro Manila"<br>
+                            When OFF: Customers can select custom addresses using PSGC dropdowns
+                        </small>
+                        <button class="btn ac-btn-primary btn-sm mt-3" id="btn-save-delivery-address-settings">
+                            <i class="bi bi-check-lg me-1"></i>Save Delivery Address Settings
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2084,12 +2148,15 @@
                                     <option value="always_on">🔒 Always ON (Both Environments)</option>
                                     <option value="always_off">⚠️ Always OFF (Both Environments)</option>
                                 </select>
-                                <small class="text-muted" style="font-size: 11px;">Auto: Automatically OFF in local, ON in production</small>
+                                <small class="text-muted" style="font-size: 11px;"><code>recaptcha_mode</code> - Current: <span id="value-recaptcha_mode" class="badge bg-secondary">—</span></small>
                             </div>
                             <small class="text-muted d-block">
                                 <i class="bi bi-info-circle me-1"></i>
                                 <strong>Purpose:</strong> Prevents automated bot attacks on registration, login, and password reset. <strong>Auto mode</strong> automatically sets OFF for local testing and ON for production security.
                             </small>
+                            <button class="btn ac-btn-primary btn-sm mt-2" id="btn-save-recaptcha-settings">
+                                <i class="bi bi-check-lg me-1"></i>Save reCAPTCHA Settings
+                            </button>
                         </div>
 
                         <!-- Rate Limiting Settings -->
@@ -2102,30 +2169,33 @@
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">Auth Requests (Local)</label>
                                     <input type="number" class="form-control platform-setting-input" id="setting-auth-rate-limit-local" data-key="auth_rate_limit_local" min="1" max="1000" placeholder="100">
-                                    <small class="text-muted" style="font-size: 11px;">Recommended: 100 (local testing)</small>
+                                    <small class="text-muted" style="font-size: 11px;"><code>auth_rate_limit_local</code> - Current: <span id="value-auth_rate_limit_local" class="badge bg-secondary">—</span></small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">Auth Requests (Production)</label>
                                     <input type="number" class="form-control platform-setting-input" id="setting-auth-rate-limit-production" data-key="auth_rate_limit_production" min="1" max="1000" placeholder="20">
-                                    <small class="text-muted" style="font-size: 11px;">Recommended: 20 (production)</small>
+                                    <small class="text-muted" style="font-size: 11px;"><code>auth_rate_limit_production</code> - Current: <span id="value-auth_rate_limit_production" class="badge bg-secondary">—</span></small>
                                 </div>
                             </div>
                             <div class="row g-2 mb-2">
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">OTP Requests (Local)</label>
                                     <input type="number" class="form-control platform-setting-input" id="setting-otp-rate-limit-local" data-key="otp_rate_limit_local" min="1" max="1000" placeholder="50">
-                                    <small class="text-muted" style="font-size: 11px;">Recommended: 50 (local testing)</small>
+                                    <small class="text-muted" style="font-size: 11px;"><code>otp_rate_limit_local</code> - Current: <span id="value-otp_rate_limit_local" class="badge bg-secondary">—</span></small>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">OTP Requests (Production)</label>
                                     <input type="number" class="form-control platform-setting-input" id="setting-otp-rate-limit-production" data-key="otp_rate_limit_production" min="1" max="1000" placeholder="10">
-                                    <small class="text-muted" style="font-size: 11px;">Recommended: 10 (production)</small>
+                                    <small class="text-muted" style="font-size: 11px;"><code>otp_rate_limit_production</code> - Current: <span id="value-otp_rate_limit_production" class="badge bg-secondary">—</span></small>
                                 </div>
                             </div>
                             <small class="text-muted d-block">
                                 <i class="bi bi-info-circle me-1"></i>
                                 <strong>Purpose:</strong> Limits API requests per 15 minutes per IP address to prevent abuse. Separate settings for local and production environments allow different limits for testing vs production security.
                             </small>
+                            <button class="btn ac-btn-primary btn-sm mt-2" id="btn-save-rate-limit-settings">
+                                <i class="bi bi-check-lg me-1"></i>Save Rate Limit Settings
+                            </button>
                         </div>
 
                         <!-- OTP Settings -->
@@ -2141,10 +2211,12 @@
                                     <option value="testing">🧪 Testing Mode (Local Recommended)</option>
                                     <option value="disabled">⚠️ Disabled (Not Recommended)</option>
                                 </select>
+                                <small class="text-muted" style="font-size: 11px;"><code>otp_mode</code> - Current: <span id="value-otp_mode" class="badge bg-secondary">—</span></small>
                             </div>
                             <div class="mb-2" id="otp-bypass-container">
                                 <label class="form-label small text-muted">OTP Bypass Code (for Testing Mode)</label>
                                 <input type="text" class="form-control platform-setting-input" id="setting-otp-bypass-code" data-key="otp_bypass_code" placeholder="789878">
+                                <small class="text-muted" style="font-size: 11px;"><code>otp_bypass_code</code> - Current: <span id="value-otp_bypass_code" class="badge bg-secondary">—</span></small>
                             </div>
                             <small class="text-muted d-block">
                                 <i class="bi bi-info-circle me-1"></i>
@@ -2153,37 +2225,10 @@
                                 - <strong>🧪 Testing Mode:</strong> OTP required for all flows, but bypass code works. Use for local development and AI testing.<br>
                                 - <strong>⚠️ Disabled:</strong> No OTP required for registration and login. <strong>Password reset will be disabled</strong> because it requires OTP verification. Not recommended for security. Applies to both environments.
                             </small>
+                            <button class="btn ac-btn-primary btn-sm mt-2" id="btn-save-otp-settings">
+                                <i class="bi bi-check-lg me-1"></i>Save OTP Settings
+                            </button>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Delivery Address Settings -->
-            <div class="col-12 mt-3">
-                <div class="card ac-data-card">
-                    <div class="ac-data-card__header">
-                        <div class="ac-data-card__header-left">
-                            <span class="ac-data-card__icon ac-data-card__icon--primary">
-                                <i class="bi bi-geo-alt"></i>
-                            </span>
-                            <div>
-                                <h6 class="ac-data-card__title">Delivery Address Configuration</h6>
-                                <p class="ac-data-card__subtitle">Control how customers select delivery addresses</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="px-3 pb-3">
-                        <div class="form-check form-switch mb-3">
-                            <input class="form-check-input platform-setting-input" type="checkbox" id="setting-use-default-delivery-address" data-key="use_default_delivery_address" checked>
-                            <label class="form-check-label" for="setting-use-default-delivery-address">
-                                <strong>Use Default Delivery Address (Trabajo Market)</strong>
-                            </label>
-                        </div>
-                        <small class="text-muted">
-                            <i class="bi bi-info-circle me-1"></i>
-                            When ON: All orders use the fixed address "Trabajo Market, M. Dela Fuente St., Sampaloc, Manila, Metro Manila"<br>
-                            When OFF: Customers can select custom addresses using PSGC dropdowns
-                        </small>
                     </div>
                 </div>
             </div>
@@ -2207,34 +2252,48 @@
                             <div class="col-md-4">
                                 <label class="form-label small text-muted">Max Products per Farmer (Free Tier)</label>
                                 <input type="number" class="form-control platform-setting-input" id="setting-max-products-per-farmer" data-key="max_products_per_farmer" min="1" max="1000" placeholder="10">
-                                <small class="text-muted" style="font-size: 11px;">Default: 10 (adjust for development testing)</small>
+                                <small class="text-muted" style="font-size: 11px;"><code>max_products_per_farmer</code> - Current: <span id="value-max_products_per_farmer" class="badge bg-secondary">—</span></small>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label small text-muted">Max Products per Name (Available Now)</label>
                                 <input type="number" class="form-control platform-setting-input" id="setting-max-products-per-name-available" data-key="max_products_per_name_available" min="1" max="100" placeholder="1">
-                                <small class="text-muted" style="font-size: 11px;">Default: 1 (same product name limit for available products)</small>
+                                <small class="text-muted" style="font-size: 11px;"><code>max_products_per_name_available</code> - Current: <span id="value-max_products_per_name_available" class="badge bg-secondary">—</span></small>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label small text-muted">Max Products per Name (Pre-order)</label>
                                 <input type="number" class="form-control platform-setting-input" id="setting-max-products-per-name-preorder" data-key="max_products_per_name_preorder" min="1" max="100" placeholder="1">
-                                <small class="text-muted" style="font-size: 11px;">Default: 1 (same product name limit for pre-order products)</small>
+                                <small class="text-muted" style="font-size: 11px;"><code>max_products_per_name_preorder</code> - Current: <span id="value-max_products_per_name_preorder" class="badge bg-secondary">—</span></small>
                             </div>
                         </div>
                         <small class="text-muted d-block mt-2">
                             <i class="bi bi-info-circle me-1"></i>
                             <strong>Purpose:</strong> Controls the maximum number of products a free-tier farmer can list, and limits how many times the same product name can be used per order type (Available Now vs Pre-order). Premium farmers have unlimited products. Lower these values for testing, increase for production.
                         </small>
+                        <button class="btn ac-btn-primary btn-sm mt-3" id="btn-save-product-limits-settings">
+                            <i class="bi bi-check-lg me-1"></i>Save Product Limits Settings
+                        </button>
                     </div>
                 </div>
             </div>
 
         </div>
 
-        <!-- Payment Accounts & Pricing Settings (superadmin only) -->
+        <!-- Payment Settings (superadmin only) -->
         <div data-roles="super_admin">
-            <div class="card mt-3">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-credit-card"></i> Payment Accounts</h5>
+            <!-- Payment Accounts -->
+            <div class="card ac-data-card mt-3">
+                <div class="ac-data-card__header">
+                    <div class="ac-data-card__header-left">
+                        <span class="ac-data-card__icon ac-data-card__icon--primary">
+                            <i class="bi bi-credit-card"></i>
+                        </span>
+                        <div>
+                            <h6 class="ac-data-card__title">Payment Accounts</h6>
+                            <p class="ac-data-card__subtitle">Manage payment accounts for farmer subscriptions</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="px-3 pb-3">
                     <p class="text-muted small">Farmers will see all active accounts when subscribing. Add multiple GCash or bank accounts.</p>
                     <div id="payment-accounts-list" class="mb-3"></div>
                     <div class="border rounded p-3" style="background:var(--ac-bg,#f5f7f5); border-color:var(--ac-border,#e2e8e0);">
@@ -2264,30 +2323,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Platform Fee Settings -->
-            <div class="card mt-3">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-gear"></i> Platform Fee (Subscription)</h5>
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label small text-muted">Monthly Platform Fee (₱)</label>
-                            <input type="number" class="form-control" id="setting-premium-monthly-price" value="299">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small text-muted">3-Month Platform Fee Discount (%)</label>
-                            <input type="number" class="form-control" id="setting-discount-3m" value="10">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small text-muted">6-Month Platform Fee Discount (%)</label>
-                            <input type="number" class="form-control" id="setting-discount-6m" value="20">
-                        </div>
-                    </div>
-                    <button class="btn ac-btn-primary btn-sm mt-3" id="btn-save-subscription-settings">
-                        <i class="bi bi-check-lg me-1"></i>Save Platform Fee
-                    </button>
                 </div>
             </div>
         </div>

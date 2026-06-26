@@ -1947,18 +1947,19 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+    const validStatuses = ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery', 'delivered', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
 
-    // Status transition matrix - allow forward progression (skip ahead) and cancellation, but prevent going back
-    // Workflow order: pending/preorder_reserved → confirmed → preparing → out_for_delivery → delivered
+    // Status transition matrix - align with frontend admin UI
+    // Workflow order: pending/preorder_reserved → confirmed → preparing → scheduled → out_for_delivery → delivered
     const validTransitions = {
-      pending: ['confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'],
+      pending: ['confirmed', 'cancelled'],
       preorder_reserved: ['confirmed', 'cancelled'],
-      confirmed: ['preparing', 'out_for_delivery', 'delivered', 'cancelled'],
-      preparing: ['out_for_delivery', 'delivered', 'cancelled'],
+      confirmed: ['preparing', 'cancelled'],
+      preparing: ['scheduled', 'cancelled'],
+      scheduled: ['out_for_delivery', 'cancelled'],
       out_for_delivery: ['delivered', 'cancelled'],
       delivered: [], // Terminal state - no transitions allowed
       cancelled: [] // Terminal state - no transitions allowed
@@ -1990,7 +1991,7 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
     if (ordUserId) {
       const statusLabels = {
         pending: 'Pending', preorder_reserved: 'Pre-order Reserved', confirmed: 'Confirmed', preparing: 'Preparing',
-        out_for_delivery: 'Out for Delivery', delivered: 'Delivered', cancelled: 'Cancelled'
+        scheduled: 'Scheduled', out_for_delivery: 'Out for Delivery', delivered: 'Delivered', cancelled: 'Cancelled'
       };
       await insertNotification(pool, {
         userId: ordUserId,

@@ -241,7 +241,7 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
     // Get order with product info (per-item order)
     const orderResult = await pool.query(`
             SELECT o.id, o.product_id, o.quantity, o.total_amount, o.status, o.user_id as customer_id,
-             o.is_disabled,
+             o.is_disabled, o.is_preorder, o.preorder_converted_at, o.preorder_fulfilled_quantity, o.preorder_reserved_quantity,
              p.farmer_id
       FROM orders o
       JOIN products p ON o.product_id = p.id
@@ -1046,9 +1046,11 @@ router.put('/:id/cancel', async (req, res) => {
     }
 
     const orderStatus = orderResult.rows[0].status;
-    // CRITICAL: Customer can ONLY cancel when status is 'pending' - after farmer confirms, cancellation is blocked
-    if (orderStatus !== 'pending') {
-      return res.status(400).json({ message: 'Order cannot be cancelled at this stage. Only pending orders can be cancelled by customers.' });
+    // Customer can cancel pending orders and unconverted pre-order reservations.
+    // Once an order is confirmed or beyond, cancellation is blocked for customers.
+    const customerCancellableStatuses = ['pending', 'preorder_reserved'];
+    if (!customerCancellableStatuses.includes(orderStatus)) {
+      return res.status(400).json({ message: 'Order cannot be cancelled at this stage. Only pending orders or pre-order reservations can be cancelled by customers.' });
     }
 
     // Start transaction to restore stock
@@ -1196,12 +1198,22 @@ router.put('/:id/delivery-date', async (req, res) => {
     const order = orderResult.rows[0];
 
     // Validate order status - only allow scheduling for certain statuses
-    const allowedStatuses = ['pending', 'preorder_reserved', 'confirmed', 'preparing'];
+    const allowedStatuses = ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled'];
     if (!allowedStatuses.includes(order.status)) {
       return res.status(400).json({ 
         message: `Cannot schedule delivery for order in ${order.status} status` 
       });
     }
+
+    // For pre-orders, require harvest conversion before scheduling
+    if (order.status === 'preorder_reserved' && !order.preorder_converted_at) {
+      return res.status(400).json({ 
+        message: 'Cannot schedule delivery for pre-order before harvest conversion' 
+      });
+    }
+
+    // Check if this is a reschedule (order already has delivery date)
+    const isReschedule = order.status === 'scheduled' && order.delivery_date;
 
     // Update order with delivery date and set status to scheduled
     const client = await pool.connect();
@@ -1217,11 +1229,14 @@ router.put('/:id/delivery-date', async (req, res) => {
       `, [delivery_date, orderId]);
 
       // Send notification to customer
-      const message = `Your order #${orderId} has been scheduled for delivery on ${delivery_date}.`;
+      const message = isReschedule 
+        ? `Your delivery date for order #${orderId} has been updated to ${delivery_date}.`
+        : `Your order #${orderId} has been scheduled for delivery on ${delivery_date}.`;
+      const notificationTitle = isReschedule ? 'Delivery Rescheduled' : 'Delivery Scheduled';
       await client.query(`
         INSERT INTO notifications (user_id, type, title, message, order_id, product_id)
-        VALUES ($1, 'order_update', 'Delivery Scheduled', $2, $3, $4)
-      `, [order.user_id, message, orderId, order.product_id]);
+        VALUES ($1, 'order_update', $2, $3, $4, $5)
+      `, [order.user_id, notificationTitle, message, orderId, order.product_id]);
       broadcastEvent('notification.created', { user_id: order.user_id });
 
       await client.query('COMMIT');
@@ -1236,7 +1251,7 @@ router.put('/:id/delivery-date', async (req, res) => {
       });
 
       res.json({
-        message: 'Delivery date scheduled successfully',
+        message: isReschedule ? 'Delivery date rescheduled successfully' : 'Delivery date scheduled successfully',
         order_id: orderId,
         delivery_date,
         status: 'scheduled'

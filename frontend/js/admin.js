@@ -10613,13 +10613,3 @@ function loadVerificationRequests(page, status) {
         adminDashboard.loadVerificationRequests(page, status);
     }
 }
-
-    }
-}
-
-function loadVerificationRequests(page, status) {
-    if (adminDashboard) {
-        adminDashboard.loadVerificationRequests(page, status);
-    }
-}
-

@@ -646,7 +646,10 @@ class ChatUI {
                         <div class="conversation-name">${this.escapeHtml(listName)}</div>
                         ${unreadCount > 0 ? `<span class="unread-badge" style="flex-shrink:0;">${unreadCount}</span>` : ''}
                     </div>
-                    <div class="conversation-time">${lastMessageTime}</div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
+                        <div class="conversation-time">${lastMessageTime}</div>
+                        <div style="font-size:0.72rem;color:var(--ac-text-muted);font-weight:600;">#${ticketId}</div>
+                    </div>
                 </div>
                 ${detailsBtn}
             </div>

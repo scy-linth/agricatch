@@ -8857,6 +8857,9 @@ class FarmerDashboard {
             `;
         } else if (status === 'scheduled') {
             return `
+                <button class="btn btn-sm btn-info order-schedule-btn" data-action="schedule-delivery" data-order-id="${orderId}">
+                    <i class="bi bi-calendar me-1"></i>Reschedule Delivery
+                </button>
                 <button class="btn btn-sm btn-info order-ship-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="out_for_delivery">
                     <i class="bi bi-truck me-1"></i>Mark as Out for Delivery
                 </button>
@@ -9272,6 +9275,7 @@ class FarmerDashboard {
             'pending': 'Pending',
             'confirmed': 'Confirmed',
             'preparing': 'Preparing',
+            'scheduled': 'Scheduled',
             'out_for_delivery': 'Out for Delivery',
             'delivered': 'Delivered',
             'cancelled': 'Cancelled',
@@ -9521,7 +9525,14 @@ class FarmerDashboard {
             // Set minimum date to today
             const today = new Date().toISOString().split('T')[0];
             dateInput.min = today;
-            dateInput.value = today;
+            
+            // Pre-fill existing delivery date if available (for rescheduling)
+            const order = this.lastOrdersById?.get(Number(orderId));
+            if (order && order.delivery_date) {
+                dateInput.value = order.delivery_date;
+            } else {
+                dateInput.value = today;
+            }
             dateInput.required = true;
             
             this.currentScheduleOrderId = orderId;

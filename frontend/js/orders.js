@@ -506,7 +506,7 @@ class OrdersPage {
         container.innerHTML = filtered.map(order => {
             const item = (order.items && order.items[0]) || order;
             const isPreorder = order.is_preorder || item.is_preorder || false;
-            const canCancel = (item.status || order.status || 'pending') === 'pending';
+            const canCancel = ['pending', 'preorder_reserved'].includes(item.status || order.status || 'pending');
             const deliveredAtRaw = item.delivered_at || order.delivered_at || null;
             const isDelivered = (item.status || order.status || 'pending') === 'delivered';
             const deliveredAt = deliveredAtRaw ? new Date(deliveredAtRaw) : null;
@@ -525,7 +525,7 @@ class OrdersPage {
             const quantity = Number(item.quantity || order.quantity || 1) || 1;
 
             // Delivery tracking timeline
-            const steps = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered'];
+            const steps = ['pending', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery', 'delivered'];
             const currentStepIdx = steps.indexOf(currentStatus);
             const isCancelled = currentStatus === 'cancelled';
             const timelineHtml = !isCancelled ? `
@@ -533,7 +533,7 @@ class OrdersPage {
                     ${steps.map((step, i) => {
                         const done = i <= currentStepIdx;
                         const active = i === currentStepIdx;
-                        const labels = { pending: 'Pending', confirmed: 'Confirmed', preparing: 'Preparing', out_for_delivery: 'On the Way', delivered: 'Delivered' };
+                        const labels = { pending: 'Pending', confirmed: 'Confirmed', preparing: 'Preparing', scheduled: 'Scheduled', out_for_delivery: 'On the Way', delivered: 'Delivered' };
                         const color = done ? '#10b981' : '#d1d5db';
                         const textColor = active ? '#059669' : done ? '#10b981' : '#9ca3af';
                         return `
@@ -571,6 +571,7 @@ class OrdersPage {
                         <div class="order-item-meta">${this.fmtNumber(quantity)} x ${this.fmtCurrency(item.price || order.price || 0)} ${item.unit || ''}</div>
                         <div class="order-item-meta"><strong>From:</strong> ${item.farmer_name || 'Local Farmer'}${item.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : ''}</div>
                         ${isPreorder && item.preorder_availability_date ? `<div class="order-item-meta"><strong>Available:</strong> ${item.preorder_availability_date}</div>` : ''}
+                        ${order.delivery_date ? `<div class="order-item-meta"><strong>Delivery Date:</strong> ${new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
                         ${(currentStatus === 'cancelled') ? `
                             <div class="order-item-meta">
                                 <button class="btn btn-small btn-secondary" onclick="ordersPage.openReasonViewer('${encodedReason}')">

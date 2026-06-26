@@ -1496,6 +1496,26 @@ body.sidebar-collapsed #main.main {
   pointer-events: none;
 }
 
+/* Bootstrap pagination overrides for green theme */
+.pagination .page-link {
+  color: var(--ac-primary);
+  border-color: var(--ac-border);
+}
+.pagination .page-link:hover {
+  background-color: var(--ac-primary-light);
+  color: var(--ac-primary-dark);
+  border-color: var(--ac-primary);
+}
+.pagination .page-item.active .page-link {
+  background-color: var(--ac-primary);
+  border-color: var(--ac-primary);
+  color: #fff;
+}
+.pagination .page-item.disabled .page-link {
+  color: var(--ac-text-muted);
+  pointer-events: none;
+}
+
 /* ─── 22. Slide-Over Panels ─────────────────────────────────────────── */
 .admin-detail-panel {
   position: fixed;

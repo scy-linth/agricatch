@@ -1253,31 +1253,6 @@ router.post('/', multer().none(), async (req, res) => {
 
     let createdProduct = result.rows[0];
 
-    // Ensure newly created products use categorized Cloudinary IDs.
-    if (createdProduct && (createdProduct.cloudinary_public_id || createdProduct.image_url)) {
-      const categoryName = await loadCategoryNameById(createdProduct.category_id);
-      const moved = await rehomeProductImageToCategorizedId({
-        categoryName,
-        productName: createdProduct.name,
-        productId: createdProduct.id,
-        imagePublicId: createdProduct.cloudinary_public_id,
-        imageUrl: createdProduct.image_url
-      });
-
-      if (moved.changed && moved.imagePublicId) {
-        const refreshed = await pool.query(
-          `UPDATE products
-           SET image_url = $1,
-               cloudinary_public_id = $2,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = $3
-           RETURNING *`,
-          [moved.imageUrl || createdProduct.image_url, moved.imagePublicId, createdProduct.id]
-        );
-        createdProduct = refreshed.rows[0] || createdProduct;
-      }
-    }
-
     broadcastEvent('product.updated', {
       action: 'product.create',
       product_id: Number(createdProduct.id),
@@ -1459,20 +1434,6 @@ router.put('/:id', multer().none(), async (req, res) => {
         console.warn('Failed to delete old product image:', e.message || e);
       }
 
-      // Normalize explicit Cloudinary replacements to the required agricatch/category/product path.
-      if (imagePublicId) {
-        const moved = await rehomeProductImageToCategorizedId({
-          categoryName: resolvedCategoryName,
-          productName: nextName,
-          productId: id,
-          imagePublicId,
-          imageUrl
-        });
-        if (moved.imagePublicId) {
-          imagePublicId = moved.imagePublicId;
-          imageUrl = moved.imageUrl || imageUrl;
-        }
-      }
     }
 
     // If product was rejected, reset status to pending for resubmission
@@ -1645,15 +1606,17 @@ router.post('/:id/convert-preorders', async (req, res) => {
 
       for (const order of orderResult.rows) {
         if (remainingToAllocate <= 0) break;
-        
-        const orderQuantity = order.quantity;
-        const allocateToOrder = Math.min(remainingToAllocate, orderQuantity);
-        
+
+        // Allocate against the remaining reservation for this order, not the original quantity.
+        // This prevents double-allocating orders that were already fulfilled in a previous harvest.
+        const orderRemaining = order.preorder_reserved_quantity;
+        const allocateToOrder = Math.min(remainingToAllocate, orderRemaining);
+
         if (allocateToOrder > 0) {
           await client.query(`
             UPDATE orders
             SET preorder_converted_at = CURRENT_TIMESTAMP,
-                preorder_fulfilled_quantity = $1,
+                preorder_fulfilled_quantity = COALESCE(preorder_fulfilled_quantity, 0) + $1,
                 preorder_reserved_quantity = preorder_reserved_quantity - $1,
                 status = 'confirmed'
             WHERE id = $2
@@ -1661,10 +1624,10 @@ router.post('/:id/convert-preorders', async (req, res) => {
           
           remainingToAllocate -= allocateToOrder;
           
-          if (allocateToOrder === orderQuantity) {
+          if (allocateToOrder === orderRemaining) {
             fullyAllocatedOrderIds.push(order.id);
           } else {
-            partiallyAllocatedOrders.push({ id: order.id, allocated: allocateToOrder, total: orderQuantity });
+            partiallyAllocatedOrders.push({ id: order.id, allocated: allocateToOrder, total: orderRemaining });
           }
 
           // Notify customer that pre-order is confirmed and ready for delivery scheduling
