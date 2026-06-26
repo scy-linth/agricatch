@@ -3665,8 +3665,11 @@ class AdminDashboard {
                 return `
                     <div class="mb-3">
                         <label for="setting-delivery_fee" class="form-label fw-semibold">Delivery Fee (₱)</label>
-                        <input type="number" id="setting-delivery_fee" class="form-control platform-setting-input"
-                               data-key="${key}" min="0" step="1" value="${this.escapeHtml(data.value || '35')}">
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="number" id="setting-delivery_fee" class="form-control platform-setting-input"
+                                   data-key="${key}" min="0" step="1" value="${this.escapeHtml(data.value || '35')}">
+                            <span class="badge bg-primary" id="value-delivery_fee">₱${this.escapeHtml(data.value || '35')}</span>
+                        </div>
                         <div class="form-text text-muted">Set to 0 to disable delivery fee - it will not appear in checkout</div>
                         <small class="text-muted">Last updated: ${data.updated_at ? new Date(data.updated_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</small>
                     </div>
@@ -3698,9 +3701,29 @@ class AdminDashboard {
 
         // Handle delivery address setting separately
         const useDefaultAddressCheckbox = document.getElementById('setting-use-default-delivery-address');
+        const useDefaultAddressValue = document.getElementById('value-use_default_delivery_address');
         if (useDefaultAddressCheckbox) {
             useDefaultAddressCheckbox.checked = settings.use_default_delivery_address?.value === 'true';
-            // Removed immediate save - will save via Save All button
+            if (useDefaultAddressValue) {
+                useDefaultAddressValue.textContent = settings.use_default_delivery_address?.value === 'true' ? 'ON' : 'OFF';
+                useDefaultAddressValue.className = settings.use_default_delivery_address?.value === 'true' ? 'badge bg-success' : 'badge bg-secondary';
+            }
+            // Add real-time update listener
+            useDefaultAddressCheckbox.onchange = () => {
+                if (useDefaultAddressValue) {
+                    useDefaultAddressValue.textContent = useDefaultAddressCheckbox.checked ? 'ON' : 'OFF';
+                    useDefaultAddressValue.className = useDefaultAddressCheckbox.checked ? 'badge bg-success' : 'badge bg-secondary';
+                }
+            };
+        }
+
+        // Add real-time value update listener for delivery fee
+        const deliveryFeeInput = document.getElementById('setting-delivery_fee');
+        const deliveryFeeValue = document.getElementById('value-delivery_fee');
+        if (deliveryFeeInput && deliveryFeeValue) {
+            deliveryFeeInput.oninput = () => {
+                deliveryFeeValue.textContent = `₱${deliveryFeeInput.value}`;
+            };
         }
 
         // Handle security settings
@@ -3826,24 +3849,8 @@ class AdminDashboard {
             otpBypassCode.oninput = () => { if (valueSpan) valueSpan.textContent = otpBypassCode.value; };
         }
 
-        // Delivery address setting
-        const useDefaultAddressCheckbox = document.getElementById('setting-use-default-delivery-address');
-        if (useDefaultAddressCheckbox) {
-            const value = settings.use_default_delivery_address?.value === 'true';
-            useDefaultAddressCheckbox.checked = value;
-            const valueSpan = document.getElementById('value-use_default_delivery_address');
-            if (valueSpan) {
-                valueSpan.textContent = value ? 'ON' : 'OFF';
-                valueSpan.className = value ? 'badge bg-success' : 'badge bg-secondary';
-            }
-            useDefaultAddressCheckbox.onchange = () => {
-                const newValue = useDefaultAddressCheckbox.checked;
-                if (valueSpan) {
-                    valueSpan.textContent = newValue ? 'ON' : 'OFF';
-                    valueSpan.className = newValue ? 'badge bg-success' : 'badge bg-secondary';
-                }
-            };
-        }
+        // Delivery address setting - already handled in renderPlatformSettings
+        // This is a duplicate, removing to avoid conflicts
         
         // Show environment indicator
         const envIndicator = document.getElementById('security-env-indicator');
