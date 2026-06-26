@@ -3666,6 +3666,12 @@ class AgricultureMarket {
 
                 return;
             } else {
+                // Handle rate limiting (429)
+                if (response.status === 429) {
+                    this.setButtonLoading('auth-submit-btn', false);
+                    this.showMessage(data.message || 'Too many login attempts. Please try again later.', 'error');
+                    return;
+                }
                 // Don't reset CAPTCHA on server errors (5xx) - allow retry without new solve
                 if (response.status >= 500) {
                     this.setButtonLoading('auth-submit-btn', false);
