@@ -3721,14 +3721,14 @@ class AdminDashboard {
             };
         }
 
-        // Add real-time value update listener for delivery fee
-        const deliveryFeeInput = document.getElementById('setting-delivery_fee');
-        const deliveryFeeValue = document.getElementById('value-delivery_fee');
-        if (deliveryFeeInput && deliveryFeeValue) {
-            deliveryFeeInput.oninput = () => {
-                deliveryFeeValue.textContent = `₱${deliveryFeeInput.value}`;
-            };
-        }
+        // Remove real-time update listener - badge should only show SAVED database value
+        // const deliveryFeeInput = document.getElementById('setting-delivery_fee');
+        // const deliveryFeeValue = document.getElementById('value-delivery_fee');
+        // if (deliveryFeeInput && deliveryFeeValue) {
+        //     deliveryFeeInput.oninput = () => {
+        //         deliveryFeeValue.textContent = `₱${deliveryFeeInput.value}`;
+        //     };
+        // }
 
         // Handle security settings
         this.renderSecuritySettings(settings);
