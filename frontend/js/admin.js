@@ -3955,6 +3955,7 @@ class AdminDashboard {
 
     async saveCoreSettings() {
         const input = document.getElementById('setting-delivery_fee');
+        const btn = document.getElementById('btn-save-core-settings');
         if (!input) {
             console.error('Delivery fee input not found');
             this.showMessage('Delivery fee input not found', 'error');
@@ -3968,6 +3969,12 @@ class AdminDashboard {
         if (currentValue === originalValue) {
             this.showMessage('No changes to save', 'info');
             return;
+        }
+
+        // Show loading state
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
         }
 
         try {
@@ -3990,11 +3997,18 @@ class AdminDashboard {
         } catch (error) {
             console.error('Error saving core settings:', error);
             this.showMessage('Failed to update core settings', 'error');
+        } finally {
+            // Reset button state
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Save';
+            }
         }
     }
 
     async saveDeliveryAddressSettings() {
         const checkbox = document.getElementById('setting-use-default-delivery-address');
+        const btn = document.getElementById('btn-save-delivery-address-settings');
         if (!checkbox) return;
         
         const key = 'use_default_delivery_address';
@@ -4004,6 +4018,12 @@ class AdminDashboard {
         if (currentValue === originalValue) {
             this.showMessage('No changes to save', 'info');
             return;
+        }
+
+        // Show loading state
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
         }
 
         try {
@@ -4026,11 +4046,18 @@ class AdminDashboard {
         } catch (error) {
             console.error('Error saving delivery address settings:', error);
             this.showMessage('Failed to update delivery address settings', 'error');
+        } finally {
+            // Reset button state
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Save';
+            }
         }
     }
 
     async saveRecaptchaSettings() {
         const input = document.getElementById('setting-recaptcha-mode');
+        const btn = document.getElementById('btn-save-recaptcha-settings');
         if (!input) return;
         
         const key = 'recaptcha_mode';
@@ -4040,6 +4067,12 @@ class AdminDashboard {
         if (currentValue === originalValue) {
             this.showMessage('No changes to save', 'info');
             return;
+        }
+
+        // Show loading state
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
         }
 
         try {
@@ -4062,6 +4095,12 @@ class AdminDashboard {
         } catch (error) {
             console.error('Error saving reCAPTCHA settings:', error);
             this.showMessage('Failed to update reCAPTCHA settings', 'error');
+        } finally {
+            // Reset button state
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Save';
+            }
         }
     }
 
@@ -4090,6 +4129,13 @@ class AdminDashboard {
             return;
         }
 
+        const btn = document.getElementById('btn-save-rate-limit-settings');
+        // Show loading state
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+        }
+
         try {
             const response = await fetch(`${this.apiBase}/superadmin/settings`, {
                 method: 'PUT',
@@ -4110,6 +4156,12 @@ class AdminDashboard {
         } catch (error) {
             console.error('Error saving rate limit settings:', error);
             this.showMessage('Failed to update rate limit settings', 'error');
+        } finally {
+            // Reset button state
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Save';
+            }
         }
     }
 
@@ -4136,6 +4188,13 @@ class AdminDashboard {
             return;
         }
 
+        const btn = document.getElementById('btn-save-otp-settings');
+        // Show loading state
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+        }
+
         try {
             const response = await fetch(`${this.apiBase}/superadmin/settings`, {
                 method: 'PUT',
@@ -4156,6 +4215,12 @@ class AdminDashboard {
         } catch (error) {
             console.error('Error saving OTP settings:', error);
             this.showMessage('Failed to update OTP settings', 'error');
+        } finally {
+            // Reset button state
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Save';
+            }
         }
     }
 
@@ -4183,6 +4248,13 @@ class AdminDashboard {
             return;
         }
 
+        const btn = document.getElementById('btn-save-product-limits-settings');
+        // Show loading state
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+        }
+
         try {
             const response = await fetch(`${this.apiBase}/superadmin/settings`, {
                 method: 'PUT',
@@ -4203,6 +4275,12 @@ class AdminDashboard {
         } catch (error) {
             console.error('Error saving product limits settings:', error);
             this.showMessage('Failed to update product limits settings', 'error');
+        } finally {
+            // Reset button state
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Save';
+            }
         }
     }
 
@@ -7776,6 +7854,7 @@ class AdminDashboard {
                 <p>Total: ${this.fmtCurrency(order.total_amount)}</p>
                 <p>Date: ${new Date(order.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                 ${order.delivery_date ? `<p>Delivery Date: ${new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}
+                ${order.reschedule_reason ? `<p>Reason for Rescheduling: ${this.escapeHtml(order.reschedule_reason)}</p>` : ''}
                 ${order.delivery_address ? `<p>Address: ${order.delivery_address}</p>` : ''}
             </div>
             <div class="panel-section">

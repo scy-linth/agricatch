@@ -3171,16 +3171,16 @@ body.sidebar-collapsed #main.main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex: 1;
 }
 .ac-filter-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 .ac-filter-label {
-  font-size: .75rem;
+  font-size: .7rem;
   font-weight: 600;
   color: var(--ac-text-muted);
   white-space: nowrap;
