@@ -3685,7 +3685,13 @@ class AdminDashboard {
             `;
         }).join('');
 
-        document.getElementById('save-settings-btn')?.addEventListener('click', () => this.savePlatformSettings());
+        // Individual save button listeners
+        document.getElementById('btn-save-core-settings')?.addEventListener('click', () => this.saveCoreSettings());
+        document.getElementById('btn-save-delivery-address-settings')?.addEventListener('click', () => this.saveDeliveryAddressSettings());
+        document.getElementById('btn-save-recaptcha-settings')?.addEventListener('click', () => this.saveRecaptchaSettings());
+        document.getElementById('btn-save-rate-limit-settings')?.addEventListener('click', () => this.saveRateLimitSettings());
+        document.getElementById('btn-save-otp-settings')?.addEventListener('click', () => this.saveOtpSettings());
+        document.getElementById('btn-save-product-limits-settings')?.addEventListener('click', () => this.saveProductLimitsSettings());
 
         // Handle delivery address setting separately
         const useDefaultAddressCheckbox = document.getElementById('setting-use-default-delivery-address');
@@ -3941,6 +3947,259 @@ class AdminDashboard {
         } catch (error) {
             console.error('Error saving platform settings:', error);
             this.showMessage('Failed to update platform settings', 'error');
+        }
+    }
+
+    async saveCoreSettings() {
+        const input = document.getElementById('setting-delivery_fee');
+        if (!input) {
+            console.error('Delivery fee input not found');
+            this.showMessage('Delivery fee input not found', 'error');
+            return;
+        }
+        
+        const key = 'delivery_fee';
+        const currentValue = input.value;
+        const originalValue = this.lastPlatformSettings?.[key]?.value;
+        
+        if (currentValue === originalValue) {
+            this.showMessage('No changes to save', 'info');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ [key]: currentValue })
+            });
+
+            if (response.ok) {
+                this.showMessage('Core settings updated successfully', 'success');
+                this.loadPlatformSettings();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to update core settings', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving core settings:', error);
+            this.showMessage('Failed to update core settings', 'error');
+        }
+    }
+
+    async saveDeliveryAddressSettings() {
+        const checkbox = document.getElementById('setting-use-default-delivery-address');
+        if (!checkbox) return;
+        
+        const key = 'use_default_delivery_address';
+        const currentValue = checkbox.checked ? 'true' : 'false';
+        const originalValue = this.lastPlatformSettings?.[key]?.value;
+        
+        if (currentValue === originalValue) {
+            this.showMessage('No changes to save', 'info');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ [key]: currentValue })
+            });
+
+            if (response.ok) {
+                this.showMessage('Delivery address settings updated successfully', 'success');
+                this.loadPlatformSettings();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to update delivery address settings', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving delivery address settings:', error);
+            this.showMessage('Failed to update delivery address settings', 'error');
+        }
+    }
+
+    async saveRecaptchaSettings() {
+        const input = document.getElementById('setting-recaptcha-mode');
+        if (!input) return;
+        
+        const key = 'recaptcha_mode';
+        const currentValue = input.value;
+        const originalValue = this.lastPlatformSettings?.[key]?.value;
+        
+        if (currentValue === originalValue) {
+            this.showMessage('No changes to save', 'info');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ [key]: currentValue })
+            });
+
+            if (response.ok) {
+                this.showMessage('reCAPTCHA settings updated successfully', 'success');
+                this.loadPlatformSettings();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to update reCAPTCHA settings', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving reCAPTCHA settings:', error);
+            this.showMessage('Failed to update reCAPTCHA settings', 'error');
+        }
+    }
+
+    async saveRateLimitSettings() {
+        const keyToId = {
+            'auth_rate_limit_local': 'setting-auth-rate-limit-local',
+            'auth_rate_limit_production': 'setting-auth-rate-limit-production',
+            'otp_rate_limit_local': 'setting-otp-rate-limit-local',
+            'otp_rate_limit_production': 'setting-otp-rate-limit-production'
+        };
+        const updates = {};
+        
+        Object.entries(keyToId).forEach(([key, id]) => {
+            const input = document.getElementById(id);
+            if (input) {
+                const currentValue = input.value;
+                const originalValue = this.lastPlatformSettings?.[key]?.value;
+                if (currentValue !== originalValue) {
+                    updates[key] = currentValue;
+                }
+            }
+        });
+
+        if (Object.keys(updates).length === 0) {
+            this.showMessage('No changes to save', 'info');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify(updates)
+            });
+
+            if (response.ok) {
+                this.showMessage('Rate limit settings updated successfully', 'success');
+                this.loadPlatformSettings();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to update rate limit settings', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving rate limit settings:', error);
+            this.showMessage('Failed to update rate limit settings', 'error');
+        }
+    }
+
+    async saveOtpSettings() {
+        const keyToId = {
+            'otp_mode': 'setting-otp-mode',
+            'otp_bypass_code': 'setting-otp-bypass-code'
+        };
+        const updates = {};
+        
+        Object.entries(keyToId).forEach(([key, id]) => {
+            const input = document.getElementById(id);
+            if (input) {
+                const currentValue = input.value;
+                const originalValue = this.lastPlatformSettings?.[key]?.value;
+                if (currentValue !== originalValue) {
+                    updates[key] = currentValue;
+                }
+            }
+        });
+
+        if (Object.keys(updates).length === 0) {
+            this.showMessage('No changes to save', 'info');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify(updates)
+            });
+
+            if (response.ok) {
+                this.showMessage('OTP settings updated successfully', 'success');
+                this.loadPlatformSettings();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to update OTP settings', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving OTP settings:', error);
+            this.showMessage('Failed to update OTP settings', 'error');
+        }
+    }
+
+    async saveProductLimitsSettings() {
+        const keyToId = {
+            'max_products_per_farmer': 'setting-max-products-per-farmer',
+            'max_products_per_name_available': 'setting-max-products-per-name-available',
+            'max_products_per_name_preorder': 'setting-max-products-per-name-preorder'
+        };
+        const updates = {};
+        
+        Object.entries(keyToId).forEach(([key, id]) => {
+            const input = document.getElementById(id);
+            if (input) {
+                const currentValue = input.value;
+                const originalValue = this.lastPlatformSettings?.[key]?.value;
+                if (currentValue !== originalValue) {
+                    updates[key] = currentValue;
+                }
+            }
+        });
+
+        if (Object.keys(updates).length === 0) {
+            this.showMessage('No changes to save', 'info');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify(updates)
+            });
+
+            if (response.ok) {
+                this.showMessage('Product limits settings updated successfully', 'success');
+                this.loadPlatformSettings();
+            } else {
+                const data = await response.json().catch(() => ({}));
+                this.showMessage(data.message || 'Failed to update product limits settings', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving product limits settings:', error);
+            this.showMessage('Failed to update product limits settings', 'error');
         }
     }
 
@@ -7513,6 +7772,7 @@ class AdminDashboard {
                 <h4>Order Info</h4>
                 <p>Total: ${this.fmtCurrency(order.total_amount)}</p>
                 <p>Date: ${new Date(order.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                ${order.delivery_date ? `<p>Delivery Date: ${new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}
                 ${order.delivery_address ? `<p>Address: ${order.delivery_address}</p>` : ''}
             </div>
             <div class="panel-section">
@@ -10345,6 +10605,15 @@ function closeVerificationDocModal() {
 function closeVerificationDetailsModal() {
     if (adminDashboard) {
         adminDashboard.closeVerificationDetailsModal();
+    }
+}
+
+function loadVerificationRequests(page, status) {
+    if (adminDashboard) {
+        adminDashboard.loadVerificationRequests(page, status);
+    }
+}
+
     }
 }
 
