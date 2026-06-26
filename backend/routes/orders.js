@@ -1214,6 +1214,17 @@ router.put('/:id/delivery-date', async (req, res) => {
 
     // Check if this is a reschedule (order already has delivery date)
     const isReschedule = order.status === 'scheduled' && order.delivery_date;
+    const rescheduleReason = req.body.reschedule_reason;
+
+    // Require reason for rescheduling
+    if (isReschedule && !rescheduleReason) {
+      return res.status(400).json({ message: 'Reason for rescheduling is required' });
+    }
+
+    // Validate reschedule reason length
+    if (rescheduleReason && rescheduleReason.length > 300) {
+      return res.status(400).json({ message: 'Reason must be 300 characters or less' });
+    }
 
     // Update order with delivery date and set status to scheduled
     const client = await pool.connect();
@@ -1224,14 +1235,18 @@ router.put('/:id/delivery-date', async (req, res) => {
         UPDATE orders
         SET delivery_date = $1,
             status = 'scheduled',
+            reschedule_reason = $2,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2
-      `, [delivery_date, orderId]);
+        WHERE id = $3
+      `, [delivery_date, isReschedule ? rescheduleReason : null, orderId]);
 
       // Send notification to customer
-      const message = isReschedule 
-        ? `Your delivery date for order #${orderId} has been updated to ${delivery_date}.`
-        : `Your order #${orderId} has been scheduled for delivery on ${delivery_date}.`;
+      let message;
+      if (isReschedule) {
+        message = `Your delivery date for order #${orderId} has been updated to ${delivery_date}.\n\nReason: ${rescheduleReason}`;
+      } else {
+        message = `Your order #${orderId} has been scheduled for delivery on ${delivery_date}.`;
+      }
       const notificationTitle = isReschedule ? 'Delivery Rescheduled' : 'Delivery Scheduled';
       await client.query(`
         INSERT INTO notifications (user_id, type, title, message, order_id, product_id)

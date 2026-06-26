@@ -12,15 +12,27 @@ function generateOtp() {
 }
 
 async function shouldExposeOtpForDebug() {
-  const { getPlatformSetting } = require('../utils/db');
+  const { pool } = require('../utils/db');
   // Check OTP mode - only expose in testing mode
-  const otpMode = await getPlatformSetting('otp_mode', 'strict');
-  return otpMode === 'testing';
+  // bypass_only mode: bypass works but OTP is NOT exposed (secret)
+  // Bypass cache for security-sensitive check
+  try {
+    const result = await pool.query(
+      'SELECT value FROM platform_settings WHERE key = $1',
+      ['otp_mode']
+    );
+    const otpMode = result.rows.length > 0 ? result.rows[0].value : 'strict';
+    return otpMode === 'testing';
+  } catch (error) {
+    console.error('Error checking otp_mode:', error);
+    return false; // Default to not exposing on error
+  }
 }
 
 async function getOtpBypassCode() {
   const { getPlatformSetting } = require('../utils/db');
-  // Bypass code works in all modes for easier testing
+  // Bypass code works in all modes except disabled
+  // bypass_only mode: bypass works but OTP is NOT exposed (secret)
   const otpMode = await getPlatformSetting('otp_mode', 'strict');
   if (otpMode === 'disabled') {
     return null; // No bypass code if OTP is completely disabled
@@ -157,7 +169,8 @@ router.post('/send', async (req, res) => {
           emailDelivery: 'failed',
           emailError: emailResult.error || 'Unknown email error'
         };
-        if (shouldExposeOtpForDebug()) {
+        // Only expose OTP in testing mode, not in bypass_only mode
+        if (await shouldExposeOtpForDebug()) {
           responseData.otp = otp;
         }
         return res.json({
