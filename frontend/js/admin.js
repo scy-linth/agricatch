@@ -4000,6 +4000,9 @@ class AdminDashboard {
 
             if (response.ok) {
                 this.showMessage('Core settings updated successfully', 'success');
+                // Clear delivery fee cache so checkout gets the new value
+                localStorage.removeItem('cached_delivery_fee');
+                localStorage.removeItem('cached_delivery_fee_timestamp');
                 this.loadPlatformSettings();
             } else {
                 const data = await response.json().catch(() => ({}));
