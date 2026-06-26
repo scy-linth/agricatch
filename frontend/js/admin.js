@@ -3660,15 +3660,19 @@ class AdminDashboard {
             return;
         }
 
+        console.log('Platform settings loaded:', settings);
+
         container.innerHTML = entries.map(([key, data]) => {
             if (key === 'delivery_fee') {
+                const deliveryFeeValue = data.value || '35';
+                console.log('Delivery fee value:', deliveryFeeValue);
                 return `
                     <div class="mb-3">
                         <label for="setting-delivery_fee" class="form-label fw-semibold">Delivery Fee (₱)</label>
                         <input type="number" id="setting-delivery_fee" class="form-control platform-setting-input"
-                               data-key="${key}" min="0" step="1" value="${this.escapeHtml(data.value || '35')}">
-                        <div class="form-text text-muted">
-                            Current value: <span class="badge bg-primary" id="value-delivery_fee">₱${this.escapeHtml(data.value || '35')}</span>
+                               data-key="${key}" min="0" step="1" value="${this.escapeHtml(deliveryFeeValue)}">
+                        <div class="form-text text-muted" style="font-size: 0.85rem; font-weight: 500;">
+                            Current value: <span class="badge bg-primary" id="value-delivery_fee" style="font-size: 0.9rem;">₱${this.escapeHtml(deliveryFeeValue)}</span>
                         </div>
                         <div class="form-text text-muted">Set to 0 to disable delivery fee - it will not appear in checkout</div>
                         <small class="text-muted">Last updated: ${data.updated_at ? new Date(data.updated_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</small>
@@ -3829,13 +3833,13 @@ class AdminDashboard {
             const valueSpan = document.getElementById('value-otp_mode');
             if (valueSpan) {
                 valueSpan.textContent = value;
-                valueSpan.className = value === 'strict' ? 'badge bg-success' : (value === 'testing' ? 'badge bg-warning text-dark' : (value === 'bypass_only' ? 'badge bg-primary' : 'badge bg-danger'));
+                valueSpan.className = value === 'strict' ? 'badge bg-success' : (value === 'testing' ? 'badge bg-warning text-dark' : (value === 'bypass' ? 'badge bg-info' : (value === 'bypass_only' ? 'badge bg-primary' : 'badge bg-danger')));
             }
             otpMode.onchange = () => {
                 const newValue = otpMode.value;
                 if (valueSpan) {
                     valueSpan.textContent = newValue;
-                    valueSpan.className = newValue === 'strict' ? 'badge bg-success' : (newValue === 'testing' ? 'badge bg-warning text-dark' : (newValue === 'bypass_only' ? 'badge bg-primary' : 'badge bg-danger'));
+                    valueSpan.className = newValue === 'strict' ? 'badge bg-success' : (newValue === 'testing' ? 'badge bg-warning text-dark' : (newValue === 'bypass' ? 'badge bg-info' : (newValue === 'bypass_only' ? 'badge bg-primary' : 'badge bg-danger')));
                 }
             };
         }
