@@ -3672,8 +3672,8 @@ class AdminDashboard {
                     </div>
                 `;
             }
-            // Skip security settings and internal fields - they have dedicated UI elements or should not be displayed
-            if (['recaptcha_mode', 'recaptcha_enabled', 'auth_rate_limit', 'auth_rate_limit_local', 'auth_rate_limit_production', 'otp_rate_limit', 'otp_rate_limit_local', 'otp_rate_limit_production', 'otp_mode', 'otp_bypass_code', 'otp_enabled', 'dev_expose_otp', 'use_default_delivery_address', 'max_products_per_farmer', 'max_products_per_name_available', 'max_products_per_name_preorder', 'updates'].includes(key)) {
+            // Skip security settings, subscription pricing, and internal fields - they have dedicated UI elements or should not be displayed
+            if (['recaptcha_mode', 'recaptcha_enabled', 'auth_rate_limit', 'auth_rate_limit_local', 'auth_rate_limit_production', 'otp_rate_limit', 'otp_rate_limit_local', 'otp_rate_limit_production', 'otp_mode', 'otp_bypass_code', 'otp_enabled', 'dev_expose_otp', 'use_default_delivery_address', 'max_products_per_farmer', 'max_products_per_name_available', 'max_products_per_name_preorder', 'premium_monthly_price', 'premium_3month_discount_pct', 'premium_6month_discount_pct', 'updates'].includes(key)) {
                 return '';
             }
             return `
@@ -3705,67 +3705,135 @@ class AdminDashboard {
         // reCAPTCHA mode
         const recaptchaMode = document.getElementById('setting-recaptcha-mode');
         if (recaptchaMode) {
-            recaptchaMode.value = settings.recaptcha_mode?.value || 'auto';
-            // Removed immediate save - will save via Save All button
+            const value = settings.recaptcha_mode?.value || 'auto';
+            recaptchaMode.value = value;
+            const valueSpan = document.getElementById('value-recaptcha_mode');
+            if (valueSpan) {
+                valueSpan.textContent = value;
+                valueSpan.className = value === 'auto' ? 'badge bg-info' : (value === 'always_on' ? 'badge bg-success' : 'badge bg-warning');
+            }
+            // Add real-time update listener
+            recaptchaMode.onchange = () => {
+                const newValue = recaptchaMode.value;
+                if (valueSpan) {
+                    valueSpan.textContent = newValue;
+                    valueSpan.className = newValue === 'auto' ? 'badge bg-info' : (newValue === 'always_on' ? 'badge bg-success' : 'badge bg-warning');
+                }
+            };
         }
 
         // Rate limiting - environment-aware
         const authRateLimitLocal = document.getElementById('setting-auth-rate-limit-local');
         if (authRateLimitLocal) {
-            authRateLimitLocal.value = settings.auth_rate_limit_local?.value || '100';
-            // Removed immediate save - will save via Save All button
+            const value = settings.auth_rate_limit_local?.value || '100';
+            authRateLimitLocal.value = value;
+            const valueSpan = document.getElementById('value-auth_rate_limit_local');
+            if (valueSpan) valueSpan.textContent = value;
+            authRateLimitLocal.oninput = () => { if (valueSpan) valueSpan.textContent = authRateLimitLocal.value; };
         }
 
         const authRateLimitProduction = document.getElementById('setting-auth-rate-limit-production');
         if (authRateLimitProduction) {
-            authRateLimitProduction.value = settings.auth_rate_limit_production?.value || '20';
-            // Removed immediate save - will save via Save All button
+            const value = settings.auth_rate_limit_production?.value || '20';
+            authRateLimitProduction.value = value;
+            const valueSpan = document.getElementById('value-auth_rate_limit_production');
+            if (valueSpan) valueSpan.textContent = value;
+            authRateLimitProduction.oninput = () => { if (valueSpan) valueSpan.textContent = authRateLimitProduction.value; };
         }
 
         const otpRateLimitLocal = document.getElementById('setting-otp-rate-limit-local');
         if (otpRateLimitLocal) {
-            otpRateLimitLocal.value = settings.otp_rate_limit_local?.value || '50';
-            // Removed immediate save - will save via Save All button
+            const value = settings.otp_rate_limit_local?.value || '50';
+            otpRateLimitLocal.value = value;
+            const valueSpan = document.getElementById('value-otp_rate_limit_local');
+            if (valueSpan) valueSpan.textContent = value;
+            otpRateLimitLocal.oninput = () => { if (valueSpan) valueSpan.textContent = otpRateLimitLocal.value; };
         }
 
         const otpRateLimitProduction = document.getElementById('setting-otp-rate-limit-production');
         if (otpRateLimitProduction) {
-            otpRateLimitProduction.value = settings.otp_rate_limit_production?.value || '10';
-            // Removed immediate save - will save via Save All button
+            const value = settings.otp_rate_limit_production?.value || '10';
+            otpRateLimitProduction.value = value;
+            const valueSpan = document.getElementById('value-otp_rate_limit_production');
+            if (valueSpan) valueSpan.textContent = value;
+            otpRateLimitProduction.oninput = () => { if (valueSpan) valueSpan.textContent = otpRateLimitProduction.value; };
         }
 
         // Max products per farmer
         const maxProductsPerFarmer = document.getElementById('setting-max-products-per-farmer');
         if (maxProductsPerFarmer) {
-            maxProductsPerFarmer.value = settings.max_products_per_farmer?.value || '10';
-            // Removed immediate save - will save via Save All button
+            const value = settings.max_products_per_farmer?.value || '10';
+            maxProductsPerFarmer.value = value;
+            const valueSpan = document.getElementById('value-max_products_per_farmer');
+            if (valueSpan) valueSpan.textContent = value;
+            maxProductsPerFarmer.oninput = () => { if (valueSpan) valueSpan.textContent = maxProductsPerFarmer.value; };
         }
 
         // Max products per name (available)
         const maxProductsPerNameAvailable = document.getElementById('setting-max-products-per-name-available');
         if (maxProductsPerNameAvailable) {
-            maxProductsPerNameAvailable.value = settings.max_products_per_name_available?.value || '1';
-            // Removed immediate save - will save via Save All button
+            const value = settings.max_products_per_name_available?.value || '1';
+            maxProductsPerNameAvailable.value = value;
+            const valueSpan = document.getElementById('value-max_products_per_name_available');
+            if (valueSpan) valueSpan.textContent = value;
+            maxProductsPerNameAvailable.oninput = () => { if (valueSpan) valueSpan.textContent = maxProductsPerNameAvailable.value; };
         }
 
         // Max products per name (preorder)
         const maxProductsPerNamePreorder = document.getElementById('setting-max-products-per-name-preorder');
         if (maxProductsPerNamePreorder) {
-            maxProductsPerNamePreorder.value = settings.max_products_per_name_preorder?.value || '1';
-            // Removed immediate save - will save via Save All button
+            const value = settings.max_products_per_name_preorder?.value || '1';
+            maxProductsPerNamePreorder.value = value;
+            const valueSpan = document.getElementById('value-max_products_per_name_preorder');
+            if (valueSpan) valueSpan.textContent = value;
+            maxProductsPerNamePreorder.oninput = () => { if (valueSpan) valueSpan.textContent = maxProductsPerNamePreorder.value; };
         }
 
         // OTP mode (single selection)
         const otpMode = document.getElementById('setting-otp-mode');
         if (otpMode) {
-            otpMode.value = settings.otp_mode?.value || 'strict';
-            // Removed immediate save - will save via Save All button
+            const value = settings.otp_mode?.value || 'strict';
+            otpMode.value = value;
+            const valueSpan = document.getElementById('value-otp_mode');
+            if (valueSpan) {
+                valueSpan.textContent = value;
+                valueSpan.className = value === 'strict' ? 'badge bg-success' : (value === 'testing' ? 'badge bg-warning text-dark' : 'badge bg-danger');
+            }
+            otpMode.onchange = () => {
+                const newValue = otpMode.value;
+                if (valueSpan) {
+                    valueSpan.textContent = newValue;
+                    valueSpan.className = newValue === 'strict' ? 'badge bg-success' : (newValue === 'testing' ? 'badge bg-warning text-dark' : 'badge bg-danger');
+                }
+            };
         }
 
         const otpBypassCode = document.getElementById('setting-otp-bypass-code');
         if (otpBypassCode) {
-            otpBypassCode.value = settings.otp_bypass_code?.value || '789878';
-            // Removed immediate save - will save via Save All button
+            const value = settings.otp_bypass_code?.value || '789878';
+            otpBypassCode.value = value;
+            const valueSpan = document.getElementById('value-otp_bypass_code');
+            if (valueSpan) valueSpan.textContent = value;
+            otpBypassCode.oninput = () => { if (valueSpan) valueSpan.textContent = otpBypassCode.value; };
+        }
+
+        // Delivery address setting
+        const useDefaultAddressCheckbox = document.getElementById('setting-use-default-delivery-address');
+        if (useDefaultAddressCheckbox) {
+            const value = settings.use_default_delivery_address?.value === 'true';
+            useDefaultAddressCheckbox.checked = value;
+            const valueSpan = document.getElementById('value-use_default_delivery_address');
+            if (valueSpan) {
+                valueSpan.textContent = value ? 'ON' : 'OFF';
+                valueSpan.className = value ? 'badge bg-success' : 'badge bg-secondary';
+            }
+            useDefaultAddressCheckbox.onchange = () => {
+                const newValue = useDefaultAddressCheckbox.checked;
+                if (valueSpan) {
+                    valueSpan.textContent = newValue ? 'ON' : 'OFF';
+                    valueSpan.className = newValue ? 'badge bg-success' : 'badge bg-secondary';
+                }
+            };
         }
         
         // Show environment indicator
@@ -3836,9 +3904,22 @@ class AdminDashboard {
         const inputs = document.querySelectorAll('.platform-setting-input');
         const updates = {};
         inputs.forEach(input => {
-            const value = input.type === 'checkbox' ? (input.checked ? 'true' : 'false') : input.value;
-            updates[input.dataset.key] = value;
+            const key = input.dataset.key;
+            if (!key) return;
+            
+            const currentValue = input.type === 'checkbox' ? (input.checked ? 'true' : 'false') : input.value;
+            const originalValue = this.lastPlatformSettings?.[key]?.value;
+            
+            // Only include if value has changed
+            if (currentValue !== originalValue) {
+                updates[key] = currentValue;
+            }
         });
+
+        if (Object.keys(updates).length === 0) {
+            this.showMessage('No changes to save', 'info');
+            return;
+        }
 
         try {
             const response = await fetch(`${this.apiBase}/superadmin/settings`, {
@@ -3903,6 +3984,10 @@ class AdminDashboard {
                 <div class="flex-grow-1 min-width-0">
                     <div class="ac-flag-name">${this.escapeHtml(flag.name)}</div>
                     <div class="ac-flag-desc">${this.escapeHtml(flag.description || '')}</div>
+                    <div class="ac-flag-key">
+                        <code class="text-muted" style="font-size: 11px;">${this.escapeHtml(flag.key)}</code>
+                        <span class="badge ${flag.enabled ? 'bg-success' : 'bg-secondary'} ms-2" style="font-size: 10px;">${flag.enabled ? 'ON' : 'OFF'}</span>
+                    </div>
                 </div>
                 <div class="ac-flag-meta">
                     <span class="text-muted" style="font-size:.74rem">${flag.updated_at ? new Date(flag.updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</span>
@@ -8715,7 +8800,17 @@ class AdminDashboard {
         window.location.href = '/';
     }
 
-    logout() {
+    async logout() {
+        try {
+            // Call backend logout endpoint to create audit log
+            await fetch(`${this.apiBase}/auth/logout`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+        } catch (error) {
+            // Continue with logout even if backend call fails
+            console.error('Logout API call failed:', error);
+        }
         localStorage.removeItem('token');
         window.location.href = '/';
     }
@@ -9945,18 +10040,60 @@ class AdminDashboard {
             const monthlyEl = document.getElementById('setting-premium-monthly-price');
             const d3El = document.getElementById('setting-discount-3m');
             const d6El = document.getElementById('setting-discount-6m');
-            if (monthlyEl) monthlyEl.value = data.monthly_price;
-            if (d3El) d3El.value = data.durations[3]?.discount_pct || 10;
-            if (d6El) d6El.value = data.durations[6]?.discount_pct || 20;
+            
+            const monthlyPrice = data.monthly_price || '299';
+            const d3Discount = data.durations[3]?.discount_pct || '10';
+            const d6Discount = data.durations[6]?.discount_pct || '20';
+            
+            if (monthlyEl) {
+                monthlyEl.value = monthlyPrice;
+                const valueSpan = document.getElementById('value-premium_monthly_price');
+                if (valueSpan) valueSpan.textContent = monthlyPrice;
+                monthlyEl.oninput = () => { if (valueSpan) valueSpan.textContent = monthlyEl.value; };
+            }
+            if (d3El) {
+                d3El.value = d3Discount;
+                const valueSpan = document.getElementById('value-premium_3month_discount_pct');
+                if (valueSpan) valueSpan.textContent = d3Discount;
+                d3El.oninput = () => { if (valueSpan) valueSpan.textContent = d3El.value; };
+            }
+            if (d6El) {
+                d6El.value = d6Discount;
+                const valueSpan = document.getElementById('value-premium_6month_discount_pct');
+                if (valueSpan) valueSpan.textContent = d6Discount;
+                d6El.oninput = () => { if (valueSpan) valueSpan.textContent = d6El.value; };
+            }
+            
+            // Store original values for change detection
+            this.lastSubscriptionSettings = {
+                premium_monthly_price: monthlyPrice,
+                premium_3month_discount_pct: d3Discount,
+                premium_6month_discount_pct: d6Discount
+            };
         } catch (e) { console.error('Load subscription settings error:', e); }
     }
 
     async saveSubscriptionSettings() {
-        const updates = {
-            premium_monthly_price: document.getElementById('setting-premium-monthly-price')?.value,
-            premium_3month_discount_pct: document.getElementById('setting-discount-3m')?.value,
-            premium_6month_discount_pct: document.getElementById('setting-discount-6m')?.value
-        };
+        const updates = {};
+        const monthlyEl = document.getElementById('setting-premium-monthly-price');
+        const d3El = document.getElementById('setting-discount-3m');
+        const d6El = document.getElementById('setting-discount-6m');
+        
+        if (monthlyEl && monthlyEl.value !== this.lastSubscriptionSettings?.premium_monthly_price) {
+            updates.premium_monthly_price = monthlyEl.value;
+        }
+        if (d3El && d3El.value !== this.lastSubscriptionSettings?.premium_3month_discount_pct) {
+            updates.premium_3month_discount_pct = d3El.value;
+        }
+        if (d6El && d6El.value !== this.lastSubscriptionSettings?.premium_6month_discount_pct) {
+            updates.premium_6month_discount_pct = d6El.value;
+        }
+        
+        if (Object.keys(updates).length === 0) {
+            this.showToast('No changes to save', 'info');
+            return;
+        }
+        
         try {
             const res = await fetch(`${this.apiBase}/superadmin/settings`, {
                 method: 'PUT',
@@ -9964,8 +10101,12 @@ class AdminDashboard {
                 body: JSON.stringify(updates)
             });
             const data = await res.json();
-            if (res.ok) { this.showToast('Pricing saved', 'success'); }
-            else { this.showToast(data.message || 'Failed to save', 'error'); }
+            if (res.ok) {
+                this.showToast('Pricing saved', 'success');
+                this.loadSubscriptionSettings();
+            } else {
+                this.showToast(data.message || 'Failed to save', 'error');
+            }
         } catch (e) { this.showToast('Error saving pricing', 'error'); }
     }
 

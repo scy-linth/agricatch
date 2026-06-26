@@ -4684,11 +4684,22 @@ class AgricultureMarket {
         }
     }
 
-    logout() {
+    async logout() {
         // Show loading screen
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
             loadingScreen.classList.remove('hidden');
+        }
+
+        try {
+            // Call backend logout endpoint to create audit log
+            await fetch(`${this.apiBase}/auth/logout`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+        } catch (error) {
+            // Continue with logout even if backend call fails
+            console.error('Logout API call failed:', error);
         }
 
         this.token = null;

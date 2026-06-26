@@ -736,9 +736,9 @@ function createAuthRateLimit() {
     },
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => {
-      const path = String(req.path || '').toLowerCase();
-      return !(req.method === 'POST' && (path === '/login' || path === '/recover-admin'));
+    keyGenerator: (req) => {
+      // Use IP address as key for rate limiting
+      return req.ip || req.connection.remoteAddress || 'unknown';
     },
     message: { error: 'Too many requests. Please try again later.' }
   });
@@ -757,6 +757,10 @@ function createOtpRateLimit() {
     },
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: (req) => {
+      // Use IP address as key for rate limiting
+      return req.ip || req.connection.remoteAddress || 'unknown';
+    },
     message: { error: 'Too many OTP requests. Please try again later.' }
   });
 }

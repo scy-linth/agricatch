@@ -7210,21 +7210,7 @@ class FarmerDashboard {
                 throw new Error('Price and stock must be zero or higher.');
             }
 
-            // Upload image through backend
-            let imageUrl = '';
-            let imagePublicId = '';
-            const imageFile = document.getElementById('available-image').files[0];
-            if (imageFile) {
-                const uploaded = await this.uploadProductImage(imageFile, {
-                    name,
-                    category_id,
-                    category_name: categoryInput?.selectedOptions?.[0]?.text || ''
-                });
-                imageUrl = uploaded.imageUrl || '';
-                imagePublicId = uploaded.public_id || '';
-            }
-
-            // Send product data to backend
+            // Send product data to backend first to get product_id
             const formData = new FormData();
             formData.append('name', name);
             formData.append('description', description);
@@ -7236,7 +7222,6 @@ class FarmerDashboard {
             formData.append('harvest_date', '');
             formData.append('expiry_date', expiryDate);
             formData.append('is_preorder', 'false');
-            if (imageUrl) formData.append('image_url', imageUrl);
 
             const response = await fetch(`${this.apiBase}/products`, {
                 method: 'POST',
@@ -7246,17 +7231,47 @@ class FarmerDashboard {
 
             const data = await response.json();
 
-            if (response.ok) {
-                this.showMessage('Product added successfully!', 'success');
-                document.getElementById('add-available-form').reset();
-                const preview = document.getElementById('available-image-preview');
-                if (preview) preview.innerHTML = '';
-                this.closeAddAvailableModal();
-                this.loadMyProducts();
-                this.loadFarmerStats();
-            } else {
+            if (!response.ok) {
                 throw new Error(data.message || 'Failed to add product');
             }
+
+            // Upload image with product_id for direct categorized storage
+            let imageUrl = '';
+            let imagePublicId = '';
+            const imageFile = document.getElementById('available-image').files[0];
+            if (imageFile) {
+                const uploaded = await this.uploadProductImage(imageFile, {
+                    name,
+                    category_id,
+                    category_name: categoryInput?.selectedOptions?.[0]?.text || '',
+                    product_id: data.product.id
+                });
+                imageUrl = uploaded.imageUrl || '';
+                imagePublicId = uploaded.public_id || '';
+
+                // Update product with image URL
+                const updateFormData = new FormData();
+                updateFormData.append('image_url', imageUrl);
+                updateFormData.append('cloudinary_public_id', imagePublicId);
+
+                const updateResponse = await fetch(`${this.apiBase}/products/${data.product.id}`, {
+                    method: 'PUT',
+                    headers: { Authorization: `Bearer ${this.token}` },
+                    body: updateFormData
+                });
+
+                if (!updateResponse.ok) {
+                    console.error('Failed to update product image:', await updateResponse.json());
+                }
+            }
+
+            this.showMessage('Product added successfully!', 'success');
+            document.getElementById('add-available-form').reset();
+            const preview = document.getElementById('available-image-preview');
+            if (preview) preview.innerHTML = '';
+            this.closeAddAvailableModal();
+            this.loadMyProducts();
+            this.loadFarmerStats();
         } catch (error) {
             console.error('Error adding product:', error);
             this.showMessage(error.message || 'Error adding product', 'error');
@@ -7314,21 +7329,7 @@ class FarmerDashboard {
                 throw new Error('Expected harvest date is required for pre-orders.');
             }
 
-            // Upload image through backend
-            let imageUrl = '';
-            let imagePublicId = '';
-            const imageFile = document.getElementById('preorder-image').files[0];
-            if (imageFile) {
-                const uploaded = await this.uploadProductImage(imageFile, {
-                    name,
-                    category_id,
-                    category_name: categoryInput?.selectedOptions?.[0]?.text || ''
-                });
-                imageUrl = uploaded.imageUrl || '';
-                imagePublicId = uploaded.public_id || '';
-            }
-
-            // Send product data to backend
+            // Send product data to backend first to get product_id
             const formData = new FormData();
             formData.append('name', name);
             formData.append('description', description);
@@ -7342,7 +7343,6 @@ class FarmerDashboard {
             formData.append('is_preorder', 'true');
             formData.append('max_preorder_quantity', maxPreorderQuantity);
             formData.append('preorder_availability_date', preorderAvailabilityDate);
-            if (imageUrl) formData.append('image_url', imageUrl);
 
             const response = await fetch(`${this.apiBase}/products`, {
                 method: 'POST',
@@ -7352,17 +7352,47 @@ class FarmerDashboard {
 
             const data = await response.json();
 
-            if (response.ok) {
-                this.showMessage('Product added successfully!', 'success');
-                document.getElementById('add-preorder-form').reset();
-                const preview = document.getElementById('preorder-image-preview');
-                if (preview) preview.innerHTML = '';
-                this.closeAddPreorderModal();
-                this.loadMyProducts();
-                this.loadFarmerStats();
-            } else {
+            if (!response.ok) {
                 throw new Error(data.message || 'Failed to add product');
             }
+
+            // Upload image with product_id for direct categorized storage
+            let imageUrl = '';
+            let imagePublicId = '';
+            const imageFile = document.getElementById('preorder-image').files[0];
+            if (imageFile) {
+                const uploaded = await this.uploadProductImage(imageFile, {
+                    name,
+                    category_id,
+                    category_name: categoryInput?.selectedOptions?.[0]?.text || '',
+                    product_id: data.product.id
+                });
+                imageUrl = uploaded.imageUrl || '';
+                imagePublicId = uploaded.public_id || '';
+
+                // Update product with image URL
+                const updateFormData = new FormData();
+                updateFormData.append('image_url', imageUrl);
+                updateFormData.append('cloudinary_public_id', imagePublicId);
+
+                const updateResponse = await fetch(`${this.apiBase}/products/${data.product.id}`, {
+                    method: 'PUT',
+                    headers: { Authorization: `Bearer ${this.token}` },
+                    body: updateFormData
+                });
+
+                if (!updateResponse.ok) {
+                    console.error('Failed to update product image:', await updateResponse.json());
+                }
+            }
+
+            this.showMessage('Product added successfully!', 'success');
+            document.getElementById('add-preorder-form').reset();
+            const preview = document.getElementById('preorder-image-preview');
+            if (preview) preview.innerHTML = '';
+            this.closeAddPreorderModal();
+            this.loadMyProducts();
+            this.loadFarmerStats();
         } catch (error) {
             console.error('Error adding product:', error);
             this.showMessage(error.message || 'Error adding product', 'error');
@@ -7516,7 +7546,8 @@ class FarmerDashboard {
                     const uploaded = await this.uploadProductImage(imageFile, {
                         name: editName,
                         category_id: editCategoryId,
-                        category_name: editCategorySelect?.selectedOptions?.[0]?.text || ''
+                        category_name: editCategorySelect?.selectedOptions?.[0]?.text || '',
+                        product_id: productId
                     });
                     if (uploaded.imageUrl) formData.append('image_url', uploaded.imageUrl);
                     if (uploaded.public_id) formData.append('cloudinary_public_id', uploaded.public_id);
@@ -9657,7 +9688,17 @@ class FarmerDashboard {
         this.showMessage('Order details feature coming soon!', 'info');
     }
 
-    logout() {
+    async logout() {
+        try {
+            // Call backend logout endpoint to create audit log
+            await fetch(`${this.apiBase}/auth/logout`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+        } catch (error) {
+            // Continue with logout even if backend call fails
+            console.error('Logout API call failed:', error);
+        }
         localStorage.removeItem('token');
         window.location.href = '/';
     }
@@ -10292,7 +10333,7 @@ class FarmerDashboard {
         if (!tbody) return;
 
         if (this.supportTickets.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No support tickets yet. Click "Create New Ticket" to get help.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No support tickets yet. Click "Create New Ticket" to get help.</td></tr>';
             return;
         }
 
@@ -10308,6 +10349,7 @@ class FarmerDashboard {
             return `
                 <tr>
                     <td>${this.escapeHtml(ticket.subject)}</td>
+                    <td class="text-center">#${ticket.id}</td>
                     <td class="text-center"><span style="background:${style.bg};color:${style.color};font-size:0.75rem;font-weight:600;padding:4px 10px;border-radius:9999px;text-transform:uppercase;">${style.label}</span></td>
                     <td>${new Date(ticket.created_at).toLocaleDateString('en-PH')}</td>
                     <td>

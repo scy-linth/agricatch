@@ -912,7 +912,7 @@ class CustomerAccount {
             console.error('Load tickets error:', error);
             const tbody = document.querySelector('#support-tickets-table tbody');
             if (tbody) {
-                tbody.innerHTML = `<tr class="empty-row"><td colspan="4">Unable to load tickets. Please try again.</td></tr>`;
+                tbody.innerHTML = `<tr class="empty-row"><td colspan="5">Unable to load tickets. Please try again.</td></tr>`;
             }
         }
     }
@@ -921,7 +921,7 @@ class CustomerAccount {
         const tbody = document.querySelector('#support-tickets-table tbody');
         if (!tbody) return;
         if (!this.tickets.length) {
-            tbody.innerHTML = `<tr class="empty-row"><td colspan="4">No support tickets yet. Create one to get help.</td></tr>`;
+            tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No support tickets yet. Create one to get help.</td></tr>`;
             return;
         }
         tbody.innerHTML = this.tickets.map(ticket => {
@@ -936,6 +936,7 @@ class CustomerAccount {
             return `
                 <tr>
                     <td>${this.escapeHtml(ticket.subject)}</td>
+                    <td class="text-center">#${ticket.id}</td>
                     <td class="text-center"><span style="background:${style.bg};color:${style.color};font-size:0.75rem;font-weight:600;padding:4px 10px;border-radius:9999px;text-transform:uppercase;">${style.label}</span></td>
                     <td>${new Date(ticket.created_at).toLocaleDateString('en-PH')}</td>
                     <td>
@@ -1211,7 +1212,17 @@ class CustomerAccount {
         return div.innerHTML;
     }
 
-    logout() {
+    async logout() {
+        try {
+            // Call backend logout endpoint to create audit log
+            await fetch(`${this.apiBase}/auth/logout`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+        } catch (error) {
+            // Continue with logout even if backend call fails
+            console.error('Logout API call failed:', error);
+        }
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/';

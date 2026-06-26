@@ -667,7 +667,7 @@ router.get('/security-log', requireSuperAdmin, async (req, res) => {
 
     const SECURITY_ACTIONS = [
       'user.role_change', 'user.password_reset', 'user.create', 'user.disable', 'user.enable',
-      'login.failed', 'login.success', 'auth.recover_admin',
+      'login.failed', 'login.success', 'logout.success', 'auth.recover_admin',
       'otp.sent', 'otp.verify_success', 'otp.verify_failed'
     ];
     
