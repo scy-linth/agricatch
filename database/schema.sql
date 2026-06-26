@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS orders (
     cancelled_at TIMESTAMP,
     cancellation_reason TEXT,
     cancelled_by VARCHAR(20),
+    reschedule_reason TEXT,
     replacement_order_id INTEGER,
     special_instructions TEXT,
     delivered_at TIMESTAMP,

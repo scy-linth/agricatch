@@ -83,4 +83,22 @@ router.get('/product-limits', async (req, res) => {
   }
 });
 
+// ── GET /api/settings/recaptcha-mode ─────────────────────────────────────────────
+// Public endpoint - no authentication required
+// Returns the recaptcha_mode setting
+router.get('/recaptcha-mode', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT value FROM platform_settings WHERE key = 'recaptcha_mode'`
+    );
+    
+    const recaptchaMode = result.rows.length > 0 ? result.rows[0].value : 'auto';
+    res.json({ recaptcha_mode: recaptchaMode });
+  } catch (err) {
+    console.error('Error fetching recaptcha mode:', err);
+    // Fallback to auto on error
+    res.json({ recaptcha_mode: 'auto' });
+  }
+});
+
 module.exports = router;

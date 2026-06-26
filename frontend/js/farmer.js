@@ -9519,6 +9519,9 @@ class FarmerDashboard {
         const modal = document.getElementById('schedule-delivery-modal');
         const orderText = document.getElementById('schedule-delivery-order');
         const dateInput = document.getElementById('delivery-date-input');
+        const reasonContainer = document.getElementById('reschedule-reason-container');
+        const reasonInput = document.getElementById('reschedule-reason-input');
+        const reasonCount = document.getElementById('reschedule-reason-count');
         
         if (modal && orderText && dateInput) {
             orderText.textContent = `Order #${orderId}`;
@@ -9528,12 +9531,34 @@ class FarmerDashboard {
             
             // Pre-fill existing delivery date if available (for rescheduling)
             const order = this.lastOrdersById?.get(Number(orderId));
-            if (order && order.delivery_date) {
+            const isReschedule = order && order.delivery_date && order.status === 'scheduled';
+            
+            if (isReschedule) {
                 dateInput.value = order.delivery_date;
+                // Show reason field for rescheduling
+                if (reasonContainer) reasonContainer.style.display = 'block';
+                if (reasonInput) {
+                    reasonInput.value = '';
+                    reasonInput.required = true;
+                }
+                if (reasonCount) reasonCount.textContent = '0';
             } else {
                 dateInput.value = today;
+                // Hide reason field for initial scheduling
+                if (reasonContainer) reasonContainer.style.display = 'none';
+                if (reasonInput) {
+                    reasonInput.value = '';
+                    reasonInput.required = false;
+                }
             }
             dateInput.required = true;
+            
+            // Add character count listener
+            if (reasonInput && reasonCount) {
+                reasonInput.oninput = () => {
+                    reasonCount.textContent = reasonInput.value.length;
+                };
+            }
             
             this.currentScheduleOrderId = orderId;
             modal.classList.add('open');
@@ -9555,6 +9580,8 @@ class FarmerDashboard {
         
         const dateInput = document.getElementById('delivery-date-input');
         const deliveryDate = dateInput?.value;
+        const reasonInput = document.getElementById('reschedule-reason-input');
+        const rescheduleReason = reasonInput?.value?.trim();
         
         if (!deliveryDate) {
             this.showMessage('Please select a delivery date', 'error');
@@ -9568,24 +9595,38 @@ class FarmerDashboard {
             return;
         }
         
+        // Check if this is a reschedule (reason field is visible)
+        const isReschedule = document.getElementById('reschedule-reason-container')?.style.display !== 'none';
+        
+        // Require reason for rescheduling
+        if (isReschedule && !rescheduleReason) {
+            this.showMessage('Please provide a reason for rescheduling', 'error');
+            return;
+        }
+        
         if (!this.currentScheduleOrderId) {
             this.showMessage('Order ID not found', 'error');
             return;
         }
         
         try {
-            this.debugLog('API Call', { method: 'PUT', endpoint: `/orders/${this.currentScheduleOrderId}/delivery-date`, action: 'schedule_delivery', orderId: this.currentScheduleOrderId, deliveryDate });
+            const requestBody = { delivery_date: deliveryDate };
+            if (isReschedule) {
+                requestBody.reschedule_reason = rescheduleReason;
+            }
+            
+            this.debugLog('API Call', { method: 'PUT', endpoint: `/orders/${this.currentScheduleOrderId}/delivery-date`, action: 'schedule_delivery', orderId: this.currentScheduleOrderId, deliveryDate, rescheduleReason });
             const response = await fetch(`${this.apiBase}/orders/${this.currentScheduleOrderId}/delivery-date`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify({ delivery_date: deliveryDate })
+                body: JSON.stringify(requestBody)
             });
             
             if (response.ok) {
-                this.showMessage('Delivery scheduled successfully', 'success');
+                this.showMessage(isReschedule ? 'Delivery rescheduled successfully' : 'Delivery scheduled successfully', 'success');
                 this.closeScheduleDeliveryModal();
                 // Reload orders to reflect status change
                 this.loadMyOrders();

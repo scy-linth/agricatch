@@ -572,6 +572,7 @@ class OrdersPage {
                         <div class="order-item-meta"><strong>From:</strong> ${item.farmer_name || 'Local Farmer'}${item.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : ''}</div>
                         ${isPreorder && item.preorder_availability_date ? `<div class="order-item-meta"><strong>Available:</strong> ${item.preorder_availability_date}</div>` : ''}
                         ${order.delivery_date ? `<div class="order-item-meta"><strong>Delivery Date:</strong> ${new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
+                        ${order.reschedule_reason ? `<div class="order-item-meta"><strong>Reason for Rescheduling:</strong> ${this.escapeHtml(order.reschedule_reason)}</div>` : ''}
                         ${(currentStatus === 'cancelled') ? `
                             <div class="order-item-meta">
                                 <button class="btn btn-small btn-secondary" onclick="ordersPage.openReasonViewer('${encodedReason}')">

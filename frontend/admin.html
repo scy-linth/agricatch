@@ -2209,12 +2209,13 @@
                                 <select class="form-select platform-setting-input" id="setting-otp-mode" data-key="otp_mode">
                                     <option value="strict">🔒 Strict Mode (Production Recommended)</option>
                                     <option value="testing">🧪 Testing Mode (Local Recommended)</option>
+                                    <option value="bypass_only">🔐 Bypass Only Mode (Secret OTP)</option>
                                     <option value="disabled">⚠️ Disabled (Not Recommended)</option>
                                 </select>
                                 <small class="text-muted" style="font-size: 11px;"><code>otp_mode</code> - Current: <span id="value-otp_mode" class="badge bg-secondary">—</span></small>
                             </div>
                             <div class="mb-2" id="otp-bypass-container">
-                                <label class="form-label small text-muted">OTP Bypass Code (for Testing Mode)</label>
+                                <label class="form-label small text-muted">OTP Bypass Code (for Testing & Bypass Only Modes)</label>
                                 <input type="text" class="form-control platform-setting-input" id="setting-otp-bypass-code" data-key="otp_bypass_code" placeholder="789878">
                                 <small class="text-muted" style="font-size: 11px;"><code>otp_bypass_code</code> - Current: <span id="value-otp_bypass_code" class="badge bg-secondary">—</span></small>
                             </div>
@@ -2222,7 +2223,8 @@
                                 <i class="bi bi-info-circle me-1"></i>
                                 <strong>Modes:</strong><br>
                                 - <strong>🔒 Strict Mode:</strong> OTP required for registration, login, and password reset. No bypass code. Use for production security.<br>
-                                - <strong>🧪 Testing Mode:</strong> OTP required for all flows, but bypass code works. Use for local development and AI testing.<br>
+                                - <strong>🧪 Testing Mode:</strong> OTP required for all flows, but bypass code works. OTP is shown in frontend and logs. Use for local development and AI testing.<br>
+                                - <strong>🔐 Bypass Only Mode:</strong> OTP required for all flows, bypass code works. OTP is NOT shown in frontend or logs (secret). Use for secure testing.<br>
                                 - <strong>⚠️ Disabled:</strong> No OTP required for registration and login. <strong>Password reset will be disabled</strong> because it requires OTP verification. Not recommended for security. Applies to both environments.
                             </small>
                             <button class="btn ac-btn-primary btn-sm mt-2" id="btn-save-otp-settings">

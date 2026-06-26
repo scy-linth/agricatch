@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 const { addSseClient, broadcastEvent } = require('./utils/realtime');
 const { checkMaintenanceMode } = require('./middleware/featureFlags');
 require('dotenv').config();
@@ -736,10 +737,7 @@ function createAuthRateLimit() {
     },
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => {
-      // Use IP address as key for rate limiting
-      return req.ip || req.connection.remoteAddress || 'unknown';
-    },
+    keyGenerator: ipKeyGenerator,
     message: { error: 'Too many requests. Please try again later.' }
   });
 }
@@ -757,10 +755,7 @@ function createOtpRateLimit() {
     },
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => {
-      // Use IP address as key for rate limiting
-      return req.ip || req.connection.remoteAddress || 'unknown';
-    },
+    keyGenerator: ipKeyGenerator,
     message: { error: 'Too many OTP requests. Please try again later.' }
   });
 }

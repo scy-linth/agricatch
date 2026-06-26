@@ -3396,6 +3396,13 @@
                 <input type="date" id="delivery-date-input" class="form-control" required>
                 <small class="text-muted" style="font-size:0.75rem;">Select the date for delivery (DATE ONLY)</small>
             </div>
+            <div class="mb-3" id="reschedule-reason-container" style="display:none;">
+                <label for="reschedule-reason-input" class="form-label fw-semibold">Reason for Rescheduling <span class="text-danger">*</span></label>
+                <textarea id="reschedule-reason-input" class="form-control" rows="3" maxlength="300" placeholder="Explain why the delivery date needs to be changed..."></textarea>
+                <div class="text-muted small mt-1" style="font-size:0.75rem;">
+                    <span id="reschedule-reason-count">0</span>/300 characters
+                </div>
+            </div>
             <div class="modal-footer">
                 <button type="button" id="schedule-delivery-cancel" class="btn btn-sm btn-secondary">Cancel</button>
                 <button type="submit" id="schedule-delivery-submit" class="btn btn-sm btn-primary">

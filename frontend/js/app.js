@@ -43,6 +43,9 @@ class AgricultureMarket {
         this.currentSort = 'latest';
         this.currentProductTab = 'order-now'; // 'order-now' or 'preorder-now'
         
+        // reCAPTCHA mode setting (will be fetched from API)
+        this.recaptchaMode = 'auto'; // default
+        
         // Separate filter states for available and preorder sections
         this.availableFilters = {
             search: '',
@@ -702,6 +705,35 @@ class AgricultureMarket {
             sessionStorage.setItem('sessionId', sessionId);
         }
         return sessionId;
+    }
+
+    // Fetch platform settings from API
+    async fetchPlatformSettings() {
+        try {
+            const response = await fetch(`${this.apiBase}/settings/recaptcha-mode`);
+            if (response.ok) {
+                const data = await response.json();
+                this.recaptchaMode = data.recaptcha_mode || 'auto';
+                console.log('Platform settings loaded - recaptcha_mode:', this.recaptchaMode);
+            }
+        } catch (error) {
+            console.error('Failed to fetch platform settings:', error);
+            // Keep default 'auto' mode
+        }
+    }
+
+    // Check if reCAPTCHA should be required based on platform setting
+    shouldRequireRecaptcha() {
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        
+        if (this.recaptchaMode === 'always_off') {
+            return false; // Always disabled
+        } else if (this.recaptchaMode === 'always_on') {
+            return true; // Always enabled
+        } else {
+            // Auto mode: OFF in development, ON in production
+            return !isLocalhost;
+        }
     }
 
     // Handle contact form submission
@@ -1971,7 +2003,8 @@ class AgricultureMarket {
         }
 
         const recaptchaResponse = this.getRecaptchaResponse('forgot');
-        if (!recaptchaResponse) {
+        // Check if reCAPTCHA should be required based on platform setting
+        if (this.shouldRequireRecaptcha() && !recaptchaResponse) {
             this.setRecaptchaError('forgot', 'Please complete the CAPTCHA before continuing.');
             this.showMessage('Please complete the CAPTCHA before continuing.', 'error');
             return;
@@ -2035,7 +2068,8 @@ class AgricultureMarket {
         }
 
         const recaptchaResponse = this.getRecaptchaResponse('forgot');
-        if (!recaptchaResponse) {
+        // Check if reCAPTCHA should be required based on platform setting
+        if (this.shouldRequireRecaptcha() && !recaptchaResponse) {
             this.setRecaptchaError('forgot', 'Please complete the CAPTCHA before resending the code.');
             this.showMessage('Please complete the CAPTCHA before resending the code.', 'error');
             return;
@@ -3570,14 +3604,15 @@ class AgricultureMarket {
         const recaptchaResponse = this.getRecaptchaResponse('auth');
         // Skip recaptcha validation for testing if recaptcha element is not present
         const recaptchaElement = document.getElementById('auth-recaptcha-login');
-        // Disable CAPTCHA verification in local development for testing
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const skipRecaptcha = !recaptchaElement || recaptchaElement.children.length === 0 || isLocalhost;
+        // Check if reCAPTCHA should be required based on platform setting
+        const requireRecaptcha = this.shouldRequireRecaptcha();
+        const skipRecaptcha = !recaptchaElement || recaptchaElement.children.length === 0 || !requireRecaptcha;
         console.log('DEBUG login recaptcha check:', { 
             hasResponse: !!recaptchaResponse, 
             elementExists: !!recaptchaElement,
             elementHasChildren: recaptchaElement ? recaptchaElement.children.length > 0 : false,
-            isLocalhost,
+            recaptchaMode: this.recaptchaMode,
+            requireRecaptcha,
             skipRecaptcha 
         });
         if (!recaptchaResponse && !skipRecaptcha) {
@@ -4224,9 +4259,8 @@ class AgricultureMarket {
         }
 
         let recaptchaResponse = '';
-        // Skip CAPTCHA in local development
-        const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        if (requireRecaptcha && !isLocalDev) {
+        // Check if reCAPTCHA should be required based on platform setting
+        if (requireRecaptcha && this.shouldRequireRecaptcha()) {
             recaptchaResponse = this.getRecaptchaResponse('auth');
             if (!recaptchaResponse) {
                 this.setButtonLoading('register-next-1', false);
@@ -8605,6 +8639,9 @@ function initializeApp() {
         // Make app globally accessible for onclick handlers
         window.app = app;
         console.log('App initialized successfully');
+        
+        // Fetch platform settings including recaptcha_mode
+        app.fetchPlatformSettings();
         
         // Initialize true LQIP with Cloudinary transformations
         initializeLQIP();
