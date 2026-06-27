@@ -23,6 +23,11 @@ class ChatUI {
             page: 1
         };
 
+        // Customer Messages filter state (farmer page)
+        this.chatFilter = {
+            search: ''
+        };
+
         if (!this.token || !this.currentUserId) {
             // Preserve deep link parameters
             const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
@@ -106,6 +111,15 @@ class ChatUI {
 
         // Support Center filter event listeners
         this.setupSupportCenterFilters();
+
+        // Customer Messages search event listener (farmer page)
+        const chatSearchInput = document.getElementById('admin-chat-search-input');
+        if (chatSearchInput) {
+            chatSearchInput.addEventListener('input', (e) => {
+                this.chatFilter.search = e.target.value.toLowerCase();
+                this.filterCustomerConversations();
+            });
+        }
     }
 
     setupSupportCenterFilters() {
@@ -213,6 +227,30 @@ class ChatUI {
         const emptyState = document.getElementById('chat-empty-state');
         if (emptyState) {
             emptyState.style.display = totalMatching === 0 ? 'flex' : 'none';
+        }
+    }
+
+    filterCustomerConversations() {
+        const conversationList = document.getElementById('conversation-list');
+        if (!conversationList) return;
+
+        const allItems = Array.from(conversationList.querySelectorAll('.conversation-item'));
+
+        // Filter by customer name
+        const matching = allItems.filter(item => {
+            const itemName = item.querySelector('.conversation-name')?.textContent.toLowerCase() || '';
+            const searchMatch = this.chatFilter.search === '' || itemName.includes(this.chatFilter.search);
+            return searchMatch;
+        });
+
+        // Show/hide items
+        allItems.forEach(item => item.style.display = 'none');
+        matching.forEach(item => item.style.display = '');
+
+        // Show/hide empty state
+        const emptyState = document.getElementById('chat-empty-state');
+        if (emptyState) {
+            emptyState.style.display = matching.length === 0 ? 'flex' : 'none';
         }
     }
 
@@ -534,7 +572,7 @@ class ChatUI {
         // On admin page, render items hidden by default to prevent visual flash before filter applies.
         // On farmer page, render visible since no filtering is applied.
         const isAdminPage = document.getElementById('admin-sidebar-toggle') !== null;
-        list.innerHTML = allItems.map(item => {
+        const itemsHtml = allItems.map(item => {
             const html = item._type === 'chat'
                 ? this.renderChatConversationItem(item)
                 : this.renderTicketConversationItem(item);
@@ -542,6 +580,17 @@ class ChatUI {
                 ? html.replace(/<div class="conversation-item/, '<div style="display:none;" class="conversation-item')
                 : html;
         }).join('');
+
+        // Preserve empty state element in DOM for filtering
+        const emptyStateHtml = `
+            <div id="chat-empty-state" class="text-center py-5" style="display:none">
+                <i class="bi bi-chat-dots text-muted" style="font-size: 3rem;"></i>
+                <p class="text-muted mt-3">No conversations yet</p>
+                <p class="text-muted small">Messages from farmers will appear here</p>
+            </div>
+        `;
+
+        list.innerHTML = itemsHtml + emptyStateHtml;
 
         // Add click handlers
         list.querySelectorAll('.conversation-item').forEach(item => {

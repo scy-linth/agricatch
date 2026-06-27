@@ -2,6 +2,18 @@
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
 const { broadcastEvent } = require('../utils/realtime');
+const activityLogger = require('../services/activityLogger');
+const { restoreInventoryOnCancel, updateStatisticsOnDeliver, getOrderForBusinessLogic } = require('../utils/orderBusinessLogic');
+
+function getClientIp(req) {
+  const xf = req.headers['x-forwarded-for'];
+  if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
+  return req.ip || req.connection?.remoteAddress || 'unknown';
+}
+
+function generateRequestId() {
+  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
 
 const router = express.Router();
 
@@ -33,10 +45,12 @@ router.get('/', async (req, res) => {
              p.farmer_id,
              p.is_preorder,
              p.preorder_availability_date,
+             p.reserved_quantity,
+             p.max_preorder_quantity,
             COALESCE(f.shop_name, f.full_name) as farmer_name,
             f.address as farm_location
       FROM orders o
-      JOIN products p ON o.product_id = p.id
+      LEFT JOIN products p ON o.product_id = p.id
       LEFT JOIN users f ON p.farmer_id = f.id
       WHERE o.user_id = $1
         AND COALESCE(o.is_disabled, false) = false
@@ -73,6 +87,8 @@ router.get('/', async (req, res) => {
         farm_location: row.farm_location,
         is_preorder: row.is_preorder,
         preorder_availability_date: row.preorder_availability_date,
+        reserved_quantity: row.reserved_quantity,
+        max_preorder_quantity: row.max_preorder_quantity,
         status: row.status,
         delivered_at: row.delivered_at,
         cancellation_reason: row.cancellation_reason
@@ -140,9 +156,9 @@ router.get('/farmer/:farmerId', async (req, res) => {
         o.price,
         o.quantity
       FROM orders o
-      JOIN products p ON o.product_id = p.id
+      LEFT JOIN products p ON o.product_id = p.id
       LEFT JOIN users u ON o.user_id = u.id
-      WHERE p.farmer_id = $1
+      WHERE (p.farmer_id = $1 OR p.farmer_id IS NULL)
         AND COALESCE(o.is_disabled, false) = false
     `;
 
@@ -325,53 +341,13 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
       `, [status, actualOrderId]);
 
       if (status === 'delivered' && order.status !== 'delivered') {
-        await client.query(
-          `UPDATE products SET sales_count = COALESCE(sales_count, 0) + $1 WHERE id = $2`,
-          [order.quantity, order.product_id]
-        );
-
-        await client.query(
-          `UPDATE users
-           SET total_sales = COALESCE(total_sales, 0) + $1,
-               total_revenue = COALESCE(total_revenue, 0) + $2
-           WHERE id = $3`,
-          [order.quantity, order.total_amount || 0, order.farmer_id]
-        );
+        // Update statistics using shared business logic
+        await updateStatisticsOnDeliver(client, order);
       }
 
       if (status === 'cancelled' && order.status !== 'cancelled') {
-        // Idempotent inventory restoration based on order type and conversion state
-        if (order.is_preorder) {
-          // Preorder cancellation
-          if (order.preorder_converted_at) {
-            // Already converted: restore allocated quantity to stock
-            if (order.preorder_fulfilled_quantity > 0) {
-              await client.query(`
-                UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2
-              `, [order.preorder_fulfilled_quantity, order.product_id]);
-              // Reset fulfilled quantity to prevent double restoration
-              await client.query(`
-                UPDATE orders SET preorder_fulfilled_quantity = 0 WHERE id = $1
-              `, [actualOrderId]);
-            }
-          } else {
-            // Not yet converted: release reservation
-            if (order.preorder_reserved_quantity > 0) {
-              await client.query(`
-                UPDATE products SET reserved_quantity = GREATEST(reserved_quantity - $1, 0) WHERE id = $2
-              `, [order.preorder_reserved_quantity, order.product_id]);
-              // Reset reserved quantity to prevent double release
-              await client.query(`
-                UPDATE orders SET preorder_reserved_quantity = 0 WHERE id = $1
-              `, [actualOrderId]);
-            }
-          }
-        } else {
-          // Regular order cancellation: restore stock
-          await client.query(`
-            UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2
-          `, [order.quantity, order.product_id]);
-        }
+        // Restore inventory using shared business logic
+        await restoreInventoryOnCancel(client, order);
       }
 
       const message = `Order #${orderId} is now ${status}.`;
@@ -491,7 +467,7 @@ router.post('/', async (req, res) => {
       return res.status(403).json({ message: 'Super admin cannot place orders' });
     }
 
-    const {
+    let {
       delivery_address,
       delivery_date,
       special_instructions,
@@ -515,7 +491,11 @@ router.post('/', async (req, res) => {
     // This maintains backward compatibility while allowing separate fields
     if (recipient_firstname && recipient_lastname && recipient_phone) {
       const fullName = [recipient_firstname, recipient_middlename, recipient_lastname].filter(Boolean).join(' ').trim();
-      delivery_address = `${fullName} | +63${recipient_phone.replace(/\D/g, '')} | ${delivery_address || 'Trabajo Market, M. Dela Fuente St., Sampaloc, Manila, Metro Manila'}`;
+      const phoneDigits = recipient_phone.replace(/\D/g, '');
+      // If delivery_address is already provided, use it as the base address
+      // Otherwise use the default address
+      const baseAddress = delivery_address || 'Trabajo Market, M. Dela Fuente St., Sampaloc, Manila, Metro Manila';
+      delivery_address = `${fullName} | +63${phoneDigits} | ${baseAddress}`;
     }
 
     // Validate required fields
@@ -653,7 +633,19 @@ router.post('/', async (req, res) => {
         totalAmount += itemTotal;
 
         console.log(`[Create Order] Creating order for item: Product ${item.product_id}, Qty: ${item.quantity}, Price: ${item.price}, Total: ${itemTotal}`);
-        
+
+        // Reservation threshold check: Block new preorder reservations if harvest is overdue for 7+ days
+        if (item.is_preorder) {
+          await client.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS reservations_disabled BOOLEAN DEFAULT false");
+          const reservationCheck = await client.query(
+            'SELECT reservations_disabled FROM products WHERE id = $1',
+            [item.product_id]
+          );
+          if (reservationCheck.rows.length > 0 && reservationCheck.rows[0].reservations_disabled === true) {
+            throw new Error(`Product "${item.name}" is not accepting new pre-order reservations due to harvest delay. Please check back later.`);
+          }
+        }
+
         // Create order for this item
         // Regular orders: status = 'pending', delivery_date = NULL
         // Preorders: status = 'preorder_reserved', delivery_date = NULL
@@ -752,6 +744,20 @@ router.post('/', async (req, res) => {
       }
 
       await client.query('COMMIT');
+
+      // Log order placement to activity logger (async, non-blocking)
+      for (const orderId of createdOrderIds) {
+        activityLogger.logPlaceOrder(
+          decoded.id, 
+          decoded.role, 
+          req.sessionID, 
+          orderId,
+          {},
+          getClientIp(req),
+          req.headers['user-agent'],
+          generateRequestId()
+        );
+      }
 
       res.status(201).json({
         message: 'Orders placed successfully',
@@ -926,27 +932,20 @@ router.put('/:id/status', async (req, res) => {
         WHERE id = $2
       `, [status, orderId]);
 
-      // Restore stock or reservation if cancelled
+      // Apply business logic based on status change
       if (status === 'cancelled' && currentStatus !== 'cancelled') {
-        // Check if this is a preorder order
-        const orderPreorderCheck = await client.query(`
-          SELECT is_preorder, preorder_reserved_quantity FROM orders WHERE id = $1
-        `, [orderId]);
-        const isPreorder = orderPreorderCheck.rows[0]?.is_preorder === true;
-        
-        if (isPreorder) {
-          // Preorder: decrement reserved_quantity and preorder_reserved_quantity
-          await client.query(`
-            UPDATE products SET reserved_quantity = GREATEST(reserved_quantity - $1, 0) WHERE id = $2
-          `, [orderData.quantity, orderData.product_id]);
-          await client.query(`
-            UPDATE orders SET preorder_reserved_quantity = GREATEST(preorder_reserved_quantity - $1, 0) WHERE id = $1
-          `, [orderData.quantity, orderId]);
-        } else {
-          // Regular order: restore stock_quantity
-          await client.query(`
-            UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2
-          `, [orderData.quantity, orderData.product_id]);
+        // Restore inventory using shared business logic
+        const order = await getOrderForBusinessLogic(client, orderId);
+        if (order) {
+          await restoreInventoryOnCancel(client, order);
+        }
+      }
+
+      if (status === 'delivered' && currentStatus !== 'delivered') {
+        // Update statistics using shared business logic
+        const order = await getOrderForBusinessLogic(client, orderId);
+        if (order) {
+          await updateStatisticsOnDeliver(client, order);
         }
       }
 
@@ -965,25 +964,6 @@ router.put('/:id/status', async (req, res) => {
         ]
       );
       broadcastEvent('notification.created', { user_id: orderInfo.rows[0].user_id });
-
-      // Update sales stats if delivered
-      if (status === 'delivered') {
-        await client.query(`
-          UPDATE products p
-          SET sales_count = sales_count + o.quantity
-          FROM orders o
-          WHERE o.id = $1 AND p.id = o.product_id
-        `, [orderId]);
-
-        await client.query(`
-          UPDATE users u
-          SET total_sales = total_sales + o.quantity,
-              total_revenue = total_revenue + o.total_amount
-          FROM orders o
-          JOIN products p ON o.product_id = p.id
-          WHERE o.id = $1 AND u.id = p.farmer_id
-        `, [orderId]);
-      }
 
       await client.query('COMMIT');
 
@@ -1034,7 +1014,7 @@ router.put('/:id/cancel', async (req, res) => {
     // Check if order belongs to user and can be cancelled
     const { reason } = req.body;
     const orderResult = await pool.query(
-      `SELECT o.status, o.product_id, p.name AS product_name
+      `SELECT o.status, o.product_id, p.name AS product_name, p.farmer_id
        FROM orders o
        JOIN products p ON p.id = o.product_id
        WHERE o.id = $1 AND o.user_id = $2`,
@@ -1071,35 +1051,26 @@ router.put('/:id/cancel', async (req, res) => {
         ['cancelled', reason || null, 'customer', id]
       );
 
-      // Restore product stock or reservation (per-item order)
-      // Check if this is a preorder order
-      const orderPreorderCheck = await client.query(`
-        SELECT is_preorder, preorder_reserved_quantity FROM orders WHERE id = $1
-      `, [id]);
-      const isPreorder = orderPreorderCheck.rows[0]?.is_preorder === true;
-      
-      if (isPreorder) {
-        // Preorder: decrement reserved_quantity and preorder_reserved_quantity
-        await client.query(`
-          UPDATE products
-          SET reserved_quantity = GREATEST(reserved_quantity - o.quantity, 0)
-          FROM orders o
-          WHERE o.id = $1 AND products.id = o.product_id
-        `, [id]);
-        await client.query(`
-          UPDATE orders SET preorder_reserved_quantity = GREATEST(preorder_reserved_quantity - quantity, 0) WHERE id = $1
-        `, [id]);
-      } else {
-        // Regular order: restore stock_quantity
-        await client.query(`
-          UPDATE products
-          SET stock_quantity = stock_quantity + o.quantity
-          FROM orders o
-          WHERE o.id = $1 AND products.id = o.product_id
-        `, [id]);
+      // Restore inventory using shared business logic
+      const order = await getOrderForBusinessLogic(client, id);
+      if (order) {
+        await restoreInventoryOnCancel(client, order);
       }
 
       await client.query('COMMIT');
+
+      // Log order cancellation to activity logger (async, non-blocking)
+      activityLogger.logCancelOrder(
+        decoded.id, 
+        decoded.role, 
+        req.sessionID, 
+        id, 
+        reason || 'Customer request',
+        {},
+        getClientIp(req),
+        req.headers['user-agent'],
+        generateRequestId()
+      );
 
       // Send notification to customer
       await pool.query(
@@ -1350,32 +1321,10 @@ router.put('/:id/cancel-farmer', async (req, res) => {
         ['cancelled', reason || null, 'farmer', id]
       );
 
-      // Restore product stock or reservation (per-item order)
-      // Check if this is a preorder order
-      const orderPreorderCheck = await client.query(`
-        SELECT is_preorder, preorder_reserved_quantity FROM orders WHERE id = $1
-      `, [id]);
-      const isPreorder = orderPreorderCheck.rows[0]?.is_preorder === true;
-      
-      if (isPreorder) {
-        // Preorder: decrement reserved_quantity and preorder_reserved_quantity
-        await client.query(`
-          UPDATE products
-          SET reserved_quantity = GREATEST(reserved_quantity - o.quantity, 0)
-          FROM orders o
-          WHERE o.id = $1 AND products.id = o.product_id
-        `, [id]);
-        await client.query(`
-          UPDATE orders SET preorder_reserved_quantity = GREATEST(preorder_reserved_quantity - quantity, 0) WHERE id = $1
-        `, [id]);
-      } else {
-        // Regular order: restore stock_quantity
-        await client.query(`
-          UPDATE products
-          SET stock_quantity = stock_quantity + o.quantity
-          FROM orders o
-          WHERE o.id = $1 AND products.id = o.product_id
-        `, [id]);
+      // Restore inventory using unified business logic
+      const order = await getOrderForBusinessLogic(client, id);
+      if (order) {
+        await restoreInventoryOnCancel(client, order);
       }
 
       await client.query('COMMIT');

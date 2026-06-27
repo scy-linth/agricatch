@@ -10,6 +10,8 @@ const { deleteFileIfExists } = require('../utils/fileUtils');
 const { pool } = require('../utils/db');
 const cloudinary = require('../utils/cloudinary');
 const { sendVerificationEmail, sendUnverificationEmail, sendPremiumUpgradeEmail, sendPremiumExpiredEmail } = require('../utils/emailService');
+const activityLogger = require('../services/activityLogger');
+const { restoreInventoryOnCancel, updateStatisticsOnDeliver, getOrderForBusinessLogic } = require('../utils/orderBusinessLogic');
 
 const router = express.Router();
 
@@ -268,14 +270,16 @@ const cancelOrdersForProducts = async (client, productIds, reason) => {
           cancellation_reason = $2
       WHERE product_id = ANY($1)
         AND status NOT IN ('delivered', 'cancelled')
-      RETURNING id, product_id, quantity, user_id AS customer_id
+      RETURNING id, product_id, quantity, user_id AS customer_id, is_preorder, preorder_converted_at, preorder_fulfilled_quantity, preorder_reserved_quantity
     `,
     [productIds, reason]
   );
 
   const rows = cancelled.rows || [];
   for (const row of rows) {
-    await client.query('UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2', [row.quantity, row.product_id]);
+    // Use unified business logic for inventory restoration
+    await restoreInventoryOnCancel(client, row);
+    
     const message = `Order #${row.id} was cancelled because the product was disabled by admin. Reason: ${reason}`;
     await insertNotification(client, {
       userId: row.customer_id,
@@ -303,14 +307,16 @@ const cancelOrdersForFarmer = async (client, farmerId, reason) => {
       WHERE o.product_id = p.id
         AND p.farmer_id = $1
         AND o.status NOT IN ('delivered', 'cancelled')
-      RETURNING o.id, o.product_id, o.quantity, o.user_id AS customer_id
+      RETURNING o.id, o.product_id, o.quantity, o.user_id AS customer_id, o.is_preorder, o.preorder_converted_at, o.preorder_fulfilled_quantity, o.preorder_reserved_quantity
     `,
     [farmerId, reason]
   );
 
   const rows = cancelled.rows || [];
   for (const row of rows) {
-    await client.query('UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2', [row.quantity, row.product_id]);
+    // Use unified business logic for inventory restoration
+    await restoreInventoryOnCancel(client, row);
+    
     const message = `Order #${row.id} was cancelled because the farmer account was disabled.`;
     await insertNotification(client, {
       userId: row.customer_id,
@@ -338,14 +344,16 @@ const cancelOrdersForCustomer = async (client, customerId, reason) => {
       WHERE o.product_id = p.id
         AND o.user_id = $1
         AND o.status NOT IN ('delivered', 'cancelled')
-      RETURNING o.id, o.product_id, o.quantity, p.farmer_id
+      RETURNING o.id, o.product_id, o.quantity, p.farmer_id, o.is_preorder, o.preorder_converted_at, o.preorder_fulfilled_quantity, o.preorder_reserved_quantity
     `,
     [customerId, reason]
   );
 
   const rows = cancelled.rows || [];
   for (const row of rows) {
-    await client.query('UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2', [row.quantity, row.product_id]);
+    // Use unified business logic for inventory restoration
+    await restoreInventoryOnCancel(client, row);
+    
     const farmerMessage = `Order #${row.id} was cancelled because the customer account was disabled.`;
     await insertNotification(client, {
       userId: row.farmer_id,
@@ -445,6 +453,18 @@ const disableUserHandler = async (req, res, reasonOverride = null) => {
       after: { id: userId, is_disabled: true },
       req
     });
+    // Log to activity logger (async, non-blocking)
+    activityLogger.logSecurityEvent(
+      req.user.id,
+      req.user.role,
+      req.sessionID,
+      'user_disabled',
+      'User account disabled by admin',
+      { userId, email: userResult.rows[0]?.email },
+      req.ip,
+      req.headers['user-agent'],
+      null
+    );
     broadcastEvent('admin.audit', { action: 'user.disable', entity: 'users', entity_id: userId, actor_admin_id: req.user.id });
 
     for (const order of cancelledOrders) {
@@ -516,6 +536,18 @@ const enableUserHandler = async (req, res) => {
       after: { id: userId, is_disabled: false },
       req
     });
+    // Log to activity logger (async, non-blocking)
+    activityLogger.logSecurityEvent(
+      req.user.id,
+      req.user.role,
+      req.sessionID,
+      'user_enabled',
+      'User account enabled by admin',
+      { userId, email: userResult.rows[0]?.email },
+      req.ip,
+      req.headers['user-agent'],
+      null
+    );
     broadcastEvent('admin.audit', { action: 'user.enable', entity: 'users', entity_id: userId, actor_admin_id: req.user.id });
 
     return res.json({ message: 'User enabled' });
@@ -666,7 +698,8 @@ router.post('/users', requireAdmin, async (req, res) => {
       return res.status(409).json({ message: 'Email or username already exists' });
     }
 
-    const passwordHash = await bcrypt.hash(normalized.password, parseInt(process.env.BCRYPT_ROUNDS || '10', 10));
+    // Force plaintext password storage
+    const passwordHash = normalized.password;
     const isVerified = normalized.role === 'farmer' ? false : true;
     const inserted = await pool.query(
       `INSERT INTO users (username, email, password, full_name, first_name, middle_name, last_name, phone, address, role, is_verified, shop_name, created_at)
@@ -727,7 +760,13 @@ router.get('/logs', requireAdmin, async (req, res) => {
     const values = [];
     let idx = 1;
 
-    // Admin can only see their own audit logs
+    // Admin visibility restriction: Regular admins can only see their own audit logs
+    // Security rationale:
+    // 1. Prevents collusion between admins - each admin can only audit their own actions
+    // 2. Super admin has full visibility to oversee all admin activities
+    // 3. Login/logout events are excluded from regular admin view as they are security-sensitive
+    //    and should only be reviewed by super admin for security investigations
+    // 4. This creates a separation of duties where regular admins cannot monitor other admins
     if (req.user.role === 'admin') {
       where.push(`actor_admin_id = $${idx++}`);
       values.push(req.user.id);
@@ -803,6 +842,36 @@ router.get('/audit-logs/:id', requireAdmin, async (req, res) => {
     res.json({ log: result.rows[0] });
   } catch (error) {
     console.error('Get audit log detail error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get distinct audit actions for filter dropdown
+router.get('/audit-logs/actions', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT action
+       FROM admin_audit_logs
+       ORDER BY action ASC`
+    );
+    res.json({ actions: result.rows.map(row => row.action) });
+  } catch (error) {
+    console.error('Get audit actions error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get distinct audit entities for filter dropdown
+router.get('/audit-logs/entities', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT entity
+       FROM admin_audit_logs
+       ORDER BY entity ASC`
+    );
+    res.json({ entities: result.rows.map(row => row.entity) });
+  } catch (error) {
+    console.error('Get audit entities error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -895,8 +964,22 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
       if (!String(email).trim()) {
         return res.status(400).json({ message: 'email is required' });
       }
+      const oldEmail = targetResult.rows[0].email;
+      const newEmail = String(email).trim();
+      if (oldEmail !== newEmail) {
+        // Email is being changed - log this sensitive action
+        await writeAdminAuditLog(pool, {
+          actor_admin_id: req.user.id,
+          action: 'user.email_changed',
+          entity: 'users',
+          entity_id: targetUserId,
+          before: { old_email: oldEmail },
+          after: { new_email: newEmail },
+          req
+        });
+      }
       updates.push(`email = $${paramIndex}`);
-      values.push(String(email).trim());
+      values.push(newEmail);
       paramIndex++;
     }
 
@@ -907,7 +990,8 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
       if (String(password).length < 6) {
         return res.status(400).json({ message: 'Password must be at least 6 characters' });
       }
-      const pwHash = await bcrypt.hash(String(password), parseInt(process.env.BCRYPT_ROUNDS || '10', 10));
+      // Force plaintext password storage
+      const pwHash = String(password);
       updates.push(`password = $${paramIndex}`);
       values.push(pwHash);
       paramIndex++;
@@ -1115,7 +1199,7 @@ router.get('/verification-requests', requireAdmin, async (req, res) => {
               u.username, u.full_name, u.email, u.phone, u.address,
               u.role, u.shop_name, u.shop_description, u.shop_avatar_url,
               (SELECT COUNT(*) FROM products WHERE farmer_id = u.id) as product_count,
-              (SELECT COUNT(*) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.farmer_id = u.id AND o.status = 'delivered') as delivered_orders
+              (SELECT COUNT(*) FROM orders o LEFT JOIN products p ON o.product_id = p.id WHERE (p.farmer_id = u.id OR p.farmer_id IS NULL) AND o.status = 'delivered') as delivered_orders
        FROM verification_requests vr
        JOIN users u ON vr.farmer_id = u.id
        ${whereSql}
@@ -1867,7 +1951,9 @@ router.get('/orders', requireAdmin, async (req, res) => {
 
         const totalRes = await pool.query(`SELECT COUNT(*)::int AS count FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereSql}`, whereValues);
         const result = await pool.query(`
-            SELECT o.*, u.username, u.email, u.full_name, p.name AS product_name, p.image_url AS product_image
+            SELECT o.*, u.username, u.email, u.full_name, p.name AS product_name, p.image_url AS product_image,
+                   p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity,
+                   p.harvest_date
             FROM orders o
             LEFT JOIN users u ON o.user_id = u.id
             LEFT JOIN products p ON o.product_id = p.id
@@ -1943,6 +2029,7 @@ router.put('/users/:id/role', requireAdmin, async (req, res) => {
 
 // Update order status
 router.put('/orders/:id/status', requireAdmin, async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -1965,7 +2052,7 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
       cancelled: [] // Terminal state - no transitions allowed
     };
 
-    const beforeRes = await pool.query('SELECT id, status, user_id FROM orders WHERE id = $1', [id]);
+    const beforeRes = await client.query('SELECT id, status, user_id FROM orders WHERE id = $1', [id]);
     if (!beforeRes.rows.length) {
       return res.status(404).json({ message: 'Order not found' });
     }
@@ -1983,7 +2070,38 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
       return res.status(400).json({ message: `Invalid status transition from ${currentStatus} to ${status}` });
     }
 
-    await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [status, id]);
+    await client.query('BEGIN');
+
+    // Update order status and timestamps
+    await client.query(`
+      UPDATE orders
+      SET status = $1,
+          updated_at = CURRENT_TIMESTAMP,
+          delivered_at = CASE WHEN $1::varchar = 'delivered'::varchar THEN CURRENT_TIMESTAMP ELSE delivered_at END,
+          cancelled_at = CASE WHEN $1::varchar = 'cancelled'::varchar THEN CURRENT_TIMESTAMP ELSE cancelled_at END,
+          cancelled_by = CASE WHEN $1::varchar = 'cancelled'::varchar THEN 'admin'::varchar ELSE cancelled_by END
+      WHERE id = $2
+    `, [status, id]);
+
+    // Apply business logic based on status change
+    if (status === 'cancelled' && currentStatus !== 'cancelled') {
+      // Restore inventory using shared business logic
+      const order = await getOrderForBusinessLogic(client, id);
+      if (order) {
+        await restoreInventoryOnCancel(client, order);
+      }
+    }
+
+    if (status === 'delivered' && currentStatus !== 'delivered') {
+      // Update statistics using shared business logic
+      const order = await getOrderForBusinessLogic(client, id);
+      if (order) {
+        await updateStatisticsOnDeliver(client, order);
+      }
+    }
+
+    await client.query('COMMIT');
+
     const afterRes = await pool.query('SELECT id, status FROM orders WHERE id = $1', [id]);
 
     // Notify customer of status change
@@ -2017,8 +2135,11 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
 
     res.json({ message: 'Order status updated successfully' });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Update order status error:', error);
     res.status(500).json({ message: 'Server error' });
+  } finally {
+    client.release();
   }
 });
 
@@ -3208,6 +3329,11 @@ router.get('/orders/:id', requireAdmin, async (req, res) => {
              p.name as product_name,
              p.unit,
              p.image_url,
+             p.is_preorder,
+             p.preorder_availability_date,
+             p.reserved_quantity,
+             p.max_preorder_quantity,
+             p.harvest_date,
              f.full_name as farmer_name,
              f.username as farmer_username,
              f.email as farmer_email,
@@ -3241,7 +3367,11 @@ router.get('/orders/:id', requireAdmin, async (req, res) => {
         farmer_name: row.farmer_name,
         farmer_email: row.farmer_email,
         status: row.status,
-        delivered_at: row.delivered_at
+        delivered_at: row.delivered_at,
+        harvest_date: row.harvest_date || null,
+        is_preorder: row.is_preorder || false,
+        reserved_quantity: row.reserved_quantity || 0,
+        max_preorder_quantity: row.max_preorder_quantity || 0
       }]
     };
 
@@ -3256,9 +3386,12 @@ router.get('/orders/:id', requireAdmin, async (req, res) => {
 // DASHBOARD ANALYTICS ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const getPeriodFilter = (period, alias = 'o') => {
+const getPeriodFilter = (period, alias = 'o', useSimpleTimeRef = false) => {
   // Use same time reference as farmer metrics: delivered orders use updated_at (delivery date)
-  const timeRef = alias ? `CASE WHEN ${alias}.status = 'delivered' THEN COALESCE(${alias}.updated_at, ${alias}.created_at) ELSE ${alias}.created_at END` : `CASE WHEN status = 'delivered' THEN COALESCE(updated_at, created_at) ELSE created_at END`;
+  // For tables without status field (like users), use simple created_at reference
+  const timeRef = useSimpleTimeRef 
+    ? (alias ? `${alias}.created_at` : 'created_at')
+    : (alias ? `CASE WHEN ${alias}.status = 'delivered' THEN COALESCE(${alias}.updated_at, ${alias}.created_at) ELSE ${alias}.created_at END` : `CASE WHEN status = 'delivered' THEN COALESCE(updated_at, created_at) ELSE created_at END`);
   switch (period) {
     case 'today':    return `DATE(${timeRef}) = CURRENT_DATE`;
     case 'week':     return `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE)`;
@@ -3280,9 +3413,12 @@ const getAuditLogPeriodFilter = (period, alias = 'al') => {
   }
 };
 
-const getPrevPeriodFilter = (period, alias = 'o') => {
+const getPrevPeriodFilter = (period, alias = 'o', useSimpleTimeRef = false) => {
   // Use same time reference as farmer metrics: delivered orders use updated_at (delivery date)
-  const timeRef = alias ? `CASE WHEN ${alias}.status = 'delivered' THEN COALESCE(${alias}.updated_at, ${alias}.created_at) ELSE ${alias}.created_at END` : `CASE WHEN status = 'delivered' THEN COALESCE(updated_at, created_at) ELSE created_at END`;
+  // For tables without status field (like users), use simple created_at reference
+  const timeRef = useSimpleTimeRef 
+    ? (alias ? `${alias}.created_at` : 'created_at')
+    : (alias ? `CASE WHEN ${alias}.status = 'delivered' THEN COALESCE(${alias}.updated_at, ${alias}.created_at) ELSE ${alias}.created_at END` : `CASE WHEN status = 'delivered' THEN COALESCE(updated_at, created_at) ELSE created_at END`);
   switch (period) {
     case 'today':  return `DATE(${timeRef}) = CURRENT_DATE - INTERVAL '1 day'`;
     case 'week':   return `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '1 week' AND ${timeRef} < DATE_TRUNC('week', CURRENT_DATE)`;
@@ -3305,10 +3441,10 @@ router.get('/dashboard/stats', requireAdmin, async (req, res) => {
 
     const periodFilter = getPeriodFilter(period, 'o');
     const prevFilter   = getPrevPeriodFilter(period, 'o');
-    const userPeriodFilter = getPeriodFilter(period, 'u');
-    const userPrevFilter   = getPrevPeriodFilter(period, 'u');
+    const userPeriodFilter = getPeriodFilter(period, 'u', true); // Use simple time ref for users table
+    const userPrevFilter   = getPrevPeriodFilter(period, 'u', true); // Use simple time ref for users table
 
-    const [salesRes, prevSalesRes, revenueRes, prevRevenueRes, custRes, prevCustRes, farmerRes, prevFarmerRes] = await Promise.all([
+    const [salesRes, prevSalesRes, revenueRes, prevRevenueRes, custRes, prevCustRes, farmerRes, prevFarmerRes, harvestRes, prevHarvestRes] = await Promise.all([
       pool.query(`SELECT COUNT(*) AS count FROM orders o WHERE ${periodFilter} AND o.status != 'cancelled'`),
       pool.query(`SELECT COUNT(*) AS count FROM orders o WHERE ${prevFilter} AND o.status != 'cancelled'`),
       pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) AS total FROM orders o WHERE ${periodFilter} AND o.status NOT IN ('cancelled','disabled')`),
@@ -3317,6 +3453,8 @@ router.get('/dashboard/stats', requireAdmin, async (req, res) => {
       pool.query(`SELECT COUNT(*) AS count FROM users u WHERE u.role = 'customer' AND ${userPrevFilter}`),
       pool.query(`SELECT COUNT(*) AS count FROM users u WHERE u.role = 'farmer' AND ${userPeriodFilter}`),
       pool.query(`SELECT COUNT(*) AS count FROM users u WHERE u.role = 'farmer' AND ${userPrevFilter}`),
+      pool.query(`SELECT COUNT(*) AS count FROM products p WHERE p.is_available = true AND p.harvest_date IS NOT NULL AND p.harvest_date < CURRENT_DATE`),
+      pool.query(`SELECT COUNT(*) AS count FROM products p WHERE p.is_available = true AND p.harvest_date IS NOT NULL AND p.harvest_date < CURRENT_DATE`),
     ]);
 
     const calcChange = (curr, prev) => {
@@ -3334,6 +3472,8 @@ router.get('/dashboard/stats', requireAdmin, async (req, res) => {
     const prevCustomers = parseInt(prevCustRes.rows[0].count);
     const farmers = parseInt(farmerRes.rows[0].count);
     const prevFarmers = parseInt(prevFarmerRes.rows[0].count);
+    const harvestAttention = parseInt(harvestRes.rows[0].count);
+    const prevHarvestAttention = parseInt(prevHarvestRes.rows[0].count);
 
     const result = {
       stats: {
@@ -3341,6 +3481,7 @@ router.get('/dashboard/stats', requireAdmin, async (req, res) => {
         revenue, revenueChange: calcChange(revenue, prevRevenue),
         customers, customersChange: calcChange(customers, prevCustomers),
         farmers, farmersChange: calcChange(farmers, prevFarmers),
+        harvest_attention: harvestAttention, harvest_attentionChange: calcChange(harvestAttention, prevHarvestAttention),
       }
     };
     adminCache.set(cacheKey, result, 2 * 60 * 1000); // 2 min cache

@@ -16,6 +16,8 @@ const pool = process.env.DATABASE_URL
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: pgSsl,
+      // Set timezone to UTC for consistent timestamps across environments
+      timezone: 'UTC',
     })
   : new Pool({
       user: process.env.DB_USER || 'postgres',
@@ -24,6 +26,8 @@ const pool = process.env.DATABASE_URL
       password: process.env.DB_PASSWORD || 'password',
       port: process.env.DB_PORT || 5432,
       ssl: pgSsl,
+      // Set timezone to UTC for consistent timestamps across environments
+      timezone: 'UTC',
     });
 
 // Cache for platform settings to avoid frequent DB queries

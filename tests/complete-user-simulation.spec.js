@@ -397,46 +397,11 @@ test.describe('Complete Real User Simulation', () => {
       
       console.log('Admin OTP verified successfully using secret bypass');
       
-      // Step 2: Register admin via API with admin secret password
-      const registerResponse = await request.post(`${API_BASE}/auth/register`, {
-        data: {
-          username: testUsers.admin.username,
-          email: testUsers.admin.email,
-          password: 'agri_catch_admin_secret_2024_secure_random_value_minimum_32_characters', // Using ADMIN_SECRET for admin role
-          full_name: `${testUsers.admin.firstName} ${testUsers.admin.lastName}`,
-          phone: testUsers.admin.phone,
-          role: 'admin'
-        }
-      });
-      
-      if (registerResponse.ok()) {
-        const data = await registerResponse.json();
-        adminToken = data.token;
-        console.log('Admin registered successfully');
-      } else {
-        console.log('Admin registration failed, trying to recover admin role...');
-        // Try to recover admin role
-        const recoverResponse = await request.post(`${API_BASE}/auth/recover-admin`, {
-          data: {
-            email: testUsers.admin.email,
-            admin_secret: 'agri_catch_admin_secret_2024_secure_random_value_minimum_32_characters'
-          }
-        });
-        
-        if (recoverResponse.ok()) {
-          // Login
-          const loginResponse = await request.post(`${API_BASE}/auth/login`, {
-            data: {
-              identifier: testUsers.admin.email,
-              password: 'agri_catch_admin_secret_2024_secure_random_value_minimum_32_characters'
-            }
-          });
-          if (loginResponse.ok()) {
-            const data = await loginResponse.json();
-            adminToken = data.token;
-          }
-        }
-      }
+      // Step 2: Admin registration requires Super Admin (not public registration)
+      // Per business rules, admin accounts are created ONLY by Super Admin via admin panel
+      // This test skips admin creation and focuses on customer/farmer public flows
+      console.log('Admin registration skipped - requires Super Admin via admin panel');
+      adminToken = null;
     });
 
     test('ADMIN-001: Login as admin', async ({ page }) => {

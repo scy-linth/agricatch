@@ -9,6 +9,18 @@ class CheckoutPage {
         this.deliveryFee = 35;
         this.useDefaultDeliveryAddress = true;
         this.selectedAddress = null;
+        this.checkoutStorageKey = this.getCheckoutStorageKey();
+    }
+
+    getCheckoutStorageKey() {
+        try {
+            const payload = JSON.parse(atob(this.token.split('.')[1]));
+            const userId = payload.user_id || payload.id || payload.sub;
+            return userId ? `checkout_draft_${userId}` : null;
+        } catch (error) {
+            console.error('Error getting user ID from token:', error);
+            return null;
+        }
     }
 
     init() {
@@ -50,9 +62,9 @@ class CheckoutPage {
             if (isPreorder) {
                 const reserved = Number(product.reserved_quantity ?? 0);
                 const max = Number(product.max_preorder_quantity ?? 0);
-                return max > 0 ? max - reserved : null;
+                return { stock: max > 0 ? max - reserved : null, isPreorder: true };
             }
-            return Number(product?.stock_quantity || 0);
+            return { stock: Number(product?.stock_quantity || 0), isPreorder: false };
         } catch (_) {
             return null;
         }
@@ -402,6 +414,9 @@ class CheckoutPage {
         // Set the selected address for checkout
         this.selectedAddress = fullAddress;
 
+        // Auto-save the address
+        this.saveDraftCheckoutInfo();
+
         // Update the display
         this.updateAddressDisplay();
 
@@ -410,6 +425,47 @@ class CheckoutPage {
         form.reset();
 
         this.showMessage('Delivery address set successfully!', 'success');
+    }
+
+    loadSavedCheckoutInfo() {
+        if (!this.checkoutStorageKey) return;
+
+        try {
+            const savedData = localStorage.getItem(this.checkoutStorageKey);
+            if (!savedData) return;
+
+            const checkoutInfo = JSON.parse(savedData);
+
+            // Auto-fill personal info
+            if (checkoutInfo.firstname) {
+                const firstnameEl = document.getElementById('checkout-firstname');
+                if (firstnameEl) firstnameEl.value = checkoutInfo.firstname;
+            }
+            if (checkoutInfo.middlename) {
+                const middlenameEl = document.getElementById('checkout-middlename');
+                if (middlenameEl) middlenameEl.value = checkoutInfo.middlename;
+            }
+            if (checkoutInfo.lastname) {
+                const lastnameEl = document.getElementById('checkout-lastname');
+                if (lastnameEl) lastnameEl.value = checkoutInfo.lastname;
+            }
+            if (checkoutInfo.phone) {
+                const phoneEl = document.getElementById('checkout-phone');
+                if (phoneEl) phoneEl.value = checkoutInfo.phone;
+            }
+            if (checkoutInfo.specialInstructions) {
+                const specialEl = document.getElementById('special-instructions');
+                if (specialEl) specialEl.value = checkoutInfo.specialInstructions;
+            }
+
+            // Auto-fill address if custom address is enabled
+            if (!this.useDefaultDeliveryAddress && checkoutInfo.address) {
+                this.selectedAddress = checkoutInfo.address;
+                this.updateAddressDisplay();
+            }
+        } catch (error) {
+            console.error('Error loading saved checkout info:', error);
+        }
     }
 
     autoFillCheckoutForm() {
@@ -458,6 +514,41 @@ class CheckoutPage {
         } catch (error) {
             console.error('Error getting last checkout info:', error);
             return null;
+        }
+    }
+
+    saveDraftCheckoutInfo() {
+        if (!this.checkoutStorageKey) return;
+
+        const firstname = document.getElementById('checkout-firstname')?.value?.trim() || '';
+        const middlename = document.getElementById('checkout-middlename')?.value?.trim() || '';
+        const lastname = document.getElementById('checkout-lastname')?.value?.trim() || '';
+        const phone = document.getElementById('checkout-phone')?.value?.trim() || '';
+        const specialInstructions = document.getElementById('special-instructions')?.value?.trim() || '';
+
+        const checkoutInfo = {
+            firstname,
+            middlename,
+            lastname,
+            phone,
+            specialInstructions,
+            address: this.selectedAddress,
+            savedAt: new Date().toISOString()
+        };
+
+        try {
+            localStorage.setItem(this.checkoutStorageKey, JSON.stringify(checkoutInfo));
+        } catch (error) {
+            console.error('Error saving draft checkout info:', error);
+        }
+    }
+
+    clearDraftCheckoutInfo() {
+        if (!this.checkoutStorageKey) return;
+        try {
+            localStorage.removeItem(this.checkoutStorageKey);
+        } catch (error) {
+            console.error('Error clearing draft checkout info:', error);
         }
     }
 
@@ -561,7 +652,10 @@ class CheckoutPage {
                 if (loadingEl) loadingEl.style.display = 'none';
                 if (formEl) formEl.style.display = '';
 
-                // Auto-fill form with last used checkout info
+                // Load saved draft checkout info first
+                this.loadSavedCheckoutInfo();
+
+                // Auto-fill form with last used checkout info (fallback)
                 this.autoFillCheckoutForm();
             } else {
                 this.showMessage('Error loading cart', 'error');
@@ -676,6 +770,17 @@ class CheckoutPage {
 
         // Set Address button for custom delivery address - handled via inline onclick in HTML
 
+        // Auto-save delivery information on input
+        const deliveryFields = ['checkout-firstname', 'checkout-middlename', 'checkout-lastname', 'checkout-phone', 'special-instructions'];
+        deliveryFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.addEventListener('input', () => {
+                    this.saveDraftCheckoutInfo();
+                });
+            }
+        });
+
         // Format phone input with spaces (9XX XXX XXXX)
         const checkoutPhone = document.getElementById('checkout-phone');
         if (checkoutPhone) {
@@ -738,6 +843,10 @@ class CheckoutPage {
         // Delivery date is now set by farmer only - always send null
         const deliveryDate = null;
 
+        // Check if cart has any pre-order items
+        const hasPreorder = this.currentCartData && this.currentCartData.cartItems && 
+                           this.currentCartData.cartItems.some(item => item.is_preorder === true);
+
         const submitBtn = document.getElementById('place-order-btn');
         if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Placing…'; }
 
@@ -762,6 +871,10 @@ class CheckoutPage {
             if (response.ok) {
                 // Save checkout info for next time
                 this.saveCheckoutInfo();
+
+                // Clear draft checkout info after successful order
+                this.clearDraftCheckoutInfo();
+
                 const successMessage = hasPreorder ? 'Pre-order placed successfully! Redirecting…' : 'Order placed successfully! Redirecting…';
                 this.showMessage(successMessage, 'success');
                 setTimeout(() => { window.location.href = '/orders.html'; }, 1500);
@@ -791,10 +904,11 @@ class CheckoutPage {
         // Fetch current stock from server
         let currentStock = maxStock;
         if (productId) {
-            const serverStock = await this.fetchProductStock(productId);
-            if (serverStock !== null && serverStock !== currentStock) {
-                currentStock = serverStock;
-                this.showMessage(`Stock updated: Only ${currentStock} available`, 'info');
+            const stockInfo = await this.fetchProductStock(productId);
+            if (stockInfo !== null && stockInfo.stock !== null && stockInfo.stock !== currentStock) {
+                currentStock = stockInfo.stock;
+                const stockType = stockInfo.isPreorder ? 'pre-order' : 'stock';
+                this.showMessage(`${stockType.charAt(0).toUpperCase() + stockType.slice(1)} updated: Only ${currentStock} available`, 'info');
             }
         }
 
@@ -816,10 +930,11 @@ class CheckoutPage {
         // Fetch current stock from server
         let currentStock = maxStock;
         if (productId) {
-            const serverStock = await this.fetchProductStock(productId);
-            if (serverStock !== null && serverStock !== currentStock) {
-                currentStock = serverStock;
-                this.showMessage(`Stock updated: Only ${currentStock} available`, 'info');
+            const stockInfo = await this.fetchProductStock(productId);
+            if (stockInfo !== null && stockInfo.stock !== null && stockInfo.stock !== currentStock) {
+                currentStock = stockInfo.stock;
+                const stockType = stockInfo.isPreorder ? 'pre-order' : 'stock';
+                this.showMessage(`${stockType.charAt(0).toUpperCase() + stockType.slice(1)} updated: Only ${currentStock} available`, 'info');
             }
         }
         

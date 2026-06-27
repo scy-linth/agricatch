@@ -26,6 +26,7 @@ router.get('/', async (req, res) => {
       query = `
         SELECT c.id, c.quantity, c.added_at,
                p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.is_preorder, p.max_preorder_quantity, p.reserved_quantity,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
                COALESCE(f.is_disabled, false) as farmer_is_disabled,
@@ -56,6 +57,7 @@ router.get('/', async (req, res) => {
       query = `
         SELECT c.id, c.quantity, c.added_at,
                p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.is_preorder, p.max_preorder_quantity, p.reserved_quantity,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
                COALESCE(f.is_disabled, false) as farmer_is_disabled,

@@ -359,12 +359,6 @@
             </a>
         </li>
         <li class="nav-item" data-roles="super_admin">
-            <a class="nav-link collapsed sidebar-link" href="#security-log" data-section="security-log">
-                <i class="bi bi-shield-exclamation"></i>
-                <span>Security Log</span>
-            </a>
-        </li>
-        <li class="nav-item" data-roles="super_admin">
             <a class="nav-link collapsed sidebar-link" href="#logs" data-section="logs">
                 <i class="bi bi-journal-check"></i>
                 <span>Audit Logs</span>
@@ -374,6 +368,12 @@
         <!-- ── Super Admin ─────────────────────────────────────── -->
         <li class="nav-heading" data-roles="super_admin">Super Admin</li>
 
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#activity-monitor" data-section="activity-monitor">
+                <i class="bi bi-activity"></i>
+                <span>Activity Monitor</span>
+            </a>
+        </li>
         <li class="nav-item" data-roles="super_admin">
             <a class="nav-link collapsed sidebar-link" href="#platform-settings" data-section="platform-settings">
                 <i class="bi bi-gear"></i>
@@ -433,11 +433,11 @@
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="overview" class="admin-section-card active">
 
-        <!-- KPI Cards Row -->
+        <!-- KPI Cards Row 1: Sales and Harvest Attention -->
         <div class="row g-3 mb-4">
 
             <!-- Sales KPI -->
-            <div class="col-xxl-3 col-md-6">
+            <div class="col-xxl-6 col-md-6">
                 <div class="card info-card sales-card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown">
@@ -471,8 +471,47 @@
                 </div>
             </div>
 
+            <!-- Harvest Attention Required KPI -->
+            <div class="col-xxl-6 col-md-6">
+                <div class="card info-card harvest-attention-card">
+                    <div class="filter">
+                        <a class="icon" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <li class="dropdown-header text-start"><h6>Filter</h6></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-harvest-attention" data-period="today">Today</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-harvest-attention" data-period="week">This Week</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-harvest-attention" data-period="month">This Month</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-harvest-attention" data-period="year">This Year</a></li>
+                            <li><a class="dropdown-item kpi-period-filter" href="#" data-card="kpi-harvest-attention" data-period="all">All Time</a></li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Harvest Attention <span id="kpi-harvest-attention-period">| Today</span></h5>
+                        <div class="d-flex align-items-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-exclamation-triangle" style="color:#dc3545"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="kpi-harvest-attention-value">—</h6>
+                                <span class="text-muted small">Products needing attention</span>
+                            </div>
+                        </div>
+                        <div id="kpi-harvest-attention-error" class="text-danger small mt-2" style="display:none">
+                            <i class="bi bi-exclamation-circle"></i> Failed to load
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /KPI row 1 -->
+
+        <!-- KPI Cards Row 2: Revenue, Customers, Farmers -->
+        <div class="row g-3 mb-4">
+
             <!-- Revenue KPI -->
-            <div class="col-xxl-3 col-md-6">
+            <div class="col-xxl-4 col-md-6">
                 <div class="card info-card revenue-card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown">
@@ -507,7 +546,7 @@
             </div>
 
             <!-- Customers KPI -->
-            <div class="col-xxl-3 col-md-6">
+            <div class="col-xxl-4 col-md-6">
                 <div class="card info-card customers-card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown">
@@ -542,7 +581,7 @@
             </div>
 
             <!-- Farmers KPI -->
-            <div class="col-xxl-3 col-md-6">
+            <div class="col-xxl-4 col-md-6">
                 <div class="card info-card farmers-card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown">
@@ -576,7 +615,7 @@
                 </div>
             </div>
 
-        </div><!-- /KPI row -->
+        </div><!-- /KPI row 2 -->
 
         <!-- Reports + Activity Row -->
         <div class="row g-3">
@@ -1122,6 +1161,14 @@
                             <option value="">All categories</option>
                         </select>
                     </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Filter</label>
+                        <select id="products-filter" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="available_now">Available Now</option>
+                            <option value="preorder">Pre-order</option>
+                        </select>
+                    </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
@@ -1658,7 +1705,6 @@
                             <option value="25" selected>25</option>
                             <option value="50">50</option>
                             <option value="100">100</option>
-                            <option value="200">200</option>
                         </select>
                     </div>
                     <div class="ac-filter-group">
@@ -1702,14 +1748,6 @@
                         <label class="ac-filter-label">To</label>
                         <input id="logs-date-to" type="date" class="form-control form-control-sm ac-filter-date">
                     </div>
-                    <div class="ac-filter-group">
-                        <input type="text" id="logs-search-input" class="form-control form-control-sm ac-filter-select" placeholder="Username or action…">
-                    </div>
-                    <div class="ac-filter-group">
-                        <button id="logs-search-btn" class="btn ac-btn-primary btn-sm" type="button">
-                            <i class="bi bi-search me-1"></i>Search
-                        </button>
-                    </div>
                 </div>
                 <button id="logs-refresh-btn" class="btn ac-btn-outline-muted btn-sm" type="button">
                     <i class="bi bi-arrow-clockwise"></i>
@@ -1749,6 +1787,316 @@
             </div>
         </div>
     </section><!-- /logs -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 16 — ACTIVITY MONITOR SECTION (superadmin only)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="activity-monitor" class="admin-section-card" data-roles="super_admin">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-activity"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Activity Monitor</h4>
+                <p class="ac-section-hero__sub">Monitor customer, farmer and admin activities.</p>
+            </div>
+            <div class="ac-section-hero__actions">
+                <div class="d-flex gap-2 align-items-center">
+                    <small class="text-muted small" id="am-last-updated">Last Updated: --:--:--</small>
+                    <button id="am-refresh-btn" class="btn btn-sm ac-btn-outline-muted" type="button">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                    </button>
+                    <button id="am-settings-btn" class="btn btn-sm ac-btn-outline-muted" type="button">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card ac-data-card" style="height: 160px;">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--primary">
+                                <i class="bi bi-calendar-day"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Today's Activities</h6>
+                                <p class="ac-data-card__subtitle">Total events today</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3 am-card-body">
+                        <div class="display-6 fw-bold text-primary" id="am-today-count">--</div>
+                        <small class="text-muted" id="am-today-trend">--</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card ac-data-card" style="height: 160px;">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--success">
+                                <i class="bi bi-person-check"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Online Users</h6>
+                                <p class="ac-data-card__subtitle">Currently online</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3 am-card-body">
+                        <div class="display-6 fw-bold text-success" id="am-online-users">--</div>
+                        <small class="text-muted" id="am-online-status">--</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card ac-data-card" style="height: 160px;">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--info">
+                                <i class="bi bi-person"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Customer Actions</h6>
+                                <p class="ac-data-card__subtitle">Today</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3 am-card-body">
+                        <div class="display-6 fw-bold text-info" id="am-customer-actions">--</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card ac-data-card" style="height: 160px;">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--warning">
+                                <i class="bi bi-person-check"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Farmer Actions</h6>
+                                <p class="ac-data-card__subtitle">Today</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3 am-card-body">
+                        <div class="display-6 fw-bold text-warning" id="am-farmer-actions">--</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card ac-data-card" style="height: 160px;">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--danger">
+                                <i class="bi bi-shield-check"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Admin Actions</h6>
+                                <p class="ac-data-card__subtitle">Today</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3 am-card-body">
+                        <div class="display-6 fw-bold text-danger" id="am-admin-actions">--</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-sm-6">
+                <div class="card ac-data-card" style="height: 160px;">
+                    <div class="ac-data-card__header">
+                        <div class="ac-data-card__header-left">
+                            <span class="ac-data-card__icon ac-data-card__icon--danger">
+                                <i class="bi bi-exclamation-triangle"></i>
+                            </span>
+                            <div>
+                                <h6 class="ac-data-card__title">Errors Today</h6>
+                                <p class="ac-data-card__subtitle">Failed events</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-3 pb-3 am-card-body">
+                        <div class="display-6 fw-bold text-danger" id="am-errors-today">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="card ac-data-card mb-3">
+            <div class="ac-data-card__header">
+                <div class="ac-data-card__header-left ac-filter-inline flex-wrap">
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Search</label>
+                        <input type="text" id="am-search-user" class="form-control form-control-sm ac-filter-input" placeholder="Search anything...">
+                    </div>
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Role</label>
+                        <select id="am-role-filter" class="form-select form-select-sm ac-filter-select">
+                            <option value="">All Roles</option>
+                            <option value="customer">Customer</option>
+                            <option value="farmer">Farmer</option>
+                            <option value="admin">Admin</option>
+                            <option value="super_admin">Super Admin</option>
+                        </select>
+                    </div>
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Action</label>
+                        <select id="am-action-filter" class="form-select form-select-sm ac-filter-select">
+                            <option value="">All Actions</option>
+                            <optgroup label="Authentication">
+                                <option value="login">Login Success</option>
+                                <option value="failed_login">Login Failed</option>
+                                <option value="logout">Logout</option>
+                            </optgroup>
+                            <optgroup label="Security">
+                                <option value="security_event">Security Event</option>
+                                <option value="captcha.failed">CAPTCHA Failed</option>
+                                <option value="rate_limit.exceeded">Rate Limit Exceeded</option>
+                            </optgroup>
+                            <optgroup label="User Management">
+                                <option value="user.create">User Created</option>
+                                <option value="user.disable">User Disabled</option>
+                                <option value="user.enable">User Enabled</option>
+                            </optgroup>
+                            <optgroup label="OTP">
+                                <option value="otp.sent">OTP Sent</option>
+                                <option value="otp.verify_success">OTP Verified</option>
+                                <option value="otp.verify_failed">OTP Failed</option>
+                            </optgroup>
+                            <optgroup label="Customer Actions">
+                                <option value="search_product">Search Product</option>
+                                <option value="view_product">View Product</option>
+                                <option value="add_wishlist">Add Wishlist</option>
+                                <option value="remove_wishlist">Remove Wishlist</option>
+                                <option value="add_cart">Add to Cart</option>
+                                <option value="remove_cart">Remove from Cart</option>
+                                <option value="checkout">Checkout</option>
+                                <option value="place_order">Place Order</option>
+                                <option value="cancel_order">Cancel Order</option>
+                            </optgroup>
+                            <optgroup label="Farmer Actions">
+                                <option value="add_product">Add Product</option>
+                                <option value="edit_product">Edit Product</option>
+                                <option value="delete_product">Delete Product</option>
+                            </optgroup>
+                            <optgroup label="Admin Actions">
+                                <option value="approve_farmer">Approve Farmer</option>
+                                <option value="reject_farmer">Reject Farmer</option>
+                                <option value="admin_settings_change">Admin Settings Change</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Date Range</label>
+                        <div class="d-flex gap-2">
+                            <input type="date" id="am-date-from" class="form-control form-control-sm ac-filter-date" placeholder="From">
+                            <input type="date" id="am-date-to" class="form-control form-control-sm ac-filter-date" placeholder="To">
+                        </div>
+                    </div>
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Status</label>
+                        <select id="am-status-filter" class="form-select form-select-sm ac-filter-select">
+                            <option value="">All Status</option>
+                            <option value="success">Success</option>
+                            <option value="failed">Failed</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </div>
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Session</label>
+                        <select id="am-session-filter" class="form-select form-select-sm ac-filter-select">
+                            <option value="">All Sessions</option>
+                            <option value="active">Active Only</option>
+                            <option value="inactive">Inactive Only</option>
+                        </select>
+                    </div>
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Quick Filter</label>
+                        <button id="am-security-filter-btn" class="btn btn-sm ac-btn-outline-danger" type="button">
+                            <i class="bi bi-shield-exclamation me-1"></i>Security Events
+                        </button>
+                    </div>
+                </div>
+                <div class="ac-data-card__header-right">
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="ac-filter-group">
+                            <label class="ac-filter-label mb-0">Auto Refresh</label>
+                            <select id="am-auto-refresh" class="form-select form-select-sm ac-filter-select" style="width: 100px;">
+                                <option value="off">OFF</option>
+                                <option value="10">10 sec</option>
+                                <option value="30">30 sec</option>
+                                <option value="60">60 sec</option>
+                            </select>
+                        </div>
+                        <button id="am-refresh-toolbar" class="btn btn-sm ac-btn-primary" type="button">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Filters -->
+        <div class="d-flex gap-2 flex-wrap mb-3">
+            <button class="btn btn-sm am-quick-filter active" data-filter="all">All</button>
+            <button class="btn btn-sm am-quick-filter" data-filter="login">Login</button>
+            <button class="btn btn-sm am-quick-filter" data-filter="orders">Orders</button>
+            <button class="btn btn-sm am-quick-filter" data-filter="products">Products</button>
+            <button class="btn btn-sm am-quick-filter" data-filter="wishlist">Wishlist</button>
+            <button class="btn btn-sm am-quick-filter" data-filter="cart">Cart</button>
+            <button class="btn btn-sm am-quick-filter" data-filter="checkout">Checkout</button>
+            <button class="btn btn-sm am-quick-filter" data-filter="admin">Admin</button>
+            <button class="btn btn-sm am-quick-filter" data-filter="errors">Errors</button>
+            <button class="btn btn-sm am-quick-filter" data-filter="security">Security</button>
+        </div>
+
+        <!-- Activity Table -->
+        <div class="card ac-data-card">
+            <div class="ac-data-card__header">
+                <div class="ac-filter-inline">
+                    <div class="ac-filter-group">
+                        <label class="ac-filter-label">Show</label>
+                        <select class="form-select form-select-sm ac-filter-select" id="am-entries-per-page">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="am-activity-table" class="table table-hover ac-table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>User</th>
+                            <th>Role</th>
+                            <th>Action</th>
+                            <th>Description</th>
+                            <th>Current Page</th>
+                            <th>Status</th>
+                            <th>Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody id="am-activity-tbody">
+                        <tr><td colspan="8" class="text-center py-4 text-muted">No activities found</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="am-pagination" class="pagination-container px-3 pb-3"></div>
+        </div>
+
+
+    </section><!-- /activity-monitor -->
 
 
     <!-- ════════════════════════════════════════════════════════════════
@@ -2332,85 +2680,6 @@
         </div>
 
     </section><!-- /platform-settings -->
-
-
-    <!-- ════════════════════════════════════════════════════════════════
-         § 11 — SECURITY LOG SECTION (superadmin only)
-    ═══════════════════════════════════════════════════════════════════ -->
-    <section id="security-log" class="admin-section-card" data-roles="super_admin">
-
-        <div class="ac-section-hero ac-section-hero--danger mb-4">
-            <div class="ac-section-hero__icon">
-                <i class="bi bi-shield-lock"></i>
-            </div>
-            <div class="ac-section-hero__body">
-                <h4 class="ac-section-hero__title">Security Log</h4>
-                <p class="ac-section-hero__sub">Audit trail for all sensitive authentication and access-control events.</p>
-            </div>
-            <div class="ac-section-hero__actions">
-                <button id="seclog-refresh-btn" class="btn btn-sm ac-btn-outline-muted" type="button">
-                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-                </button>
-            </div>
-        </div>
-
-        <div class="card ac-data-card">
-            <div class="ac-data-card__header">
-                <div class="ac-data-card__header-left ac-filter-inline">
-                    <div class="ac-filter-group">
-                        <label class="ac-filter-label">Show</label>
-                        <select class="form-select form-select-sm ac-filter-select" data-entries-section="security-log">
-                            <option value="10">10</option>
-                            <option value="25" selected>25</option>
-                            <option value="50">50</option>
-                        </select>
-                    </div>
-                    <div class="ac-filter-group">
-                        <label class="ac-filter-label">Event</label>
-                        <select id="seclog-action-filter" class="form-select form-select-sm ac-filter-select">
-                            <option value="">All events</option>
-                            <option value="login.failed">Failed Login</option>
-                            <option value="login.success">Login</option>
-                            <option value="user.role_change">Role Change</option>
-                            <option value="user.password_reset">Password Reset</option>
-                            <option value="user.create">User Create</option>
-                            <option value="user.disable">User Disable</option>
-                            <option value="user.enable">User Enable</option>
-                        </select>
-                    </div>
-                    <div class="ac-filter-group">
-                        <label class="ac-filter-label">From</label>
-                        <input type="date" id="seclog-date-from" class="form-control form-control-sm ac-filter-date">
-                    </div>
-                    <div class="ac-filter-group">
-                        <label class="ac-filter-label">To</label>
-                        <input type="date" id="seclog-date-to" class="form-control form-control-sm ac-filter-date">
-                    </div>
-                </div>
-            </div>
-            <div class="table-responsive">
-                <table id="seclog-table" class="table table-hover ac-table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>Actor</th>
-                            <th>Action</th>
-                            <th>Entity</th>
-                            <th>IP Address</th>
-                            <th>User Agent</th>
-                        </tr>
-                    </thead>
-                    <tbody id="seclog-tbody">
-                        <tr><td colspan="6" class="text-center py-4">
-                            <span class="spinner-border spinner-border-sm text-success"></span>
-                        </td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div id="seclog-pagination" class="pagination-container px-3 pb-3"></div>
-        </div>
-
-    </section><!-- /security-log -->
 
 
     <!-- ════════════════════════════════════════════════════════════════
@@ -3012,6 +3281,12 @@
                             <option value="100">100</option>
                         </select>
                     </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Category</label>
+                        <select id="product-approvals-category-filter" class="form-select form-select-sm">
+                            <option value="">All categories</option>
+                        </select>
+                    </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
@@ -3036,17 +3311,17 @@
                 </div>
 
                 <div class="table-responsive">
-                    <table id="product-approvals-table" class="table table-hover ac-table table-sm align-middle">
+                    <table id="product-approvals-table" class="table table-hover ac-table table-sm align-middle sortable-table">
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>Product Name</th>
-                                <th>Category</th>
-                                <th>Farmer</th>
-                                <th>Price</th>
-                                <th>Stock</th>
-                                <th>Status</th>
-                                <th>Date</th>
+                                <th data-sort="id">ID <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th data-sort="name">Product Name <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th data-sort="category">Category <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th data-sort="farmer">Farmer <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th data-sort="price">Price <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th data-sort="stock">Stock <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th data-sort="status">Status <i class="bi bi-arrow-down-up sort-icon"></i></th>
+                                <th data-sort="date">Date <i class="bi bi-arrow-down-up sort-icon"></i></th>
                                 <th class="col-actions">Actions</th>
                             </tr>
                         </thead>
@@ -3515,6 +3790,157 @@
         </div>
     </div>
 
+    <!-- Activity Details Modal -->
+    <div id="activity-details-modal" class="admin-modal-backdrop">
+        <div class="admin-modal modal-xl">
+            <div class="modal-header">
+                <h5 class="modal-title">Activity Details</h5>
+                <button class="modal-close-btn" data-close-modal="activity-details-modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-4">
+                    <!-- Activity Details -->
+                    <div class="col-lg-5">
+                        <div class="card bg-light">
+                            <div class="card-header bg-white">
+                                <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Activity Information</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">User</label>
+                                    <div class="fw-bold" id="am-detail-user">--</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Role</label>
+                                    <div><span class="badge badge-role-customer" id="am-detail-role">--</span></div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Session ID</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="font-monospace small" id="am-detail-session">--</div>
+                                        <button class="btn btn-sm btn-outline-secondary" id="am-copy-session-btn" title="Copy Session ID">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Action</label>
+                                    <div class="fw-bold" id="am-detail-action">--</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Description</label>
+                                    <div id="am-detail-description">--</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Current Page</label>
+                                    <div id="am-detail-current-page">--</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Timestamp</label>
+                                    <div id="am-detail-timestamp">--</div>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label small text-muted">Status</label>
+                                    <div><span class="badge bg-success" id="am-detail-status">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Session Timeline -->
+                    <div class="col-lg-7">
+                        <div class="card bg-light">
+                            <div class="card-header bg-white">
+                                <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Session Timeline</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="session-timeline" id="am-session-timeline">
+                                    <!-- Timeline items will be dynamically inserted -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-close-modal="activity-details-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Monitor Settings Modal -->
+    <div id="activity-settings-modal" class="admin-modal-backdrop">
+        <div class="admin-modal">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-gear me-2"></i>Activity Monitor Settings</h5>
+                <button class="modal-close-btn" data-close-modal="activity-settings-modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Enable Activity Monitoring</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="am-enable-monitoring" checked>
+                                <label class="form-check-label" for="am-enable-monitoring">Enable monitoring of user activities</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Retention Period (days)</label>
+                            <input type="number" class="form-control" id="am-retention-period" value="90" min="7" max="365">
+                            <small class="text-muted">Activities older than this will be auto-deleted</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Maximum Records</label>
+                            <input type="number" class="form-control" id="am-max-records" value="100000" min="1000" step="1000">
+                            <small class="text-muted">Maximum number of activity records to store</small>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Storage Used</label>
+                            <div class="progress mb-2" style="height: 24px;">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: 11.5%;" id="am-storage-bar">2.3 MB / 20 MB</div>
+                            </div>
+                            <small class="text-muted">2.3 MB of 20 MB used (11.5%)</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Auto Delete Oldest</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="am-auto-delete" checked>
+                                <label class="form-check-label" for="am-auto-delete">Automatically delete oldest records when limit reached</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Activity Types to Monitor</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="am-enable-customer" checked>
+                                <label class="form-check-label" for="am-enable-customer">Enable Customer Activity</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="am-enable-farmer" checked>
+                                <label class="form-check-label" for="am-enable-farmer">Enable Farmer Activity</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="am-enable-admin" checked>
+                                <label class="form-check-label" for="am-enable-admin">Enable Admin Activity</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-close-modal="activity-settings-modal">Cancel</button>
+                <button class="btn ac-btn-primary" id="am-save-settings">
+                    <i class="bi bi-check-lg me-1"></i>Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
 </main><!-- /main -->
 
 
@@ -3639,12 +4065,6 @@
                     </div>
                 </div>
 
-                <div class="form-group mb-3">
-                    <label class="form-label" for="edit-user-fullname">Full Name</label>
-                    <input type="text" id="edit-user-fullname"
-                           class="form-control" placeholder="Full name">
-                </div>
-
                 <div class="form-group mb-3" id="edit-user-shop-name-group" style="display:none;">
                     <label class="form-label" for="edit-user-shopname">Shop Name</label>
                     <input type="text" id="edit-user-shopname"
@@ -3689,9 +4109,9 @@
                     <label class="form-label" for="edit-user-phone">Phone Number</label>
                     <div class="input-group">
                         <span class="input-group-text">+63</span>
-                        <input type="tel" id="edit-user-phone" class="form-control" placeholder="9XXXXXXXXX" maxlength="10" pattern="9[0-9]{9}">
+                        <input type="tel" id="edit-user-phone" class="form-control" placeholder="929 819 6629" maxlength="12" pattern="[0-9\s]{10,12}">
                     </div>
-                    <div class="form-hint">Enter 10 digits starting with 9 (e.g. 9123456789).</div>
+                    <div class="form-hint">Enter 10-digit mobile number (e.g., 929 819 6629)</div>
                 </div>
 
                 <div class="form-group mb-2">
@@ -3796,9 +4216,10 @@
                         <label class="form-label" for="create-user-phone">Phone Number</label>
                         <div class="input-group">
                             <span class="input-group-text">+63</span>
-                            <input type="text" id="create-user-phone"
-                                   class="form-control" placeholder="9XXXXXXXXX" maxlength="10" pattern="9[0-9]{9}">
+                            <input type="tel" id="create-user-phone"
+                                   class="form-control" placeholder="929 819 6629" maxlength="12" pattern="[0-9\s]{10,12}">
                         </div>
+                        <div class="form-text text-muted small">Enter 10-digit mobile number (e.g., 929 819 6629)</div>
                     </div>
                 </div>
 
@@ -4515,6 +4936,14 @@
 
                 <div class="row g-3 mt-2">
                     <div class="col-md-6">
+                        <label class="form-label" for="sa-user-phone">Phone Number</label>
+                        <div class="input-group">
+                            <span class="input-group-text">+63</span>
+                            <input type="tel" id="sa-user-phone" class="form-control" placeholder="929 819 6629" maxlength="12" pattern="[0-9\s]{10,12}">
+                        </div>
+                        <div class="form-text text-muted small">Enter 10-digit mobile number (e.g., 929 819 6629)</div>
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label" for="sa-user-role">Role <span class="text-danger">*</span></label>
                         <select id="sa-user-role" class="form-select" required>
                             <option value="">Select role…</option>
@@ -4523,13 +4952,16 @@
                             <option value="admin">Admin</option>
                         </select>
                     </div>
-                    <div class="col-md-6">
+                </div>
+
+                <div class="row g-3 mt-2">
+                    <div class="col-md-12">
                         <label class="form-label" for="sa-user-password">
                             Password
                             <span id="sa-user-pw-required-label" class="text-danger">*</span>
                             <span id="sa-user-pw-optional-label" class="text-muted" style="display:none;">(leave blank to keep)</span>
                         </label>
-                        <div class="input-group">
+                        <div class="input-group" style="max-width: 400px;">
                             <input type="password" id="sa-user-password" class="form-control" placeholder="Min 8 characters" autocomplete="new-password">
                             <button type="button" class="btn btn-outline-secondary" id="sa-user-pw-toggle" aria-label="Toggle password visibility">
                                 <i class="bi bi-eye"></i>

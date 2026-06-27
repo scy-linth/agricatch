@@ -1,0 +1,131 @@
+{
+  "scenarioA": {
+    "farmerCancel": {
+      "orderBefore": {
+        "status": "cancelled",
+        "quantity": 1,
+        "total_amount": "12.00",
+        "is_preorder": false,
+        "preorder_converted_at": null,
+        "preorder_fulfilled_quantity": 0,
+        "preorder_reserved_quantity": 0,
+        "product_id": 15,
+        "farmer_id": 8
+      },
+      "orderAfter": {
+        "status": "cancelled",
+        "quantity": 1,
+        "total_amount": "12.00",
+        "is_preorder": false,
+        "preorder_converted_at": null,
+        "preorder_fulfilled_quantity": 0,
+        "preorder_reserved_quantity": 0,
+        "product_id": 15,
+        "farmer_id": 8
+      },
+      "inventoryBefore": {
+        "stock_quantity": 441,
+        "reserved_quantity": 0,
+        "sales_count": 2
+      },
+      "inventoryAfter": {
+        "stock_quantity": 442,
+        "reserved_quantity": 0,
+        "sales_count": 2
+      },
+      "inventoryChange": {
+        "stock_delta": 1,
+        "reserved_delta": 0
+      }
+    }
+  },
+  "scenarioB": {
+    "adminCancel": {
+      "orderBefore": {
+        "status": "cancelled",
+        "quantity": 1,
+        "total_amount": "35.00",
+        "is_preorder": true,
+        "preorder_converted_at": null,
+        "preorder_fulfilled_quantity": 0,
+        "preorder_reserved_quantity": 1,
+        "product_id": 65,
+        "farmer_id": 85
+      },
+      "orderAfter": {
+        "status": "cancelled",
+        "quantity": 1,
+        "total_amount": "35.00",
+        "is_preorder": true,
+        "preorder_converted_at": null,
+        "preorder_fulfilled_quantity": 0,
+        "preorder_reserved_quantity": 1,
+        "product_id": 65,
+        "farmer_id": 85
+      },
+      "inventoryBefore": {
+        "stock_quantity": 0,
+        "reserved_quantity": 1,
+        "sales_count": 0
+      },
+      "inventoryAfter": {
+        "stock_quantity": 0,
+        "reserved_quantity": 0,
+        "sales_count": 0
+      },
+      "inventoryChange": {
+        "stock_delta": 0,
+        "reserved_delta": -1
+      }
+    }
+  },
+  "scenarioC": {
+    "delivered": {
+      "orderBefore": {
+        "status": "delivered",
+        "quantity": 2,
+        "total_amount": "24.00",
+        "is_preorder": false,
+        "preorder_converted_at": null,
+        "preorder_fulfilled_quantity": 0,
+        "preorder_reserved_quantity": 0,
+        "product_id": 15,
+        "farmer_id": 8
+      },
+      "orderAfter": {
+        "status": "delivered",
+        "quantity": 2,
+        "total_amount": "24.00",
+        "is_preorder": false,
+        "preorder_converted_at": null,
+        "preorder_fulfilled_quantity": 0,
+        "preorder_reserved_quantity": 0,
+        "product_id": 15,
+        "farmer_id": 8
+      },
+      "inventoryBefore": {
+        "stock_quantity": 442,
+        "reserved_quantity": 0,
+        "sales_count": 2
+      },
+      "inventoryAfter": {
+        "stock_quantity": 442,
+        "reserved_quantity": 0,
+        "sales_count": 4
+      },
+      "userStatsBefore": {
+        "total_sales": 4,
+        "total_revenue": "134.00"
+      },
+      "userStatsAfter": {
+        "total_sales": 6,
+        "total_revenue": "158.00"
+      },
+      "statsChange": {
+        "sales_delta": 2,
+        "total_sales_delta": 2,
+        "total_revenue_delta": 24
+      }
+    }
+  }
+}

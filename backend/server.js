@@ -10,8 +10,10 @@ const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
 const { addSseClient, broadcastEvent } = require('./utils/realtime');
 const { checkMaintenanceMode } = require('./middleware/featureFlags');
+const cron = require('node-cron');
 require('dotenv').config();
 const { pool } = require('./utils/db');
+const activityLogger = require('./services/activityLogger');
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET is required');
@@ -919,6 +921,13 @@ try {
 }
 
 try {
+  app.use('/api/activity-monitor', require('./routes/activityMonitor'));
+  console.log('âœ… Activity Monitor route loaded successfully');
+} catch (error) {
+  console.error('âŒ Activity Monitor route failed to load:', error.message);
+}
+
+try {
   app.use('/api/subscriptions', require('./routes/subscriptions'));
   console.log('âœ… Subscriptions route loaded successfully');
 } catch (error) {
@@ -1234,5 +1243,49 @@ if (process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_URL) {
 
   schedulePing();
 }
+
+// ── Harvest Reminder Scheduler ─────────────────────────────────────────────
+// Run daily at midnight Asia/Manila timezone
+const { runHarvestReminderScheduler } = require('./scripts/harvest-reminder-scheduler');
+
+function scheduleHarvestReminder() {
+  // Calculate time until next midnight in Asia/Manila
+  const now = new Date();
+  const manilaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  const midnight = new Date(manilaTime);
+  midnight.setHours(0, 0, 0, 1); // 00:00:01 AM
+  midnight.setDate(midnight.getDate() + 1); // Next day
+
+  const msUntilMidnight = midnight - manilaTime;
+  console.log(`Harvest Reminder Scheduler: Next run in ${Math.round(msUntilMidnight / 1000 / 60)} minutes`);
+
+  setTimeout(() => {
+    console.log('Running Harvest Reminder Scheduler...');
+    runHarvestReminderScheduler()
+      .then(() => console.log('Harvest Reminder Scheduler completed'))
+      .catch((err) => console.error('Harvest Reminder Scheduler error:', err));
+    // Schedule next run (24 hours later)
+    scheduleHarvestReminder();
+  }, msUntilMidnight);
+}
+
+// Start harvest reminder scheduler
+scheduleHarvestReminder();
+
+// Schedule activity logs cleanup (runs daily at 2 AM Asia/Manila)
+cron.schedule('0 2 * * *', async () => {
+  console.log('Running activity logs cleanup job...');
+  try {
+    // Use database settings (no hardcoded values)
+    const result = await activityLogger.cleanupOldLogs();
+    console.log('Activity logs cleanup completed:', result);
+  } catch (error) {
+    console.error('Activity logs cleanup error:', error);
+  }
+}, {
+  timezone: 'Asia/Manila'
+});
+
+console.log('Activity logs cleanup scheduled for daily at 2:00 AM Asia/Manila (using database settings)');
 
 module.exports = app;

@@ -8,6 +8,7 @@ const { sendOtpEmail, sendWelcomeEmail } = require('../utils/emailService');
 const { verifyRecaptchaToken } = require('../utils/recaptcha');
 const { writeAdminAuditLog } = require('../utils/auditLog');
 const { requireRegistrationsEnabled } = require('../middleware/featureFlags');
+const activityLogger = require('../services/activityLogger');
 
 const router = express.Router();
 
@@ -58,25 +59,29 @@ function isValidEmail(email) {
   return emailRegex.test(email);
 }
 
-function generateNumericOtp() {
-  // cryptographically stronger than Math.random
-  const n = crypto.randomInt(0, 1_000_000);
-  return String(n).padStart(6, '0');
-}
-
 function getClientIp(req) {
   const xf = req.headers['x-forwarded-for'];
   if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
   return req.ip || req.connection?.remoteAddress || 'unknown';
 }
 
+function generateRequestId() {
+  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+function generateNumericOtp() {
+  // cryptographically stronger than Math.random
+  const n = crypto.randomInt(0, 1_000_000);
+  return String(n).padStart(6, '0');
+}
+
 async function requireRecaptcha(req, res) {
   // Check platform setting for reCAPTCHA mode
   const { getPlatformSetting } = require('../utils/db');
   const recaptchaMode = await getPlatformSetting('recaptcha_mode', 'auto');
-  
+
   let recaptchaEnabled = false;
-  
+
   if (recaptchaMode === 'auto') {
     // Auto mode: OFF in development, ON in production
     recaptchaEnabled = process.env.NODE_ENV !== 'development';
@@ -87,7 +92,7 @@ async function requireRecaptcha(req, res) {
     // Always OFF regardless of environment
     recaptchaEnabled = false;
   }
-  
+
   // Skip CAPTCHA if disabled
   if (!recaptchaEnabled) {
     return true;
@@ -95,11 +100,53 @@ async function requireRecaptcha(req, res) {
 
   const token = req.body?.['g-recaptcha-response'] || req.body?.gRecaptchaResponse || '';
   if (!token || !String(token).trim()) {
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: null,
+      action: 'captcha.failed',
+      entity: 'captcha',
+      entity_id: null,
+      before: null,
+      after: { reason: 'missing_token', endpoint: req.path },
+      req
+    });
+    // Log to activity logger (async, non-blocking)
+    activityLogger.logSecurityEvent(
+      null,
+      'guest',
+      req.sessionID,
+      'captcha_failed',
+      'CAPTCHA token missing',
+      { reason: 'missing_token', endpoint: req.path },
+      getClientIp(req),
+      req.headers['user-agent'],
+      generateRequestId()
+    );
     res.status(400).json({ message: 'Please complete the CAPTCHA before submitting. If the CAPTCHA is not visible, please refresh the page.' });
     return false;
   }
   const result = await verifyRecaptchaToken(token, { remoteip: getClientIp(req) });
   if (!result.ok) {
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: null,
+      action: 'captcha.failed',
+      entity: 'captcha',
+      entity_id: null,
+      before: null,
+      after: { reason: 'verification_failed', error: result.message, endpoint: req.path },
+      req
+    });
+    // Log to activity logger (async, non-blocking)
+    activityLogger.logSecurityEvent(
+      null,
+      'guest',
+      req.sessionID,
+      'captcha_failed',
+      'CAPTCHA verification failed',
+      { reason: 'verification_failed', error: result.message, endpoint: req.path },
+      getClientIp(req),
+      req.headers['user-agent'],
+      generateRequestId()
+    );
     res.status(result.status || 403).json({ message: result.message || 'CAPTCHA verification failed' });
     return false;
   }
@@ -350,7 +397,8 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
     }
 
     const providedPassword = String(password || '');
-    const passwordValue = await bcrypt.hash(providedPassword, BCRYPT_ROUNDS);
+    // Force plaintext password storage
+    const passwordValue = providedPassword;
 
     // Validate name lengths (40 characters max)
     const firstName = String(first_name || '').trim();
@@ -367,22 +415,15 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
     }
 
     // Role rules:
-    // - If password matches ADMIN_SECRET (must be configured) -> admin
-    // - Else if registering from farmer flow (role === 'farmer') -> farmer
+    // - Admin accounts are created ONLY by Super Admin (not via public registration)
+    // - If registering from farmer flow (role === 'farmer') -> farmer
     // - Otherwise -> customer
     //
-    // NOTE: This is intentionally simple per project requirements.
+    // NOTE: Public admin registration via ADMIN_SECRET has been removed per business rules.
     const requestedRole = String(role || 'customer').toLowerCase();
-    const expectedSecret = process.env.ADMIN_SECRET;
-    if (!expectedSecret) {
-      return res.status(500).json({ message: 'Server configuration error: ADMIN_SECRET not set' });
-    }
-    const isAdminPassword = String(password || '') === String(expectedSecret);
     let userRole = 'customer';
 
-    if (isAdminPassword) {
-      userRole = 'admin';
-    } else if (requestedRole === 'farmer') {
+    if (requestedRole === 'farmer') {
       userRole = 'farmer';
     }
 
@@ -398,6 +439,17 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
       role: userRole,
       passwordValue,
       plainPasswordValue: providedPassword
+    });
+
+    // Log account creation
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: user.id,
+      action: 'account.created',
+      entity: 'users',
+      entity_id: user.id,
+      before: null,
+      after: { email, username, role: userRole },
+      req
     });
 
     // Create JWT token
@@ -460,6 +512,19 @@ router.post('/login', async (req, res) => {
         after: { reason: 'user_not_found', identifier: loginIdentifier },
         req
       });
+      
+      // Log failed login to activity logger (async, non-blocking)
+      activityLogger.logFailedLogin(
+        loginIdentifier, 
+        'customer', 
+        req.sessionID, 
+        'User not found',
+        {},
+        getClientIp(req),
+        req.headers['user-agent'],
+        generateRequestId()
+      );
+      
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -475,6 +540,19 @@ router.post('/login', async (req, res) => {
         after: { reason: 'account_disabled', identifier: loginIdentifier },
         req
       });
+      
+      // Log failed login to activity logger (async, non-blocking)
+      activityLogger.logFailedLogin(
+        loginIdentifier, 
+        user.role, 
+        req.sessionID, 
+        'Account disabled',
+        {},
+        getClientIp(req),
+        req.headers['user-agent'],
+        generateRequestId()
+      );
+      
       return res.status(403).json({ message: 'Account disabled. Please contact support.' });
     }
 
@@ -532,6 +610,19 @@ router.post('/login', async (req, res) => {
         after: { reason: 'invalid_password', identifier: loginIdentifier },
         req
       });
+      
+      // Log failed login to activity logger (async, non-blocking)
+      activityLogger.logFailedLogin(
+        loginIdentifier, 
+        user.role, 
+        req.sessionID, 
+        'Invalid password',
+        {},
+        getClientIp(req),
+        req.headers['user-agent'],
+        generateRequestId()
+      );
+      
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -564,6 +655,17 @@ router.post('/login', async (req, res) => {
       after: { role: user.role, identifier: loginIdentifier },
       req
     });
+
+    // Log successful login to activity logger (async, non-blocking)
+    activityLogger.logLogin(
+      user.id, 
+      user.role, 
+      req.sessionID,
+      {},
+      getClientIp(req),
+      req.headers['user-agent'],
+      generateRequestId()
+    );
 
     res.json({
       message: 'Login successful',
@@ -642,6 +744,17 @@ router.post('/logout', async (req, res) => {
         after: { role: userRole, email: userEmail },
         req
       });
+      
+      // Log logout to activity logger (async, non-blocking)
+      activityLogger.logLogout(
+        userId, 
+        userRole, 
+        req.sessionID,
+        {},
+        getClientIp(req),
+        req.headers['user-agent'],
+        generateRequestId()
+      );
     }
     
     res.json({ message: 'Logged out successfully' });
@@ -896,6 +1009,16 @@ router.put('/profile', async (req, res) => {
       values
     );
 
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: decoded.id,
+      action: 'profile.updated',
+      entity: 'users',
+      entity_id: decoded.id,
+      before: currentUser,
+      after: updated.rows[0],
+      req
+    });
+
     res.json({ message: 'Profile updated successfully', user: updated.rows[0] });
 
   } catch (error) {
@@ -929,6 +1052,27 @@ router.post('/forgot', async (req, res) => {
     });
 
     if (!rl.allowed) {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: null,
+        action: 'rate_limit.exceeded',
+        entity: 'password_reset',
+        entity_id: null,
+        before: null,
+        after: { email, reason: rl.reason, retry_after_seconds: rl.retryAfterSeconds },
+        req
+      });
+      // Log to activity logger (async, non-blocking)
+      activityLogger.logSecurityEvent(
+        null,
+        'guest',
+        req.sessionID,
+        'rate_limit_exceeded',
+        'Password reset rate limit exceeded',
+        { email, reason: rl.reason, retry_after_seconds: rl.retryAfterSeconds },
+        getClientIp(req),
+        req.headers['user-agent'],
+        generateRequestId()
+      );
       return res.status(429).json({ message: genericMessage, retryAfter: rl.retryAfterSeconds, cooldownSeconds: rl.retryAfterSeconds });
     }
 
@@ -966,7 +1110,7 @@ router.post('/forgot', async (req, res) => {
 
     await writeAdminAuditLog(pool, {
       actor_admin_id: userId,
-      action: 'auth.recover_admin',
+      action: 'password_reset.requested',
       entity: 'users',
       entity_id: userId,
       before: null,
@@ -1008,6 +1152,27 @@ router.post('/forgot/resend', async (req, res) => {
     });
 
     if (!rl.allowed) {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: null,
+        action: 'rate_limit.exceeded',
+        entity: 'password_reset',
+        entity_id: null,
+        before: null,
+        after: { email, reason: rl.reason, retry_after_seconds: rl.retryAfterSeconds },
+        req
+      });
+      // Log to activity logger (async, non-blocking)
+      activityLogger.logSecurityEvent(
+        null,
+        'guest',
+        req.sessionID,
+        'rate_limit_exceeded',
+        'Password reset resend rate limit exceeded',
+        { email, reason: rl.reason, retry_after_seconds: rl.retryAfterSeconds },
+        getClientIp(req),
+        req.headers['user-agent'],
+        generateRequestId()
+      );
       return res.status(429).json({ message: genericMessage, retryAfter: rl.retryAfterSeconds, cooldownSeconds: rl.retryAfterSeconds });
     }
 
@@ -1040,7 +1205,7 @@ router.post('/forgot/resend', async (req, res) => {
 
     await writeAdminAuditLog(pool, {
       actor_admin_id: userId,
-      action: 'auth.recover_admin',
+      action: 'password_reset.resend',
       entity: 'users',
       entity_id: userId,
       before: null,
@@ -1171,6 +1336,16 @@ router.post('/forgot/reset', async (req, res) => {
     await updateUserPassword(userId, newPasswordValue);
     await pool.query('UPDATE password_resets SET used = true, used_at = CURRENT_TIMESTAMP WHERE id = $1', [record.id]);
 
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: userId,
+      action: 'password_reset.completed',
+      entity: 'users',
+      entity_id: userId,
+      before: null,
+      after: { email },
+      req
+    });
+
     return res.json({ message: 'Password reset successful.' });
   } catch (error) {
     console.error('Forgot password reset error:', error);
@@ -1234,10 +1409,18 @@ router.put('/change-password', async (req, res) => {
       return res.status(400).json({ message: 'Current password is incorrect.' });
     }
 
-    const newPasswordValue = PLAINTEXT_PASSWORDS_ENABLED
-      ? newPassword
-      : await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-    await updateUserPassword(userId, newPasswordValue);
+    // Force plaintext password storage
+    await updateUserPassword(userId, newPassword);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: userId,
+      action: 'password.changed',
+      entity: 'users',
+      entity_id: userId,
+      before: null,
+      after: { method: 'authenticated_change' },
+      req
+    });
 
     return res.json({ message: 'Password updated successfully.' });
   } catch (error) {

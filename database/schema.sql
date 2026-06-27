@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS products (
     location VARCHAR(100), -- farm location
     harvest_date DATE,
     expiry_date DATE,
+    linked_product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -280,3 +281,26 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 CREATE UNIQUE INDEX IF NOT EXISTS categories_name_lower_unique ON categories(LOWER(name));
 CREATE INDEX IF NOT EXISTS idx_orders_disabled ON orders(is_disabled);
+
+-- Admin audit logs table for tracking administrative actions
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id SERIAL PRIMARY KEY,
+    actor_admin_id INTEGER NOT NULL,
+    actor_admin_email VARCHAR(255),
+    actor_admin_name VARCHAR(255),
+    action VARCHAR(100) NOT NULL,
+    entity VARCHAR(50) NOT NULL,
+    entity_id INTEGER,
+    before JSONB,
+    after JSONB,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    session_id VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for audit logs performance
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_created_at ON admin_audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_actor ON admin_audit_logs(actor_admin_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_entity ON admin_audit_logs(entity, entity_id);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs(action);

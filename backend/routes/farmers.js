@@ -126,9 +126,9 @@ router.get('/:id/profile', async (req, res) => {
       SELECT u.id, u.username, u.full_name, COALESCE(u.shop_name, u.full_name) as shop_name, u.is_verified,
              u.shop_description, u.shop_banner_url, u.shop_avatar_url, u.created_at,
              -- Aggregate: total orders (all statuses) for farmer's products
-             (SELECT COUNT(*) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.farmer_id = u.id)::int AS total_sales,
+             (SELECT COUNT(*) FROM orders o LEFT JOIN products p ON o.product_id = p.id WHERE p.farmer_id = u.id OR p.farmer_id IS NULL)::int AS total_sales,
              -- Aggregate: total revenue from delivered orders
-             COALESCE((SELECT SUM(o.total_amount) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.farmer_id = u.id AND o.status = 'delivered'), 0)::numeric AS total_revenue,
+             COALESCE((SELECT SUM(o.total_amount) FROM orders o LEFT JOIN products p ON o.product_id = p.id WHERE (p.farmer_id = u.id OR p.farmer_id IS NULL) AND o.status = 'delivered'), 0)::numeric AS total_revenue,
              -- Aggregate: average rating across this farmer's products
              COALESCE((SELECT AVG(r.rating) FROM reviews r JOIN products p2 ON r.product_id = p2.id WHERE p2.farmer_id = u.id), 0)::numeric AS average_rating,
              -- Aggregate: total reviews across this farmer's products

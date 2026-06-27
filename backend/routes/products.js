@@ -1141,7 +1141,6 @@ router.get('/farmer/:farmerId', async (req, res) => {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.farmer_id = $1
-        AND p.status IN ('approved', 'available')
       ORDER BY p.created_at DESC
     `, [farmerId]);
 
@@ -1982,7 +1981,11 @@ router.post('/:id/convert-preorders', async (req, res) => {
           console.error('Rollback error:', rollbackError);
         }
       }
-      throw error;
+      console.error('Convert pre-orders error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Server error converting pre-orders' });
+      }
+      // Don't re-throw - we've handled the error
     } finally {
       if (client) {
         client.release();
@@ -1990,23 +1993,29 @@ router.post('/:id/convert-preorders', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Convert pre-orders error:', error);
-    res.status(500).json({ message: 'Server error converting pre-orders' });
+    console.error('Convert pre-orders outer error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Server error converting pre-orders' });
+    }
   }
 });
 
 // Harvest lifecycle: Complete harvest and optionally create Available product
 router.post('/:id/harvest-lifecycle', async (req, res) => {
   try {
+    console.log('[HARVEST LIFECYCLE] Starting harvest lifecycle');
     const productId = req.params.id;
     const { harvest_quantity, make_available } = req.body;
     const token = req.headers.authorization?.split(' ')[1];
+
+    console.log('[HARVEST LIFECYCLE] Request params:', { productId, harvest_quantity, make_available });
 
     if (!token) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('[HARVEST LIFECYCLE] Decoded user ID:', decoded.id);
 
     // Parse and validate harvest_quantity
     const harvestQuantity = Number.parseInt(harvest_quantity, 10);
@@ -2016,10 +2025,12 @@ router.post('/:id/harvest-lifecycle', async (req, res) => {
 
     // Validate make_available boolean
     const makeAvailable = make_available === true || make_available === 'true' || make_available === '1';
+    console.log('[HARVEST LIFECYCLE] makeAvailable:', makeAvailable);
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      console.log('[HARVEST LIFECYCLE] Transaction started');
 
       // Get product details with row lock
       const productResult = await client.query(
@@ -2028,27 +2039,32 @@ router.post('/:id/harvest-lifecycle', async (req, res) => {
       );
 
       if (productResult.rows.length === 0) {
+        console.log('[HARVEST LIFECYCLE] Product not found');
         await client.query('ROLLBACK');
         client.release();
         return res.status(404).json({ message: 'Product not found' });
       }
 
       const product = productResult.rows[0];
+      console.log('[HARVEST LIFECYCLE] Product found:', { id: product.id, name: product.name, farmer_id: product.farmer_id, is_preorder: product.is_preorder });
 
       // Verify user is the farmer
       if (Number(product.farmer_id) !== Number(decoded.id)) {
+        console.log('[HARVEST LIFECYCLE] Farmer ID mismatch');
         await client.query('ROLLBACK');
         client.release();
         return res.status(403).json({ message: 'You can only harvest your own products' });
       }
 
       if (!product.is_preorder) {
+        console.log('[HARVEST LIFECYCLE] Product is not a pre-order');
         await client.query('ROLLBACK');
         client.release();
         return res.status(400).json({ message: 'This product is not a pre-order product' });
       }
 
       // Ensure linked_product_id column exists
+      console.log('[HARVEST LIFECYCLE] Ensuring linked_product_id column exists');
       await client.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS linked_product_id INTEGER REFERENCES products(id) ON DELETE SET NULL');
 
       if (makeAvailable) {
@@ -2065,6 +2081,10 @@ router.post('/:id/harvest-lifecycle', async (req, res) => {
             availableProductId = linkedCheck.rows[0].id;
           }
         }
+
+        // Harvest conversion products are always approved.
+        // No additional product approval is required.
+        const initialStatus = 'approved';
 
         if (availableProductId) {
           // Transfer stock to existing linked Available product
@@ -2097,14 +2117,11 @@ router.post('/:id/harvest-lifecycle', async (req, res) => {
           });
         } else {
           // Create new Available product
-          const requireApproval = await getFeatureFlag('require_product_approval');
-          const initialStatus = requireApproval ? 'pending' : 'approved';
-          
           const newProductResult = await client.query(`
             INSERT INTO products (name, description, price, category_id, farmer_id, stock_quantity,
                                  unit, image_url, location, city, province, cloudinary_public_id, is_available, status,
                                  is_preorder, preorder_availability_date, reserved_quantity, max_preorder_quantity, linked_product_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
             RETURNING *
           `, [
             product.name,
@@ -2174,11 +2191,15 @@ router.post('/:id/harvest-lifecycle', async (req, res) => {
         client.release();
       }
       console.error('Harvest lifecycle error:', error);
-      res.status(500).json({ message: 'Server error processing harvest lifecycle' });
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Server error processing harvest lifecycle' });
+      }
     }
   } catch (error) {
     console.error('Harvest lifecycle outer error:', error);
-    res.status(500).json({ message: 'Server error processing harvest lifecycle' });
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Server error processing harvest lifecycle' });
+    }
   }
 });
 

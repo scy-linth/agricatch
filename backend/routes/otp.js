@@ -3,6 +3,7 @@ const { pool } = require('../utils/db');
 const { sendOtpEmail } = require('../utils/emailService');
 const { verifyRecaptchaToken } = require('../utils/recaptcha');
 const { writeAdminAuditLog } = require('../utils/auditLog');
+const activityLogger = require('../services/activityLogger');
 require('dotenv').config();
 
 const router = express.Router();
@@ -13,9 +14,27 @@ function generateOtp() {
 
 async function shouldExposeOtpForDebug() {
   const { pool } = require('../utils/db');
-  // Check OTP mode - only expose in testing mode
+  // Check OTP mode - expose in testing and bypass modes (for logs/API)
   // bypass_only mode: bypass works but OTP is NOT exposed (secret)
   // Bypass cache for security-sensitive check
+  try {
+    const result = await pool.query(
+      'SELECT value FROM platform_settings WHERE key = $1',
+      ['otp_mode']
+    );
+    const otpMode = result.rows.length > 0 ? result.rows[0].value : 'strict';
+    return otpMode === 'testing' || otpMode === 'bypass';
+  } catch (error) {
+    console.error('Error checking otp_mode:', error);
+    return false; // Default to not exposing on error
+  }
+}
+
+async function shouldExposeOtpInFrontend() {
+  const { pool } = require('../utils/db');
+  // Check OTP mode - only expose in testing mode (for frontend UI)
+  // bypass mode: OTP exposed in logs/API but NOT in frontend
+  // bypass_only mode: OTP is NOT exposed anywhere (secret)
   try {
     const result = await pool.query(
       'SELECT value FROM platform_settings WHERE key = $1',
@@ -61,6 +80,27 @@ router.post('/send', async (req, res) => {
         remoteip: req.ip || req.connection?.remoteAddress || undefined
       });
       if (!captcha.ok) {
+        await writeAdminAuditLog(pool, {
+          actor_admin_id: userId,
+          action: 'captcha.failed',
+          entity: 'captcha',
+          entity_id: null,
+          before: null,
+          after: { reason: 'verification_failed', error: captcha.message, endpoint: req.path, email },
+          req
+        });
+        // Log to activity logger (async, non-blocking)
+        activityLogger.logSecurityEvent(
+          userId,
+          'customer',
+          req.sessionID,
+          'captcha_failed',
+          'CAPTCHA verification failed during OTP request',
+          { reason: 'verification_failed', error: captcha.message, endpoint: req.path, email },
+          req.ip || req.connection?.remoteAddress,
+          req.headers['user-agent'],
+          null
+        );
         return res.status(captcha.status || 403).json({ message: captcha.message || 'CAPTCHA verification failed' });
       }
     }
@@ -169,9 +209,13 @@ router.post('/send', async (req, res) => {
           emailDelivery: 'failed',
           emailError: emailResult.error || 'Unknown email error'
         };
-        // Only expose OTP in testing mode, not in bypass_only mode
+        // Expose OTP in logs/API for testing and bypass modes
         if (await shouldExposeOtpForDebug()) {
           responseData.otp = otp;
+        }
+        // Expose OTP in frontend UI only for testing mode (not for bypass mode)
+        if (await shouldExposeOtpInFrontend()) {
+          responseData.otp_for_frontend = otp;
         }
         return res.json({
           ...responseData
@@ -200,7 +244,7 @@ router.post('/send', async (req, res) => {
 
     await writeAdminAuditLog(pool, {
       actor_admin_id: userId,
-      action: 'otp.sent',
+      action: isResend ? 'otp.resend' : 'otp.sent',
       entity: 'otps',
       entity_id: insertedOtpId,
       before: null,
@@ -215,8 +259,14 @@ router.post('/send', async (req, res) => {
       expiresIn: 600,
     };
 
-    if (shouldExposeOtpForDebug()) {
+    // Expose OTP in logs/API for testing and bypass modes
+    if (await shouldExposeOtpForDebug()) {
       responseData.otp = otp;
+    }
+
+    // Expose OTP in frontend UI only for testing mode (not for bypass mode)
+    if (await shouldExposeOtpInFrontend()) {
+      responseData.otp_for_frontend = otp;
     }
 
     return res.json(responseData);

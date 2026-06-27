@@ -1832,7 +1832,7 @@ class AgricultureMarket {
             quantityEl.addEventListener('blur', normalize);
         }
 
-        this.bindProductCategoryTabListeners();
+        this.bindProductCategoryTabListeners('global');
 
         document.getElementById('close-shop-details-modal')?.addEventListener('click', () => this.closeShopDetailsModal());
         document.getElementById('close-shop-details-footer-btn')?.addEventListener('click', () => this.closeShopDetailsModal());
@@ -2570,7 +2570,11 @@ class AgricultureMarket {
             user: 'bi-person',
             system: 'bi-gear',
             notification: 'bi-bell',
-            support_ticket: 'bi-ticket-perforated'
+            support_ticket: 'bi-ticket-perforated',
+            harvest: 'bi-calendar-check',
+            harvest_reminder: 'bi-calendar-event',
+            harvest_adjusted: 'bi-calendar-x',
+            harvest_completed: 'bi-check-circle'
         };
 
         const recent = notifications.slice(0, 5);
@@ -4336,15 +4340,15 @@ class AgricultureMarket {
                     nextButtonText.textContent = 'Confirm OTP';
                 }
                 // Display OTP for testing if provided by backend
-                if (data.otp) {
-                    console.log('🔑 OTP Code (for testing):', data.otp);
+                if (data.otp_for_frontend) {
+                    console.log('🔑 OTP Code (for testing):', data.otp_for_frontend);
                     console.log('📧 Email:', email);
                     console.log('⏰ Valid for 10 minutes');
                     // Display OTP in the UI
                     const otpDisplay = document.getElementById('otp-test-display');
                     const otpCodeDisplay = document.getElementById('otp-code-display');
                     if (otpDisplay && otpCodeDisplay) {
-                        otpCodeDisplay.textContent = data.otp;
+                        otpCodeDisplay.textContent = data.otp_for_frontend;
                         otpDisplay.style.display = 'block';
                     }
                 } else {
@@ -5388,17 +5392,67 @@ class AgricultureMarket {
             const hasValidId = product.id && product.id !== 'null' && product.id !== 'undefined';
             const cardClickAttr = hasValidId ? `onclick="app.showProductDetails(${product.id})"` : '';
             const cardStyle = hasValidId ? 'cursor: pointer;' : 'cursor: not-allowed; opacity: 0.7;';
-            const cartBtnAttr = hasValidId ? `onclick="event.stopPropagation(); app.addToCart(${product.id})"` : 'disabled style="opacity: 0.5; cursor: not-allowed;"';
             const isPreorder = product.is_preorder === true;
             const preorderBadge = isPreorder ? '<span class="badge harvest-soon-badge mb-2">HARVEST SOON</span>' : '<span class="badge bg-success mb-2">Available Now</span>';
-            
+
+            // Check if reservations are disabled
+            const reservationsDisabled = product.reservations_disabled === true || product.reservations_disabled === 't' || product.reservations_disabled === 'true';
+
+            // Calculate harvest status for preorder products
+            let harvestStatus = '';
+            let harvestStatusClass = '';
+            if (isPreorder && product.harvest_date) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const harvestDate = new Date(product.harvest_date);
+                harvestDate.setHours(0, 0, 0, 0);
+                const diffTime = harvestDate - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays === 0) {
+                    harvestStatus = 'Today';
+                    harvestStatusClass = 'text-success';
+                } else if (diffDays > 0 && diffDays <= 3) {
+                    harvestStatus = `${diffDays} Days`;
+                    harvestStatusClass = 'text-warning';
+                } else if (diffDays > 3) {
+                    const harvestFormatted = new Date(product.harvest_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+                    harvestStatus = harvestFormatted;
+                    harvestStatusClass = 'text-primary';
+                } else {
+                    harvestStatus = 'To Be Announced';
+                    harvestStatusClass = 'text-muted';
+                }
+            } else if (isPreorder) {
+                harvestStatus = 'To Be Announced';
+                harvestStatusClass = 'text-muted';
+            }
+
             // Section-specific date display
             let dateDisplay = '';
-            if (section === 'preorder' && isPreorder && product.preorder_availability_date) {
-                const harvestFormatted = new Date(product.preorder_availability_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
-                dateDisplay = `<div class="harvest-date-display"><i class="bi bi-calendar-check-fill"></i>Expected Harvest: <strong>${harvestFormatted}</strong></div>`;
+            if (section === 'preorder' && isPreorder) {
+                if (harvestStatus) {
+                    dateDisplay = `<div class="harvest-date-display"><i class="bi bi-calendar-check-fill"></i>Expected Harvest: <strong class="${harvestStatusClass}">${harvestStatus}</strong></div>`;
+                }
+                if (reservationsDisabled) {
+                    dateDisplay += `<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle"></i> Reservations Temporarily Unavailable</div>`;
+                }
             } else if (section === 'available' && !isPreorder && product.expiry_date) {
                 dateDisplay = `<div class="text-muted small mb-2"><i class="bi bi-hourglass-split me-1"></i>Best Before: ${new Date(product.expiry_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</div>`;
+            }
+
+            // Cart button logic - disable if reservations disabled for preorder
+            let cartBtnAttr;
+            let cartBtnText;
+            if (reservationsDisabled && isPreorder) {
+                cartBtnAttr = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
+                cartBtnText = 'Reservations Temporarily Unavailable';
+            } else if (hasValidId) {
+                cartBtnAttr = `onclick="event.stopPropagation(); app.addToCart(${product.id})"`;
+                cartBtnText = isPreorder ? 'Reserve' : 'Add to Cart';
+            } else {
+                cartBtnAttr = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
+                cartBtnText = 'Unavailable';
             }
 
             return `
@@ -5442,8 +5496,8 @@ class AgricultureMarket {
                     </div>
                         <button type="button" class="add-to-cart-btn ${product.is_preorder ? 'btn-warning' : ''}"
                             ${cartBtnAttr}
-                            ${isPurchasable ? '' : 'disabled'}>
-                        ${isPurchasable ? (product.is_preorder ? 'Reserve' : 'Add to Cart') : 'Unavailable'}
+                            ${isPurchasable && !reservationsDisabled ? '' : 'disabled'}>
+                        ${cartBtnText}
                     </button>
                 </div>
             </div>
@@ -5632,13 +5686,37 @@ class AgricultureMarket {
         try {
         // Format dates from farmer's input
         let harvestDate = 'Not specified';
-        if (product.harvest_date) {
+        let harvestDateClass = '';
+        const isPreorder = product.is_preorder === true;
+
+        if (isPreorder && product.harvest_date) {
             try {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
                 const harvest = new Date(product.harvest_date);
-                harvestDate = harvest.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });
+                harvest.setHours(0, 0, 0, 0);
+                const diffTime = harvest - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays === 0) {
+                    harvestDate = 'Today';
+                    harvestDateClass = 'text-success';
+                } else if (diffDays > 0 && diffDays <= 3) {
+                    harvestDate = `${diffDays} Days`;
+                    harvestDateClass = 'text-warning';
+                } else if (diffDays > 3) {
+                    harvestDate = harvest.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });
+                    harvestDateClass = 'text-primary';
+                } else {
+                    harvestDate = 'To Be Announced';
+                    harvestDateClass = 'text-muted';
+                }
             } catch (e) {
                 harvestDate = product.harvest_date; // Use raw value if date parsing fails
             }
+        } else if (isPreorder) {
+            harvestDate = 'To Be Announced';
+            harvestDateClass = 'text-muted';
         }
             
             let expiryDate = 'Not specified';
@@ -5793,8 +5871,25 @@ class AgricultureMarket {
                     if (stockLabelEl) stockLabelEl.textContent = 'Available Stock';
                 }
             }
-            if (harvestEl) harvestEl.textContent = harvestDate;
+            if (harvestEl) {
+                harvestEl.textContent = harvestDate;
+                if (harvestDateClass) {
+                    harvestEl.className = harvestDateClass;
+                }
+            }
             if (expiryEl) expiryEl.textContent = expiryDate;
+
+            // Add reservation status for preorder products
+            const reservationsDisabled = product.reservations_disabled === true || product.reservations_disabled === 't' || product.reservations_disabled === 'true';
+            if (isPreorder && reservationsDisabled) {
+                // Add reservation disabled indicator after harvest date
+                if (harvestEl && harvestEl.parentElement) {
+                    const reservationStatus = document.createElement('div');
+                    reservationStatus.className = 'text-danger small mt-1';
+                    reservationStatus.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Reservations Temporarily Unavailable';
+                    harvestEl.parentElement.appendChild(reservationStatus);
+                }
+            }
             if (priceEl) {
                 const unit = product.unit || 'unit';
                 priceEl.textContent = `${this.fmtCurrency(product.price || 0)} per ${unit}`;
@@ -6161,9 +6256,9 @@ class AgricultureMarket {
             if (isPreorder) {
                 const reserved = Number(product.reserved_quantity ?? 0);
                 const max = Number(product.max_preorder_quantity ?? 0);
-                return max > 0 ? max - reserved : null;
+                return { stock: max > 0 ? max - reserved : null, isPreorder: true };
             }
-            return Number(product?.stock_quantity || 0);
+            return { stock: Number(product?.stock_quantity || 0), isPreorder: false };
         } catch (_) {
             return null;
         }
@@ -6232,6 +6327,17 @@ class AgricultureMarket {
                     cartCountEl.classList.remove('bounce');
                     void cartCountEl.offsetWidth; // Trigger reflow
                     cartCountEl.classList.add('bounce');
+                }
+
+                // Always update cart total in sidebar
+                const cartTotalEl = document.getElementById('cart-total');
+                const checkoutBtn = document.getElementById('checkout-btn');
+                if (cartTotalEl && data.summary) {
+                    cartTotalEl.textContent = data.summary.subtotal || '0.00';
+                }
+                if (checkoutBtn && data.summary) {
+                    checkoutBtn.disabled = (data.summary.itemCount || 0) === 0;
+                    checkoutBtn.style.opacity = (data.summary.itemCount || 0) > 0 ? '1' : '0.6';
                 }
 
                 this.showMessage('Item added to cart!', 'success', { position: 'center' });
@@ -6707,10 +6813,11 @@ class AgricultureMarket {
         // Fetch current stock from server
         let currentStock = maxStock;
         if (productId) {
-            const serverStock = await this.fetchProductStock(productId);
-            if (serverStock !== null && serverStock !== currentStock) {
-                currentStock = serverStock;
-                this.showMessage(`Stock updated: Only ${currentStock} available`, 'info');
+            const stockInfo = await this.fetchProductStock(productId);
+            if (stockInfo !== null && stockInfo.stock !== null && stockInfo.stock !== currentStock) {
+                currentStock = stockInfo.stock;
+                const stockType = stockInfo.isPreorder ? 'pre-order' : 'stock';
+                this.showMessage(`${stockType.charAt(0).toUpperCase() + stockType.slice(1)} updated: Only ${currentStock} available`, 'info');
             }
         }
         
@@ -6732,10 +6839,11 @@ class AgricultureMarket {
         // Fetch current stock from server
         let currentStock = maxStock;
         if (productId) {
-            const serverStock = await this.fetchProductStock(productId);
-            if (serverStock !== null && serverStock !== currentStock) {
-                currentStock = serverStock;
-                this.showMessage(`Stock updated: Only ${currentStock} available`, 'info');
+            const stockInfo = await this.fetchProductStock(productId);
+            if (stockInfo !== null && stockInfo.stock !== null && stockInfo.stock !== currentStock) {
+                currentStock = stockInfo.stock;
+                const stockType = stockInfo.isPreorder ? 'pre-order' : 'stock';
+                this.showMessage(`${stockType.charAt(0).toUpperCase() + stockType.slice(1)} updated: Only ${currentStock} available`, 'info');
             }
         }
         

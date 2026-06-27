@@ -444,25 +444,59 @@ class OrdersPage {
     }
 
     renderAllOrders() {
-        // Render orders for all statuses
-        Object.keys(this.ordersByStatus).forEach(status => {
-            this.renderOrdersByStatus(status);
+        // Render orders for simplified tabs only (all, active, delivered, cancelled)
+        const tabStatusMap = {
+            'all': ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery', 'delivered', 'cancelled'],
+            'active': ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery'],
+            'delivered': ['delivered'],
+            'cancelled': ['cancelled']
+        };
+
+        Object.keys(tabStatusMap).forEach(tab => {
+            this.currentTab = tab;
+            this.renderOrdersByStatus(tabStatusMap[tab]);
         });
+
+        // Reset to all tab
+        this.currentTab = 'all';
+
         // Update tab counters after rendering
         this.updateTabCounts();
     }
 
     updateTabCounts() {
         try {
+            // Map simplified tabs to status counts
+            const tabCounts = {
+                'all': 0,
+                'active': 0,
+                'delivered': 0,
+                'cancelled': 0
+            };
+
+            // Calculate counts for each simplified tab
             Object.keys(this.ordersByStatus).forEach(status => {
                 const count = (this.ordersByStatus[status] || []).length || 0;
-                const tab = document.getElementById(`${status}-orders-tab`);
-                if (!tab) return;
-                const label = this.formatStatusLabel(status);
+                if (['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery'].includes(status)) {
+                    tabCounts.active += count;
+                } else if (status === 'delivered') {
+                    tabCounts.delivered += count;
+                } else if (status === 'cancelled') {
+                    tabCounts.cancelled += count;
+                }
+                tabCounts.all += count;
+            });
+
+            // Update tab labels with counts
+            Object.keys(tabCounts).forEach(tab => {
+                const count = tabCounts[tab];
+                const tabEl = document.getElementById(`${tab}-orders-tab`);
+                if (!tabEl) return;
+                const label = this.formatTabLabel(tab);
                 if (count > 0) {
-                    tab.innerHTML = `${label} <span class="tab-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">${count}</span>`;
+                    tabEl.innerHTML = `${label} <span class="tab-count" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 6px;margin-left:8px;font-size:0.85rem;vertical-align:middle;">${count}</span>`;
                 } else {
-                    tab.textContent = label;
+                    tabEl.textContent = label;
                 }
             });
         } catch (e) {
@@ -570,7 +604,12 @@ class OrdersPage {
                         <div class="order-item-name">${item.product_name || 'Product'}</div>
                         <div class="order-item-meta">${this.fmtNumber(quantity)} x ${this.fmtCurrency(item.price || order.price || 0)} ${item.unit || ''}</div>
                         <div class="order-item-meta"><strong>From:</strong> ${item.farmer_name || 'Local Farmer'}${item.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : ''}</div>
-                        ${isPreorder && item.preorder_availability_date ? `<div class="order-item-meta"><strong>Available:</strong> ${item.preorder_availability_date}</div>` : ''}
+                        ${isPreorder && item.harvest_date ? `<div class="order-item-meta"><strong>Expected Harvest:</strong> ${new Date(item.harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
+                        ${isPreorder && item.harvest_date_updated_at ? `<div class="order-item-meta"><strong>Last Updated:</strong> ${new Date(item.harvest_date_updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
+                        ${isPreorder && item.harvest_adjustment_count ? `<div class="order-item-meta"><strong>Adjustments:</strong> ${item.harvest_adjustment_count}</div>` : ''}
+                        ${isPreorder && item.previous_harvest_date ? `<div class="order-item-meta"><strong>Previous Harvest Date:</strong> ${new Date(item.previous_harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
+                        ${isPreorder && item.harvest_adjustment_reason ? `<div class="order-item-meta"><strong>Adjustment Reason:</strong> ${this.escapeHtml(item.harvest_adjustment_reason)}</div>` : ''}
+                        ${isPreorder && item.preorder_availability_date ? `<div class="order-item-meta"><strong>Available:</strong> ${new Date(item.preorder_availability_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
                         ${order.delivery_date ? `<div class="order-item-meta"><strong>Delivery Date:</strong> ${new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
                         ${order.reschedule_reason ? `<div class="order-item-meta"><strong>Reason for Rescheduling:</strong> ${this.escapeHtml(order.reschedule_reason)}</div>` : ''}
                         ${(currentStatus === 'cancelled') ? `

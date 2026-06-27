@@ -96,6 +96,12 @@ if (!useResend) {
  * @returns {Promise}
  */
 async function sendOtpEmail(to, otp, purpose = "login", firstName = null) {
+  // Skip email sending in local development to save Resend API quota
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`🔧 Development mode: Skipping email send to ${to}, OTP is: ${otp}`);
+    return { success: true, developmentMode: true, otp: otp };
+  }
+
   const purposeText = {
     login: "Login",
     register: "Registration",

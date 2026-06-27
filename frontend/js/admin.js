@@ -390,9 +390,8 @@ class AdminDashboard {
             'all-users': { page: 1, total: 0, limit: 25 },
             'suspicious-patterns': { page: 1, total: 0, limit: 50 },
             'flagged-users': { page: 1, total: 0, limit: 50 },
-            'security-log': { page: 1, total: 0, limit: 50 },
         };
-        this._kpiPeriods = { 'kpi-sales': 'today', 'kpi-revenue': 'today', 'kpi-customers': 'today', 'kpi-farmers': 'today' };
+        this._kpiPeriods = { 'kpi-sales': 'today', 'kpi-revenue': 'today', 'kpi-customers': 'today', 'kpi-farmers': 'today', 'kpi-harvest-attention': 'today' };
         this._reportPeriod = 'today';
         this._activityPeriod = 'today';
         this._topProductsPeriod = 'today';
@@ -411,6 +410,8 @@ class AdminDashboard {
         this.startNotifPolling();
         this.loadProductApprovalsBadge();
         this.loadSubscriptionBadgeCount();
+        this.loadVerificationBadgeCount();
+        this.loadCategoryBadgeCount();
         this.loadSupportTicketsBadge();
         this.initChat();
 
@@ -418,6 +419,14 @@ class AdminDashboard {
         const loadSupportBadge = () => this.loadSupportTicketsBadge();
         loadSupportBadge();
         this._supportBadgeInterval = setInterval(loadSupportBadge, 60000);
+        // Poll verification badge every 60s
+        const loadVerificationBadge = () => this.loadVerificationBadgeCount();
+        loadVerificationBadge();
+        this._verificationBadgeInterval = setInterval(loadVerificationBadge, 60000);
+        // Poll category badge every 60s
+        const loadCategoryBadge = () => this.loadCategoryBadgeCount();
+        loadCategoryBadge();
+        this._categoryBadgeInterval = setInterval(loadCategoryBadge, 60000);
         // Description char counter for product edit
         const desc = document.getElementById('edit-product-description');
         const count = document.getElementById('edit-product-description-count');
@@ -810,8 +819,6 @@ class AdminDashboard {
             this.loadSuspiciousPatterns();
         } else if (sectionId === 'flagged-users') {
             this.loadFlaggedUsers();
-        } else if (sectionId === 'security-log') {
-            this.loadSecurityLog();
         } else if (sectionId === 'platform-settings') {
             this.loadPlatformSettings();
         } else if (sectionId === 'feature-flags') {
@@ -905,7 +912,7 @@ class AdminDashboard {
                 broadcast: 'Broadcast Announcement',
                 'suspicious-patterns': 'Suspicious Patterns',
                 'flagged-users': 'Flagged Users',
-                'security-log': 'Security Log',
+                'activity-monitor': 'Activity Monitor',
                 'platform-settings': 'Platform Settings',
                 'feature-flags': 'Feature Flags',
                 'database-backup': 'Database Data Backup',
@@ -939,7 +946,7 @@ class AdminDashboard {
                 broadcast: 'Broadcast',
                 'suspicious-patterns': 'Suspicious Patterns',
                 'flagged-users': 'Flagged Users',
-                'security-log': 'Security Log',
+                'activity-monitor': 'Activity Monitor',
                 'platform-settings': 'Platform Settings',
                 'feature-flags': 'Feature Flags',
             };
@@ -951,6 +958,8 @@ class AdminDashboard {
             this._loadedSections = this._loadedSections || {};
             this._loadedSections.logs = true;
             this.loadAdminsForLogs();
+            this.loadAuditLogActions();
+            this.loadAuditLogEntities();
             this.loadAuditLogs();
         }
         if (sectionId === 'users' && !this._loadedSections?.users) {
@@ -1015,10 +1024,11 @@ class AdminDashboard {
             this._loadedSections['flagged-users'] = true;
             this.loadFlaggedUsers();
         }
-        if (sectionId === 'security-log' && !this._loadedSections?.['security-log']) {
+        if (sectionId === 'activity-monitor' && !this._loadedSections?.['activity-monitor']) {
             this._loadedSections = this._loadedSections || {};
-            this._loadedSections['security-log'] = true;
-            this.loadSecurityLog();
+            this._loadedSections['activity-monitor'] = true;
+            this.loadActivityMonitor();
+            this.setupActivityMonitorEventListeners();
         }
         if (sectionId === 'platform-settings' && !this._loadedSections?.['platform-settings']) {
             this._loadedSections = this._loadedSections || {};
@@ -1384,11 +1394,23 @@ class AdminDashboard {
                 document.querySelectorAll('.products-tabs .tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.resetPaginationPage('products');
+                const status = btn.getAttribute('data-status');
                 await this.loadProductsAll();
                 this.loadProducts(1);
             });
         });
-        
+
+        const productsFilter = document.getElementById('products-filter');
+        if (productsFilter) {
+            productsFilter.addEventListener('change', async () => {
+                this.resetPaginationPage('products');
+                const status = productsFilter.value;
+                // Load all products and filter client-side for all filter options
+                await this.loadProductsAll();
+                this.applyProductsFilter();
+            });
+        }
+
         if (productsSearchBtn) productsSearchBtn.addEventListener('click', () => this.loadProducts(1));
         if (productsSearchInput) productsSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadProducts(1); });
         if (productsCatFilter) productsCatFilter.addEventListener('change', () => this.loadProducts(1));
@@ -1414,13 +1436,11 @@ class AdminDashboard {
         if (farmersVerificationFilter) farmersVerificationFilter.addEventListener('change', () => this.loadFarmers('all', 1));
 
         // Audit logs filters - auto-apply on change
-        const logsSearchBtn = document.getElementById('logs-search-btn');
         const logsActionFilter = document.getElementById('logs-action-filter');
         const logsEntityFilter = document.getElementById('logs-entity-filter');
         const logsActorFilter = document.getElementById('logs-actor-filter');
         const logsDateFrom  = document.getElementById('logs-date-from');
         const logsDateTo    = document.getElementById('logs-date-to');
-        if (logsSearchBtn) logsSearchBtn.addEventListener('click', () => this.loadAuditLogs());
         if (logsActionFilter) logsActionFilter.addEventListener('change', () => this.loadAuditLogs());
         if (logsEntityFilter) logsEntityFilter.addEventListener('change', () => this.loadAuditLogs());
         if (logsActorFilter) logsActorFilter.addEventListener('change', () => this.loadAuditLogs());
@@ -1584,25 +1604,44 @@ class AdminDashboard {
             });
         });
 
-        // Format phone input with spaces (9XX XXX XXXX)
-        ['pe-phone', 'edit-user-phone', 'create-user-phone'].forEach(id => {
+        // Format phone input with spaces (9XX XXX XXXX) - match landing page behavior
+        ['pe-phone', 'edit-user-phone', 'create-user-phone', 'sa-user-phone'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                el.addEventListener('input', () => {
-                    // Remove non-digits
-                    let digits = el.value.replace(/\D/g, '');
-                    // Limit to 10 digits
-                    if (digits.length > 10) digits = digits.slice(0, 10);
+                el.addEventListener('input', function(e) {
+                    const input = e.target;
+                    let value = input.value;
+                    let selectionStart = input.selectionStart;
+
+                    // Remove all non-numeric characters
+                    let digits = value.replace(/\D/g, '');
+                    if (digits.startsWith('0')) digits = digits.substring(1);
+                    digits = digits.substring(0, 10);
+
                     // Format as 9XX XXX XXXX
-                    if (digits.length > 0) {
-                        let formatted = digits[0];
-                        if (digits.length > 1) formatted += digits.slice(1, 3);
-                        if (digits.length > 3) formatted += ' ' + digits.slice(3, 6);
-                        if (digits.length > 6) formatted += ' ' + digits.slice(6, 10);
-                        el.value = formatted;
+                    let formatted = '';
+                    if (digits.length <= 3) {
+                        formatted = digits;
+                    } else if (digits.length <= 6) {
+                        formatted = digits.slice(0, 3) + ' ' + digits.slice(3);
                     } else {
-                        el.value = '';
+                        formatted = digits.slice(0, 3) + ' ' + digits.slice(3, 6) + ' ' + digits.slice(6);
                     }
+
+                    // Calculate new cursor position
+                    let pos = selectionStart;
+                    let rawLeft = value.slice(0, pos).replace(/\D/g, '');
+                    let newPos = rawLeft.length;
+                    if (newPos > 3 && newPos <= 6) newPos += 1; // after first space
+                    else if (newPos > 6) newPos += 2; // after two spaces
+
+                    // If deleting a space, move cursor back
+                    if (value[pos - 1] === ' ' && formatted.length < value.length) {
+                        newPos = Math.max(0, newPos - 1);
+                    }
+
+                    input.value = formatted;
+                    input.setSelectionRange(newPos, newPos);
                 });
             }
         });
@@ -1636,6 +1675,25 @@ class AdminDashboard {
                 if (icon) icon.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
             });
         }
+
+        // Superadmin user modal handlers
+        const saUserPwToggle = document.getElementById('sa-user-pw-toggle');
+        const saUserPwInput  = document.getElementById('sa-user-password');
+        if (saUserPwToggle && saUserPwInput) {
+            saUserPwToggle.addEventListener('click', () => {
+                const show = saUserPwInput.type === 'password';
+                saUserPwInput.type = show ? 'text' : 'password';
+                const icon = saUserPwToggle.querySelector('i');
+                if (icon) icon.className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+            });
+        }
+
+        document.getElementById('sa-user-modal-cancel')?.addEventListener('click', () => {
+            const modal = document.getElementById('sa-user-modal');
+            if (modal) modal.classList.remove('open');
+        });
+
+        document.getElementById('sa-user-form')?.addEventListener('submit', (e) => this.submitSaUserCreate(e));
 
         // Rejection modal event listeners
         document.getElementById('reject-product-modal-close')?.addEventListener('click', () => {
@@ -1727,6 +1785,10 @@ class AdminDashboard {
                 this.loadProductApprovals(undefined, undefined, 1);
             }
         });
+        document.getElementById('product-approvals-category-filter')?.addEventListener('change', () => {
+            this.resetPaginationPage('product-approvals');
+            this.loadProductApprovals(undefined, undefined, 1);
+        });
         document.getElementById('product-approval-refresh-btn')?.addEventListener('click', () => {
             // Reset tabs to first tab (All)
             const tabsContainer = document.querySelector('.product-approval-tabs');
@@ -1780,14 +1842,8 @@ class AdminDashboard {
         // Superadmin section buttons
         document.getElementById('detect-patterns-btn')?.addEventListener('click', () => this.loadSuspiciousPatterns());
         document.getElementById('refresh-flagged-btn')?.addEventListener('click', () => this.loadFlaggedUsers());
-        document.getElementById('seclog-refresh-btn')?.addEventListener('click', () => this.loadSecurityLog());
         document.getElementById('flags-refresh-btn')?.addEventListener('click', () => this.loadFeatureFlags());
         document.getElementById('refresh-status-btn')?.addEventListener('click', () => this.loadServiceStatus());
-
-        // Security log filters - auto-apply on change
-        document.getElementById('seclog-action-filter')?.addEventListener('change', () => this.loadSecurityLog());
-        document.getElementById('seclog-date-from')?.addEventListener('change', () => this.loadSecurityLog());
-        document.getElementById('seclog-date-to')?.addEventListener('change', () => this.loadSecurityLog());
 
         // Entries-per-page selects
         document.addEventListener('change', (e) => {
@@ -1816,7 +1872,6 @@ class AdminDashboard {
                 'recent-sales': () => this.loadRecentSales(this._recentSalesPeriod || 'today'),
                 'admin': () => this.loadAdmin(),
                 'all-users': () => this.loadAllUsers(),
-                'security-log': () => this.loadSecurityLog(),
             };
             loaders[section]?.();
         });
@@ -1882,6 +1937,56 @@ class AdminDashboard {
         }
     }
 
+    async loadAuditLogActions() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/audit-logs/actions`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            const actions = data.actions || [];
+            const select = document.getElementById('logs-action-filter');
+            if (!select) return;
+
+            // Keep the "All actions" option
+            select.innerHTML = '<option value="">All actions</option>';
+
+            actions.forEach(action => {
+                const option = document.createElement('option');
+                option.value = action;
+                option.textContent = this.humanizeAction(action);
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading audit log actions:', error);
+        }
+    }
+
+    async loadAuditLogEntities() {
+        try {
+            const response = await fetch(`${this.apiBase}/admin/audit-logs/entities`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            const entities = data.entities || [];
+            const select = document.getElementById('logs-entity-filter');
+            if (!select) return;
+
+            // Keep the "All entities" option
+            select.innerHTML = '<option value="">All entities</option>';
+
+            entities.forEach(entity => {
+                const option = document.createElement('option');
+                option.value = entity;
+                option.textContent = entity.charAt(0).toUpperCase() + entity.slice(1);
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading audit log entities:', error);
+        }
+    }
+
     async loadAuditLogs(page = 1) {
         try {
             const pg = this.pagination.logs;
@@ -1891,6 +1996,40 @@ class AdminDashboard {
             const entity  = document.getElementById('logs-entity-filter')?.value?.trim();
             const dateFrom = document.getElementById('logs-date-from')?.value?.trim();
             const dateTo   = document.getElementById('logs-date-to')?.value?.trim();
+
+            // Validate date range
+            if (dateFrom && dateTo) {
+                const fromDate = new Date(dateFrom);
+                const toDate = new Date(dateTo);
+                if (fromDate > toDate) {
+                    const tbody = document.getElementById('logs-tbody');
+                    if (tbody) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>From date cannot be after To date</span>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                    return;
+                }
+            }
+
+            // Show loading state
+            const tbody = document.getElementById('logs-tbody');
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            <div class="spinner-border spinner-border-sm text-muted" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="text-muted ms-2">Loading audit logs...</span>
+                        </td>
+                    </tr>
+                `;
+            }
 
             const params = new URLSearchParams();
             params.set('limit', String(pg.limit));
@@ -1912,6 +2051,16 @@ class AdminDashboard {
             this.renderPagination('logs-pagination', pg, (p) => this.loadAuditLogs(p));
         } catch (error) {
             console.error('Error loading audit logs:', error);
+            const tbody = document.getElementById('logs-tbody');
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            <span class="text-danger">Failed to load audit logs</span>
+                        </td>
+                    </tr>
+                `;
+            }
         }
     }
 
@@ -1968,7 +2117,26 @@ class AdminDashboard {
         }
 
         if (!sortedLogs.length) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No logs found.</td></tr>`;
+            // Check if any filters are active to show appropriate empty state message
+            const hasActiveFilters = 
+                document.getElementById('logs-action-filter')?.value ||
+                document.getElementById('logs-entity-filter')?.value ||
+                document.getElementById('logs-actor-filter')?.value ||
+                document.getElementById('logs-date-from')?.value ||
+                document.getElementById('logs-date-to')?.value;
+            
+            const message = hasActiveFilters 
+                ? 'No audit logs found matching your filters'
+                : 'No audit logs recorded yet';
+            
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-5">
+                        <i class="bi bi-journal-x text-muted" style="font-size: 3rem;"></i>
+                        <p class="text-muted mt-3 mb-0">${message}</p>
+                    </td>
+                </tr>
+            `;
             this.refreshSortableTable('logs-table', { columns: [{ select: 6, sortable: false }] });
             return;
         }
@@ -2302,6 +2470,8 @@ class AdminDashboard {
                     valEl.textContent = this.fmtNumber(stats.customers ?? 0);
                 } else if (metric === 'farmers') {
                     valEl.textContent = this.fmtNumber(stats.farmers ?? 0);
+                } else if (metric === 'harvest-attention') {
+                    valEl.textContent = this.fmtNumber(stats.harvest_attention ?? 0);
                 }
             }
 
@@ -2724,8 +2894,12 @@ class AdminDashboard {
     applyProductsFilter() {
         const q = (document.getElementById('products-search-input')?.value || '').trim().toLowerCase();
         const catId = document.getElementById('products-category-filter')?.value || '';
+        const productsFilter = document.getElementById('products-filter');
+        const filterStatus = productsFilter ? productsFilter.value : '';
         const activeTab = document.querySelector('.products-tabs .tab-btn.active');
-        const status = activeTab ? activeTab.getAttribute('data-status') : '';
+        const tabStatus = activeTab ? activeTab.getAttribute('data-status') : '';
+        // Use filter dropdown value if set, otherwise use tab status
+        const status = filterStatus || tabStatus;
 
         let products = [...(this.lastProducts || [])];
         
@@ -2741,10 +2915,10 @@ class AdminDashboard {
             products = products.filter(p => String(p.category_id) === catId);
         }
         
-        if (status === 'available') {
-            products = products.filter(p => !p.is_admin_disabled && !p.farmer_is_disabled && p.is_available);
-        } else if (status === 'disabled') {
-            products = products.filter(p => p.is_admin_disabled || p.farmer_is_disabled || !p.is_available);
+        if (status === 'available_now') {
+            products = products.filter(p => !p.is_preorder && p.stock_quantity > 0 && !p.is_admin_disabled && !p.farmer_is_disabled && p.is_available);
+        } else if (status === 'preorder') {
+            products = products.filter(p => p.is_preorder && !p.is_admin_disabled && !p.farmer_is_disabled && p.is_available);
         }
 
         this.renderProducts(products);
@@ -3455,117 +3629,6 @@ class AdminDashboard {
             // Revert checkbox on failure
             this.loadAllUsers();
         }
-    }
-
-    async loadSecurityLog(page = 1) {
-        try {
-            const pg = this.pagination['security-log'] || { page: 1, total: 0, limit: 50 };
-            pg.page = page;
-            const actionFilter = document.getElementById('seclog-action-filter')?.value || '';
-            const dateFrom = document.getElementById('seclog-date-from')?.value || '';
-            const dateTo = document.getElementById('seclog-date-to')?.value || '';
-            const params = new URLSearchParams({
-                page: String(page),
-                limit: String(pg.limit)
-            });
-            if (actionFilter) params.set('action', actionFilter);
-            if (dateFrom) params.set('date_from', dateFrom);
-            if (dateTo) params.set('date_to', dateTo);
-
-            const response = await fetch(`${this.apiBase}/superadmin/security-log?${params.toString()}`, {
-                headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                this.lastSecurityLogs = data.logs || [];
-                pg.total = Number(data.total || 0);
-                this.renderSecurityLog(this.lastSecurityLogs);
-                this.renderPagination('seclog-pagination', pg, (p) => this.loadSecurityLog(p));
-            } else {
-                const tbody = document.getElementById('seclog-tbody');
-                if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Failed to load security log. Please try again.</td></tr>`;
-                this.showMessage('Failed to load security log', 'error');
-            }
-        } catch (error) {
-            console.error('Error loading security log:', error);
-            const tbody = document.getElementById('seclog-tbody');
-            if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Failed to load security log. Please try again.</td></tr>`;
-            this.showMessage('Failed to load security log', 'error');
-        }
-    }
-
-    renderSecurityLog(logs) {
-        this.destroySortableTable('seclog-table');
-        const tbody = document.getElementById('seclog-tbody');
-        if (!tbody) return;
-
-        let sortedLogs = logs || [];
-
-        // Apply saved sort from localStorage
-        const savedSort = localStorage.getItem('adminTableSort_seclog-table');
-        if (savedSort) {
-            try {
-                const [colIndex, direction] = JSON.parse(savedSort);
-                const sortMultiplier = direction === 'asc' ? 1 : -1;
-
-                sortedLogs.sort((a, b) => {
-                    let valA, valB;
-                    switch (colIndex) {
-                        case 0: // created_at
-                            valA = new Date(a.created_at || 0).getTime();
-                            valB = new Date(b.created_at || 0).getTime();
-                            break;
-                        case 1: // actor name
-                            valA = (a.actor_admin_name || a.actor_admin_email || '').toLowerCase();
-                            valB = (b.actor_admin_name || b.actor_admin_email || '').toLowerCase();
-                            break;
-                        case 2: // action
-                            valA = (a.action || '').toLowerCase();
-                            valB = (b.action || '').toLowerCase();
-                            break;
-                        case 3: // entity
-                            valA = (a.entity || '').toLowerCase();
-                            valB = (b.entity || '').toLowerCase();
-                            break;
-                        case 4: // ip_address
-                            valA = (a.ip_address || '').toLowerCase();
-                            valB = (b.ip_address || '').toLowerCase();
-                            break;
-                        case 5: // user_agent
-                            valA = (a.user_agent || '').toLowerCase();
-                            valB = (b.user_agent || '').toLowerCase();
-                            break;
-                        default:
-                            return 0;
-                    }
-                    if (valA < valB) return -1 * sortMultiplier;
-                    if (valA > valB) return 1 * sortMultiplier;
-                    return 0;
-                });
-            } catch (e) {}
-        }
-
-        if (!sortedLogs.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No security log entries found</td></tr>`;
-            this.refreshSortableTable('seclog-table');
-            return;
-        }
-
-        tbody.innerHTML = sortedLogs.map(log => {
-            return `
-                <tr>
-                    <td class="text-muted">${log.created_at ? new Date(log.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</td>
-                    <td>${this.escapeHtml(log.actor_admin_name || log.actor_admin_email || '—')}</td>
-                    <td>${this.escapeHtml(log.action || '—')}</td>
-                    <td>${this.escapeHtml(log.entity || '—')}</td>
-                    <td class="text-muted">${log.ip_address || '—'}</td>
-                    <td class="text-muted small">${this.escapeHtml(log.user_agent || '—')}</td>
-                </tr>
-            `;
-        }).join('');
-
-        this.refreshSortableTable('seclog-table', { columns: [{ select: 6, sortable: false }] });
     }
 
     async loadPlatformSettings() {
@@ -4386,17 +4449,844 @@ class AdminDashboard {
         }
     }
 
+    async loadActivityMonitor() {
+        try {
+            // Build query parameters from current filter values
+            const params = new URLSearchParams({
+                page: 1,
+                limit: document.getElementById('am-entries-per-page')?.value || 25
+            });
+
+            const searchValue = document.getElementById('am-search-user')?.value;
+            if (searchValue) params.append('search', searchValue);
+
+            const roleValue = document.getElementById('am-role-filter')?.value;
+            if (roleValue) params.append('role', roleValue);
+
+            const actionValue = document.getElementById('am-action-filter')?.value;
+            if (actionValue) params.append('action', actionValue);
+
+            const statusValue = document.getElementById('am-status-filter')?.value;
+            if (statusValue) params.append('status', statusValue);
+
+            const sessionValue = document.getElementById('am-session-filter')?.value;
+            if (sessionValue) params.append('session', sessionValue);
+
+            const dateFromValue = document.getElementById('am-date-from')?.value;
+            if (dateFromValue) params.append('dateFrom', dateFromValue);
+
+            const dateToValue = document.getElementById('am-date-to')?.value;
+            if (dateToValue) params.append('dateTo', dateToValue);
+
+            // Fetch activities from backend API
+            const response = await fetch(`${this.apiBase}/activity-monitor/activities?${params.toString()}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch activities');
+            }
+
+            const data = await response.json();
+            
+            // Transform API data to match frontend format
+            const activities = data.activities.map(activity => ({
+                id: activity.id,
+                user: activity.full_name || activity.username || 'Unknown',
+                email: activity.email || 'N/A',
+                role: activity.role,
+                action: activity.action,
+                actionLabel: this.getActionLabel(activity.action),
+                actionIcon: this.getActionIcon(activity.action),
+                description: activity.description || '',
+                currentPage: activity.current_page || 'N/A',
+                timestamp: activity.created_at,
+                status: activity.status,
+                sessionId: activity.session_id || 'N/A',
+                riskLevel: activity.risk_level || 'low',
+                riskScore: activity.risk_score || 0
+            }));
+
+            this.renderActivityMonitor(activities);
+            
+            // Store current activities for realtime updates
+            this.currentActivities = activities;
+            
+            // Update Last Updated timestamp
+            const lastUpdated = document.getElementById('am-last-updated');
+            if (lastUpdated) {
+                const now = new Date();
+                lastUpdated.textContent = `Last Updated: ${now.toLocaleTimeString('en-PH', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                })}`;
+            }
+
+            // Fetch dashboard summary
+            this.loadActivityDashboardSummary();
+
+            // Start SSE connection for realtime updates (only on first load)
+            if (!this._activityMonitorEventSource) {
+                this.startActivityMonitorStream();
+            }
+
+        } catch (error) {
+            console.error('Error loading activity monitor:', error);
+            this.showMessage('Failed to load activity data', 'error');
+            this.renderActivityMonitor([]);
+        }
+    }
+
+    startActivityMonitorStream() {
+        // Close existing connection if any
+        this.stopActivityMonitorStream();
+
+        try {
+            // Include token in SSE connection for authentication
+            const token = localStorage.getItem('token');
+            if (!token) {
+                console.warn('No token available for Activity Monitor stream');
+                return;
+            }
+
+            const eventSource = new EventSource(`/api/activity-monitor/stream?token=${encodeURIComponent(token)}`);
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+
+                    if (message.type === 'new_activity') {
+                        // Prepend new activity to the list
+                        this.handleNewActivity(message.data);
+                    } else if (message.type === 'connected') {
+                        console.log('Activity Monitor stream connected');
+                    }
+                } catch (error) {
+                    console.error('Error parsing SSE message:', error);
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('Activity Monitor stream error:', error);
+                this.stopActivityMonitorStream();
+            };
+
+            this._activityMonitorEventSource = eventSource;
+        } catch (error) {
+            console.error('Error starting Activity Monitor stream:', error);
+        }
+    }
+
+    stopActivityMonitorStream() {
+        if (this._activityMonitorEventSource) {
+            this._activityMonitorEventSource.close();
+            this._activityMonitorEventSource = null;
+        }
+    }
+
+    handleNewActivity(activity) {
+        // Transform new activity data
+        const newActivity = {
+            id: activity.id,
+            user: activity.full_name || activity.username || 'Unknown',
+            email: activity.email || 'N/A',
+            role: activity.role,
+            action: activity.action,
+            actionLabel: this.getActionLabel(activity.action),
+            actionIcon: this.getActionIcon(activity.action),
+            description: activity.description || '',
+            currentPage: activity.current_page || 'N/A',
+            timestamp: activity.created_at,
+            status: activity.status,
+            sessionId: activity.session_id || 'N/A',
+            riskLevel: activity.risk_level || 'low',
+            riskScore: activity.risk_score || 0
+        };
+
+        // Add to beginning of current activities
+        if (!this.currentActivities) {
+            this.currentActivities = [];
+        }
+        this.currentActivities.unshift(newActivity);
+
+        // Re-render with new activity
+        this.renderActivityMonitor(this.currentActivities);
+
+        // Update last updated timestamp
+        const lastUpdated = document.getElementById('am-last-updated');
+        if (lastUpdated) {
+            const now = new Date();
+            lastUpdated.textContent = `Last Updated: ${now.toLocaleTimeString('en-PH', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            })}`;
+        }
+
+        // Refresh dashboard summary
+        this.loadActivityDashboardSummary();
+    }
+
+    async loadActivityDashboardSummary() {
+        try {
+            const response = await fetch('/api/activity-monitor/dashboard', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch dashboard summary');
+            }
+
+            const data = await response.json();
+
+            // Update summary cards
+            const todayActivitiesCard = document.getElementById('am-today-count');
+            const onlineUsersCard = document.getElementById('am-online-users');
+            const errorsTodayCard = document.getElementById('am-errors-today');
+            const customerActionsCard = document.getElementById('am-customer-actions');
+            const farmerActionsCard = document.getElementById('am-farmer-actions');
+            const adminActionsCard = document.getElementById('am-admin-actions');
+
+            if (todayActivitiesCard) {
+                todayActivitiesCard.textContent = data.todayActivities || 0;
+            }
+            if (onlineUsersCard) {
+                onlineUsersCard.textContent = data.onlineUsers || 0;
+            }
+            if (errorsTodayCard) {
+                errorsTodayCard.textContent = data.errorsToday || 0;
+            }
+            if (customerActionsCard) {
+                customerActionsCard.textContent = data.customerActions || 0;
+            }
+            if (farmerActionsCard) {
+                farmerActionsCard.textContent = data.farmerActions || 0;
+            }
+            if (adminActionsCard) {
+                adminActionsCard.textContent = data.adminActions || 0;
+            }
+
+        } catch (error) {
+            console.error('Error loading dashboard summary:', error);
+        }
+    }
+
+    getActionLabel(action) {
+        const labels = {
+            login: 'Login',
+            logout: 'Logout',
+            failed_login: 'Failed Login',
+            search_product: 'Search Product',
+            view_product: 'View Product',
+            add_wishlist: 'Add Wishlist',
+            remove_wishlist: 'Remove Wishlist',
+            add_cart: 'Add to Cart',
+            remove_cart: 'Remove from Cart',
+            checkout: 'Checkout',
+            place_order: 'Place Order',
+            cancel_order: 'Cancel Order',
+            add_product: 'Add Product',
+            edit_product: 'Edit Product',
+            delete_product: 'Delete Product',
+            approve_farmer: 'Approve Farmer',
+            reject_farmer: 'Reject Farmer',
+            security_event: 'Security Event',
+            admin_settings_change: 'Admin Settings'
+        };
+        return labels[action] || action;
+    }
+
+    getActionIcon(action) {
+        const icons = {
+            login: '🟢',
+            logout: '🔴',
+            failed_login: '❌',
+            search_product: '🔍',
+            view_product: '📦',
+            add_wishlist: '❤️',
+            remove_wishlist: '💔',
+            add_cart: '🛒',
+            remove_cart: '🗑️',
+            checkout: '💳',
+            place_order: '📋',
+            cancel_order: '❌',
+            add_product: '➕',
+            edit_product: '✏️',
+            delete_product: '🗑️',
+            approve_farmer: '✅',
+            reject_farmer: '🚫',
+            security_event: '🔒',
+            admin_settings_change: '⚙️'
+        };
+        return icons[action] || '📌';
+    }
+
+
+    getActionDescription(actionType) {
+        const descriptions = {
+            login: 'User logged in successfully',
+            logout: 'User logged out',
+            search: 'Searched for products',
+            view_product: 'Viewed product details',
+            add_wishlist: 'Added product to wishlist',
+            remove_wishlist: 'Removed product from wishlist',
+            add_cart: 'Added product to cart',
+            remove_cart: 'Removed product from cart',
+            checkout: 'Initiated checkout process',
+            place_order: 'Placed new order',
+            cancel_order: 'Cancelled order',
+            add_product: 'Created new product listing',
+            edit_product: 'Updated product information',
+            delete_product: 'Deleted product listing',
+            approve_farmer: 'Approved farmer verification',
+            reject_farmer: 'Rejected farmer verification',
+            admin_settings: 'Modified platform settings',
+            security_event: 'Security-related event detected',
+        };
+        return descriptions[actionType] || 'Unknown action';
+    }
+
+    renderActivityMonitor(activities) {
+        const tbody = document.getElementById('am-activity-tbody');
+        if (!tbody) return;
+
+        if (!activities.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">No activities found</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = activities.map(activity => {
+            const time = new Date(activity.timestamp).toLocaleTimeString('en-PH', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true 
+            });
+            const date = new Date(activity.timestamp).toLocaleDateString('en-PH', {
+                month: 'short',
+                day: 'numeric'
+            });
+
+            const roleBadge = this.getRoleBadge(activity.role);
+            const statusBadge = this.getStatusBadge(activity.status);
+            const riskBadge = this.getRiskBadge(activity.riskLevel, activity.riskScore);
+
+            return `
+                <tr class="am-activity-row" data-activity-id="${activity.id}" style="cursor: pointer;">
+                    <td>
+                        <div class="small text-muted">${date}</div>
+                        <div class="fw-bold">${time}</div>
+                    </td>
+                    <td>
+                        <div class="fw-bold am-user-name-hover" data-user-id="${activity.id}" data-user-name="${this.escapeHtml(activity.user)}" data-user-role="${activity.role}" data-user-email="${this.escapeHtml(activity.email)}">${this.escapeHtml(activity.user)}</div>
+                        <div class="small text-muted" style="font-size: 11px;">${this.escapeHtml(activity.email)}</div>
+                    </td>
+                    <td>${roleBadge}</td>
+                    <td>
+                        <span class="me-1">${activity.actionIcon}</span>
+                        <span class="fw-bold">${this.escapeHtml(activity.actionLabel)}</span>
+                    </td>
+                    <td>
+                        <div class="small">${this.escapeHtml(activity.description)}</div>
+                    </td>
+                    <td>
+                        <div class="small font-monospace text-muted">${this.escapeHtml(activity.currentPage)}</div>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td>${riskBadge}</td>
+                </tr>
+            `;
+        }).join('');
+
+        // Add click handlers for rows
+        tbody.querySelectorAll('.am-activity-row').forEach(row => {
+            row.addEventListener('click', () => {
+                const activityId = parseInt(row.dataset.activityId);
+                const activity = activities.find(a => a.id === activityId);
+                if (activity) {
+                    this.openActivityDetailsModal(activity);
+                }
+            });
+        });
+
+        // Add hover handlers for user names
+        tbody.querySelectorAll('.am-user-name-hover').forEach(userName => {
+            userName.addEventListener('mouseenter', (e) => {
+                this.showUserPreview(e.target);
+            });
+            userName.addEventListener('mouseleave', () => {
+                this.hideUserPreview();
+            });
+        });
+
+        // Render pagination placeholder
+        this.renderActivityPagination(activities.length);
+    }
+
+    getRiskBadge(riskLevel, riskScore) {
+        const badges = {
+            low: '<span class="badge bg-success">🟢 Low</span>',
+            medium: '<span class="badge bg-warning">🟡 Medium</span>',
+            high: '<span class="badge bg-danger">🔴 High</span>',
+            critical: '<span class="badge bg-dark">⚫ Critical</span>'
+        };
+        const badge = badges[riskLevel] || badges.low;
+        return `<span title="Risk Score: ${riskScore}">${badge}</span>`;
+    }
+
+    getRoleBadge(role) {
+        const badges = {
+            customer: '<span class="badge badge-role-customer">Customer</span>',
+            farmer: '<span class="badge badge-role-farmer">Farmer</span>',
+            admin: '<span class="badge badge-role-admin">Admin</span>',
+            super_admin: '<span class="badge badge-role-super_admin">Super Admin</span>',
+        };
+        return badges[role] || `<span class="badge bg-secondary">${role}</span>`;
+    }
+
+    getStatusBadge(status) {
+        const badges = {
+            success: '<span class="badge bg-success">🟢 Success</span>',
+            failed: '<span class="badge bg-danger">🔴 Failed</span>',
+            pending: '<span class="badge bg-warning">🟡 Pending</span>',
+        };
+        return badges[status] || `<span class="badge bg-secondary">⚪ ${status}</span>`;
+    }
+
+    renderActivityPagination(totalItems) {
+        const container = document.getElementById('am-pagination');
+        if (!container) return;
+
+        const perPage = parseInt(document.getElementById('am-entries-per-page')?.value || 25);
+        const totalPages = Math.ceil(totalItems / perPage);
+
+        if (totalPages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = '<div class="d-flex justify-content-between align-items-center">';
+        html += `<small class="text-muted">Showing 1-${Math.min(perPage, totalItems)} of ${totalItems} activities</small>`;
+        html += '<div class="pagination">';
+        
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<button class="btn btn-sm ${i === 1 ? 'btn-primary' : 'btn-outline-secondary'} me-1">${i}</button>`;
+        }
+        
+        html += '</div></div>';
+        container.innerHTML = html;
+    }
+
+    openActivityDetailsModal(activity) {
+        const modal = document.getElementById('activity-details-modal');
+        if (!modal) return;
+
+        // Populate activity details
+        document.getElementById('am-detail-user').textContent = activity.user;
+        document.getElementById('am-detail-role').innerHTML = this.getRoleBadge(activity.role);
+        document.getElementById('am-detail-session').textContent = activity.sessionId;
+        document.getElementById('am-detail-action').textContent = activity.actionLabel;
+        document.getElementById('am-detail-description').textContent = activity.description;
+        document.getElementById('am-detail-current-page').textContent = activity.currentPage;
+        document.getElementById('am-detail-timestamp').textContent = new Date(activity.timestamp).toLocaleString('en-PH', {
+            timeZone: 'Asia/Manila',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+        document.getElementById('am-detail-status').innerHTML = this.getStatusBadge(activity.status);
+
+        // Generate session timeline
+        this.renderSessionTimeline(activity);
+
+        // Show modal
+        modal.classList.add('open');
+        modal.style.display = 'flex';
+    }
+
+    renderSessionTimeline(activity) {
+        const container = document.getElementById('am-session-timeline');
+        if (!container) return;
+
+        // Generate placeholder timeline based on the activity
+        const timeline = this.generateSessionTimeline(activity);
+
+        container.innerHTML = timeline.map((item, index) => {
+            const time = new Date(item.timestamp).toLocaleTimeString('en-PH', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+
+            const itemClass = item.status === 'failed' ? 'timeline-error' : 
+                             item.status === 'pending' ? 'timeline-warning' : '';
+
+            return `
+                <div class="session-timeline-item ${itemClass}">
+                    <div class="d-flex align-items-baseline gap-2">
+                        <div class="session-timeline-time">${time}</div>
+                        <div class="session-timeline-action">${item.icon} ${this.escapeHtml(item.action)}</div>
+                    </div>
+                    <div class="session-timeline-description">${this.escapeHtml(item.description)}</div>
+                    ${index < timeline.length - 1 ? '<span class="session-timeline-arrow">↓</span>' : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    generateSessionTimeline(activity) {
+        // Generate a realistic session timeline based on the activity
+        const baseTime = new Date(activity.timestamp);
+        const timeline = [];
+
+        // Always start with login
+        timeline.push({
+            timestamp: new Date(baseTime - 3600000 * 2).toISOString(),
+            action: 'Login',
+            icon: '🟢',
+            description: 'User logged in successfully',
+            status: 'success'
+        });
+
+        // Add some browsing activities
+        timeline.push({
+            timestamp: new Date(baseTime - 3600000 * 1.8).toISOString(),
+            action: 'View Product',
+            icon: '📦',
+            description: 'Viewed product details',
+            status: 'success'
+        });
+
+        timeline.push({
+            timestamp: new Date(baseTime - 3600000 * 1.5).toISOString(),
+            action: 'Add Wishlist',
+            icon: '❤️',
+            description: 'Added product to wishlist',
+            status: 'success'
+        });
+
+        timeline.push({
+            timestamp: new Date(baseTime - 3600000 * 1.2).toISOString(),
+            action: 'Add to Cart',
+            icon: '🛒',
+            description: 'Added product to cart',
+            status: 'success'
+        });
+
+        // Add the current activity
+        timeline.push({
+            timestamp: activity.timestamp,
+            action: activity.actionLabel,
+            icon: activity.actionIcon,
+            description: activity.description,
+            status: activity.status
+        });
+
+        // Add logout if the activity was successful
+        if (activity.status === 'success') {
+            timeline.push({
+                timestamp: new Date(baseTime + 60000).toISOString(),
+                action: 'Logout',
+                icon: '🔴',
+                description: 'User logged out',
+                status: 'success'
+            });
+        }
+
+        return timeline;
+    }
+
+    setupActivityMonitorEventListeners() {
+        // Quick filter buttons
+        document.querySelectorAll('.am-quick-filter').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.am-quick-filter').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.filterActivities(e.target.dataset.filter);
+            });
+        });
+
+        // Refresh buttons
+        document.getElementById('am-refresh-btn')?.addEventListener('click', () => {
+            // Clear all filters
+            ['am-search-user','am-role-filter','am-action-filter','am-status-filter','am-session-filter','am-date-from','am-date-to'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
+            });
+            // Reset quick filters
+            document.querySelectorAll('.am-quick-filter').forEach(b => b.classList.remove('active'));
+            document.querySelector('.am-quick-filter[data-filter="all"]')?.classList.add('active');
+            this.loadActivityMonitor();
+            this.showToast('Activity monitor refreshed', 'success');
+        });
+
+        document.getElementById('am-refresh-toolbar')?.addEventListener('click', () => {
+            // Clear all filters
+            ['am-search-user','am-role-filter','am-action-filter','am-status-filter','am-session-filter','am-date-from','am-date-to'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
+            });
+            // Reset quick filters
+            document.querySelectorAll('.am-quick-filter').forEach(b => b.classList.remove('active'));
+            document.querySelector('.am-quick-filter[data-filter="all"]')?.classList.add('active');
+            this.loadActivityMonitor();
+            this.showToast('Activity monitor refreshed', 'success');
+        });
+
+        // Settings button
+        document.getElementById('am-settings-btn')?.addEventListener('click', () => {
+            const modal = document.getElementById('activity-settings-modal');
+            if (modal) {
+                modal.classList.add('open');
+                modal.style.display = 'flex';
+            }
+        });
+
+        // Settings modal close buttons
+        document.querySelectorAll('[data-close-modal="activity-settings-modal"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const modal = document.getElementById('activity-settings-modal');
+                if (modal) {
+                    modal.classList.remove('open');
+                    modal.style.display = 'none';
+                }
+            });
+        });
+
+        // Save settings button
+        document.getElementById('am-save-settings')?.addEventListener('click', () => {
+            this.showMessage('Activity Monitor settings saved successfully', 'success');
+            const modal = document.getElementById('activity-settings-modal');
+            if (modal) {
+                modal.classList.remove('open');
+                modal.style.display = 'none';
+            }
+        });
+
+        // Copy Session ID button
+        document.getElementById('am-copy-session-btn')?.addEventListener('click', () => {
+            const sessionId = document.getElementById('am-detail-session')?.textContent;
+            if (sessionId) {
+                navigator.clipboard.writeText(sessionId).then(() => {
+                    this.showMessage('Session ID copied to clipboard', 'success');
+                }).catch(() => {
+                    this.showMessage('Failed to copy Session ID', 'error');
+                });
+            }
+        });
+
+        // Entries per page
+        document.getElementById('am-entries-per-page')?.addEventListener('change', () => {
+            this.loadActivityMonitor();
+        });
+
+        // Auto refresh toggle
+        document.getElementById('am-auto-refresh')?.addEventListener('change', (e) => {
+            if (e.target.value !== 'off') {
+                this.startAutoRefresh(parseInt(e.target.value) * 1000);
+            } else {
+                this.stopAutoRefresh();
+            }
+        });
+
+        // Filter inputs - trigger refresh on change
+        document.getElementById('am-search-user')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.loadActivityMonitor();
+            }
+        });
+
+        document.getElementById('am-role-filter')?.addEventListener('change', () => {
+            this.loadActivityMonitor();
+        });
+
+        document.getElementById('am-action-filter')?.addEventListener('change', () => {
+            this.loadActivityMonitor();
+        });
+
+        document.getElementById('am-status-filter')?.addEventListener('change', () => {
+            this.loadActivityMonitor();
+        });
+
+        document.getElementById('am-session-filter')?.addEventListener('change', () => {
+            this.loadActivityMonitor();
+        });
+
+        document.getElementById('am-date-from')?.addEventListener('change', () => {
+            this.loadActivityMonitor();
+        });
+
+        document.getElementById('am-date-to')?.addEventListener('change', () => {
+            this.loadActivityMonitor();
+        });
+
+        // Security Events quick filter
+        document.getElementById('am-security-filter-btn')?.addEventListener('click', () => {
+            // Set action filter to security-related actions
+            const actionFilter = document.getElementById('am-action-filter');
+            if (actionFilter) {
+                actionFilter.value = 'security_event';
+                this.loadActivityMonitor();
+            }
+        });
+
+        // Modal close button
+        document.querySelectorAll('[data-close-modal="activity-details-modal"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const modal = document.getElementById('activity-details-modal');
+                if (modal) {
+                    modal.classList.remove('open');
+                    modal.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    filterActivities(filter) {
+        // Filter currently loaded activities
+        const allActivities = this.currentActivities || [];
+        let filtered = allActivities;
+
+        switch (filter) {
+            case 'login':
+                filtered = allActivities.filter(a => a.action === 'login' || a.action === 'logout');
+                break;
+            case 'orders':
+                filtered = allActivities.filter(a =>
+                    a.action === 'place_order' || a.action === 'cancel_order' ||
+                    a.action === 'checkout' || a.action === 'add_cart' || a.action === 'remove_cart'
+                );
+                break;
+            case 'products':
+                filtered = allActivities.filter(a =>
+                    a.action === 'add_product' || a.action === 'edit_product' ||
+                    a.action === 'delete_product' || a.action === 'view_product'
+                );
+                break;
+            case 'wishlist':
+                filtered = allActivities.filter(a => a.action === 'add_wishlist' || a.action === 'remove_wishlist');
+                break;
+            case 'cart':
+                filtered = allActivities.filter(a => a.action === 'add_cart' || a.action === 'remove_cart');
+                break;
+            case 'checkout':
+                filtered = allActivities.filter(a => a.action === 'checkout' || a.action === 'place_order');
+                break;
+            case 'admin':
+                filtered = allActivities.filter(a =>
+                    a.role === 'admin' || a.role === 'super_admin' ||
+                    a.action === 'admin_settings' || a.action === 'approve_farmer' || a.action === 'reject_farmer'
+                );
+                break;
+            case 'errors':
+                filtered = allActivities.filter(a => a.status === 'failed');
+                break;
+            case 'security':
+                filtered = allActivities.filter(a =>
+                    a.action === 'security_event' ||
+                    a.action === 'failed_login' ||
+                    a.action === 'unauthorized_access' ||
+                    a.action === 'permission_denied' ||
+                    a.action === 'suspicious_activity'
+                );
+                break;
+            default:
+                filtered = allActivities;
+        }
+
+        this.renderActivityMonitor(filtered);
+    }
+
+    startAutoRefresh(interval) {
+        this.stopAutoRefresh();
+        this._autoRefreshTimer = setInterval(() => {
+            // Refresh only Activity Monitor data without page reload
+            this.loadActivityMonitor();
+            this.loadActivityDashboardSummary();
+        }, interval);
+    }
+
+    stopAutoRefresh() {
+        if (this._autoRefreshTimer) {
+            clearInterval(this._autoRefreshTimer);
+            this._autoRefreshTimer = null;
+        }
+    }
+
+    showUserPreview(element) {
+        // Remove existing preview if any
+        this.hideUserPreview();
+
+        const userName = element.dataset.userName;
+        const userRole = element.dataset.userRole;
+        const userEmail = element.dataset.userEmail;
+
+        // Create preview card
+        const preview = document.createElement('div');
+        preview.className = 'am-user-preview';
+        preview.innerHTML = `
+            <div class="am-user-preview-name">${this.escapeHtml(userName)}</div>
+            <div class="am-user-preview-role">${this.getRoleBadge(userRole)}</div>
+            <div class="am-user-preview-status"><span class="badge bg-success">Online</span></div>
+            <div class="am-user-preview-last-activity">Last activity: Just now</div>
+        `;
+
+        // Position the preview
+        const rect = element.getBoundingClientRect();
+        preview.style.left = `${rect.left}px`;
+        preview.style.top = `${rect.bottom + 8}px`;
+
+        document.body.appendChild(preview);
+
+        // Trigger reflow for transition
+        requestAnimationFrame(() => {
+            preview.classList.add('visible');
+        });
+
+        this._userPreview = preview;
+    }
+
+    hideUserPreview() {
+        if (this._userPreview) {
+            this._userPreview.classList.remove('visible');
+            setTimeout(() => {
+                if (this._userPreview && this._userPreview.parentNode) {
+                    this._userPreview.parentNode.removeChild(this._userPreview);
+                }
+                this._userPreview = null;
+            }, 200);
+        }
+    }
+
     async loadProducts(page = 1) {
         try {
             const pg = this.pagination?.products || { page: 1, total: 0, limit: 50 };
             pg.page = page;
             const search = (document.getElementById('products-search-input')?.value || '').trim();
             const category = (document.getElementById('products-category-filter')?.value || '').trim();
+            const productsFilter = document.getElementById('products-filter');
+            let status = productsFilter ? productsFilter.value : '';
             const activeTab = document.querySelector('.products-tabs .tab-btn.active');
-            let status = activeTab ? activeTab.getAttribute('data-status') : '';
+            let tabStatus = activeTab ? activeTab.getAttribute('data-status') : '';
             // Set default to empty string (All) if filter is empty on initial load
             if (!status && page === 1) {
                 status = '';
+                if (productsFilter) productsFilter.value = '';
+            }
+            // Set default tab to empty string (All) if tab is empty on initial load
+            if (!tabStatus && page === 1) {
+                tabStatus = '';
                 const defaultTab = document.querySelector('.products-tabs .tab-btn[data-status=""]');
                 if (defaultTab) {
                     document.querySelectorAll('.products-tabs .tab-btn').forEach(b => b.classList.remove('active'));
@@ -4409,7 +5299,10 @@ class AdminDashboard {
             });
             if (search) params.set('search', search);
             if (category) params.set('category', category);
-            if (status) params.set('status', status);
+            // Use filter dropdown value if set, otherwise use tab status
+            const effectiveStatus = status || tabStatus;
+            // All filters are now client-side (All, available_now, preorder)
+            // Don't send status to backend
 
             const response = await fetch(`${this.apiBase}/admin/products?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
@@ -4420,7 +5313,12 @@ class AdminDashboard {
                 this.lastProducts = data.products || [];
                 this.allProducts = data.products || [];
                 pg.total = Number(data.total || 0);
-                this.renderProducts(this.lastProducts);
+                // Apply client-side filtering for available_now and preorder
+                if (effectiveStatus === 'available_now' || effectiveStatus === 'preorder') {
+                    this.applyProductsFilter();
+                } else {
+                    this.renderProducts(this.lastProducts);
+                }
                 this.renderPagination('products-pagination', pg, (p) => this.loadProducts(p));
                 this.updateProductStats(this.allProducts);
             } else {
@@ -4519,11 +5417,38 @@ class AdminDashboard {
                 : '';
             const placeholder = `<div class="product-thumb-placeholder" ${product.image_url ? 'style="display:none"' : ''}><i class="bi bi-image"></i></div>`;
 
+            // Linked product badge and button
+            let linkedProductHtml = '';
+            if (product.linked_product_id) {
+                const linkedProduct = this.allProducts?.find(p => p.id === product.linked_product_id);
+                if (linkedProduct) {
+                    const linkedType = linkedProduct.is_preorder ? 'Pre-order' : 'Available';
+                    linkedProductHtml = `
+                        <div class="mt-1">
+                            <span class="badge bg-info" style="font-size:0.6rem;">Linked: ${linkedType}</span>
+                        </div>
+                    `;
+                }
+            }
+
+            // Pre-order badge
+            let preorderBadge = '';
+            if (product.is_preorder) {
+                preorderBadge = `<span class="badge bg-warning text-dark" style="font-size:0.65rem;">🟠 Pre-order</span>`;
+            }
+
+            // Harvest badge for status column
+            const harvestBadge = this.getHarvestBadgeHtml(product.harvest_date, product.status);
+
             return `
             <tr>
                 <td>${thumb}${placeholder}</td>
                 <td class="text-muted">${product.id}</td>
-                <td class="fw-semibold">${this.escapeHtml(product.name)}</td>
+                <td class="fw-semibold">
+                    ${this.escapeHtml(product.name)}
+                    <div class="mt-1">${preorderBadge}</div>
+                    ${linkedProductHtml}
+                </td>
                 <td class="text-muted">${this.escapeHtml(product.category_name || '—')}</td>
                 <td>${this.fmtCurrency(product.price)}</td>
                 <td>${this.fmtNumber(product.stock_quantity ?? 0)}</td>
@@ -4532,7 +5457,7 @@ class AdminDashboard {
                     ${product.farmer_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(product.farmer_name)}${product.farmer_username ? ` (${this.escapeHtml(product.farmer_username)})` : ''}</div>` : ''}
                     ${product.farmer_email ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(product.farmer_email)}</div>` : ''}
                 </td>
-                <td>${this.renderStatus(statusLabel, statusKey)}</td>
+                <td>${this.renderStatus(statusLabel, statusKey)}${harvestBadge}</td>
                 <td class="text-muted" data-order="${createdOrder}">${createdLabel}</td>
                 <td>
                     <button class="btn btn-sm py-0 px-2 btn-ac-green product-edit-btn" data-product-id="${product.id}">Edit</button>
@@ -5224,7 +6149,7 @@ class AdminDashboard {
     async loadInitialSectionData() {
         try {
             const savedSection = localStorage.getItem('adminActiveSection') || 'overview';
-            const validSections = new Set(['overview', 'orders', 'users', 'products', 'categories', 'catalog-products', 'farmers', 'suspicious-patterns', 'flagged-users', 'logs', 'admin', 'all-users', 'platform-settings', 'security-log', 'feature-flags', 'broadcast', 'database-backup', 'image-manager', 'notifications', 'chat', 'category-requests', 'product-approvals', 'verification-requests', 'subscription-requests', 'profile']);
+            const validSections = new Set(['overview', 'orders', 'users', 'products', 'categories', 'catalog-products', 'farmers', 'suspicious-patterns', 'flagged-users', 'logs', 'admin', 'all-users', 'platform-settings', 'feature-flags', 'broadcast', 'database-backup', 'image-manager', 'notifications', 'chat', 'category-requests', 'product-approvals', 'verification-requests', 'subscription-requests', 'profile']);
             const safeSection = validSections.has(savedSection) ? savedSection : 'overview';
 
             // Load data based on initial section
@@ -5248,8 +6173,6 @@ class AdminDashboard {
                 await this.loadSuspiciousPatterns();
             } else if (safeSection === 'flagged-users') {
                 await this.loadFlaggedUsers();
-            } else if (safeSection === 'security-log') {
-                await this.loadSecurityLog();
             } else if (safeSection === 'platform-settings') {
                 await this.loadPlatformSettings();
             } else if (safeSection === 'feature-flags') {
@@ -5516,7 +6439,7 @@ class AdminDashboard {
             dropdownList.innerHTML = `<li class="text-center py-2 small text-muted">No notifications</li>`;
             return;
         }
-        const iconMap = { order: 'bi-bag-check text-success', product: 'bi-box-seam text-primary', user: 'bi-person text-info', system: 'bi-gear text-secondary' };
+        const iconMap = { order: 'bi-bag-check text-success', product: 'bi-box-seam text-primary', user: 'bi-person text-info', system: 'bi-gear text-secondary', harvest: 'bi-calendar-check text-success', harvest_reminder: 'bi-calendar-event text-warning', harvest_adjusted: 'bi-calendar-x text-danger', harvest_completed: 'bi-check-circle text-success' };
         dropdownList.innerHTML = recent.map(n => {
             const ic = iconMap[n.type] || 'bi-bell text-muted';
             const relTime = this._relativeTime(new Date(n.created_at));
@@ -5613,14 +6536,31 @@ class AdminDashboard {
             user: 'bi-person text-info',
             system: 'bi-gear text-secondary',
             payment: 'bi-credit-card text-warning',
+            harvest: 'bi-calendar-check text-success',
+            harvest_reminder: 'bi-calendar-event text-warning',
+            harvest_reminder_7days: 'bi-calendar-event text-warning',
+            harvest_reminder_3days: 'bi-calendar-event text-warning',
+            harvest_reminder_1day: 'bi-calendar-event text-warning',
+            harvest_reminder_today: 'bi-calendar-event text-danger',
+            harvest_overdue: 'bi-exclamation-triangle-fill text-danger',
+            harvest_overdue_alert: 'bi-exclamation-diamond-fill text-danger',
+            harvest_adjusted: 'bi-calendar-x text-danger',
+            harvest_date_changed: 'bi-calendar-x text-info',
+            harvest_adjustment_alert: 'bi-calendar-x text-danger',
+            harvest_completed: 'bi-check-circle text-success',
         };
         list.innerHTML = items.map(n => {
             const iconClass  = iconMap[n.type] || 'bi-bell text-muted';
             const readStatus = n.is_read ? 'read' : 'unread';
             const relTime    = this._relativeTime(new Date(n.created_at));
             const cursorCls  = n.is_read ? '' : 'cursor-pointer';
+            const isHarvestNotif = ['harvest', 'harvest_reminder', 'harvest_adjusted', 'harvest_completed',
+                'harvest_reminder_7days', 'harvest_reminder_3days', 'harvest_reminder_1day',
+                'harvest_reminder_today', 'harvest_overdue', 'harvest_overdue_alert',
+                'harvest_date_changed', 'harvest_adjustment_alert'].includes(n.type);
+            const clickableCls = isHarvestNotif ? 'cursor-pointer harvest-notif-clickable' : cursorCls;
             return `
-            <div class="notification-item ${readStatus} ${cursorCls}" data-id="${n.id}">
+            <div class="notification-item ${readStatus} ${clickableCls}" data-id="${n.id}" data-type="${this.escapeHtml(n.type || '')}" data-product-id="${n.product_id || ''}" data-order-id="${n.order_id || ''}" data-product-name="${this.escapeHtml(n.product_name || '')}">
                 <div class="notification-icon">
                     <i class="bi ${iconClass}"></i>
                 </div>
@@ -5657,6 +6597,18 @@ class AdminDashboard {
                     const btn = item.querySelector('.notification-mark-read-btn');
                     if (btn) this.markNotifRead(id, btn);
                 }
+                // Navigate to orders for harvest-related notifications
+                const notifType = item.dataset.type || '';
+                const isHarvestNotif = ['harvest', 'harvest_reminder', 'harvest_adjusted', 'harvest_completed',
+                    'harvest_reminder_7days', 'harvest_reminder_3days', 'harvest_reminder_1day',
+                    'harvest_reminder_today', 'harvest_overdue', 'harvest_overdue_alert',
+                    'harvest_date_changed', 'harvest_adjustment_alert'].includes(notifType);
+                if (isHarvestNotif) {
+                    const productId = item.dataset.productId || '';
+                    const orderId = item.dataset.orderId || '';
+                    const productName = item.dataset.productName || '';
+                    this.navigateToOrderFromHarvestNotif(productId, orderId, productName);
+                }
             });
         });
     }
@@ -5668,6 +6620,77 @@ class AdminDashboard {
         if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
         if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
         return `${Math.floor(diff / 86400)}d ago`;
+    }
+
+    async navigateToOrderFromHarvestNotif(productId, orderId, productName) {
+        // Navigate to orders section
+        this.showSection('orders');
+
+        // Switch to Pre-order Reserved tab
+        const preorderTab = document.querySelector('.order-tabs .tab-btn[data-status="preorder_reserved"]');
+        if (preorderTab) {
+            document.querySelectorAll('.order-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            preorderTab.classList.add('active');
+        }
+
+        // If we have an order_id, directly open the order details
+        if (orderId && orderId !== 'null' && Number(orderId) > 0) {
+            this.viewOrderDetails(Number(orderId));
+            return;
+        }
+
+        // Otherwise, load orders with preorder_reserved status and find matching product
+        try {
+            const pg = this.pagination?.orders || { page: 1, total: 0, limit: 50 };
+            pg.page = 1;
+            const params = new URLSearchParams({
+                page: '1',
+                limit: String(pg.limit),
+                status: 'preorder_reserved',
+                sort: 'date_desc',
+                t: String(Date.now())
+            });
+
+            const response = await fetch(`${this.apiBase}/admin/orders?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const orders = data.orders || [];
+                this.lastOrders = orders;
+                pg.total = Number(data.total || 0);
+                this.renderOrders(orders);
+                this.renderPagination('orders-pagination', pg, (p) => this.loadOrders(p));
+
+                // Find the order matching the product_id
+                if (productId && Number(productId) > 0) {
+                    const matchingOrder = orders.find(o =>
+                        o.product_id === Number(productId) ||
+                        (o.items && o.items[0] && o.items[0].product_id === Number(productId))
+                    );
+                    if (matchingOrder) {
+                        // Auto-open order details modal after a short delay for rendering
+                        setTimeout(() => {
+                            this.viewOrderDetails(matchingOrder.id);
+                        }, 300);
+                    } else if (orders.length > 0) {
+                        // If no exact match, open the first order
+                        setTimeout(() => {
+                            this.viewOrderDetails(orders[0].id);
+                        }, 300);
+                    }
+                } else if (orders.length > 0) {
+                    // No product_id, open first order
+                    setTimeout(() => {
+                        this.viewOrderDetails(orders[0].id);
+                    }, 300);
+                }
+            }
+        } catch (error) {
+            console.error('Error navigating to order from harvest notification:', error);
+        }
     }
 
     async markNotifRead(id, btn, skipReload = false) {
@@ -5800,7 +6823,8 @@ class AdminDashboard {
         const categories = (this.lastCategories || []).filter(c => !c.is_disabled);
         const filters = [
             'products-category-filter',
-            'catalog-category-filter-bar'
+            'catalog-category-filter-bar',
+            'product-approvals-category-filter'
         ];
 
         filters.forEach(filterId => {
@@ -6444,6 +7468,8 @@ class AdminDashboard {
             if (statusVal) params.set('status', statusVal);
             const searchVal = search !== undefined ? search : (document.getElementById('product-approval-search-input')?.value?.trim() ?? '');
             if (searchVal) params.set('search', searchVal);
+            const categoryVal = document.getElementById('product-approvals-category-filter')?.value || '';
+            if (categoryVal) params.set('category_id', categoryVal);
             params.set('page', String(page));
             params.set('limit', String(pg.limit));
 
@@ -6572,6 +7598,7 @@ class AdminDashboard {
                 <td class="small">
                     <div class="fw-semibold">${this.escapeHtml(p.farmer_shop_name || p.farmer_name || '—')}</div>
                     ${p.farmer_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(p.farmer_name)}</div>` : ''}
+                    ${p.is_preorder && p.reservations_disabled ? `<div class="text-danger" style="font-size:.75rem"><i class="bi bi-exclamation-triangle"></i> Reservations Disabled</div>` : ''}
                     ${p.is_preorder && p.preorder_availability_date ? `<div class="text-muted" style="font-size:.75rem">Available: ${new Date(p.preorder_availability_date).toLocaleDateString()}</div>` : ''}
                     ${p.is_preorder && p.max_preorder_quantity ? `<div class="text-muted" style="font-size:.75rem">Max: ${this.fmtNumber(p.max_preorder_quantity)}</div>` : ''}
                 </td>
@@ -6633,6 +7660,38 @@ class AdminDashboard {
                 badge.style.display = count > 0 ? 'inline-block' : 'none';
             }
         } catch (e) { console.error('Error loading subscription badge:', e); }
+    }
+
+    async loadVerificationBadgeCount() {
+        try {
+            const res = await fetch(`${this.apiBase}/admin/verification-requests?status=pending&limit=1`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const count = data.requests?.length || 0;
+            const badge = document.getElementById('verification-requests-badge');
+            if (badge) {
+                badge.textContent = count;
+                badge.style.display = count > 0 ? 'inline-block' : 'none';
+            }
+        } catch (e) { console.error('Error loading verification badge:', e); }
+    }
+
+    async loadCategoryBadgeCount() {
+        try {
+            const res = await fetch(`${this.apiBase}/admin/category-requests?status=pending&limit=1`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const count = data.requests?.length || 0;
+            const badge = document.getElementById('category-requests-badge');
+            if (badge) {
+                badge.textContent = count;
+                badge.style.display = count > 0 ? 'inline-block' : 'none';
+            }
+        } catch (e) { console.error('Error loading category badge:', e); }
     }
 
     async loadSupportTicketsBadge() {
@@ -7393,6 +8452,7 @@ class AdminDashboard {
             this.loadCategories();
             this.loadCategoryRequests();
             this.loadCatalogNames();
+            this.loadCategoryBadgeCount();
         } catch (error) {
             console.error('Review category request error:', error);
             this.showMessage('Failed to review request', 'error');
@@ -7697,6 +8757,29 @@ class AdminDashboard {
         return `<span class="status-pill ${pillClass}">${text}</span>`;
     }
 
+    getHarvestBadgeHtml(harvestDate, productStatus) {
+        if (productStatus === 'harvested') {
+            return '<div class="mt-1"><span class="badge bg-secondary" style="font-size:0.6rem;">Harvested</span></div>';
+        }
+        if (!harvestDate) return '';
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const hDate = new Date(harvestDate);
+        hDate.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((hDate - today) / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) {
+            return '<div class="mt-1"><span class="badge bg-danger" style="font-size:0.6rem;">Harvest Today</span></div>';
+        } else if (diffDays > 0 && diffDays <= 3) {
+            return `<div class="mt-1"><span class="badge bg-warning text-dark" style="font-size:0.6rem;">Harvest in ${diffDays} Day${diffDays > 1 ? 's' : ''}</span></div>`;
+        } else if (diffDays < 0) {
+            const daysOverdue = Math.abs(diffDays);
+            return `<div class="mt-1"><span class="badge bg-danger" style="font-size:0.6rem;">${daysOverdue} Day${daysOverdue > 1 ? 's' : ''} Overdue</span></div>`;
+        }
+        return '';
+    }
+
     toggleChatDrawer(show) {
         const drawer = document.getElementById('admin-chat-drawer');
         if (!drawer) return;
@@ -7871,6 +8954,25 @@ class AdminDashboard {
                 ${order.reschedule_reason ? `<p>Reason for Rescheduling: ${this.escapeHtml(order.reschedule_reason)}</p>` : ''}
                 ${order.delivery_address ? `<p>Address: ${order.delivery_address}</p>` : ''}
             </div>
+            ${(order.items && order.items[0] && order.items[0].is_preorder) ? `
+            <div class="panel-section" style="background:#f0fdf4;border-left:3px solid #16a34a;padding:12px;margin-bottom:16px;">
+                <h4 style="color:#16a34a;margin:0 0 8px 0;font-size:0.875rem;">Pre-order & Harvest Information</h4>
+                ${order.items[0].harvest_date ? `<p style="margin:4px 0;font-size:0.875rem;"><strong>Expected Harvest:</strong> ${new Date(order.items[0].harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}
+                <div style="margin:4px 0;font-size:0.875rem;">${this.getHarvestBadgeHtml(order.items[0].harvest_date, null)}</div>
+                <hr style="margin:8px 0;border:none;border-top:1px solid #d1d5db;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0;font-size:0.875rem;">
+                    <div><strong>Reserved:</strong> ${this.fmtNumber(order.items[0].reserved_quantity || 0)}</div>
+                    <div><strong>Max Pre-order:</strong> ${this.fmtNumber(order.items[0].max_preorder_quantity || 0)}</div>
+                    <div><strong>Progress:</strong> ${order.items[0].max_preorder_quantity > 0 ? Math.round((order.items[0].reserved_quantity / order.items[0].max_preorder_quantity) * 100) : 0}%</div>
+                    <div><strong>Stock:</strong> ${this.fmtNumber(order.stock_quantity || 0)}</div>
+                </div>
+                ${order.preorder_availability_date ? `<p style="margin:4px 0;font-size:0.875rem;"><strong>Availability Date:</strong> ${new Date(order.preorder_availability_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}
+                ${order.items[0].harvest_date_updated_at ? `<p style="margin:4px 0;font-size:0.875rem;"><strong>Last Updated:</strong> ${new Date(order.items[0].harvest_date_updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}
+                ${order.items[0].harvest_adjustment_count ? `<p style="margin:4px 0;font-size:0.875rem;"><strong>Adjustments:</strong> ${order.items[0].harvest_adjustment_count}</p>` : ''}
+                ${order.items[0].previous_harvest_date ? `<p style="margin:4px 0;font-size:0.875rem;"><strong>Previous Harvest Date:</strong> ${new Date(order.items[0].previous_harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}
+                ${order.items[0].harvest_adjustment_reason ? `<p style="margin:4px 0;font-size:0.875rem;"><strong>Adjustment Reason:</strong> ${this.escapeHtml(order.items[0].harvest_adjustment_reason)}</p>` : ''}
+            </div>
+            ` : ''}
             <div class="panel-section">
                 <h4>Items</h4>
                 ${(order.items || []).map(item => `
@@ -8042,7 +9144,12 @@ class AdminDashboard {
         if (passwordEl) passwordEl.value = '';
         if (phoneEl) {
             // Format phone with spaces (9XX XXX XXXX)
-            const phoneDigits = String(user.phone || '').replace(/\D/g, '');
+            // Strip +63 prefix if present, then format the 10-digit number
+            let phoneDigits = String(user.phone || '').replace(/\D/g, '');
+            // Remove +63 prefix (first 2 digits if they are 63)
+            if (phoneDigits.startsWith('63') && phoneDigits.length > 10) {
+                phoneDigits = phoneDigits.slice(2);
+            }
             if (phoneDigits.length > 0) {
                 let formatted = phoneDigits[0];
                 if (phoneDigits.length > 1) formatted += phoneDigits.slice(1, 3);
@@ -8137,7 +9244,6 @@ class AdminDashboard {
         e.preventDefault();
 
         const userId = document.getElementById('edit-user-id')?.value;
-        const full_name = document.getElementById('edit-user-fullname')?.value || '';
         const first_name = document.getElementById('edit-user-firstname')?.value || '';
         const middle_name = document.getElementById('edit-user-middlename')?.value || '';
         const last_name = document.getElementById('edit-user-lastname')?.value || '';
@@ -8146,7 +9252,9 @@ class AdminDashboard {
         const email = document.getElementById('edit-user-email')?.value || '';
         const password = document.getElementById('edit-user-password')?.value || '';
         const rawPhone = document.getElementById('edit-user-phone')?.value?.trim() || '';
-        const phone = rawPhone ? ('+63' + rawPhone.replace(/^\+63/, '')) : '';
+        // Remove spaces for validation and API - backend expects 10 digits without +63 prefix
+        const phoneDigits = rawPhone.replace(/\s/g, '');
+        const phone = phoneDigits;
 
         // Get user role to determine if shop_name should be included
         const user = (this.lastUsers || []).find(u => u.id === Number(userId))
@@ -8181,8 +9289,12 @@ class AdminDashboard {
                 : [street, barangay, city, province].filter(Boolean).join(', '))
             : addressPreview;
 
+        // Construct full_name from name parts
+        const nameParts = [first_name, middle_name, last_name].filter(Boolean);
+        const full_name = nameParts.join(' ').trim();
+
         const payload = {
-            full_name: full_name.trim(),
+            full_name: full_name,
             username: username.trim(),
             email: email.trim(),
             phone: phone.trim(),
@@ -8232,12 +9344,14 @@ class AdminDashboard {
         const role = document.getElementById('create-user-role')?.value?.trim() || '';
         const shop_name = document.getElementById('create-user-shopname')?.value?.trim() || '';
         const rawPhone = document.getElementById('create-user-phone')?.value?.trim() || '';
+        // Remove spaces for validation - backend expects 10 digits without +63 prefix
+        const phoneDigits = rawPhone.replace(/\s/g, '');
         // Validate phone format: must be 10 digits starting with 9 if provided
-        if (rawPhone && !/^9[0-9]{9}$/.test(rawPhone)) {
-            this.showMessage('Phone must be 10 digits starting with 9 (e.g. 9123456789)', 'error');
+        if (phoneDigits && !/^9[0-9]{9}$/.test(phoneDigits)) {
+            this.showMessage('Phone must be 10 digits starting with 9 (e.g. 912 345 6789)', 'error');
             return;
         }
-        const phone = rawPhone ? ('+63' + rawPhone.replace(/^\+63/, '')) : '';
+        const phone = phoneDigits;
         const password = document.getElementById('create-user-password')?.value || '';
         const full_name = [first_name, middle_name, last_name].filter(Boolean).join(' ').trim();
 
@@ -8316,6 +9430,111 @@ class AdminDashboard {
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Create Account';
+            }
+        }
+    }
+
+    async submitSaUserCreate(e) {
+        e.preventDefault();
+
+        const userId = document.getElementById('sa-user-id')?.value;
+        const first_name = document.getElementById('sa-user-firstname')?.value?.trim() || '';
+        const middle_name = document.getElementById('sa-user-middlename')?.value?.trim() || '';
+        const last_name = document.getElementById('sa-user-lastname')?.value?.trim() || '';
+        const username = document.getElementById('sa-user-username')?.value?.trim() || '';
+        const email = document.getElementById('sa-user-email')?.value?.trim() || '';
+        const role = document.getElementById('sa-user-role')?.value?.trim() || '';
+        const rawPhone = document.getElementById('sa-user-phone')?.value?.trim() || '';
+        // Remove spaces for validation - backend expects 10 digits without +63 prefix
+        const phoneDigits = rawPhone.replace(/\s/g, '');
+        // Validate phone format: must be 10 digits starting with 9 if provided
+        if (phoneDigits && !/^9[0-9]{9}$/.test(phoneDigits)) {
+            this.showMessage('Phone must be 10 digits starting with 9 (e.g. 912 345 6789)', 'error');
+            return;
+        }
+        const phone = phoneDigits;
+        const password = document.getElementById('sa-user-password')?.value || '';
+        const full_name = [first_name, middle_name, last_name].filter(Boolean).join(' ').trim();
+
+        // Validate name length limits
+        if (first_name.length > 40) {
+            this.showMessage('First name must be 40 characters or less', 'error'); return;
+        }
+        if (middle_name.length > 40) {
+            this.showMessage('Middle name must be 40 characters or less', 'error'); return;
+        }
+        if (last_name.length > 40) {
+            this.showMessage('Last name must be 40 characters or less', 'error'); return;
+        }
+
+        const isEdit = !!userId;
+        const submitBtn = document.getElementById('sa-user-modal-save');
+
+        if (!first_name || !last_name || !username || !email || !role) {
+            this.showMessage('Please complete all required fields.', 'error');
+            return;
+        }
+
+        if (!isEdit && password.length < 8) {
+            this.showMessage('Password must be at least 8 characters.', 'error');
+            return;
+        }
+
+        const confirmed = await this.adminConfirm(
+            `${isEdit ? 'Update' : 'Create'} User:\nName: ${full_name}\nEmail: ${email}\nUsername: ${username}\nRole: ${role}${phone ? `\nPhone: ${phone}` : ''}`,
+            { title: isEdit ? 'Update User' : 'Create User', danger: false, okLabel: isEdit ? 'Update' : 'Create' }
+        );
+        if (!confirmed) return;
+
+        const payload = {
+            full_name,
+            first_name,
+            middle_name: middle_name || null,
+            last_name,
+            username,
+            email,
+            role,
+            phone: phone || null
+        };
+        if (password.trim()) payload.password = password;
+
+        try {
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = isEdit ? 'Updating...' : 'Creating...';
+            }
+
+            const url = isEdit ? `${this.apiBase}/superadmin/users/${userId}` : `${this.apiBase}/superadmin/users`;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                this.showMessage(data.message || `Failed to ${isEdit ? 'update' : 'create'} user`, 'error');
+                return;
+            }
+
+            this.showMessage(`User ${isEdit ? 'updated' : 'created'} successfully!`, 'success');
+            this.closeModal('sa-user-modal');
+            await this.loadAllUsers();
+            await this.loadUsers();
+            await this.loadAdmin();
+            await this.loadFarmers();
+        } catch (error) {
+            console.error(`Error ${isEdit ? 'updating' : 'creating'} user:`, error);
+            this.showMessage(`Error ${isEdit ? 'updating' : 'creating'} user`, 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = isEdit ? 'Update User' : 'Create User';
             }
         }
     }
@@ -8402,6 +9621,66 @@ class AdminDashboard {
                           class="form-control" rows="3" maxlength="500">${this.escapeHtml(product.description || '')}</textarea>
                 <div class="form-hint">
                     <span id="edit-product-description-count">${(product.description || '').length}</span>/500 characters
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">Product Information</h6>
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">Product Type:</label>
+                        <div class="fw-semibold">${product.is_preorder ? '🟠 Pre-order' : '🟢 Available Now'}</div>
+                    </div>
+                    ${product.linked_product_id ? `
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">Linked Product ID:</label>
+                        <div class="fw-semibold">${product.linked_product_id}</div>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">Status & Harvest Information</h6>
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">Current Status:</label>
+                        <div>${this.renderStatus(statusLabel, statusKey)}</div>
+                        <div class="mt-1">${this.getHarvestBadgeHtml(product.harvest_date, product.status)}</div>
+                    </div>
+                    ${product.harvest_date ? `
+                    <div class="mb-2">
+                        <label class="form-label text-muted small">Harvest Date:</label>
+                        <div class="fw-semibold">${new Date(product.harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                    </div>
+                    ` : ''}
+                    ${product.is_preorder ? `
+                    <hr class="my-2">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Reserved Quantity:</label>
+                            <div class="fw-semibold text-primary">${this.fmtNumber(product.reserved_quantity || 0)}</div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Max Pre-order Quantity:</label>
+                            <div class="fw-semibold">${this.fmtNumber(product.max_preorder_quantity || 0)}</div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Current Stock:</label>
+                            <div class="fw-semibold">${this.fmtNumber(product.stock_quantity || 0)}</div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Reservation Progress:</label>
+                            <div class="fw-semibold">${product.max_preorder_quantity > 0 ? Math.round((product.reserved_quantity / product.max_preorder_quantity) * 100) : 0}%</div>
+                        </div>
+                    </div>
+                    ${product.preorder_availability_date ? `
+                    <div class="mt-2">
+                        <label class="form-label text-muted small">Pre-order Availability Date:</label>
+                        <div class="fw-semibold">${new Date(product.preorder_availability_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                    </div>
+                    ` : ''}
+                    ` : ''}
                 </div>
             </div>
 
@@ -8925,6 +10204,8 @@ class AdminDashboard {
             const statusClass = isDisabled ? 'pending' : this.getStatusClass(order.status);
             const statusLabel = isDisabled ? 'Disabled' : this.formatStatus(order.status);
             const isPreorder = order.is_preorder || (order.items && order.items[0] && order.items[0].is_preorder) || false;
+            const orderHarvestDate = order.harvest_date || (order.items && order.items[0] && order.items[0].harvest_date) || null;
+            const harvestBadge = isPreorder && orderHarvestDate ? this.getHarvestBadgeHtml(orderHarvestDate, null) : '';
             const customerInfo = `
                 <div class="fw-semibold">${this.escapeHtml(order.full_name || '—')}${order.username ? ` <span style="color:#777171f0;font-size:.75rem">(${this.escapeHtml(order.username)})</span>` : ''}</div>
                 ${order.email ? `<div class="text-muted">${this.escapeHtml(order.email)}</div>` : ''}
@@ -8936,7 +10217,7 @@ class AdminDashboard {
                 <td class="col-order">#${order.id}${isPreorder ? '<span class="badge bg-warning text-dark ms-1">Preorder</span>' : ''}</td>
                 <td>${customerInfo}</td>
                 <td>${this.fmtCurrency(order.total_amount)}</td>
-                <td style="text-align:center">${this.renderStatus(statusLabel, isDisabled ? 'disabled' : order.status)}</td>
+                <td style="text-align:center">${this.renderStatus(statusLabel, isDisabled ? 'disabled' : order.status)}${harvestBadge}</td>
                 <td class="text-muted">${order.created_at ? new Date(order.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
                 <td>
                     <button class="btn btn-sm py-0 px-2 btn-ac-green order-view-btn" data-order-id="${order.id}" type="button">View</button>
@@ -10149,6 +11430,7 @@ class AdminDashboard {
                 this.closeReviewModal();
                 this.showToast(`Verification request ${action}ed successfully`, 'success');
                 this.loadVerificationRequests(this.verificationCurrentPage, this.verificationCurrentStatus);
+                this.loadVerificationBadgeCount();
             } else {
                 this.showToast(data.message || `Failed to ${action} request`, 'error');
             }

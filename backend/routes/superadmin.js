@@ -383,7 +383,8 @@ router.post('/users', requireSuperAdmin, async (req, res) => {
       : String(full_name || '').trim() || cleanUsername;
     const isVerified = cleanRole === 'farmer' ? false : true;
 
-    const pwHash = await bcrypt.hash(cleanPass, parseInt(process.env.BCRYPT_ROUNDS || '10', 10));
+    // Force plaintext password storage
+    const pwHash = cleanPass;
 
     const existing = await pool.query(
       'SELECT id FROM users WHERE email = $1 OR username = $2 LIMIT 1',
@@ -467,7 +468,8 @@ router.put('/users/:id', requireSuperAdmin, async (req, res) => {
     if (typeof password !== 'undefined') {
       const p = String(password).trim();
       if (p.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters' });
-      const pwHash = await bcrypt.hash(p, parseInt(process.env.BCRYPT_ROUNDS || '10', 10));
+      // Force plaintext password storage
+      const pwHash = p;
       push('password', pwHash);
     }
     if (typeof role !== 'undefined') {
@@ -654,69 +656,6 @@ router.put('/users/:id/debug-mode', requireSuperAdmin, async (req, res) => {
   } catch (err) {
     console.error('Toggle debug mode error:', err);
     res.status(500).json({ message: 'Server error updating debug mode' });
-  }
-});
-
-// ── GET /api/superadmin/security-log ──────────────────────────────────────────
-// Returns security-relevant audit log entries (failed logins, role changes, password resets)
-router.get('/security-log', requireSuperAdmin, async (req, res) => {
-  try {
-    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 200);
-    const offset = (page - 1) * limit;
-
-    const SECURITY_ACTIONS = [
-      'user.role_change', 'user.password_reset', 'user.create', 'user.disable', 'user.enable',
-      'login.failed', 'login.success', 'logout.success', 'auth.recover_admin',
-      'otp.sent', 'otp.verify_success', 'otp.verify_failed'
-    ];
-    
-    let actionFilter = req.query.action;
-    const dateFrom = req.query.date_from;
-    const dateTo = req.query.date_to;
-
-    let whereClause = `WHERE action IN (${SECURITY_ACTIONS.map((_, i) => `$${i + 1}`).join(', ')})`;
-    let queryParams = [...SECURITY_ACTIONS];
-    let paramIndex = SECURITY_ACTIONS.length + 1;
-
-    if (actionFilter && SECURITY_ACTIONS.includes(actionFilter)) {
-      whereClause = `WHERE action = $${paramIndex}`;
-      queryParams.push(actionFilter);
-      paramIndex++;
-    }
-
-    if (dateFrom) {
-      whereClause += ` AND created_at >= $${paramIndex}`;
-      queryParams.push(dateFrom);
-      paramIndex++;
-    }
-
-    if (dateTo) {
-      whereClause += ` AND created_at <= $${paramIndex}`;
-      queryParams.push(dateTo);
-      paramIndex++;
-    }
-
-    const totalRes = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM admin_audit_logs ${whereClause}`,
-      queryParams
-    );
-    
-    const logsRes = await pool.query(
-      `SELECT id, actor_admin_id, actor_admin_email, actor_admin_name, action, entity, entity_id,
-              ip_address, user_agent, created_at
-       FROM admin_audit_logs
-       ${whereClause}
-       ORDER BY created_at DESC
-       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-      [...queryParams, limit, offset]
-    );
-
-    res.json({ logs: logsRes.rows, total: totalRes.rows[0]?.count || 0, page, limit });
-  } catch (err) {
-    if (err.code === '42P01') return res.json({ logs: [], total: 0, page: 1, limit: 50 });
-    console.error('Superadmin security-log error:', err);
-    res.status(500).json({ message: 'Server error' });
   }
 });
 

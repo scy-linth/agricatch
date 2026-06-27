@@ -12,6 +12,8 @@ module.exports = (...allowedRoles) => async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('[requireRole] Token decoded:', decoded);
+    console.log('[requireRole] Token role:', decoded.role);
+    
     const result = await pool.query(
       'SELECT id, role, email, full_name, username FROM users WHERE id = $1',
       [decoded.id]
@@ -23,10 +25,12 @@ module.exports = (...allowedRoles) => async (req, res, next) => {
     }
 
     const user = result.rows[0];
+    console.log(`[requireRole] User from DB:`, user);
     console.log(`[requireRole] User role=${user.role}, Allowed roles=[${allowedRoles.join(', ')}]`);
 
     if (allowedRoles.length && !allowedRoles.includes(user.role)) {
       console.log(`[requireRole] ACCESS DENIED - role ${user.role} not in allowed list`);
+      console.log(`[requireRole] Comparing: "${user.role}" vs [${allowedRoles.map(r => `"${r}"`).join(', ')}]`);
       return res.status(403).json({ message: 'Insufficient permissions' });
     }
 
