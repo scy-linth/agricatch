@@ -2034,23 +2034,10 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery', 'delivered', 'cancelled'];
+    const validStatuses = getValidStatuses();
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
-
-    // Status transition matrix - align with frontend admin UI
-    // Workflow order: pending/preorder_reserved → confirmed → preparing → scheduled → out_for_delivery → delivered
-    const validTransitions = {
-      pending: ['confirmed', 'cancelled'],
-      preorder_reserved: ['confirmed', 'cancelled'],
-      confirmed: ['preparing', 'cancelled'],
-      preparing: ['scheduled', 'cancelled'],
-      scheduled: ['out_for_delivery', 'cancelled'],
-      out_for_delivery: ['delivered', 'cancelled'],
-      delivered: [], // Terminal state - no transitions allowed
-      cancelled: [] // Terminal state - no transitions allowed
-    };
 
     const beforeRes = await client.query('SELECT id, status, user_id FROM orders WHERE id = $1', [id]);
     if (!beforeRes.rows.length) {
@@ -2058,19 +2045,13 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
     }
 
     const currentStatus = beforeRes.rows[0].status;
-    const allowedTransitions = validTransitions[currentStatus] || [];
 
-    if (!allowedTransitions.includes(status)) {
-      if (currentStatus === 'delivered') {
-        return res.status(400).json({ message: 'Cannot change status from delivered. Use refund/return feature instead.' });
-      }
-      if (currentStatus === 'cancelled') {
-        return res.status(400).json({ message: 'Cannot change status from cancelled. Create a new order instead.' });
-      }
-      return res.status(400).json({ message: `Invalid status transition from ${currentStatus} to ${status}` });
+    // Use shared transition matrix for validation
+    const validation = validateTransition(currentStatus, status, req.user.role);
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.message });
     }
 
-    await client.query('BEGIN');
 
     // Update order status and timestamps
     await client.query(`

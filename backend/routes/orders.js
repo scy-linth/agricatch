@@ -1,9 +1,10 @@
-﻿const express = require('express');
+const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
 const { broadcastEvent } = require('../utils/realtime');
 const activityLogger = require('../services/activityLogger');
 const { restoreInventoryOnCancel, updateStatisticsOnDeliver, getOrderForBusinessLogic } = require('../utils/orderBusinessLogic');
+const { validateTransition, getValidStatuses } = require('../utils/orderTransitions');
 
 function getClientIp(req) {
   const xf = req.headers['x-forwarded-for'];
@@ -17,7 +18,7 @@ function generateRequestId() {
 
 const router = express.Router();
 
-// Status workflow: pending â†’ confirmed â†’ preparing â†’ out_for_delivery â†’ delivered
+// Status workflow: pending → confirmed → preparing → out_for_delivery → delivered
 // Can be cancelled at any point (except delivered)
 
 // Get user orders
@@ -245,7 +246,7 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
     // If orderItemId is provided and doesn't match, that's okay - we'll use orderId
     const actualOrderId = orderId;
 
-    const validStatuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+    const validStatuses = getValidStatuses();
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
@@ -276,55 +277,17 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
       return res.status(403).json({ message: 'You can only update your own orders' });
     }
 
-    if (order.status === 'cancelled' && status !== 'cancelled') {
       return res.status(400).json({ message: 'Cancelled orders cannot be updated' });
     }
 
-    if (order.status === 'delivered' && status !== 'delivered') {
       return res.status(400).json({ message: 'Delivered orders cannot be updated' });
     }
 
-    // Strict status transition matrix - enforce workflow
-    // Regular orders: pending â†’ confirmed â†’ preparing â†’ scheduled â†’ out_for_delivery â†’ delivered
-    // Preorders: preorder_reserved â†’ confirmed â†’ preparing â†’ scheduled â†’ out_for_delivery â†’ delivered
-    const validTransitions = {
-      pending: ['confirmed', 'cancelled'],
-      preorder_reserved: ['confirmed', 'cancelled'],
-      confirmed: ['preparing', 'cancelled'],
-      preparing: ['scheduled', 'cancelled'],
-      scheduled: ['out_for_delivery', 'cancelled'],
-      out_for_delivery: ['delivered', 'cancelled'],
-      delivered: [], // Terminal state - no transitions allowed
-      cancelled: [] // Terminal state - no transitions allowed
-    };
-
-    // Validate status transition
-    if (status !== 'cancelled') {
-      const allowedNextStatuses = validTransitions[order.status] || [];
-      if (!allowedNextStatuses.includes(status)) {
-        return res.status(400).json({ 
-          message: `Invalid status transition: Cannot change from ${order.status} to ${status}. Allowed transitions: ${allowedNextStatuses.join(', ')}` 
-        });
-      }
-    } else {
-      // Cancellation rules based on user role
-      // Customer can cancel only: pending, confirmed
-      // Farmer can cancel only: pending, confirmed, preparing
-      // Neither can cancel: scheduled, out_for_delivery, delivered
-      if (order.status === 'delivered') {
-        return res.status(400).json({ message: 'Cannot cancel a delivered order' });
-      }
-      if (order.status === 'scheduled' || order.status === 'out_for_delivery') {
-        return res.status(400).json({ message: `Cannot cancel order in ${order.status} status` });
-      }
-      
-      // Check if user is customer (not farmer/admin)
-      const isCustomer = decoded.role === 'customer';
-      if (isCustomer && order.status !== 'pending' && order.status !== 'confirmed') {
-        return res.status(400).json({ message: 'Customers can only cancel pending or confirmed orders' });
-      }
+    // Use shared transition matrix for validation
+    const validation = validateTransition(order.status, status, role);
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.message });
     }
-
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -854,13 +817,25 @@ router.put('/:id/status', async (req, res) => {
       }
     }
 
-    const validStatuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+    const validStatuses = getValidStatuses();
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
 
     const orderInfo = await pool.query('SELECT user_id FROM orders WHERE id = $1', [orderId]);
     if (orderInfo.rows.length === 0) {
+    }
+
+    // Get current order status for validation
+    const orderStatusResult = await pool.query('SELECT status FROM orders WHERE id = ', [id]);
+    const currentStatus = orderStatusResult.rows[0]?.status;
+    const userRole = userResult.rows[0]?.role || 'farmer';
+
+    // Use shared transition matrix for validation
+    const validation = validateTransition(currentStatus, 'cancelled', userRole);
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.message });
+    }
       return res.status(404).json({ message: 'Order not found' });
     }
 
@@ -885,34 +860,14 @@ router.put('/:id/status', async (req, res) => {
     }
     const currentStatus = currentOrderStatus.rows[0].status;
 
-    // Strict status transition validation (same as main endpoint)
-    const validTransitions = {
-      pending: ['confirmed', 'cancelled'],
-      confirmed: ['preparing', 'cancelled'],
-      preparing: ['out_for_delivery', 'cancelled'],
-      out_for_delivery: ['delivered', 'cancelled'],
-      delivered: [],
-      cancelled: []
-    };
-
-    if (status !== 'cancelled') {
-      const allowedNextStatuses = validTransitions[currentStatus] || [];
-      if (!allowedNextStatuses.includes(status)) {
-        return res.status(400).json({ 
-          message: `Invalid status transition: Cannot change from ${currentStatus} to ${status}` 
-        });
-      }
-    } else {
-      if (currentStatus === 'delivered') {
-        return res.status(400).json({ message: 'Cannot cancel a delivered order' });
-      }
+    // Use shared transition matrix for validation
+    const validation = validateTransition(currentStatus, status, role);
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.message });
     }
-
-    if (currentStatus === 'cancelled' && status !== 'cancelled') {
       return res.status(400).json({ message: 'Cancelled orders cannot be updated' });
     }
 
-    if (currentStatus === 'delivered' && status !== 'delivered') {
       return res.status(400).json({ message: 'Delivered orders cannot be updated' });
     }
 
@@ -1028,11 +983,11 @@ router.put('/:id/cancel', async (req, res) => {
     const orderStatus = orderResult.rows[0].status;
     // Customer can cancel pending orders and unconverted pre-order reservations.
     // Once an order is confirmed or beyond, cancellation is blocked for customers.
-    const customerCancellableStatuses = ['pending', 'preorder_reserved'];
-    if (!customerCancellableStatuses.includes(orderStatus)) {
-      return res.status(400).json({ message: 'Order cannot be cancelled at this stage. Only pending orders or pre-order reservations can be cancelled by customers.' });
+    // Use shared transition matrix for validation
+    const validation = validateTransition(orderStatus, 'cancelled', 'customer');
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.message });
     }
-
     // Start transaction to restore stock
     const client = await pool.connect();
 
@@ -1303,6 +1258,18 @@ router.put('/:id/cancel-farmer', async (req, res) => {
       [id]
     );
     if (orderInfo.rows.length === 0) {
+    }
+
+    // Get current order status for validation
+    const orderStatusResult = await pool.query('SELECT status FROM orders WHERE id = ', [id]);
+    const currentStatus = orderStatusResult.rows[0]?.status;
+    const userRole = userResult.rows[0]?.role || 'farmer';
+
+    // Use shared transition matrix for validation
+    const validation = validateTransition(currentStatus, 'cancelled', userRole);
+    if (!validation.valid) {
+      return res.status(400).json({ message: validation.message });
+    }
       return res.status(404).json({ message: 'Order not found' });
     }
 

@@ -51,7 +51,7 @@ async function restoreInventoryOnCancel(client, order) {
       // Not yet converted: release reservation
       if (order.preorder_reserved_quantity > 0) {
         await client.query(
-          'UPDATE products SET reserved_quantity = reserved_quantity + $1 WHERE id = $2',
+          'UPDATE products SET reserved_quantity = reserved_quantity - $1 WHERE id = $2',
           [order.preorder_reserved_quantity, order.product_id]
         );
         // Reset reserved quantity to prevent double release (idempotent)

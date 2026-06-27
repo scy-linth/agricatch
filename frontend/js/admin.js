@@ -4884,7 +4884,7 @@ class AdminDashboard {
         container.innerHTML = html;
     }
 
-    openActivityDetailsModal(activity) {
+    async openActivityDetailsModal(activity) {
         const modal = document.getElementById('activity-details-modal');
         if (!modal) return;
 
@@ -4907,42 +4907,69 @@ class AdminDashboard {
         });
         document.getElementById('am-detail-status').innerHTML = this.getStatusBadge(activity.status);
 
-        // Generate session timeline
-        this.renderSessionTimeline(activity);
-
         // Show modal
         modal.classList.add('open');
         modal.style.display = 'flex';
+
+        // Fetch and render session timeline
+        await this.renderSessionTimeline(activity);
     }
 
-    renderSessionTimeline(activity) {
+    async renderSessionTimeline(activity) {
         const container = document.getElementById('am-session-timeline');
         if (!container) return;
 
-        // Generate placeholder timeline based on the activity
-        const timeline = this.generateSessionTimeline(activity);
+        // Show loading state
+        container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-hourglass-split me-2"></i>Loading session timeline...</div>';
 
-        container.innerHTML = timeline.map((item, index) => {
-            const time = new Date(item.timestamp).toLocaleTimeString('en-PH', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
+        try {
+            // Fetch real session timeline from backend API
+            const response = await fetch(`${this.apiBase}/activity-monitor/session/${activity.sessionId}/timeline`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
             });
 
-            const itemClass = item.status === 'failed' ? 'timeline-error' : 
-                             item.status === 'pending' ? 'timeline-warning' : '';
+            if (!response.ok) {
+                throw new Error('Failed to fetch session timeline');
+            }
 
-            return `
-                <div class="session-timeline-item ${itemClass}">
-                    <div class="d-flex align-items-baseline gap-2">
-                        <div class="session-timeline-time">${time}</div>
-                        <div class="session-timeline-action">${item.icon} ${this.escapeHtml(item.action)}</div>
+            const data = await response.json();
+            const timeline = data.timeline || [];
+
+            if (timeline.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-3">No session timeline data available</div>';
+                return;
+            }
+
+            container.innerHTML = timeline.map((item, index) => {
+                const time = new Date(item.created_at || item.timestamp).toLocaleTimeString('en-PH', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+
+                const itemClass = item.status === 'failed' ? 'timeline-error' :
+                                 item.status === 'pending' ? 'timeline-warning' : '';
+
+                const actionLabel = this.getActionLabel(item.action) || item.action;
+                const actionIcon = this.getActionIcon(item.action) || '📋';
+
+                return `
+                    <div class="session-timeline-item ${itemClass}">
+                        <div class="d-flex align-items-baseline gap-2">
+                            <div class="session-timeline-time">${time}</div>
+                            <div class="session-timeline-action">${actionIcon} ${this.escapeHtml(actionLabel)}</div>
+                        </div>
+                        <div class="session-timeline-description">${this.escapeHtml(item.description || '')}</div>
+                        ${index < timeline.length - 1 ? '<span class="session-timeline-arrow">↓</span>' : ''}
                     </div>
-                    <div class="session-timeline-description">${this.escapeHtml(item.description)}</div>
-                    ${index < timeline.length - 1 ? '<span class="session-timeline-arrow">↓</span>' : ''}
-                </div>
-            `;
-        }).join('');
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Error fetching session timeline:', error);
+            container.innerHTML = '<div class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle me-2"></i>Failed to load session timeline</div>';
+        }
     }
 
     generateSessionTimeline(activity) {
