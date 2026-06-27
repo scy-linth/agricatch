@@ -7,6 +7,17 @@ const { broadcastEvent } = require('../utils/realtime');
 const cloudinary = require('../utils/cloudinary');
 const { pool, getPlatformSetting } = require('../utils/db');
 const { getFeatureFlag } = require('../middleware/featureFlags');
+const activityLogger = require('../services/activityLogger');
+
+function getClientIp(req) {
+  const xf = req.headers['x-forwarded-for'];
+  if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
+  return req.ip || req.connection?.remoteAddress || 'unknown';
+}
+
+function generateRequestId() {
+  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
 
 const router = express.Router();
 
@@ -627,6 +638,61 @@ router.get('/catalog/names', async (_req, res) => {
   }
 });
 
+// Get previous product values for auto-fill
+router.get('/previous-values', async (req, res) => {
+  try {
+    const user = getUserFromToken(req);
+    if (!user || user.role !== 'farmer') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const { name, is_preorder } = req.query;
+    if (!name) {
+      return res.status(400).json({ message: 'Product name is required' });
+    }
+
+    const isPreorder = is_preorder === 'true' || is_preorder === true;
+
+    // Get latest product from this farmer with same name and selling type
+    // Exclude harvested products (they are historical records)
+    const result = await pool.query(
+      `SELECT description, image_url, price, location, city, province,
+              expiry_date, max_preorder_quantity, preorder_availability_date
+       FROM products
+       WHERE farmer_id = $1
+         AND LOWER(name) = LOWER($2)
+         AND is_preorder = $3
+         AND is_admin_disabled = false
+         AND status != 'harvested'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [user.id, name, isPreorder]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ values: null });
+    }
+
+    const product = result.rows[0];
+    return res.json({
+      values: {
+        description: product.description,
+        image_url: product.image_url,
+        price: product.price,
+        location: product.location,
+        city: product.city,
+        province: product.province,
+        expiry_date: product.expiry_date,
+        max_preorder_quantity: product.max_preorder_quantity,
+        preorder_availability_date: product.preorder_availability_date
+      }
+    });
+  } catch (error) {
+    console.error('Get previous values error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Suggested pricing based on system-wide delivered sales history
 router.get('/pricing/suggestion', async (req, res) => {
   try {
@@ -769,6 +835,7 @@ router.get('/featured', async (req, res) => {
               COALESCE(u.total_reviews, 0) as farmer_total_reviews,
               (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id) AS average_rating,
               (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) AS total_reviews,
+              p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity,
               fp.position
        FROM featured_products fp
        JOIN products p ON fp.product_id = p.id
@@ -914,6 +981,7 @@ router.get('/:id', async (req, res) => {
             (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id) as total_reviews,
             p.cloudinary_public_id as cloudinary_public_id,
             COALESCE(s.sold_qty, 0)::int AS sold_qty,
+            p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity,
              ${userId ? `EXISTS (SELECT 1 FROM wishlist w WHERE w.user_id = $${params.length + 1} AND w.product_id = p.id)` : 'false'} as is_in_wishlist
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
@@ -1233,6 +1301,53 @@ router.post('/', multer().none(), async (req, res) => {
     const cityValue = (city && String(city).trim() !== '') ? city : null;
     const provinceValue = (province && String(province).trim() !== '') ? province : null;
 
+    // Ensure linked_product_id column exists
+    await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS linked_product_id INTEGER REFERENCES products(id) ON DELETE SET NULL');
+
+    // DUPLICATE PREVENTION: Prevent Available+Available and Pre-order+Pre-order for same farmer and product catalog item
+    const duplicateCheck = await pool.query(
+      `SELECT id, is_preorder FROM products 
+       WHERE farmer_id = $1 
+         AND LOWER(name) = LOWER($2)
+         AND category_id = $3
+         AND is_admin_disabled = false
+       LIMIT 1`,
+      [decoded.id, name, category_id]
+    );
+
+    if (duplicateCheck.rows.length > 0) {
+      const existing = duplicateCheck.rows[0];
+      const existingIsPreorder = existing.is_preorder === true || existing.is_preorder === 't' || existing.is_preorder === 'true' || existing.is_preorder === 1 || existing.is_preorder === '1';
+      
+      // Prevent Available + Available
+      if (!isPreorderValue && !existingIsPreorder) {
+        return res.status(409).json({ 
+          message: 'You already have an Available product with this name and category. You can edit the existing product instead of creating a duplicate.',
+          existing_product_id: existing.id
+        });
+      }
+      
+      // Prevent Pre-order + Pre-order
+      if (isPreorderValue && existingIsPreorder) {
+        return res.status(409).json({ 
+          message: 'You already have a Pre-order product with this name and category. You can edit the existing product instead of creating a duplicate.',
+          existing_product_id: existing.id
+        });
+      }
+    }
+
+    // PRODUCT LINKING: Automatically link Available and Pre-order products
+    let linkedProductId = null;
+    if (duplicateCheck.rows.length > 0) {
+      const existing = duplicateCheck.rows[0];
+      const existingIsPreorder = existing.is_preorder === true || existing.is_preorder === 't' || existing.is_preorder === 'true' || existing.is_preorder === 1 || existing.is_preorder === '1';
+      
+      // Link if creating Available and existing is Pre-order, or vice versa
+      if (isPreorderValue !== existingIsPreorder) {
+        linkedProductId = existing.id;
+      }
+    }
+
     // Check if product approval is required via feature flag
     const requireApproval = await getFeatureFlag('require_product_approval');
     const initialStatus = requireApproval ? 'pending' : 'approved';
@@ -1241,15 +1356,16 @@ router.post('/', multer().none(), async (req, res) => {
     const result = await pool.query(`
       INSERT INTO products (name, description, price, category_id, farmer_id, stock_quantity,
                            unit, image_url, location, city, province, harvest_date, expiry_date, cloudinary_public_id, is_available, status,
-                           is_preorder, preorder_availability_date, reserved_quantity, max_preorder_quantity)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+                           is_preorder, preorder_availability_date, reserved_quantity, max_preorder_quantity, linked_product_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
       RETURNING *
     `, [name, normalizedDescription, price, category_id, decoded.id, stock_quantity,
          unit || 'kg', imageUrl, productLocation, cityValue, provinceValue, harvestDateValue, expiryDateValue, imagePublicId, initialIsAvailable, initialStatus,
          isPreorderValue || false,
          preorderAvailabilityDateValue || null,
          0, // reserved_quantity always starts at 0
-         max_preorder_quantity || null]);
+         max_preorder_quantity || null,
+         linkedProductId]);
 
     let createdProduct = result.rows[0];
 
@@ -1258,6 +1374,19 @@ router.post('/', multer().none(), async (req, res) => {
       product_id: Number(createdProduct.id),
       farmer_id: Number(decoded.id)
     });
+
+    // Log product creation to activity logger (async, non-blocking)
+    activityLogger.logAddProduct(
+      decoded.id, 
+      decoded.role, 
+      req.sessionID, 
+      createdProduct.id, 
+      createdProduct.name,
+      {},
+      getClientIp(req),
+      req.headers['user-agent'],
+      generateRequestId()
+    );
 
     // Send notification to admin about new product submission (only if approval is required)
     if (requireApproval) {
@@ -1286,6 +1415,158 @@ router.post('/', multer().none(), async (req, res) => {
   } catch (error) {
     console.error('Add product error:', error);
     res.status(500).json({ message: 'Server error adding product' });
+  }
+});
+
+// Update harvest date (dedicated endpoint for harvest reminder system)
+router.put('/:id/harvest-date', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      client.release();
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { id } = req.params;
+    const { harvest_date, reason } = req.body;
+
+    if (!harvest_date) {
+      client.release();
+      return res.status(400).json({ message: 'harvest_date is required' });
+    }
+    if (!reason || String(reason).trim() === '') {
+      client.release();
+      return res.status(400).json({ message: 'reason is required' });
+    }
+
+    await client.query('BEGIN');
+
+    // Get product and verify ownership
+    const productResult = await client.query('SELECT * FROM products WHERE id = $1', [id]);
+    if (productResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const product = productResult.rows[0];
+    if (Number(product.farmer_id) !== Number(decoded.id)) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(403).json({ message: 'You can only update your own products' });
+    }
+
+    // Business rule: Cannot change harvest date if any order has progressed beyond confirmed
+    const orderCheck = await client.query(`
+      SELECT COUNT(*) as count
+      FROM orders
+      WHERE product_id = $1
+        AND status NOT IN ('pending', 'cancelled')
+        AND preorder_reserved_quantity > 0
+    `, [id]);
+
+    if (parseInt(orderCheck.rows[0].count) > 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json({ 
+        message: 'Cannot change harvest date: product has active orders in progress' 
+      });
+    }
+
+    // Ensure harvest tracking columns exist
+    await client.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS harvest_adjustment_count INTEGER DEFAULT 0");
+    await client.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS last_harvest_adjustment_at TIMESTAMP");
+    await client.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS harvest_overdue_days INTEGER DEFAULT 0");
+    await client.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS reservations_disabled BOOLEAN DEFAULT false");
+
+    const oldHarvestDate = product.harvest_date;
+    const newHarvestDate = String(harvest_date).trim() === '' ? null : harvest_date;
+
+    // Update harvest date and tracking fields
+    await client.query(`
+      UPDATE products
+      SET harvest_date = $1,
+          harvest_adjustment_count = harvest_adjustment_count + 1,
+          last_harvest_adjustment_at = CURRENT_TIMESTAMP,
+          harvest_overdue_days = 0,
+          reservations_disabled = false,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+    `, [newHarvestDate, id]);
+
+    // Collect SSE broadcast targets (send after COMMIT)
+    const sseBroadcastTargets = [];
+
+    // Notify customers with active preorder reservations
+    if (oldHarvestDate !== newHarvestDate) {
+      const reservationResult = await client.query(`
+        SELECT DISTINCT o.user_id
+        FROM orders o
+        WHERE o.product_id = $1
+          AND o.preorder_reserved_quantity > 0
+          AND o.status IN ('pending', 'confirmed')
+      `, [id]);
+
+      for (const row of reservationResult.rows) {
+        await client.query(`
+          INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+          VALUES ($1, 'harvest_date_changed', 'Expected Harvest Date Adjusted', $2, $3, false, CURRENT_TIMESTAMP)
+        `, [
+          row.user_id,
+          `Expected harvest date for "${product.name}" has been adjusted from ${oldHarvestDate || 'not set'} to ${newHarvestDate || 'not set'}. Reason: ${reason}`,
+          id
+        ]);
+        sseBroadcastTargets.push({ user_id: row.user_id });
+      }
+    }
+
+    // Admin monitoring: Notify if adjustment count exceeds 3
+    const adjustmentCount = (product.harvest_adjustment_count || 0) + 1;
+    if (adjustmentCount > 3) {
+      const adminResult = await client.query(
+        "SELECT id FROM users WHERE role IN ('admin', 'super_admin') LIMIT 1"
+      );
+      if (adminResult.rows.length > 0) {
+        await client.query(`
+          INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+          VALUES ($1, 'harvest_adjustment_alert', 'Harvest Adjustment Alert', $2, $3, false, CURRENT_TIMESTAMP)
+        `, [
+          adminResult.rows[0].id,
+          `Product "${product.name}" (ID: ${id}) has been adjusted ${adjustmentCount} times. Current reason: ${reason}`,
+          id
+        ]);
+        sseBroadcastTargets.push({ user_id: adminResult.rows[0].id });
+      }
+    }
+
+    // Commit transaction
+    await client.query('COMMIT');
+    client.release();
+
+    // Send SSE broadcasts after successful COMMIT
+    for (const target of sseBroadcastTargets) {
+      try {
+        broadcastEvent('notification.created', { user_id: target.user_id });
+      } catch (sseErr) {
+        console.error('Failed to send SSE broadcast:', sseErr);
+        // Log only, do not fail the request
+      }
+    }
+
+    res.json({ 
+      message: 'Harvest date updated successfully',
+      old_harvest_date: oldHarvestDate,
+      new_harvest_date: newHarvestDate,
+      adjustment_count: adjustmentCount
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    client.release();
+    console.error('Update harvest date error:', error);
+    res.status(500).json({ message: 'Server error updating harvest date' });
   }
 });
 
@@ -1505,6 +1786,19 @@ router.put('/:id', multer().none(), async (req, res) => {
       farmer_id: Number(decoded.id)
     });
 
+    // Log product update to activity logger (async, non-blocking)
+    activityLogger.logEditProduct(
+      decoded.id, 
+      decoded.role, 
+      req.sessionID, 
+      id, 
+      nextName,
+      {},
+      getClientIp(req),
+      req.headers['user-agent'],
+      generateRequestId()
+    );
+
     res.json({ message: 'Product updated successfully' });
 
   } catch (error) {
@@ -1576,10 +1870,13 @@ router.post('/:id/convert-preorders', async (req, res) => {
       const shortageQuantity = Math.max(product.reserved_quantity - harvestQuantity, 0);
 
       // Update product: add surplus to stock, reduce reserved by allocated amount
+      // Also reset harvest tracking fields and enable reservations again
       await client.query(`
         UPDATE products
         SET stock_quantity = stock_quantity + $1,
-            reserved_quantity = reserved_quantity - $2
+            reserved_quantity = reserved_quantity - $2,
+            harvest_overdue_days = 0,
+            reservations_disabled = false
         WHERE id = $3
       `, [surplusQuantity, allocatedQuantity, productId]);
 
@@ -1698,6 +1995,193 @@ router.post('/:id/convert-preorders', async (req, res) => {
   }
 });
 
+// Harvest lifecycle: Complete harvest and optionally create Available product
+router.post('/:id/harvest-lifecycle', async (req, res) => {
+  try {
+    const productId = req.params.id;
+    const { harvest_quantity, make_available } = req.body;
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Parse and validate harvest_quantity
+    const harvestQuantity = Number.parseInt(harvest_quantity, 10);
+    if (!Number.isInteger(harvestQuantity) || harvestQuantity <= 0) {
+      return res.status(400).json({ message: 'Harvest quantity is required and must be a positive integer' });
+    }
+
+    // Validate make_available boolean
+    const makeAvailable = make_available === true || make_available === 'true' || make_available === '1';
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Get product details with row lock
+      const productResult = await client.query(
+        'SELECT id, farmer_id, is_preorder, reserved_quantity, stock_quantity, name, description, price, category_id, unit, image_url, cloudinary_public_id, location, city, province, linked_product_id, status FROM products WHERE id = $1 FOR UPDATE',
+        [productId]
+      );
+
+      if (productResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(404).json({ message: 'Product not found' });
+      }
+
+      const product = productResult.rows[0];
+
+      // Verify user is the farmer
+      if (Number(product.farmer_id) !== Number(decoded.id)) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(403).json({ message: 'You can only harvest your own products' });
+      }
+
+      if (!product.is_preorder) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json({ message: 'This product is not a pre-order product' });
+      }
+
+      // Ensure linked_product_id column exists
+      await client.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS linked_product_id INTEGER REFERENCES products(id) ON DELETE SET NULL');
+
+      if (makeAvailable) {
+        // YES PATH: Create Available product or transfer to existing linked Available product
+        
+        // Check if there's already a linked Available product
+        let availableProductId = null;
+        if (product.linked_product_id) {
+          const linkedCheck = await client.query(
+            'SELECT id, stock_quantity, is_preorder FROM products WHERE id = $1',
+            [product.linked_product_id]
+          );
+          if (linkedCheck.rows.length > 0 && !linkedCheck.rows[0].is_preorder) {
+            availableProductId = linkedCheck.rows[0].id;
+          }
+        }
+
+        if (availableProductId) {
+          // Transfer stock to existing linked Available product
+          const currentStock = await client.query(
+            'SELECT stock_quantity FROM products WHERE id = $1',
+            [availableProductId]
+          );
+          const newStock = (currentStock.rows[0].stock_quantity || 0) + harvestQuantity;
+          
+          await client.query(
+            'UPDATE products SET stock_quantity = $1, is_available = true, status = COALESCE(status, \'approved\') WHERE id = $2',
+            [newStock, availableProductId]
+          );
+
+          // Mark the pre-order as harvested (historical record)
+          await client.query(
+            'UPDATE products SET status = \'harvested\', is_available = false, stock_quantity = 0, reserved_quantity = 0 WHERE id = $1',
+            [productId]
+          );
+
+          await client.query('COMMIT');
+          client.release();
+
+          return res.json({
+            message: 'Harvest completed. Stock transferred to linked Available product.',
+            harvest_quantity: harvestQuantity,
+            available_product_id: availableProductId,
+            new_stock_quantity: newStock,
+            action: 'transferred'
+          });
+        } else {
+          // Create new Available product
+          const requireApproval = await getFeatureFlag('require_product_approval');
+          const initialStatus = requireApproval ? 'pending' : 'approved';
+          
+          const newProductResult = await client.query(`
+            INSERT INTO products (name, description, price, category_id, farmer_id, stock_quantity,
+                                 unit, image_url, location, city, province, cloudinary_public_id, is_available, status,
+                                 is_preorder, preorder_availability_date, reserved_quantity, max_preorder_quantity, linked_product_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+            RETURNING *
+          `, [
+            product.name,
+            product.description,
+            product.price,
+            product.category_id,
+            product.farmer_id,
+            harvestQuantity,
+            product.unit,
+            product.image_url,
+            product.location,
+            product.city,
+            product.province,
+            product.cloudinary_public_id,
+            true, // is_available
+            initialStatus,
+            false, // is_preorder
+            null, // preorder_availability_date
+            0, // reserved_quantity
+            null, // max_preorder_quantity
+            productId // linked_product_id
+          ]);
+
+          const newAvailableProduct = newProductResult.rows[0];
+
+          // Update the pre-order to link to the new Available product and mark as harvested
+          await client.query(
+            'UPDATE products SET linked_product_id = $1, status = \'harvested\', is_available = false, stock_quantity = 0, reserved_quantity = 0 WHERE id = $2',
+            [newAvailableProduct.id, productId]
+          );
+
+          await client.query('COMMIT');
+          client.release();
+
+          return res.json({
+            message: 'Harvest completed. New Available product created automatically.',
+            harvest_quantity: harvestQuantity,
+            available_product_id: newAvailableProduct.id,
+            available_product: newAvailableProduct,
+            action: 'created'
+          });
+        }
+      } else {
+        // NO PATH: Mark as harvested without creating Available product
+        await client.query(
+          'UPDATE products SET status = \'harvested\', is_available = false, stock_quantity = 0, reserved_quantity = 0 WHERE id = $1',
+          [productId]
+        );
+
+        await client.query('COMMIT');
+        client.release();
+
+        return res.json({
+          message: 'Harvest completed. Product marked as harvested and will no longer appear in the marketplace.',
+          harvest_quantity: harvestQuantity,
+          action: 'harvested_only'
+        });
+      }
+
+    } catch (error) {
+      if (client) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          console.error('Rollback error:', rollbackError);
+        }
+        client.release();
+      }
+      console.error('Harvest lifecycle error:', error);
+      res.status(500).json({ message: 'Server error processing harvest lifecycle' });
+    }
+  } catch (error) {
+    console.error('Harvest lifecycle outer error:', error);
+    res.status(500).json({ message: 'Server error processing harvest lifecycle' });
+  }
+});
+
 // Delete product (for farmers) - hard delete
 router.delete('/:id', async (req, res) => {
   try {
@@ -1795,6 +2279,19 @@ router.delete('/:id', async (req, res) => {
       product_id: Number(id),
       farmer_id: Number(decoded.id)
     });
+
+    // Log product deletion to activity logger (async, non-blocking)
+    activityLogger.logDeleteProduct(
+      decoded.id, 
+      decoded.role, 
+      req.sessionID, 
+      id, 
+      imageUrl || 'Product',
+      {},
+      getClientIp(req),
+      req.headers['user-agent'],
+      generateRequestId()
+    );
 
     res.json({ message: 'Product deleted successfully' });
 
