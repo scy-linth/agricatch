@@ -1272,13 +1272,39 @@
             <button type="button" class="btn-close" onclick="dismissVerificationBanner()"></button>
         </div>
 
+        <!-- KPI Cards Row 1: Harvest Reminders and My Products -->
         <div class="row g-3 mb-3">
+            <!-- Harvest Reminder KPI -->
+            <div class="col-xxl-6 col-md-6" id="harvest-reminder-card">
+                <div class="card info-card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Harvest Reminder</h5>
+                        <div class="d-flex align-items-center justify-content-center">
+                            <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                <i class="bi bi-calendar-check" style="color:#dc3545"></i>
+                            </div>
+                            <div class="ps-3">
+                                <h6 id="harvest-today">--</h6>
+                                <span class="text-muted small pt-1 fw-bold">Harvest Today</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 pt-2 border-top text-center">
+                            <div class="small">
+                                <span id="harvest-3days" class="fw-bold">Harvesting in 3 Days: 0 Item(s)</span>
+                            </div>
+                            <div class="small mt-1">
+                                <span id="harvest-overdue" class="fw-bold text-danger">Overdue: 0 Item(s)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <!-- My Products KPI -->
-            <div class="col-xxl-3 col-md-6" id="my-products-card">
-                <div class="card info-card sales-card">
-                    <div class="card-body">
+            <div class="col-xxl-6 col-md-6" id="my-products-card">
+                <div class="card info-card sales-card h-100">
+                    <div class="card-body d-flex flex-column text-center">
                         <h5 class="card-title">My Products</h5>
-                        <div class="d-flex align-items-center">
+                        <div class="d-flex align-items-center justify-content-center">
                             <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                                 <i class="bi bi-box-seam" style="color:var(--ac-primary,#2d7a3a)"></i>
                             </div>
@@ -1290,8 +1316,12 @@
                     </div>
                 </div>
             </div>
+        </div><!-- /KPI Row 1 -->
+
+        <!-- KPI Cards Row 2: Total Orders, Items Sold, Total Revenue -->
+        <div class="row g-3 mb-3">
             <!-- Total Orders KPI -->
-            <div class="col-xxl-3 col-md-6" id="total-orders-card">
+            <div class="col-xxl-4 col-md-4" id="total-orders-card">
                 <div class="card info-card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
@@ -1304,9 +1334,9 @@
                             <li><a class="dropdown-item total-orders-period-filter" href="#" data-period="all">All Time</a></li>
                         </ul>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body text-center">
                         <h5 class="card-title">Total Orders <span id="total-orders-period-label" class="small text-muted">| This Month</span></h5>
-                        <div class="d-flex align-items-center">
+                        <div class="d-flex align-items-center justify-content-center">
                             <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                                 <i class="bi bi-bag-check" style="color:#f59e0b"></i>
                             </div>
@@ -1319,7 +1349,7 @@
                 </div>
             </div>
             <!-- Items Sold KPI -->
-            <div class="col-xxl-3 col-md-6" id="items-sold-card">
+            <div class="col-xxl-4 col-md-4" id="items-sold-card">
                 <div class="card info-card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
@@ -1332,9 +1362,9 @@
                             <li><a class="dropdown-item items-sold-period-filter" href="#" data-period="all">All Time</a></li>
                         </ul>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body text-center">
                         <h5 class="card-title">Items Sold <span id="items-sold-period-label" class="small text-muted">| Today</span></h5>
-                        <div class="d-flex align-items-center">
+                        <div class="d-flex align-items-center justify-content-center">
                             <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                                 <i class="bi bi-basket2" style="color:#22c55e"></i>
                             </div>
@@ -1347,7 +1377,7 @@
                 </div>
             </div>
             <!-- Total Revenue KPI -->
-            <div class="col-xxl-3 col-md-6" id="total-revenue-card">
+            <div class="col-xxl-4 col-md-4" id="total-revenue-card">
                 <div class="card info-card revenue-card">
                     <div class="filter">
                         <a class="icon" href="#" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></a>
@@ -1360,21 +1390,21 @@
                             <li><a class="dropdown-item total-revenue-period-filter" href="#" data-period="all">All Time</a></li>
                         </ul>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body text-center">
                         <h5 class="card-title">Total Revenue <span id="total-revenue-period-label" class="small text-muted">| Today</span></h5>
-                        <div class="d-flex align-items-center">
+                        <div class="d-flex align-items-center justify-content-center">
                             <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
-                                <i class="bi bi-currency-exchange" style="color:#2eca6a"></i>
+                                <i class="bi bi-currency-dollar" style="color:#198754"></i>
                             </div>
                             <div class="ps-3">
-                                <h6 id="total-revenue">&#8369;0.00</h6>
+                                <h6 id="total-revenue">--</h6>
                                 <span class="text-success small pt-1 fw-bold" id="total-revenue-change">+0%</span> <span id="total-revenue-change-label" class="text-muted small">vs prev today</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </div><!-- /KPI Row 2 -->
         <!-- Reports + Charts Row -->
         <div class="row g-3 mb-3">
             <div class="col-lg-8">
@@ -1606,22 +1636,46 @@
                     </div>
                 </div>
                 <div class="col">
-                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fde8e8 0%, #f8d7da 100%); border-left: 4px solid #dc3545;">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
                         <div class="card-body py-2">
-                            <h6 class="text-muted mb-0 small">Reservation Full</h6>
-                            <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="kpi-preorder-reserved-max">--</h4>
+                            <h6 class="text-muted mb-0 small">Harvest Day/Due</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="kpi-preorder-due-soon">--</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%); border-left: 4px solid #22c55e;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Reserved Full</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #15803d;" id="kpi-preorder-progress">--</h4>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Approval KPI Cards -->
-            <div id="kpi-approval" class="row justify-content-center" style="display:none;">
-                <div class="col-md-3">
+            <div id="kpi-approval" class="row" style="display:none;">
+                <div class="col">
                     <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); border-left: 4px solid #ffc107;">
                         <div class="card-body py-2">
                             <h6 class="text-muted mb-0 small">Pending Approval</h6>
                             <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="kpi-approval-pending">--</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #fde8e8 0%, #f8d7da 100%); border-left: 4px solid #dc3545;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Rejected</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #b02a37;" id="kpi-approval-rejected">--</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%); border-left: 4px solid #22c55e;">
+                        <div class="card-body py-2">
+                            <h6 class="text-muted mb-0 small">Approved</h6>
+                            <h4 class="mb-0 fw-bold" style="color: #15803d;" id="kpi-approval-approved">--</h4>
                         </div>
                     </div>
                 </div>
@@ -1633,22 +1687,22 @@
             <div class="card-body">
                 <!-- Available Now Filter -->
                 <div id="filter-available" class="section-filter-bar row g-2 align-items-end">
-                    <div class="col-md-1 col-sm-6">
+                    <div class="col-auto">
                         <label class="form-label small fw-semibold mb-1">Show</label>
-                        <select class="form-select form-select-sm" data-entries-section="available-products" style="min-width: 60px;">
+                        <select class="form-select form-select-sm" data-entries-section="available-products" style="min-width: 70px;">
                             <option value="10">10</option>
                             <option value="25">25</option>
                             <option value="50" selected>50</option>
                             <option value="100">100</option>
                         </select>
                     </div>
-                    <div class="col-md-2 col-sm-6">
+                    <div class="col-md-2 col-sm-4">
                         <label class="form-label small fw-semibold mb-1">Category</label>
                         <select id="available-category-filter" class="form-select form-select-sm">
                             <option value="">All categories</option>
                         </select>
                     </div>
-                    <div class="col-md-2 col-sm-6">
+                    <div class="col-md-2 col-sm-4">
                         <label class="form-label small fw-semibold mb-1">Status</label>
                         <select id="available-status-filter" class="form-select form-select-sm">
                             <option value="" selected>Any status</option>
@@ -1657,12 +1711,12 @@
                             <option value="disabled">Disabled</option>
                         </select>
                     </div>
-                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                    <div class="col-md-auto col-sm-4 ms-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
-                            <div class="input-group input-group-sm flex-grow-1">
-                                <input type="text" id="available-search-input" class="form-control me-2" placeholder="Product name…">
-                                <button id="available-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                            <div class="input-group input-group-sm" style="width: 250px;">
+                                <input type="text" id="available-search-input" class="form-control" placeholder="Product name…">
+                                <button id="available-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search"></i></button>
                             </div>
                             <button id="available-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
@@ -1671,22 +1725,22 @@
 
                 <!-- Pre-orders Filter -->
                 <div id="filter-preorder" class="section-filter-bar row g-2 align-items-end" style="display:none;">
-                    <div class="col-md-1 col-sm-6">
+                    <div class="col-auto">
                         <label class="form-label small fw-semibold mb-1">Show</label>
-                        <select class="form-select form-select-sm" data-entries-section="preorder-products" style="min-width: 60px;">
+                        <select class="form-select form-select-sm" data-entries-section="preorder-products" style="min-width: 70px;">
                             <option value="10">10</option>
                             <option value="25">25</option>
                             <option value="50" selected>50</option>
                             <option value="100">100</option>
                         </select>
                     </div>
-                    <div class="col-md-2 col-sm-6">
+                    <div class="col-md-2 col-sm-4">
                         <label class="form-label small fw-semibold mb-1">Category</label>
                         <select id="preorder-category-filter" class="form-select form-select-sm">
                             <option value="">All categories</option>
                         </select>
                     </div>
-                    <div class="col-md-2 col-sm-6">
+                    <div class="col-md-2 col-sm-4">
                         <label class="form-label small fw-semibold mb-1">Status</label>
                         <select id="preorder-status-filter" class="form-select form-select-sm">
                             <option value="" selected>Any status</option>
@@ -1695,12 +1749,12 @@
                             <option value="disabled">Disabled</option>
                         </select>
                     </div>
-                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                    <div class="col-md-auto col-sm-4 ms-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
-                            <div class="input-group input-group-sm flex-grow-1">
-                                <input type="text" id="preorder-search-input" class="form-control me-2" placeholder="Product name…">
-                                <button id="preorder-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                            <div class="input-group input-group-sm" style="width: 250px;">
+                                <input type="text" id="preorder-search-input" class="form-control" placeholder="Product name…">
+                                <button id="preorder-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search"></i></button>
                             </div>
                             <button id="preorder-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
@@ -1709,27 +1763,27 @@
 
                 <!-- Approval Filter -->
                 <div id="filter-approval" class="section-filter-bar row g-2 align-items-end" style="display:none;">
-                    <div class="col-md-1 col-sm-6">
+                    <div class="col-auto">
                         <label class="form-label small fw-semibold mb-1">Show</label>
-                        <select class="form-select form-select-sm" data-entries-section="approval-products" style="min-width: 60px;">
+                        <select class="form-select form-select-sm" data-entries-section="approval-products" style="min-width: 70px;">
                             <option value="10">10</option>
                             <option value="25">25</option>
                             <option value="50" selected>50</option>
                             <option value="100">100</option>
                         </select>
                     </div>
-                    <div class="col-md-2 col-sm-6">
+                    <div class="col-md-2 col-sm-4">
                         <label class="form-label small fw-semibold mb-1">Category</label>
                         <select id="approval-category-filter" class="form-select form-select-sm">
                             <option value="">All categories</option>
                         </select>
                     </div>
-                    <div class="col-md-4 col-sm-6 ms-md-auto">
+                    <div class="col-md-auto col-sm-4 ms-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
-                            <div class="input-group input-group-sm flex-grow-1">
-                                <input type="text" id="approval-search-input" class="form-control me-2" placeholder="Product name…">
-                                <button id="approval-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search me-1"></i>Search</button>
+                            <div class="input-group input-group-sm" style="width: 250px;">
+                                <input type="text" id="approval-search-input" class="form-control" placeholder="Product name…">
+                                <button id="approval-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search"></i></button>
                             </div>
                             <button id="approval-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
@@ -1741,13 +1795,13 @@
         <!-- Products Tabs -->
         <ul class="nav nav-tabs nav-tabs-bordered mb-3" id="products-tabs">
             <li class="nav-item">
-                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#available-now-tab">Available Now</button>
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#available-now-tab">Available Now <span class="badge bg-secondary ms-1" id="tab-available-count">0</span></button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#preorders-tab">Pre-orders</button>
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#preorders-tab">Pre-orders <span class="badge bg-secondary ms-1" id="tab-preorder-count">0</span></button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#approval-tab">Approval</button>
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#approval-tab">Approval <span class="badge bg-secondary ms-1" id="tab-approval-count">0</span></button>
             </li>
         </ul>
 
@@ -1801,7 +1855,7 @@
                                         <th>Product</th>
                                         <th>Category</th>
                                         <th>Expected Harvest</th>
-                                        <th>Reservation Progress</th>
+                                        <th>Reserved Full</th>
                                         <th>Status</th>
                                         <th class="col-actions">Actions</th>
                                     </tr>
@@ -2087,6 +2141,10 @@
                         <i class="bi bi-chat-dots"></i>
                         Conversations
                     </h3>
+                    <div class="support-search-wrap">
+                        <i class="bi bi-search support-search-icon"></i>
+                        <input type="text" id="admin-chat-search-input" class="support-search-input" placeholder="Search conversations…" autocomplete="off">
+                    </div>
                 </div>
                 <div id="conversation-list" class="conversation-list"></div>
                 <div id="chat-empty-state" class="text-center py-5" style="display:none">
@@ -2822,211 +2880,225 @@
     </div>
 </aside>
 
-<!-- MODAL: ADD PRODUCT TYPE SELECTION -->
+<!-- MODAL: ADD PRODUCT (Unified) -->
 <div id="add-product-modal" class="modal">
-    <div class="modal-content" style="max-width:640px;">
+    <div class="modal-content" style="max-width:900px;">
         <div class="modal-header">
             <h3><i class="bi bi-plus-circle-fill me-2 text-success"></i>Add Product</h3>
             <button class="close-btn" id="close-add-product-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <div class="modal-body" style="padding:1.5rem;">
-            <h5 class="mb-3">What type of product do you want to add?</h5>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <div class="card h-100 cursor-pointer product-type-card" data-product-type="available" id="product-type-available">
-                        <div class="card-body text-center py-4">
-                            <i class="bi bi-box-seam-fill text-success mb-2" style="font-size:2rem;"></i>
-                            <h6 class="fw-bold">Available Now</h6>
-                            <p class="small text-muted mb-0">Your available stocks ready for sale</p>
+        <form id="add-product-form" class="product-form" style="padding:1.5rem;overflow-y:auto;max-height:calc(90vh - 140px);">
+            <!-- SECTION 1: SELLING MODE SELECTION -->
+            <div class="mb-4">
+                <h5 class="mb-2 fw-bold"><i class="bi bi-shop me-2 text-primary"></i>Selling Mode</h5>
+                <p class="text-muted small mb-3">Choose how you want customers to purchase this product. Select one selling mode.</p>
+                <div class="row g-3" id="selling-mode-cards-row">
+                    <div class="col-md-6" id="selling-mode-available-col">
+                        <div class="card h-100 cursor-pointer selling-mode-card" data-mode="available" id="selling-mode-available">
+                            <div class="card-body py-3">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <div class="text-center">
+                                        <h6 class="fw-bold mb-1" style="color:#198754;"><i class="bi bi-box-seam-fill me-2"></i>Available Now</h6>
+                                        <p class="small text-muted mb-0">Sell immediately using your current stock.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6" id="selling-mode-preorder-col">
+                        <div class="card h-100 cursor-pointer selling-mode-card" data-mode="preorder" id="selling-mode-preorder">
+                            <div class="card-body py-3">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <div class="text-center">
+                                        <h6 class="fw-bold mb-1" style="color:#fd7e14;"><i class="bi bi-calendar-check-fill me-2"></i>Pre-order</h6>
+                                        <p class="small text-muted mb-0">Allow customers to reserve before harvest.</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="card h-100 cursor-pointer product-type-card" data-product-type="preorder" id="product-type-preorder">
-                        <div class="card-body text-center py-4">
-                            <i class="bi bi-calendar-check-fill text-primary mb-2" style="font-size:2rem;"></i>
-                            <h6 class="fw-bold">Pre-orders</h6>
-                            <p class="small text-muted mb-0">Reserve future harvests for customers</p>
-                        </div>
-                    </div>
-                </div>
+                <input type="hidden" id="add-product-type" value="">
             </div>
-            <div id="product-type-warning" class="alert alert-warning mt-3" style="display:none;">
-                <i class="bi bi-exclamation-triangle me-1"></i>
-                <span id="product-type-warning-text"></span>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- MODAL: ADD AVAILABLE NOW PRODUCT -->
-<div id="add-available-modal" class="modal" data-no-close-on-backdrop="true">
-    <div class="modal-content" style="max-width:640px;">
-        <div class="modal-header">
-            <h3><i class="bi bi-plus-circle-fill me-2 text-success"></i>Add Available Now Product</h3>
-            <button class="close-btn" id="close-add-available-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
-        </div>
-        <form id="add-available-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(85vh - 120px);">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="available-category">Category <span class="text-danger">*</span></label>
-                    <div class="custom-select-field">
-                        <div class="custom-select-input-wrap">
-                            <input type="text" id="available-category" class="form-control form-control-sm" placeholder="Select category" autocomplete="off" readonly required>
-                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
+            <!-- SECTION 2: PRODUCT INFORMATION (Hidden until selling mode is selected) -->
+            <div class="mb-4" id="product-information-section" style="display:none;">
+                <h5 class="mb-3 fw-bold"><i class="bi bi-info-circle me-2 text-primary"></i>Product Information</h5>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="product-category">Category <span class="text-danger">*</span></label>
+                        <div class="custom-select-field">
+                            <div class="custom-select-input-wrap">
+                                <input type="text" id="product-category" class="form-control form-control-sm" placeholder="Select category" autocomplete="off" readonly required>
+                                <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
+                            </div>
+                            <div id="product-category-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Category options"></div>
                         </div>
-                        <div id="available-category-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Category options"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-name">Product Name <span class="text-danger">*</span></label>
+                        <div class="product-name-field">
+                            <div class="product-name-input-wrap">
+                                <input type="text" id="product-name" class="form-control form-control-sm"
+                                       placeholder="Choose a category first" autocomplete="off" disabled required>
+                                <i class="bi bi-chevron-down pn-chevron" aria-hidden="true"></i>
+                            </div>
+                            <div id="product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product suggestions"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:0.3;">
+                        <label for="product-unit">Unit</label>
+                        <input type="text" id="product-unit" class="form-control form-control-sm" value="kg" readonly>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="product-price">Price (&#8369;) <span class="text-danger">*</span></label>
+                        <input type="number" id="product-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
+                        <small id="product-price-suggestion" class="field-hint">Suggested price: --</small>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="available-name">Product Name <span class="text-danger">*</span></label>
-                    <div class="product-name-field">
-                        <div class="product-name-input-wrap">
-                            <input type="text" id="available-name" class="form-control form-control-sm"
-                                   placeholder="Choose a category first" autocomplete="off" disabled required>
-                            <i class="bi bi-chevron-down pn-chevron" aria-hidden="true"></i>
+                    <label for="product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
+                    <div style="display:flex;gap:.5rem;align-items:center;">
+                        <textarea id="product-location-display" class="form-control form-control-sm" rows="2" placeholder="Auto-filled from shop address — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
+                        <button type="button" id="open-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
+                            <i class="bi bi-geo-alt me-1"></i>Set Location
+                        </button>
+                    </div>
+                    <input type="hidden" id="product-location">
+                </div>
+            </div>
+
+            <!-- SECTION 3: DYNAMIC SELLING DETAILS -->
+            <div id="selling-details-section" style="display:none;">
+                <!-- Empty State -->
+                <div id="selling-mode-empty" class="alert alert-info text-center py-4" style="display:none;">
+                    <span class="fw-medium">Choose a selling mode to continue.</span>
+                </div>
+
+                <!-- Available Details -->
+                <div class="card mb-3" id="available-details" style="display:none;">
+                    <div class="card-header py-2 bg-light">
+                        <h6 class="mb-0 small fw-semibold" style="color:#198754;"><i class="bi bi-box-seam-fill me-2"></i>Available Details</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="available-stock">Current Stock <span class="text-danger">*</span></label>
+                                <input type="number" id="available-stock" class="form-control form-control-sm" name="stock_quantity" min="0">
+                                <small class="field-hint">Current available inventory (0 = Out of Stock)</small>
+                                <small id="available-stock-unit-display" class="field-hint text-muted" style="display:none;"></small>
+                            </div>
+                            <div class="form-group">
+                                <label for="available-expiry">Best Before (Optional)</label>
+                                <input type="date" id="available-expiry" class="form-control form-control-sm" name="expiry_date" min="">
+                                <small class="field-hint">Best before date (must be after today)</small>
+                            </div>
                         </div>
-                        <div id="available-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product suggestions"></div>
+                        <div class="form-group">
+                            <label for="available-description">Available Description</label>
+                            <textarea id="available-description" class="form-control form-control-sm" rows="3" maxlength="500"
+                                      placeholder="Describe the harvested product customers will receive immediately."></textarea>
+                            <small class="text-muted" style="font-size:0.75rem;">Describe the harvested product customers will receive immediately.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="available-image">Available Product Image <span class="text-danger">*</span></label>
+                            <div class="image-upload-wrapper">
+                                <input type="file" id="available-image" class="form-control form-control-sm" name="available_image" accept="image/*">
+                                <small class="text-muted" style="font-size:0.75rem;">Upload a clear photo of the harvested product</small>
+                                <small class="text-success" style="font-size:0.7rem;">Please use actual product images for better customer trust and sales</small>
+                                <div id="available-image-preview" class="image-preview mt-2" style="min-height:80px;border:2px dashed #dee2e6;border-radius:6px;display:flex;align-items:center;justify-content:center;background:#f8f9fa;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pre-order Details -->
+                <div class="card mb-3" id="preorder-details" style="display:none;">
+                    <div class="card-header py-2 bg-light">
+                        <h6 class="mb-0 small fw-semibold" style="color:#fd7e14;"><i class="bi bi-calendar-check-fill me-2"></i>Pre-order Details</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="preorder-max-quantity">Reservation Capacity <span class="text-danger">*</span></label>
+                                <input type="number" id="preorder-max-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1">
+                                <small class="field-hint">Maximum number of reservations allowed (in units)</small>
+                                <small id="preorder-max-quantity-unit-display" class="field-hint text-muted" style="display:none;"></small>
+                            </div>
+                            <div class="form-group">
+                                <label for="preorder-harvest-date">Expected Harvest Date <span class="text-danger">*</span></label>
+                                <input type="date" id="preorder-harvest-date" class="form-control form-control-sm" name="preorder_availability_date" min="">
+                                <small class="field-hint">When will this harvest be ready? (must be after today)</small>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="preorder-description">Pre-order Description</label>
+                            <textarea id="preorder-description" class="form-control form-control-sm" rows="3" maxlength="500"
+                                      placeholder="Describe the expected harvest or important information before harvesting."></textarea>
+                            <small class="text-muted" style="font-size:0.75rem;">Describe the expected harvest or important information before harvesting.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="preorder-image">Pre-order Product Image <span class="text-danger">*</span></label>
+                            <div class="image-upload-wrapper">
+                                <input type="file" id="preorder-image" class="form-control form-control-sm" name="preorder_image" accept="image/*">
+                                <small class="text-muted" style="font-size:0.75rem;">Upload a photo of the growing crop or expected harvest</small>
+                                <small class="text-success" style="font-size:0.7rem;">Please use actual product images for better customer trust and sales</small>
+                                <div id="preorder-image-preview" class="image-preview mt-2" style="min-height:80px;border:2px dashed #dee2e6;border-radius:6px;display:flex;align-items:center;justify-content:center;background:#f8f9fa;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group" style="flex:0.3;">
-                    <label for="available-unit">Unit</label>
-                    <input type="text" id="available-unit" class="form-control form-control-sm" value="kg" readonly>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label for="available-price">Price (&#8369;) <span class="text-danger">*</span></label>
-                    <input type="number" id="available-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
-                    <small id="available-price-suggestion" class="field-hint">Suggested price: --</small>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label for="available-stock">Stock Quantity <span class="text-danger">*</span></label>
-                    <input type="number" id="available-stock" class="form-control form-control-sm" name="stock_quantity" min="0" required>
-                    <small class="field-hint">Current available inventory (0 = Out of Stock)</small>
-                    <small id="available-stock-unit-display" class="field-hint text-muted" style="display:none;"></small>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label for="available-expiry">Best Before (Optional)</label>
-                    <input type="date" id="available-expiry" class="form-control form-control-sm" name="expiry_date" min="">
-                    <small class="field-hint">Best before date (must be after today)</small>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="available-description">Description</label>
-                <textarea id="available-description" class="form-control form-control-sm" rows="3" maxlength="500"
-                          placeholder="Describe your fresh product..."></textarea>
-            </div>
-            <div class="form-group">
-                <label for="available-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
-                <div style="display:flex;gap:.5rem;align-items:center;">
-                    <textarea id="available-location-display" class="form-control form-control-sm" rows="2" placeholder="Auto-filled from shop address — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
-                    <button type="button" id="open-available-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
-                        <i class="bi bi-geo-alt me-1"></i>Set Location
-                    </button>
-                </div>
-                <input type="hidden" id="available-location">
-            </div>
-            <div class="form-group">
-                <label for="available-image">Product Image <span class="text-danger">*</span></label>
-                <input type="file" id="available-image" class="form-control form-control-sm" name="image" accept="image/*" required>
-                <small class="field-hint">Upload a clear, well-lit photo of your product.</small>
-                <div id="available-image-preview" class="image-preview"></div>
-            </div>
+
             <div class="alert alert-info" style="font-size:0.85rem;padding:0.6rem 0.85rem;margin-bottom:0;">
                 <i class="bi bi-info-circle me-1"></i><strong>Delivery Responsibility:</strong> You are responsible for delivering your products to customers.
             </div>
         </form>
-        <div class="modal-footer">
-            <button type="submit" form="add-available-form" id="add-available-submit-btn" class="btn btn-sm btn-primary">
+        <div class="modal-footer" id="add-product-modal-footer" style="justify-content: space-between;">
+            <button type="button" id="cancel-add-product-modal" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-x-lg me-1"></i>Cancel
+            </button>
+            <button type="submit" form="add-product-form" id="add-product-submit-btn" class="btn btn-sm btn-primary" disabled>
                 <i class="bi bi-cloud-upload me-1"></i>Submit
             </button>
         </div>
     </div>
 </div>
 
-<!-- MODAL: ADD PRE-ORDER PRODUCT -->
-<div id="add-preorder-modal" class="modal" data-no-close-on-backdrop="true">
-    <div class="modal-content" style="max-width:640px;">
+<!-- MODAL: PRODUCT SUBMISSION CONFIRMATION -->
+<div id="product-confirmation-modal" class="modal">
+    <div class="modal-content" style="max-width:500px;">
         <div class="modal-header">
-            <h3><i class="bi bi-calendar-check-fill me-2 text-primary"></i>Add Pre-order Product</h3>
-            <button class="close-btn" id="close-add-preorder-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+            <h3><i class="bi bi-check-circle-fill me-2 text-success"></i>Submit Product</h3>
+            <button class="close-btn" id="close-confirmation-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
-        <form id="add-preorder-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;max-height:calc(85vh - 120px);">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="preorder-category">Category <span class="text-danger">*</span></label>
-                    <div class="custom-select-field">
-                        <div class="custom-select-input-wrap">
-                            <input type="text" id="preorder-category" class="form-control form-control-sm" placeholder="Select category" autocomplete="off" readonly required>
-                            <i class="bi bi-chevron-down cs-chevron" aria-hidden="true"></i>
-                        </div>
-                        <div id="preorder-category-dropdown" class="custom-select-dropdown" role="listbox" aria-label="Category options"></div>
+        <div class="modal-body" style="padding:1.5rem;">
+            <div class="mb-3">
+                <label class="fw-bold text-muted small">Product</label>
+                <div id="confirmation-product-name" class="fs-5 fw-bold">--</div>
+            </div>
+            <div class="mb-3">
+                <label class="fw-bold text-muted small">Selling Modes</label>
+                <div id="confirmation-selling-modes">
+                    <div id="conf-available-mode" style="display:none;">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>Available Now
                     </div>
-                </div>
-                <div class="form-group">
-                    <label for="preorder-name">Product Name <span class="text-danger">*</span></label>
-                    <div class="product-name-field">
-                        <div class="product-name-input-wrap">
-                            <input type="text" id="preorder-name" class="form-control form-control-sm"
-                                   placeholder="Choose a category first" autocomplete="off" disabled required>
-                            <i class="bi bi-chevron-down pn-chevron" aria-hidden="true"></i>
-                        </div>
-                        <div id="preorder-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product suggestions"></div>
+                    <div id="conf-preorder-mode" style="display:none;">
+                        <i class="bi bi-check-circle-fill text-warning me-2"></i>Pre-order
                     </div>
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group" style="flex:0.3;">
-                    <label for="preorder-unit">Unit</label>
-                    <input type="text" id="preorder-unit" class="form-control form-control-sm" value="kg" readonly>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label for="preorder-price">Price (&#8369;) <span class="text-danger">*</span></label>
-                    <input type="number" id="preorder-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
-                    <small id="preorder-price-suggestion" class="field-hint">Suggested price: --</small>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label for="preorder-max-quantity">Maximum Reservation Quantity <span class="text-danger">*</span></label>
-                    <input type="number" id="preorder-max-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1" required>
-                    <small class="field-hint">Maximum number of reservations allowed (in units)</small>
-                    <small id="preorder-max-quantity-unit-display" class="field-hint text-muted" style="display:none;"></small>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label for="preorder-harvest-date">Expected Harvest Date <span class="text-danger">*</span></label>
-                    <input type="date" id="preorder-harvest-date" class="form-control form-control-sm" name="preorder_availability_date" min="">
-                    <small class="field-hint">When will this harvest be ready? (must be after today)</small>
-                </div>
+            <div class="alert alert-info" style="font-size:0.9rem;">
+                <i class="bi bi-info-circle me-1"></i>This product listing will be submitted for Admin approval.
             </div>
-            <div class="form-group">
-                <label for="preorder-description">Description</label>
-                <textarea id="preorder-description" class="form-control form-control-sm" rows="3" maxlength="500"
-                          placeholder="Describe your fresh product..."></textarea>
-            </div>
-            <div class="form-group">
-                <label for="preorder-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
-                <div style="display:flex;gap:.5rem;align-items:center;">
-                    <textarea id="preorder-location-display" class="form-control form-control-sm" rows="2" placeholder="Auto-filled from shop address — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
-                    <button type="button" id="open-preorder-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
-                        <i class="bi bi-geo-alt me-1"></i>Set Location
-                    </button>
-                </div>
-                <input type="hidden" id="preorder-location">
-            </div>
-            <div class="form-group">
-                <label for="preorder-image">Product Image <span class="text-danger">*</span></label>
-                <input type="file" id="preorder-image" class="form-control form-control-sm" name="image" accept="image/*" required>
-                <small class="field-hint">Upload a clear, well-lit photo of your product.</small>
-                <div id="preorder-image-preview" class="image-preview"></div>
-            </div>
-            <div class="alert alert-info" style="font-size:0.85rem;padding:0.6rem 0.85rem;margin-bottom:0;">
-                <i class="bi bi-info-circle me-1"></i><strong>Delivery Responsibility:</strong> You are responsible for delivering your products to customers.
-            </div>
-        </form>
+        </div>
         <div class="modal-footer">
-            <button type="submit" form="add-preorder-form" id="add-preorder-submit-btn" class="btn btn-sm btn-primary">
-                <i class="bi bi-cloud-upload me-1"></i>Submit
+            <button type="button" id="cancel-confirmation-btn" class="btn btn-sm btn-secondary">Cancel</button>
+            <button type="button" id="confirm-submit-btn" class="btn btn-sm btn-primary">
+                <i class="bi bi-cloud-upload me-1"></i>Submit Product
             </button>
         </div>
     </div>
@@ -3034,7 +3106,7 @@
 
 <!-- MODAL: EDIT PRODUCT -->
 <div id="edit-product-modal" class="modal">
-    <div class="modal-content" style="max-width:640px;display:flex;flex-direction:column;max-height:90vh;">
+    <div class="modal-content" style="max-width:900px;display:flex;flex-direction:column;max-height:90vh;">
         <div class="modal-header">
             <h3 id="edit-product-modal-title"><i class="bi bi-pencil-square me-2 text-primary"></i>Edit Product</h3>
             <button class="close-btn" aria-label="Close"><i class="bi bi-x-lg"></i></button>
@@ -3044,88 +3116,136 @@
             <strong>Admin Disabled</strong>
             <p class="mb-0 small mt-1">This product has been disabled by an administrator. Contact support for assistance.</p>
         </div>
-        <form id="edit-product-form" class="product-form" style="padding:1rem 1.25rem;overflow-y:auto;flex:1;">
+        <form id="edit-product-form" class="product-form" style="padding:1.25rem;overflow-y:auto;flex:1;">
             <input type="hidden" id="edit-product-id">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="edit-product-category">Category <span class="text-danger">*</span></label>
-                    <div class="custom-select-field">
-                        <div class="custom-select-input-wrap">
-                            <input type="text" id="edit-product-category" class="form-control form-control-sm" placeholder="Select category" autocomplete="off" readonly required>
-                            <i class="bi bi-chevron-down cs-chevron" style="display:none;" aria-hidden="true"></i>
+            
+            <!-- Product Information Section -->
+            <div class="card mb-3">
+                <div class="card-header py-2 bg-light">
+                    <h6 class="mb-0 small fw-semibold"><i class="bi bi-info-circle me-2"></i>Product Information</h6>
+                </div>
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label for="edit-product-category" class="form-label small fw-semibold">Category <span class="text-danger">*</span></label>
+                            <div class="custom-select-field">
+                                <div class="custom-select-input-wrap">
+                                    <input type="text" id="edit-product-category" class="form-control form-control-sm" placeholder="Select category" autocomplete="off" readonly required>
+                                    <i class="bi bi-chevron-down cs-chevron" style="display:none;" aria-hidden="true"></i>
+                                </div>
+                                <div id="edit-product-category-dropdown" class="custom-select-dropdown" style="display:none;" role="listbox" aria-label="Category options"></div>
+                            </div>
                         </div>
-                        <div id="edit-product-category-dropdown" class="custom-select-dropdown" style="display:none;" role="listbox" aria-label="Category options"></div>
+                        <div class="form-group" style="flex:1;">
+                            <label for="edit-product-name" class="form-label small fw-semibold">Product Name <span class="text-danger">*</span></label>
+                            <div class="product-name-field">
+                                <div class="product-name-input-wrap">
+                                    <input type="text" id="edit-product-name" class="form-control form-control-sm" placeholder="Product name" autocomplete="off" readonly required>
+                                    <i class="bi bi-chevron-down pn-chevron" style="display:none;" aria-hidden="true"></i>
+                                </div>
+                                <div id="edit-product-name-suggestions" class="product-name-dropdown" style="display:none;" role="listbox" aria-label="Product suggestions"></div>
+                            </div>
+                        </div>
+                        <div class="form-group" style="flex:0.3;">
+                            <label for="edit-product-unit" class="form-label small fw-semibold">Unit</label>
+                            <input type="text" id="edit-product-unit" class="form-control form-control-sm" value="kg" readonly>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label for="edit-price" class="form-label small fw-semibold">Price (₱) <span class="text-danger">*</span></label>
+                            <input type="number" id="edit-price" class="form-control form-control-sm" name="price" min="0" step="0.01" required>
+                        </div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="edit-product-name">Product Name <span class="text-danger">*</span></label>
-                    <div class="product-name-field">
-                        <div class="product-name-input-wrap">
-                            <input type="text" id="edit-product-name" class="form-control form-control-sm" placeholder="Product name" autocomplete="off" readonly required>
-                            <i class="bi bi-chevron-down pn-chevron" style="display:none;" aria-hidden="true"></i>
+            </div>
+
+            <!-- Available Now Section -->
+            <div class="card mb-3" id="edit-available-section">
+                <div class="card-header py-2 bg-light">
+                    <h6 class="mb-0 small fw-semibold"><i class="bi bi-box-seam-fill me-2 text-success"></i>Available Now</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label for="edit-stock-quantity" class="form-label small fw-semibold">Stock Quantity <span class="text-danger">*</span></label>
+                            <input type="number" id="edit-stock-quantity" class="form-control form-control-sm" name="stock_quantity" min="0">
+                            <small class="text-muted" style="font-size:0.7rem;">Current available inventory (0 = Out of Stock)</small>
                         </div>
-                        <div id="edit-product-name-suggestions" class="product-name-dropdown" style="display:none;" role="listbox" aria-label="Product suggestions"></div>
+                        <div class="col-md-6">
+                            <label for="edit-expiry-date" class="form-label small fw-semibold">Best Before (Optional)</label>
+                            <input type="date" id="edit-expiry-date" class="form-control form-control-sm" name="expiry_date" min="">
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label for="edit-available-description" class="form-label small fw-semibold">Available Description</label>
+                        <textarea id="edit-available-description" class="form-control form-control-sm" rows="2" maxlength="500" placeholder="Describe the harvested product customers will receive immediately."></textarea>
+                        <small class="text-muted" style="font-size:0.7rem;">Describe the harvested product customers will receive immediately.</small>
                     </div>
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group" style="flex:0.3;">
-                    <label for="edit-product-unit">Unit</label>
-                    <input type="text" id="edit-product-unit" class="form-control form-control-sm" value="kg" readonly>
+
+            <!-- Pre-order Section -->
+            <div class="card mb-3" id="edit-preorder-section" style="display:none;">
+                <div class="card-header py-2 bg-light">
+                    <h6 class="mb-0 small fw-semibold"><i class="bi bi-calendar-check-fill me-2 text-warning"></i>Pre-order</h6>
                 </div>
-                <div class="form-group" style="flex:1;" id="edit-price-group">
-                    <label for="edit-price">Price (₱) <span class="text-danger">*</span></label>
-                    <input type="number" id="edit-price" class="form-control form-control-sm" name="price" min="0" step="0.01" required>
-                    <small class="field-hint">Price per unit</small>
-                </div>
-                <div class="form-group" style="flex:1;" id="edit-available-stock-group">
-                    <label for="edit-stock-quantity">Stock Quantity <span class="text-danger">*</span></label>
-                    <input type="number" id="edit-stock-quantity" class="form-control form-control-sm" name="stock_quantity" min="0" required>
-                    <small class="field-hint">Current available inventory (0 = Out of Stock)</small>
-                    <small id="edit-stock-quantity-unit-display" class="field-hint text-muted" style="display:none;"></small>
-                </div>
-                <div class="form-group" style="flex:1;" id="edit-available-expiry-group">
-                    <label for="edit-expiry-date">Best Before (Optional)</label>
-                    <input type="date" id="edit-expiry-date" class="form-control form-control-sm" name="expiry_date" min="">
-                    <small class="field-hint">Best before date</small>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group" style="flex:1;" id="edit-preorder-quantity-group" style="display:none;">
-                    <label for="edit-max-preorder-quantity">Maximum Reservation Quantity <span class="text-danger">*</span></label>
-                    <input type="number" id="edit-max-preorder-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1">
-                    <small class="field-hint">Maximum number of reservations allowed (in units)</small>
-                    <small id="edit-max-preorder-quantity-unit-display" class="field-hint text-muted" style="display:none;"></small>
-                </div>
-                <div class="form-group" style="flex:1;" id="edit-preorder-date-group" style="display:none;">
-                    <label for="edit-preorder-availability-date">Expected Harvest Date <span class="text-danger">*</span></label>
-                    <input type="date" id="edit-preorder-availability-date" class="form-control form-control-sm" name="preorder_availability_date" min="">
-                    <small class="field-hint">When will this harvest be ready?</small>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label for="edit-max-preorder-quantity" class="form-label small fw-semibold">Max Reservation Quantity <span class="text-danger">*</span></label>
+                            <input type="number" id="edit-max-preorder-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1">
+                            <small class="text-muted" style="font-size:0.7rem;">Maximum reservations allowed (in units)</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit-preorder-availability-date" class="form-label small fw-semibold">Expected Harvest Date <span class="text-danger">*</span></label>
+                            <input type="date" id="edit-preorder-availability-date" class="form-control form-control-sm" name="preorder_availability_date" min="">
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label for="edit-preorder-description" class="form-label small fw-semibold">Pre-order Description</label>
+                        <textarea id="edit-preorder-description" class="form-control form-control-sm" rows="2" maxlength="500" placeholder="Describe the expected harvest or important information before harvesting."></textarea>
+                        <small class="text-muted" style="font-size:0.7rem;">Describe the expected harvest or important information before harvesting.</small>
+                    </div>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="edit-product-description">Description</label>
-                <textarea id="edit-product-description" class="form-control form-control-sm" rows="3" maxlength="500"
-                          placeholder="Describe your fresh product..."></textarea>
-            </div>
-            <div class="form-group">
-                <label for="edit-product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
-                <div style="display:flex;gap:.5rem;align-items:center;">
-                    <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
-                    <button type="button" id="open-edit-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
-                        <i class="bi bi-geo-alt me-1"></i>Set Location
-                    </button>
+
+            <!-- Location Section -->
+            <div class="card mb-3">
+                <div class="card-header py-2 bg-light">
+                    <h6 class="mb-0 small fw-semibold"><i class="bi bi-geo-alt me-2"></i>Farm / Pick-up Location</h6>
+                </div>
+                <div class="card-body">
+                    <div style="display:flex;gap:.5rem;align-items:flex-start;">
+                        <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
+                        <button type="button" id="open-edit-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;margin-top:0;">
+                            <i class="bi bi-geo-alt me-1"></i>Set Location
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="edit-product-image">Product Image</label>
-                <input type="file" id="edit-product-image" class="form-control form-control-sm" name="image" accept="image/*">
-                <small class="field-hint">Leave empty to keep the current image.</small>
-                <div id="edit-product-image-preview" class="image-preview"></div>
+
+            <!-- Image Section (shared) -->
+            <div class="card mb-3" id="edit-image-section">
+                <div class="card-header py-2 bg-light">
+                    <h6 class="mb-0 small fw-semibold"><i class="bi bi-image me-2"></i>Product Image</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mt-2">
+                        <label for="edit-product-image" class="form-label small fw-semibold">Product Image</label>
+                        <div class="image-upload-wrapper">
+                            <input type="file" id="edit-product-image" class="form-control form-control-sm" name="available_image" accept="image/*">
+                            <small class="text-muted" style="font-size:0.7rem;">Leave empty to keep current image</small>
+                            <small class="text-success" style="font-size:0.7rem;">Please use actual product images for better customer trust and sales</small>
+                            <div id="edit-product-image-preview" class="image-preview mt-2" style="min-height:80px;border:2px dashed #dee2e6;border-radius:6px;display:flex;align-items:center;justify-content:center;background:#f8f9fa;"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </form>
         <div class="modal-footer gap-2" style="padding:.75rem 1.25rem;border-top:1px solid #e2e8f0;background:#fff;flex-shrink:0;">
-            <button type="button" id="edit-toggle-status-btn" class="btn btn-sm btn-danger" style="display:none;">Disable Product</button>
+            <button type="button" id="edit-toggle-status-btn" class="btn btn-sm btn-danger" style="display:none;">Make Unavailable</button>
+            <button type="button" id="edit-update-harvest-date-btn" class="btn btn-sm btn-outline-secondary" style="display:none;">
+                <i class="bi bi-calendar-event me-1"></i>Update Harvest Date
+            </button>
             <button type="button" id="edit-harvest-fulfill-btn" class="btn btn-sm btn-success" style="display:none;">
                 <i class="bi bi-box-seam me-1"></i>Harvest & Fulfill
             </button>
@@ -3136,51 +3256,68 @@
     </div>
 </div>
 
-<!-- MODAL: HARVEST & FULFILL PRE-ORDERS -->
+<!-- MODAL: HARVEST LIFECYCLE CONFIRMATION -->
+<div id="harvest-lifecycle-modal" class="modal">
+    <div class="modal-content" style="max-width:520px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-box-seam me-2 text-success"></i>Harvest Completed</h3>
+            <button class="close-btn" id="close-harvest-lifecycle-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body" style="padding:1.5rem;">
+            <div class="form-group mb-3">
+                <label for="harvest-lifecycle-quantity" class="fw-semibold">How many kilograms did you harvest? <span class="text-danger">*</span></label>
+                <input type="number" id="harvest-lifecycle-quantity" class="form-control form-control-sm" min="1" placeholder="Enter harvested quantity">
+            </div>
+
+            <div class="alert alert-info mb-3" style="font-size:0.9rem;padding:0.85rem;">
+                <div class="fw-bold mb-2">Would you like to make this harvest available for immediate selling?</div>
+                <div class="small text-muted mb-2">If YES, the system will automatically create an Available product (or transfer to an existing one) with the harvested stock.</div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="button" id="harvest-lifecycle-no-btn" class="btn btn-sm btn-outline-secondary flex-1">
+                    <i class="bi bi-x-circle me-1"></i>NO
+                </button>
+                <button type="button" id="harvest-lifecycle-yes-btn" class="btn btn-sm btn-success flex-1">
+                    <i class="bi bi-check-circle me-1"></i>YES
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: HARVEST & FULFILL PRE-ORDERS (LEGACY - kept for backward compatibility) -->
 <div id="harvest-fulfill-modal" class="modal">
     <div class="modal-content" style="max-width:520px;">
         <div class="modal-header">
-            <h3><i class="bi bi-box-seam me-2 text-success"></i>Harvest & Fulfill Pre-orders</h3>
+            <h3><i class="bi bi-box-seam me-2 text-success"></i>Harvest & Fulfill</h3>
             <button class="close-btn" id="close-harvest-fulfill-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body" style="padding:1.5rem;">
-            <p class="small text-muted mb-3">Enter the total harvested quantity. The system will first fulfill existing pre-order reservations, then add any surplus to your Available Now stock.</p>
-
-            <div class="row g-2 mb-3">
-                <div class="col-6">
-                    <div class="card border-0 bg-light">
-                        <div class="card-body py-2 text-center">
-                            <div class="small text-muted">Reserved Pre-orders</div>
-                            <div class="fw-bold fs-5" id="harvest-modal-reserved-qty">0</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6">
-                    <div class="card border-0 bg-light">
-                        <div class="card-body py-2 text-center">
-                            <div class="small text-muted">Remaining Slots</div>
-                            <div class="fw-bold fs-5" id="harvest-modal-remaining-qty">0</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="form-group mb-3">
-                <label for="harvest-fulfill-quantity" class="fw-semibold">Total Harvested Quantity <span class="text-danger">*</span></label>
-                <input type="number" id="harvest-fulfill-quantity" class="form-control form-control-sm" min="1" placeholder="Enter total harvested units">
-                <small class="field-hint">Must be at least the reserved quantity to fully fulfill pre-orders.</small>
+                <label for="harvest-fulfill-quantity" class="fw-semibold">How many kilograms did you harvest today? <span class="text-danger">*</span></label>
+                <input type="number" id="harvest-fulfill-quantity" class="form-control form-control-sm" min="1" placeholder="Enter harvested quantity">
             </div>
 
-            <div id="harvest-fulfill-preview" class="alert alert-info small mb-0" style="display:none;font-size:0.85rem;padding:0.75rem;">
-                <div class="mb-1"><strong>Preview:</strong></div>
-                <div class="d-flex justify-content-between"><span>Fulfill pre-orders:</span><strong id="preview-fulfill-qty">0</strong></div>
-                <div class="d-flex justify-content-between"><span>Surplus to stock:</span><strong id="preview-surplus-qty">0</strong></div>
-                <div class="d-flex justify-content-between"><span>Shortage:</span><strong id="preview-shortage-qty">0</strong></div>
+            <div id="harvest-fulfill-summary" class="alert alert-info small mb-0" style="display:none;font-size:0.85rem;padding:0.75rem;">
+                <div class="mb-2 fw-bold">System Summary</div>
+                <div class="d-flex justify-content-between mb-1"><span>Reserved Orders:</span><strong id="summary-reserved-qty">0 kg</strong></div>
+                <div class="d-flex justify-content-between mb-2"><span>Available Now Inventory after Harvest:</span><strong id="summary-available-qty">0 kg</strong></div>
+                <div class="border-top pt-2 mt-2">
+                    <div class="small text-muted mb-1">The system will:</div>
+                    <div class="small"><i class="bi bi-check-circle-fill text-success me-1"></i>Fulfill all reserved pre-orders.</div>
+                    <div class="small"><i class="bi bi-check-circle-fill text-success me-1"></i>Automatically add the remaining harvest to your Available Now inventory.</div>
+                </div>
+            </div>
+
+            <div id="harvest-fulfill-warning" class="alert alert-warning small mb-0 mt-2" style="display:none;font-size:0.85rem;padding:0.75rem;">
+                <div class="fw-bold text-danger mb-1">Harvest quantity is not enough.</div>
+                <div class="small">You still need <strong id="warning-needed-qty">0 kg</strong> to fulfill existing reservations.</div>
             </div>
         </div>
         <div class="modal-footer">
             <button type="button" id="cancel-harvest-fulfill-btn" class="btn btn-sm btn-secondary">Cancel</button>
-            <button type="button" id="confirm-harvest-fulfill-btn" class="btn btn-sm btn-success">Confirm Harvest & Fulfill</button>
+            <button type="button" id="confirm-harvest-fulfill-btn" class="btn btn-sm btn-success">Complete Harvest</button>
         </div>
     </div>
 </div>
@@ -3189,16 +3326,42 @@
 <div id="disable-confirm-modal" class="modal">
     <div class="modal-content" style="max-width:480px;">
         <div class="modal-header">
-            <h3 id="toggle-status-modal-title"><i class="bi bi-x-circle-fill me-2 text-danger"></i>Disable Product</h3>
+            <h3 id="toggle-status-modal-title"><i class="bi bi-x-circle-fill me-2 text-danger"></i>Make Unavailable</h3>
             <button class="close-btn" id="close-disable-confirm-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="modal-body" style="padding:1.5rem;">
-            <p id="toggle-status-modal-message" class="mb-0">This product will no longer be visible to customers.</p>
-            <p class="mb-0 mt-2">You can enable it again later.</p>
+            <p id="toggle-status-modal-message" class="mb-0">Make this product unavailable? This product will no longer appear in the customer marketplace and cannot receive new orders. Existing customer orders and deliveries will continue normally and will not be affected. You can make this product available again at any time.</p>
         </div>
         <div class="modal-footer">
             <button type="button" id="cancel-disable-btn" class="btn btn-sm btn-secondary">Cancel</button>
-            <button type="button" id="confirm-disable-btn" class="btn btn-sm btn-danger">Disable Product</button>
+            <button type="button" id="confirm-disable-btn" class="btn btn-sm btn-danger">Make Unavailable</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: UPDATE EXPECTED HARVEST DATE -->
+<div id="update-harvest-date-modal" class="modal">
+    <div class="modal-content" style="max-width:500px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-calendar-check me-2 text-primary"></i>Update Expected Harvest Date</h3>
+            <button class="close-btn" id="close-update-harvest-date-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <form id="update-harvest-date-form" style="padding:1rem 1.25rem;">
+            <input type="hidden" id="update-harvest-product-id">
+            <div class="form-group mb-3">
+                <label for="update-harvest-date">New Expected Harvest Date <span class="text-danger">*</span></label>
+                <input type="date" id="update-harvest-date" class="form-control" required>
+                <small class="text-muted">Date must be today or in the future</small>
+            </div>
+            <div class="form-group mb-3">
+                <label for="update-harvest-reason">Reason <span class="text-danger">*</span></label>
+                <textarea id="update-harvest-reason" class="form-control" rows="3" required placeholder="Please explain why you need to update the harvest date"></textarea>
+                <small class="text-muted">This will be recorded for audit purposes</small>
+            </div>
+        </form>
+        <div class="modal-footer">
+            <button type="button" id="cancel-update-harvest-date-btn" class="btn btn-sm btn-secondary">Cancel</button>
+            <button type="submit" form="update-harvest-date-form" id="confirm-update-harvest-date-btn" class="btn btn-sm btn-primary">Update Harvest Date</button>
         </div>
     </div>
 </div>

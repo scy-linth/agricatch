@@ -615,121 +615,40 @@ class FarmerDashboard {
         document.documentElement.classList.add('modal-open');
         document.body.classList.add('modal-open');
 
-        // Enable both product type cards - farmers can add multiple products
-        const availableCard = document.getElementById('product-type-available');
-        const preorderCard = document.getElementById('product-type-preorder');
-        const warningDiv = document.getElementById('product-type-warning');
+        // Reset form
+        document.getElementById('add-product-form').reset();
 
-        if (availableCard) {
-            availableCard.classList.remove('disabled');
-            availableCard.style.opacity = '1';
-            availableCard.style.pointerEvents = 'auto';
-        }
+        // Reset selling mode card styles
+        const productTypeInput = document.getElementById('add-product-type');
+        if (productTypeInput) productTypeInput.value = '';
+        document.querySelectorAll('.selling-mode-card').forEach(card => {
+            card.classList.remove('border-success', 'border-warning', 'bg-success-subtle', 'bg-warning-subtle');
+        });
 
-        if (preorderCard) {
-            preorderCard.classList.remove('disabled');
-            preorderCard.style.opacity = '1';
-            preorderCard.style.pointerEvents = 'auto';
-        }
+        // Reset dynamic sections
+        this.updateSellingDetailsSection();
 
-        // Hide warning
-        if (warningDiv) {
-            warningDiv.style.display = 'none';
-        }
-    }
+        // Reset submit button
+        const submitBtn = document.getElementById('add-product-submit-btn');
+        if (submitBtn) submitBtn.disabled = true;
 
-    selectProductType(productType) {
-        // Close the selection modal
-        this.closeAddProductModal();
-
-        // Open the appropriate modal based on product type
-        if (productType === 'available') {
-            this.openAddAvailableModal();
-        } else if (productType === 'preorder') {
-            this.openAddPreorderModal();
-        }
-    }
-
-    async openAddAvailableModal() {
-        this.debugLog('Modal Open', { modal: 'add-available-modal' });
-        const modal = document.getElementById('add-available-modal');
-        if (!modal) return;
-        
-        // Set min date to tomorrow for expiry date
+        // Set min dates
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowStr = tomorrow.toISOString().split('T')[0];
         const expiryInput = document.getElementById('available-expiry');
-        if (expiryInput) {
-            expiryInput.min = tomorrowStr;
-        }
-        
-        modal.classList.add('open');
-        document.documentElement.classList.add('modal-open');
-        document.body.classList.add('modal-open');
-
-        // Auto-fill location from shop address if empty
-        const shopLocation = this.currentShopProfile?.location || '';
-        const locationDisplay = document.getElementById('available-location-display');
-        const locationInput = document.getElementById('available-location');
-        if (locationDisplay && !locationDisplay.value) {
-            locationDisplay.value = shopLocation;
-        }
-        if (locationInput && !locationInput.value) {
-            locationInput.value = shopLocation;
-        }
-
-        await this.loadCategories();
-        await this.loadProductCatalogNames();
-
-        // Load feature flags and update button text
-        await this.loadFeatureFlags();
-        const requireApproval = this.featureFlags.require_product_approval === true;
-        const submitBtn = document.getElementById('add-available-submit-btn');
-        if (submitBtn) {
-            if (requireApproval) {
-                submitBtn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Submit for Approval';
-            } else {
-                submitBtn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Submit';
-            }
-        }
-    }
-
-    closeAddAvailableModal() {
-        this.debugLog('Modal Close', { modal: 'add-available-modal' });
-        const modal = document.getElementById('add-available-modal');
-        if (!modal) return;
-        modal.classList.remove('open');
-        document.documentElement.classList.remove('modal-open');
-        document.body.classList.remove('modal-open');
-    }
-
-    async openAddPreorderModal() {
-        this.debugLog('Modal Open', { modal: 'add-preorder-modal' });
-        const modal = document.getElementById('add-preorder-modal');
-        if (!modal) return;
-        
-        // Set min date to tomorrow for harvest date
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
         const harvestInput = document.getElementById('preorder-harvest-date');
-        if (harvestInput) {
-            harvestInput.min = tomorrowStr;
-        }
-        
-        modal.classList.add('open');
-        document.documentElement.classList.add('modal-open');
-        document.body.classList.add('modal-open');
+        if (expiryInput) expiryInput.min = tomorrowStr;
+        if (harvestInput) harvestInput.min = tomorrowStr;
 
-        // Auto-fill location from shop address if empty
-        const shopLocation = this.currentShopProfile?.location || '';
-        const locationDisplay = document.getElementById('preorder-location-display');
-        const locationInput = document.getElementById('preorder-location');
-        if (locationDisplay && !locationDisplay.value) {
+        // Auto-fill location from shop address as default
+        const shopLocation = this.currentShopProfile?.location || this.authProfile?.address || '';
+        const locationDisplay = document.getElementById('product-location-display');
+        const locationInput = document.getElementById('product-location');
+        if (locationDisplay) {
             locationDisplay.value = shopLocation;
         }
-        if (locationInput && !locationInput.value) {
+        if (locationInput) {
             locationInput.value = shopLocation;
         }
 
@@ -739,7 +658,6 @@ class FarmerDashboard {
         // Load feature flags and update button text
         await this.loadFeatureFlags();
         const requireApproval = this.featureFlags.require_product_approval === true;
-        const submitBtn = document.getElementById('add-preorder-submit-btn');
         if (submitBtn) {
             if (requireApproval) {
                 submitBtn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Submit for Approval';
@@ -749,13 +667,650 @@ class FarmerDashboard {
         }
     }
 
-    closeAddPreorderModal() {
-        this.debugLog('Modal Close', { modal: 'add-preorder-modal' });
-        const modal = document.getElementById('add-preorder-modal');
+    async loadPreviousProductValues(productName, isPreorder) {
+        try {
+            const isPreorderParam = isPreorder ? 'true' : 'false';
+            const response = await fetch(`${this.apiBase}/products/previous-values?name=${encodeURIComponent(productName)}&is_preorder=${isPreorderParam}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.values) {
+                    this.fillAddProductForm(data.values, isPreorder);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading previous values:', error);
+        }
+    }
+
+    fillAddProductForm(values, isPreorder) {
+        // Fill price
+        const priceInput = document.getElementById('product-price');
+        if (priceInput && values.price) {
+            priceInput.value = values.price;
+        }
+
+        // Fill location
+        const locationInput = document.getElementById('product-location');
+        const locationDisplay = document.getElementById('product-location-display');
+        if (locationInput && values.location) {
+            locationInput.value = values.location;
+        }
+        if (locationDisplay && values.location) {
+            locationDisplay.value = values.location;
+        }
+
+        // Fill city and province
+        const cityInput = document.getElementById('product-city');
+        const provinceInput = document.getElementById('product-province');
+        if (cityInput && values.city) {
+            cityInput.value = values.city;
+        }
+        if (provinceInput && values.province) {
+            provinceInput.value = values.province;
+        }
+
+        if (isPreorder) {
+            // Fill pre-order description
+            const descInput = document.getElementById('preorder-description');
+            if (descInput && values.description) {
+                descInput.value = values.description;
+            }
+
+            // Fill max quantity
+            const maxQtyInput = document.getElementById('preorder-max-quantity');
+            if (maxQtyInput && values.max_preorder_quantity) {
+                maxQtyInput.value = values.max_preorder_quantity;
+            }
+
+            // Fill harvest date
+            const harvestDateInput = document.getElementById('preorder-harvest-date');
+            if (harvestDateInput && values.preorder_availability_date) {
+                harvestDateInput.value = values.preorder_availability_date;
+            }
+
+            // Show previous image preview
+            if (values.image_url) {
+                const previewDiv = document.getElementById('preorder-image-preview');
+                if (previewDiv) {
+                    previewDiv.innerHTML = `<img src="${values.image_url}" alt="Previous product image" style="max-width: 100%; max-height: 200px; object-fit: cover;">`;
+                    previewDiv.style.display = 'block';
+                }
+                // Store previous image URL for submit logic
+                const imageInput = document.getElementById('preorder-image');
+                if (imageInput) {
+                    imageInput.dataset.previousImageUrl = values.image_url;
+                }
+            }
+        } else {
+            // Fill available description
+            const descInput = document.getElementById('available-description');
+            if (descInput && values.description) {
+                descInput.value = values.description;
+            }
+
+            // Fill expiry date
+            const expiryInput = document.getElementById('available-expiry');
+            if (expiryInput && values.expiry_date) {
+                expiryInput.value = values.expiry_date;
+            }
+
+            // Show previous image preview
+            if (values.image_url) {
+                const previewDiv = document.getElementById('available-image-preview');
+                if (previewDiv) {
+                    previewDiv.innerHTML = `<img src="${values.image_url}" alt="Previous product image" style="max-width: 100%; max-height: 200px; object-fit: cover;">`;
+                    previewDiv.style.display = 'block';
+                }
+                // Store previous image URL for submit logic
+                const imageInput = document.getElementById('available-image');
+                if (imageInput) {
+                    imageInput.dataset.previousImageUrl = values.image_url;
+                }
+            }
+        }
+    }
+
+    selectProductType(productType) {
+        // This function is no longer needed with the unified modal
+        // Selling modes are now handled via checkboxes in the single modal
+    }
+
+    updateSellingDetailsSection() {
+        const availableCard = document.getElementById('selling-mode-available');
+        const preorderCard = document.getElementById('selling-mode-preorder');
+        const availableCol = document.getElementById('selling-mode-available-col');
+        const preorderCol = document.getElementById('selling-mode-preorder-col');
+        const productTypeInput = document.getElementById('add-product-type');
+        const productInfoSection = document.getElementById('product-information-section');
+        const sellingDetailsSection = document.getElementById('selling-details-section');
+        const emptyState = document.getElementById('selling-mode-empty');
+        const availableDetails = document.getElementById('available-details');
+        const preorderDetails = document.getElementById('preorder-details');
+        const locationSection = document.getElementById('location-section');
+        const submitBtn = document.getElementById('add-product-submit-btn');
+        const modalFooter = document.getElementById('add-product-modal-footer');
+
+        const availableEnabled = availableCard?.classList.contains('border-success') || false;
+        const preorderEnabled = preorderCard?.classList.contains('border-warning') || false;
+
+        // Update hidden input with selected type
+        if (productTypeInput) {
+            if (availableEnabled) {
+                productTypeInput.value = 'available';
+            } else if (preorderEnabled) {
+                productTypeInput.value = 'preorder';
+            } else {
+                productTypeInput.value = '';
+            }
+        }
+
+        // Update card styles
+        if (availableCard) {
+            availableCard.classList.remove('border-success', 'border-warning', 'bg-success-subtle', 'bg-warning-subtle');
+            if (availableEnabled) {
+                availableCard.classList.add('border-success', 'bg-success-subtle');
+            }
+        }
+        if (preorderCard) {
+            preorderCard.classList.remove('border-success', 'border-warning', 'bg-success-subtle', 'bg-warning-subtle');
+            if (preorderEnabled) {
+                preorderCard.classList.add('border-warning', 'bg-warning-subtle');
+            }
+        }
+
+        // Show/hide selling mode cards: when one is selected, hide the other
+        if (availableCol) availableCol.style.display = (availableEnabled || !preorderEnabled) ? '' : 'none';
+        if (preorderCol) preorderCol.style.display = (preorderEnabled || !availableEnabled) ? '' : 'none';
+        // When a mode is selected, make the selected card take full width
+        if (availableCol) availableCol.classList.toggle('col-md-12', availableEnabled && !preorderEnabled);
+        if (availableCol) availableCol.classList.toggle('col-md-6', !availableEnabled || preorderEnabled);
+        if (preorderCol) preorderCol.classList.toggle('col-md-12', preorderEnabled && !availableEnabled);
+        if (preorderCol) preorderCol.classList.toggle('col-md-6', !preorderEnabled || availableEnabled);
+
+        // Show/hide sections based on selection
+        if (!availableEnabled && !preorderEnabled) {
+            // No mode selected - hide everything
+            if (productInfoSection) productInfoSection.style.display = 'none';
+            if (sellingDetailsSection) sellingDetailsSection.style.display = 'none';
+            if (submitBtn) submitBtn.disabled = true;
+            if (modalFooter) modalFooter.style.display = 'none';
+        } else {
+            // Mode selected - show product info and selling details
+            if (productInfoSection) productInfoSection.style.display = 'block';
+            if (sellingDetailsSection) sellingDetailsSection.style.display = 'block';
+            if (emptyState) emptyState.style.display = 'none';
+            if (availableDetails) availableDetails.style.display = availableEnabled ? 'block' : 'none';
+            if (preorderDetails) preorderDetails.style.display = preorderEnabled ? 'block' : 'none';
+            if (locationSection) locationSection.style.display = (availableEnabled || preorderEnabled) ? 'block' : 'none';
+            if (submitBtn) submitBtn.disabled = false;
+            if (modalFooter) modalFooter.style.display = 'flex';
+        }
+
+        // Refresh product name suggestions with new type filter, but don't auto-open dropdown
+        const wasOpen = document.getElementById('product-name-suggestions')?.classList.contains('open');
+        this.renderProductNameSuggestions('add', true);
+        if (!wasOpen) {
+            const list = document.getElementById('product-name-suggestions');
+            if (list) list.classList.remove('open');
+        }
+    }
+
+    closeConfirmationModal() {
+        const modal = document.getElementById('product-confirmation-modal');
         if (!modal) return;
         modal.classList.remove('open');
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
+    }
+
+    async handleAddProduct(e) {
+        this.debugLog('Form Submit', { form: 'add-product-form' });
+        e.preventDefault();
+
+        if (this.isSubmittingAddProduct) {
+            return;
+        }
+
+        const validation = this.validateUnifiedProductForm();
+
+        if (!validation.valid) {
+            this.showMessage(validation.errors.join(', '), 'error');
+            return;
+        }
+
+        // Show confirmation modal
+        this.showConfirmationModal();
+    }
+
+    showConfirmationModal() {
+        const productName = document.getElementById('product-name').value;
+        const availableCard = document.getElementById('selling-mode-available');
+        const preorderCard = document.getElementById('selling-mode-preorder');
+
+        const productNameEl = document.getElementById('confirmation-product-name');
+        const confAvailableMode = document.getElementById('conf-available-mode');
+        const confPreorderMode = document.getElementById('conf-preorder-mode');
+
+        if (productNameEl) {
+            productNameEl.textContent = productName;
+        }
+        if (confAvailableMode) {
+            confAvailableMode.style.display = availableCard?.classList.contains('border-success') ? 'block' : 'none';
+        }
+        if (confPreorderMode) {
+            confPreorderMode.style.display = preorderCard?.classList.contains('border-warning') ? 'block' : 'none';
+        }
+
+        const modal = document.getElementById('product-confirmation-modal');
+        if (modal) {
+            modal.classList.add('open');
+            document.documentElement.classList.add('modal-open');
+            document.body.classList.add('modal-open');
+        }
+    }
+
+    async confirmProductSubmission() {
+        this.closeConfirmationModal();
+
+        if (this.isSubmittingAddProduct) {
+            return;
+        }
+
+        const submitBtn = document.getElementById('add-product-submit-btn');
+        const originalSubmitText = submitBtn ? submitBtn.innerHTML : '';
+        this.isSubmittingAddProduct = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Adding...';
+        }
+
+        try {
+            const availableCard = document.getElementById('selling-mode-available');
+            const preorderCard = document.getElementById('selling-mode-preorder');
+            const availableEnabled = availableCard?.classList.contains('border-success') || false;
+            const preorderEnabled = preorderCard?.classList.contains('border-warning') || false;
+
+            // Get common product info
+            const name = document.getElementById('product-name').value;
+            const categoryInput = document.getElementById('product-category');
+            const category_id = categoryInput?.dataset.value || categoryInput?.value;
+            const category_name = categoryInput?.selectedOptions?.[0]?.text || '';
+            const unitInput = document.getElementById('product-unit');
+            const unit = unitInput?.value || 'kg';
+            const locationDisplay = document.getElementById('product-location-display');
+            const location = locationDisplay?.value || document.getElementById('product-location').value;
+            const price = document.getElementById('product-price').value;
+
+            // Get description - use available description if available, otherwise use common description
+            const availableDescription = document.getElementById('available-description')?.value || '';
+            const preorderDescription = document.getElementById('preorder-description')?.value || '';
+            const commonDescription = document.getElementById('product-description')?.value || '';
+            
+            // For now, use the available description or common description (single description field constraint)
+            const description = availableDescription || preorderDescription || commonDescription;
+
+            if (Number(price) < 0) {
+                throw new Error('Price must be zero or higher.');
+            }
+
+            // Submit based on selected selling mode (single selection)
+            if (availableEnabled) {
+                // Submit available only
+                await this.submitAvailableProduct(name, description, category_id, category_name, unit, location, price);
+            } else if (preorderEnabled) {
+                // Submit preorder only
+                await this.submitPreorderProduct(name, description, category_id, category_name, unit, location, price);
+            } else {
+                throw new Error('Please select a selling mode');
+            }
+
+            this.closeAddProductModal(true);
+            this.loadMyProducts();
+            // Show approval-specific message if image was submitted for approval
+            const imageFile = document.getElementById('available-image').files[0] || document.getElementById('preorder-image').files[0];
+            if (this.featureFlags.require_product_approval === true && imageFile) {
+                this.showMessage('Product submitted for approval. Your product will be visible once approved.', 'success');
+            } else {
+                this.showMessage('Product added successfully!', 'success');
+            }
+        } catch (error) {
+            console.error('Add product error:', error);
+            this.showMessage(error.message || 'Failed to add product. Please try again.', 'error');
+        } finally {
+            this.isSubmittingAddProduct = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalSubmitText;
+            }
+        }
+    }
+
+    async submitAvailableProduct(name, description, category_id, category_name, unit, location, price) {
+        const stock_quantity = document.getElementById('available-stock').value;
+        const expiryDate = document.getElementById('available-expiry').value || '';
+
+        if (Number(stock_quantity) < 0) {
+            throw new Error('Stock quantity must be zero or higher.');
+        }
+
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('description', description);
+        formData.append('price', price);
+        formData.append('category_id', category_id);
+        formData.append('unit', unit);
+        formData.append('location', location);
+        formData.append('stock_quantity', stock_quantity);
+        if (expiryDate) formData.append('expiry_date', expiryDate);
+        formData.append('is_preorder', 'false');
+        formData.append('is_available', 'true');
+
+        // Check if there's a previous image URL to reuse
+        const imageInput = document.getElementById('available-image');
+        const previousImageUrl = imageInput?.dataset.previousImageUrl || '';
+        if (previousImageUrl) {
+            formData.append('image_url', previousImageUrl);
+        }
+
+        const response = await fetch(`${this.apiBase}/products`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${this.token}` },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to add available product');
+        }
+
+        const data = await response.json();
+
+        // Upload image only if a new file is selected
+        let imageUrl = '';
+        let imagePublicId = '';
+        const imageFile = document.getElementById('available-image').files[0];
+        if (imageFile) {
+            const uploaded = await this.uploadProductImage(imageFile, {
+                name,
+                category_id,
+                category_name,
+                product_id: data.product.id
+            });
+            imageUrl = uploaded.imageUrl || '';
+            imagePublicId = uploaded.public_id || '';
+
+            const updateFormData = new FormData();
+            updateFormData.append('image_url', imageUrl);
+            updateFormData.append('cloudinary_public_id', imagePublicId);
+
+            const updateResponse = await fetch(`${this.apiBase}/products/${data.product.id}`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${this.token}` },
+                body: updateFormData
+            });
+
+            if (!updateResponse.ok) {
+                console.error('Failed to update product image:', await updateResponse.json());
+            }
+        }
+    }
+
+    async submitPreorderProduct(name, description, category_id, category_name, unit, location, price) {
+        const maxQuantity = document.getElementById('preorder-max-quantity').value;
+        const harvestDate = document.getElementById('preorder-harvest-date').value;
+
+        if (Number(maxQuantity) < 1) {
+            throw new Error('Reservation capacity must be at least 1.');
+        }
+
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('description', description);
+        formData.append('price', price);
+        formData.append('category_id', category_id);
+        formData.append('unit', unit);
+        formData.append('location', location);
+        formData.append('max_preorder_quantity', maxQuantity);
+        formData.append('preorder_availability_date', harvestDate);
+        formData.append('is_preorder', 'true');
+        formData.append('is_available', 'false');
+
+        // Check if there's a previous image URL to reuse
+        const imageInput = document.getElementById('preorder-image');
+        const previousImageUrl = imageInput?.dataset.previousImageUrl || '';
+        if (previousImageUrl) {
+            formData.append('image_url', previousImageUrl);
+        }
+
+        const response = await fetch(`${this.apiBase}/products`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${this.token}` },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to add pre-order product');
+        }
+
+        const data = await response.json();
+
+        // Upload image only if a new file is selected
+        let imageUrl = '';
+        let imagePublicId = '';
+        const imageFile = document.getElementById('preorder-image').files[0];
+        if (imageFile) {
+            const uploaded = await this.uploadProductImage(imageFile, {
+                name,
+                category_id,
+                category_name,
+                product_id: data.product.id
+            });
+            imageUrl = uploaded.imageUrl || '';
+            imagePublicId = uploaded.public_id || '';
+
+            const updateFormData = new FormData();
+            updateFormData.append('image_url', imageUrl);
+            updateFormData.append('cloudinary_public_id', imagePublicId);
+
+            const updateResponse = await fetch(`${this.apiBase}/products/${data.product.id}`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${this.token}` },
+                body: updateFormData
+            });
+
+            if (!updateResponse.ok) {
+                console.error('Failed to update product image:', await updateResponse.json());
+            }
+        }
+    }
+
+    async submitHybridProduct(name, description, category_id, unit, location, price) {
+        // First create the base product
+        const stock_quantity = document.getElementById('available-stock').value;
+        const expiryDate = document.getElementById('available-expiry').value || '';
+        const maxQuantity = document.getElementById('preorder-max-quantity').value;
+        const harvestDate = document.getElementById('preorder-harvest-date').value;
+
+        if (Number(stock_quantity) < 0) {
+            throw new Error('Stock quantity must be zero or higher.');
+        }
+        if (Number(maxQuantity) < 1) {
+            throw new Error('Reservation capacity must be at least 1.');
+        }
+
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('description', description);
+        formData.append('price', price);
+        formData.append('category_id', category_id);
+        formData.append('unit', unit);
+        formData.append('location', location);
+        formData.append('stock_quantity', stock_quantity);
+        if (expiryDate) formData.append('expiry_date', expiryDate);
+        formData.append('max_preorder_quantity', maxQuantity);
+        formData.append('preorder_availability_date', harvestDate);
+        formData.append('is_available', 'true');
+
+        const response = await fetch(`${this.apiBase}/products`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${this.token}` },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to add hybrid product');
+        }
+
+        const data = await response.json();
+
+        // Upload available image
+        const availableImageFile = document.getElementById('available-image').files[0];
+        if (availableImageFile) {
+            const uploaded = await this.uploadProductImage(availableImageFile, {
+                name,
+                category_id,
+                category_name: categoryInput?.selectedOptions?.[0]?.text || '',
+                product_id: data.product.id
+            });
+            
+            const updateFormData = new FormData();
+            updateFormData.append('image_url', uploaded.imageUrl || '');
+            updateFormData.append('cloudinary_public_id', uploaded.public_id || '');
+
+            await fetch(`${this.apiBase}/products/${data.product.id}`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${this.token}` },
+                body: updateFormData
+            });
+        }
+
+        // Upload preorder image (if different)
+        const preorderImageFile = document.getElementById('preorder-image').files[0];
+        if (preorderImageFile && preorderImageFile !== availableImageFile) {
+            const uploaded = await this.uploadProductImage(preorderImageFile, {
+                name,
+                category_id,
+                category_name: categoryInput?.selectedOptions?.[0]?.text || '',
+                product_id: data.product.id
+            });
+            
+            const updateFormData = new FormData();
+            updateFormData.append('preorder_image_url', uploaded.imageUrl || '');
+            updateFormData.append('preorder_cloudinary_public_id', uploaded.public_id || '');
+
+            await fetch(`${this.apiBase}/products/${data.product.id}`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${this.token}` },
+                body: updateFormData
+            });
+        }
+    }
+
+    validateUnifiedProductForm() {
+        const form = document.getElementById('add-product-form');
+        if (!form) return { valid: false, errors: ['Form not found'] };
+
+        const errors = [];
+        const availableCard = document.getElementById('selling-mode-available');
+        const preorderCard = document.getElementById('selling-mode-preorder');
+        const availableEnabled = availableCard?.classList.contains('border-success') || false;
+        const preorderEnabled = preorderCard?.classList.contains('border-warning') || false;
+
+        if (!availableEnabled && !preorderEnabled) {
+            errors.push('Please select a selling mode');
+        }
+
+        // Validate common fields
+        const category = document.getElementById('product-category');
+        const name = document.getElementById('product-name');
+        const price = document.getElementById('product-price');
+        const location = document.getElementById('product-location-display');
+
+        if (!category || !category.value || category.value.trim() === '') {
+            if (category) category.classList.add('is-invalid');
+            errors.push('Category is required');
+        } else {
+            if (category) category.classList.remove('is-invalid');
+        }
+
+        if (!name || !name.value || name.value.trim() === '') {
+            if (name) name.classList.add('is-invalid');
+            errors.push('Product name is required');
+        } else {
+            if (name) name.classList.remove('is-invalid');
+        }
+
+        if (!price || !price.value || price.value.trim() === '' || Number(price.value) < 0) {
+            if (price) price.classList.add('is-invalid');
+            errors.push('Price is required and must be zero or higher');
+        } else {
+            if (price) price.classList.remove('is-invalid');
+        }
+
+        if (!location || !location.value || location.value.trim() === '') {
+            if (location) location.classList.add('is-invalid');
+            errors.push('Farm / Pick-up Location is required');
+        } else {
+            if (location) location.classList.remove('is-invalid');
+        }
+
+        // Validate available-specific fields
+        if (availableEnabled) {
+            const stock = document.getElementById('available-stock');
+            const availableImage = document.getElementById('available-image');
+
+            if (!stock || !stock.value || stock.value.trim() === '' || Number(stock.value) < 0) {
+                if (stock) stock.classList.add('is-invalid');
+                errors.push('Current Stock is required and must be zero or higher');
+            } else {
+                if (stock) stock.classList.remove('is-invalid');
+            }
+
+            // TEMPORARY: Bypass image validation for testing automatic reuse of previous values
+            if (!availableImage || !availableImage.files || availableImage.files.length === 0) {
+                // if (availableImage) availableImage.classList.add('is-invalid');
+                // errors.push('Available Product Image is required');
+            } else {
+                if (availableImage) availableImage.classList.remove('is-invalid');
+            }
+        }
+
+        // Validate preorder-specific fields
+        if (preorderEnabled) {
+            const maxQuantity = document.getElementById('preorder-max-quantity');
+            const harvestDate = document.getElementById('preorder-harvest-date');
+            const preorderImage = document.getElementById('preorder-image');
+
+            if (!maxQuantity || !maxQuantity.value || maxQuantity.value.trim() === '' || Number(maxQuantity.value) < 1) {
+                if (maxQuantity) maxQuantity.classList.add('is-invalid');
+                errors.push('Reservation Capacity is required and must be at least 1');
+            } else {
+                if (maxQuantity) maxQuantity.classList.remove('is-invalid');
+            }
+
+            if (!harvestDate || !harvestDate.value || harvestDate.value.trim() === '') {
+                if (harvestDate) harvestDate.classList.add('is-invalid');
+                errors.push('Expected Harvest Date is required');
+            } else {
+                if (harvestDate) harvestDate.classList.remove('is-invalid');
+            }
+
+            // Temporarily bypass image validation for testing
+            // if (!preorderImage || !preorderImage.files || preorderImage.files.length === 0) {
+            //     if (preorderImage) preorderImage.classList.add('is-invalid');
+            //     errors.push('Pre-order Product Image is required');
+            // } else {
+            //     if (preorderImage) preorderImage.classList.remove('is-invalid');
+            // }
+            if (preorderImage) preorderImage.classList.remove('is-invalid');
+        }
+
+        return { valid: errors.length === 0, errors };
     }
 
     setupNonNegativeInputs() {
@@ -797,6 +1352,26 @@ class FarmerDashboard {
         modal.classList.remove('open');
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
+        
+        // Reset form to clear product name and prevent dropdown appearing on tab switch
+        document.getElementById('add-product-form').reset();
+        
+        // Reset selling mode card styles
+        const productTypeInput = document.getElementById('add-product-type');
+        if (productTypeInput) productTypeInput.value = '';
+        document.querySelectorAll('.selling-mode-card').forEach(card => {
+            card.classList.remove('border-success', 'border-warning', 'bg-success-subtle', 'bg-warning-subtle');
+        });
+        
+        // Reset dynamic sections
+        this.updateSellingDetailsSection();
+        
+        // Hide product name suggestions dropdown
+        const suggestionsList = document.getElementById('product-name-suggestions');
+        if (suggestionsList) {
+            suggestionsList.classList.remove('open');
+            suggestionsList.innerHTML = '';
+        }
     }
 
     async handleSubmitRequestForm(e) {
@@ -866,22 +1441,24 @@ class FarmerDashboard {
                 }
                 listEl.innerHTML = rows.map(r => {
                         const status = String(r.status || 'pending');
-                        const statusClass = status === 'approved' ? 'badge badge-success' : status === 'rejected' ? 'badge badge-danger' : 'badge badge-secondary';
+                        const statusClass = status === 'approved' ? 'badge bg-success' : status === 'rejected' ? 'badge bg-danger' : 'badge bg-secondary';
                         const cat = this.escapeAttr(r.category_name || r.requested_category_name || 'Uncategorized');
                         const when = new Date(r.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                         const note = this.escapeAttr(r.notes || '');
                         const review = this.escapeAttr(r.review_notes || '');
                         return `
-                            <div class="overview-list-item request-history-item" style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
-                                <div style="flex:1;">
-                                    <div style="font-size:0.92rem;color:var(--text-secondary);">Product Name: <strong style="color:var(--text-primary);">${this.escapeAttr(r.name)}</strong></div>
-                                    <div style="font-size:0.92rem;color:var(--text-secondary);">Product Category: <strong style="color:var(--text-primary);">${cat}</strong></div>
-                                    <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.2rem;">${when}</div>
-                                    ${note ? `<div style="margin-top:0.35rem;color:var(--text-muted);">${note}</div>` : ''}
-                                    ${review ? `<div style="margin-top:0.35rem;color:var(--text-muted);font-style:italic;">Review: ${review}</div>` : ''}
-                                </div>
-                                <div style="margin-left:0.75rem;white-space:nowrap;align-self:flex-start;">
-                                    <span class="${statusClass}" style="padding:6px 8px;border-radius:12px;font-weight:700;">${status}</span>
+                            <div class="card mb-2" style="border:1px solid #e2e8f0;">
+                                <div class="card-body py-2 px-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <div class="fw-semibold small">${this.escapeAttr(r.name)}</div>
+                                            <div class="text-muted small">${cat}</div>
+                                        </div>
+                                        <span class="${statusClass}">${status}</span>
+                                    </div>
+                                    <div class="small text-muted mb-1">${when}</div>
+                                    ${note ? `<div class="small text-muted" style="font-style:italic;">"${note}"</div>` : ''}
+                                    ${review ? `<div class="small text-primary mt-1"><strong>Admin Review:</strong> ${review}</div>` : ''}
                                 </div>
                             </div>
                         `;
@@ -1520,6 +2097,32 @@ class FarmerDashboard {
             closeHarvestFulfillModal();
         });
 
+        // Harvest Lifecycle modal (new YES/NO confirmation)
+        const harvestLifecycleModal = document.getElementById('harvest-lifecycle-modal');
+        const closeHarvestLifecycleModal = () => {
+            if (harvestLifecycleModal) harvestLifecycleModal.classList.remove('open');
+            document.getElementById('harvest-lifecycle-quantity').value = '';
+        };
+        document.getElementById('close-harvest-lifecycle-modal')?.addEventListener('click', closeHarvestLifecycleModal);
+        document.getElementById('harvest-lifecycle-no-btn')?.addEventListener('click', () => {
+            const productId = document.getElementById('harvest-lifecycle-no-btn').dataset.productId;
+            const quantityInput = document.getElementById('harvest-lifecycle-quantity');
+            const quantity = parseInt(quantityInput?.value || '0', 10);
+            if (productId && quantity > 0) {
+                this.handleHarvestLifecycle(productId, quantity, false);
+            }
+            closeHarvestLifecycleModal();
+        });
+        document.getElementById('harvest-lifecycle-yes-btn')?.addEventListener('click', () => {
+            const productId = document.getElementById('harvest-lifecycle-yes-btn').dataset.productId;
+            const quantityInput = document.getElementById('harvest-lifecycle-quantity');
+            const quantity = parseInt(quantityInput?.value || '0', 10);
+            if (productId && quantity > 0) {
+                this.handleHarvestLifecycle(productId, quantity, true);
+            }
+            closeHarvestLifecycleModal();
+        });
+
         // Disable confirmation modal
         document.getElementById('close-disable-confirm-modal')?.addEventListener('click', () => {
             document.getElementById('disable-confirm-modal').classList.remove('open');
@@ -1531,7 +2134,7 @@ class FarmerDashboard {
             const productId = document.getElementById('confirm-disable-btn').dataset.productId;
             const confirmBtn = document.getElementById('confirm-disable-btn');
             if (productId && confirmBtn) {
-                const isDisabling = confirmBtn.textContent === 'Disable Product';
+                const isDisabling = confirmBtn.textContent === 'Disable Product' || confirmBtn.textContent === 'Make Unavailable';
                 if (isDisabling) {
                     this.handleDisableProduct(productId);
                 } else {
@@ -1552,33 +2155,30 @@ class FarmerDashboard {
                     return;
                 }
                 
-                const isDisabling = toggleStatusBtn.textContent === 'Disable Product';
+                const isMakingUnavailable = toggleStatusBtn.textContent === 'Make Unavailable';
                 const modalTitle = document.getElementById('toggle-status-modal-title');
                 const modalMessage = document.getElementById('toggle-status-modal-message');
                 const confirmBtn = document.getElementById('confirm-disable-btn');
                 
-                if (isDisabling) {
-                    modalTitle.innerHTML = '<i class="bi bi-x-circle-fill me-2 text-danger"></i>Disable Product';
-                    modalMessage.textContent = 'This product will no longer be visible to customers.';
-                    confirmBtn.textContent = 'Disable Product';
-                    confirmBtn.classList.remove('btn-success');
-                    confirmBtn.classList.add('btn-danger');
+                if (isMakingUnavailable) {
+                    modalTitle.innerHTML = '<i class="bi bi-x-circle-fill me-2 text-danger"></i>Make Unavailable';
+                    modalMessage.textContent = 'Make this product unavailable? This product will no longer appear in the customer marketplace and cannot receive new orders. Existing customer orders and deliveries will continue normally and will not be affected. You can make this product available again at any time.';
+                    confirmBtn.textContent = 'Make Unavailable';
                 } else {
-                    modalTitle.innerHTML = '<i class="bi bi-check-circle-fill me-2 text-success"></i>Enable Product';
-                    modalMessage.textContent = 'This product will be visible to customers again.';
-                    confirmBtn.textContent = 'Enable Product';
+                    modalTitle.innerHTML = '<i class="bi bi-check-circle-fill me-2 text-success"></i>Make Available';
+                    modalMessage.textContent = 'Make this product available? It will appear in the customer marketplace and can receive new orders.';
+                    confirmBtn.textContent = 'Make Available';
                     confirmBtn.classList.remove('btn-danger');
                     confirmBtn.classList.add('btn-success');
                 }
                 
-                document.getElementById('confirm-disable-btn').dataset.productId = productId;
+                confirmBtn.dataset.productId = productId;
+                confirmBtn.dataset.action = isMakingUnavailable ? 'disable' : 'enable';
                 document.getElementById('disable-confirm-modal').classList.add('open');
             }
         });
 
-
-        document.getElementById('add-available-form')?.addEventListener('submit', (e) => this.handleAddAvailable(e));
-        document.getElementById('add-preorder-form')?.addEventListener('submit', (e) => this.handleAddPreorder(e));
+        document.getElementById('add-product-form')?.addEventListener('submit', (e) => this.handleAddProduct(e));
         document.getElementById('edit-product-form')?.addEventListener('submit', (e) => this.handleEditProduct(e));
         document.getElementById('save-shop-profile-btn')?.addEventListener('click', (e) => this.handleShopProfileUpdate(e));
         document.getElementById('profile-edit-form')?.addEventListener('submit', (e) => {
@@ -2224,9 +2824,13 @@ class FarmerDashboard {
 
         const addProductModal = document.getElementById('add-product-modal');
         const closeAddProductModalBtn = document.getElementById('close-add-product-modal');
+        const cancelAddProductModalBtn = document.getElementById('cancel-add-product-modal');
 
         if (closeAddProductModalBtn) {
             closeAddProductModalBtn.addEventListener('click', () => this.closeAddProductModal());
+        }
+        if (cancelAddProductModalBtn) {
+            cancelAddProductModalBtn.addEventListener('click', () => this.closeAddProductModal());
         }
         if (addProductModal) {
             addProductModal.addEventListener('click', (e) => {
@@ -2236,41 +2840,56 @@ class FarmerDashboard {
             });
         }
 
-        // Available modal event listeners
-        const addAvailableModal = document.getElementById('add-available-modal');
-        const closeAddAvailableBtn = document.getElementById('close-add-available-modal');
-        if (closeAddAvailableBtn) {
-            closeAddAvailableBtn.addEventListener('click', () => this.closeAddAvailableModal());
-        }
-        if (addAvailableModal) {
-            addAvailableModal.addEventListener('click', (e) => {
-                if (e.target === addAvailableModal) {
-                    this.closeAddAvailableModal();
-                }
-            });
-        }
+        // Selling mode card click handlers
+        document.querySelectorAll('.selling-mode-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const mode = card.dataset.mode;
+                const availableCard = document.getElementById('selling-mode-available');
+                const preorderCard = document.getElementById('selling-mode-preorder');
 
-        // Pre-order modal event listeners
-        const addPreorderModal = document.getElementById('add-preorder-modal');
-        const closeAddPreorderBtn = document.getElementById('close-add-preorder-modal');
-        if (closeAddPreorderBtn) {
-            closeAddPreorderBtn.addEventListener('click', () => this.closeAddPreorderModal());
-        }
-        if (addPreorderModal) {
-            addPreorderModal.addEventListener('click', (e) => {
-                if (e.target === addPreorderModal) {
-                    this.closeAddPreorderModal();
-                }
-            });
-        }
+                // Reset both cards
+                availableCard.classList.remove('border-success', 'bg-success-subtle');
+                preorderCard.classList.remove('border-warning', 'bg-warning-subtle');
 
-        // Product type card click handlers
-        document.querySelectorAll('.product-type-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const productType = card.dataset.productType;
-                this.selectProductType(productType);
+                // Set selected card
+                if (mode === 'available') {
+                    availableCard.classList.add('border-success', 'bg-success-subtle');
+                } else if (mode === 'preorder') {
+                    preorderCard.classList.add('border-warning', 'bg-warning-subtle');
+                }
+
+                this.updateSellingDetailsSection();
+                // Trigger auto-load if product name is selected
+                const productName = document.getElementById('product-name').value;
+                if (productName) {
+                    const isPreorder = mode === 'preorder';
+                    this.loadPreviousProductValues(productName, isPreorder);
+                }
             });
         });
+
+        // Confirmation modal event listeners
+        const closeConfirmationBtn = document.getElementById('close-confirmation-modal');
+        const cancelConfirmationBtn = document.getElementById('cancel-confirmation-btn');
+        const confirmSubmitBtn = document.getElementById('confirm-submit-btn');
+        const confirmationModal = document.getElementById('product-confirmation-modal');
+
+        if (closeConfirmationBtn) {
+            closeConfirmationBtn.addEventListener('click', () => this.closeConfirmationModal());
+        }
+        if (cancelConfirmationBtn) {
+            cancelConfirmationBtn.addEventListener('click', () => this.closeConfirmationModal());
+        }
+        if (confirmSubmitBtn) {
+            confirmSubmitBtn.addEventListener('click', () => this.confirmProductSubmission());
+        }
+        if (confirmationModal) {
+            confirmationModal.addEventListener('click', (e) => {
+                if (e.target === confirmationModal) {
+                    this.closeConfirmationModal();
+                }
+            });
+        }
 
         const customerRatingModal = document.getElementById('customer-rating-modal');
         const customerRatingClose = document.getElementById('customer-rating-close');
@@ -2360,18 +2979,23 @@ class FarmerDashboard {
         // Available products filters
         document.getElementById('available-category-filter')?.addEventListener('change', (e) => {
             this.debugLog('Dropdown Change', { element: 'available-category-filter', value: e.target.value });
+            this.saveProductFilters();
             this.filterAvailableProducts();
         });
         document.getElementById('available-status-filter')?.addEventListener('change', (e) => {
             this.debugLog('Dropdown Change', { element: 'available-status-filter', value: e.target.value });
+            this.saveProductFilters();
             this.filterAvailableProducts();
         });
         document.getElementById('available-search-btn')?.addEventListener('click', () => this.filterAvailableProducts());
-        document.getElementById('available-refresh-btn')?.addEventListener('click', () => this.loadMyProducts());
+        document.getElementById('available-refresh-btn')?.addEventListener('click', () => {
+            const searchInput = document.getElementById('available-search-input');
+            if (searchInput) searchInput.value = '';
+            this.filterAvailableProducts();
+        });
         
         const availableSearchInput = document.getElementById('available-search-input');
         if (availableSearchInput) {
-            availableSearchInput.addEventListener('input', () => this.filterAvailableProducts());
             availableSearchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     this.filterAvailableProducts();
@@ -2382,18 +3006,23 @@ class FarmerDashboard {
         // Preorder products filters
         document.getElementById('preorder-category-filter')?.addEventListener('change', (e) => {
             this.debugLog('Dropdown Change', { element: 'preorder-category-filter', value: e.target.value });
+            this.saveProductFilters();
             this.filterPreorderProducts();
         });
         document.getElementById('preorder-status-filter')?.addEventListener('change', (e) => {
             this.debugLog('Dropdown Change', { element: 'preorder-status-filter', value: e.target.value });
+            this.saveProductFilters();
             this.filterPreorderProducts();
         });
         document.getElementById('preorder-search-btn')?.addEventListener('click', () => this.filterPreorderProducts());
-        document.getElementById('preorder-refresh-btn')?.addEventListener('click', () => this.loadMyProducts());
+        document.getElementById('preorder-refresh-btn')?.addEventListener('click', () => {
+            const searchInput = document.getElementById('preorder-search-input');
+            if (searchInput) searchInput.value = '';
+            this.filterPreorderProducts();
+        });
         
         const preorderSearchInput = document.getElementById('preorder-search-input');
         if (preorderSearchInput) {
-            preorderSearchInput.addEventListener('input', () => this.filterPreorderProducts());
             preorderSearchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     this.filterPreorderProducts();
@@ -2416,15 +3045,42 @@ class FarmerDashboard {
         }
         const availableImageInput = document.getElementById('available-image');
         if (availableImageInput) {
-            availableImageInput.addEventListener('change', () => this.previewImage(availableImageInput, 'available-image-preview'));
+            availableImageInput.addEventListener('change', () => {
+                this.previewImage(availableImageInput, 'available-image-preview');
+                // Update submit button text based on Product Approval feature flag and image change
+                if (this.featureFlags.require_product_approval === true) {
+                    const submitBtn = document.querySelector('button[form="add-product-form"]');
+                    if (submitBtn) {
+                        submitBtn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Submit for Approval';
+                    }
+                }
+            });
         }
         const preorderImageInput = document.getElementById('preorder-image');
         if (preorderImageInput) {
-            preorderImageInput.addEventListener('change', () => this.previewImage(preorderImageInput, 'preorder-image-preview'));
+            preorderImageInput.addEventListener('change', () => {
+                this.previewImage(preorderImageInput, 'preorder-image-preview');
+                // Update submit button text based on Product Approval feature flag and image change
+                if (this.featureFlags.require_product_approval === true) {
+                    const submitBtn = document.querySelector('button[form="add-product-form"]');
+                    if (submitBtn) {
+                        submitBtn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Submit for Approval';
+                    }
+                }
+            });
         }
         const editImageInput = document.getElementById('edit-product-image');
         if (editImageInput) {
-            editImageInput.addEventListener('change', () => this.previewImage(editImageInput, 'edit-product-image-preview'));
+            editImageInput.addEventListener('change', () => {
+                this.previewImage(editImageInput, 'edit-product-image-preview');
+                // Update submit button text based on Product Approval feature flag and image change
+                if (this.featureFlags.require_product_approval === true) {
+                    const submitBtn = document.querySelector('button[form="edit-product-form"]');
+                    if (submitBtn) {
+                        submitBtn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Submit for Approval';
+                    }
+                }
+            });
         }
 
         // Add unit display listeners for stock quantity inputs
@@ -2494,10 +3150,8 @@ class FarmerDashboard {
         // Initialize PSGC for product location (shared for add and edit)
         this.initProductPsgc();
 
-        // Product address modal controls (shared for add, available, preorder, and edit)
-        const openAddAddrBtn = document.getElementById('open-add-product-address-modal');
-        const openAvailableAddrBtn = document.getElementById('open-available-address-modal');
-        const openPreorderAddrBtn = document.getElementById('open-preorder-address-modal');
+        // Product address modal controls (shared for add and edit)
+        const openAddAddrBtn = document.getElementById('open-product-address-modal');
         const openEditAddrBtn = document.getElementById('open-edit-product-address-modal');
         const closeAddrBtn = document.getElementById('close-product-address-modal');
         const cancelAddrBtn = document.getElementById('cancel-product-address-modal');
@@ -2572,8 +3226,6 @@ class FarmerDashboard {
         const closeAddrModal = () => addrModal?.classList.remove('open');
 
         if (openAddAddrBtn) openAddAddrBtn.addEventListener('click', () => openAddrModal('product-location-display'));
-        if (openAvailableAddrBtn) openAvailableAddrBtn.addEventListener('click', () => openAddrModal('available-location-display'));
-        if (openPreorderAddrBtn) openPreorderAddrBtn.addEventListener('click', () => openAddrModal('preorder-location-display'));
         if (openEditAddrBtn) openEditAddrBtn.addEventListener('click', () => openAddrModal('edit-product-location-display'));
         if (closeAddrBtn) closeAddrBtn.addEventListener('click', closeAddrModal);
         if (cancelAddrBtn) cancelAddrBtn.addEventListener('click', closeAddrModal);
@@ -2609,6 +3261,46 @@ class FarmerDashboard {
                     this.editProduct(productId);
                 }
             }
+        });
+
+        // Event delegation for Harvest Now button
+        document.addEventListener('click', (e) => {
+            const harvestNowBtn = e.target.closest('.btn-harvest-now');
+            if (harvestNowBtn) {
+                const productId = Number(harvestNowBtn.getAttribute('data-product-id'));
+                this.debugLog('Button Click', { action: 'harvest_now', productId });
+                if (productId && !isNaN(productId)) {
+                    this.openHarvestLifecycleModal(productId);
+                }
+            }
+        });
+
+        // Event delegation for Update Harvest Date button
+        document.addEventListener('click', (e) => {
+            const updateHarvestDateBtn = e.target.closest('.btn-update-harvest-date');
+            if (updateHarvestDateBtn) {
+                const productId = Number(updateHarvestDateBtn.getAttribute('data-product-id'));
+                this.debugLog('Button Click', { action: 'update_harvest_date', productId });
+                if (productId && !isNaN(productId)) {
+                    this.openUpdateHarvestDateModal(productId);
+                }
+            }
+        });
+
+        // Update Harvest Date modal close button
+        document.getElementById('close-update-harvest-date-modal')?.addEventListener('click', () => {
+            this.closeUpdateHarvestDateModal();
+        });
+
+        // Update Harvest Date modal cancel button
+        document.getElementById('cancel-update-harvest-date-btn')?.addEventListener('click', () => {
+            this.closeUpdateHarvestDateModal();
+        });
+
+        // Update Harvest Date form submission
+        document.getElementById('update-harvest-date-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.submitUpdateHarvestDate();
         });
 
         // Detail panel actions (event delegation)
@@ -2736,12 +3428,6 @@ class FarmerDashboard {
         if (mode === 'edit') {
             nameInput = document.getElementById('edit-product-name');
             listEl = document.getElementById('edit-product-name-suggestions');
-        } else if (mode === 'available') {
-            nameInput = document.getElementById('available-name');
-            listEl = document.getElementById('available-name-suggestions');
-        } else if (mode === 'preorder') {
-            nameInput = document.getElementById('preorder-name');
-            listEl = document.getElementById('preorder-name-suggestions');
         } else {
             nameInput = document.getElementById('product-name');
             listEl = document.getElementById('product-name-suggestions');
@@ -2762,14 +3448,7 @@ class FarmerDashboard {
         // For add mode, filter out product names that have reached the limit for the selected product type
         let filteredSource = source;
         if (!isEdit && this.myProductsCache) {
-            let productType = '';
-            if (mode === 'available') {
-                productType = 'available';
-            } else if (mode === 'preorder') {
-                productType = 'preorder';
-            } else {
-                productType = document.getElementById('add-product-type')?.value || '';
-            }
+            const productType = document.getElementById('add-product-type')?.value || '';
 
             // Get the limit for this product type
             const limit = productType === 'available' ? this.maxProductsPerNameAvailable : this.maxProductsPerNamePreorder;
@@ -2806,6 +3485,22 @@ class FarmerDashboard {
 
         const matches = filteredSource
             .filter((item) => !query || String(item.name).toLowerCase().includes(query))
+            .filter((item) => {
+                // Filter out product names where farmer has an admin-disabled product
+                if (this.myProductsCache && Array.isArray(this.myProductsCache)) {
+                    const itemName = String(item.name).trim().toLowerCase();
+                    const hasAdminDisabled = this.myProductsCache.some(p => {
+                        const productName = String(p.name || '').trim().toLowerCase();
+                        const isAdminDisabled = p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1';
+                        return productName === itemName && isAdminDisabled;
+                    });
+                    if (hasAdminDisabled) {
+                        console.log('[DEBUG] Filtered out admin-disabled product:', item.name);
+                        return false;
+                    }
+                }
+                return true;
+            })
             .slice(0, 10);
 
         if (!matches.length) {
@@ -2817,6 +3512,7 @@ class FarmerDashboard {
         const currentValue = String(nameInput.value || '').trim().toLowerCase();
         listEl.innerHTML = matches.map((item) => {
             const isSelected = currentValue && String(item.name).toLowerCase() === currentValue;
+            
             return `<button type="button" class="product-name-option${isSelected ? ' selected' : ''}" data-name="${this.escapeAttr(item.name)}" data-unit="${this.escapeAttr(item.default_unit)}">${this.escapeHtml(item.name)}</button>`;
         }).join('');
         // Only open dropdown when user explicitly triggered it (forceAll) or it was already open
@@ -2840,6 +3536,15 @@ class FarmerDashboard {
                 }
                 listEl.classList.remove('open');
                 this.updatePriceSuggestion(mode);
+                // Trigger automatic reuse of previous values
+                if (!isEdit) {
+                    const availableCard = document.getElementById('selling-mode-available');
+                    const preorderCard = document.getElementById('selling-mode-preorder');
+                    const isPreorder = preorderCard?.classList.contains('border-warning') || false;
+                    if (selected && (availableCard?.classList.contains('border-success') || preorderCard?.classList.contains('border-warning'))) {
+                        this.loadPreviousProductValues(selected, isPreorder);
+                    }
+                }
             });
         });
     }
@@ -2850,12 +3555,6 @@ class FarmerDashboard {
         if (mode === 'edit') {
             listEl = document.getElementById('edit-product-name-suggestions');
             nameInput = document.getElementById('edit-product-name');
-        } else if (mode === 'available') {
-            listEl = document.getElementById('available-name-suggestions');
-            nameInput = document.getElementById('available-name');
-        } else if (mode === 'preorder') {
-            listEl = document.getElementById('preorder-name-suggestions');
-            nameInput = document.getElementById('preorder-name');
         } else {
             listEl = document.getElementById('product-name-suggestions');
             nameInput = document.getElementById('product-name');
@@ -2905,8 +3604,15 @@ class FarmerDashboard {
         const dropdown = document.getElementById(`${fieldId}-dropdown`);
         if (!input || !dropdown) return;
 
+        // Clone dropdown to remove old event listeners
+        const newDropdown = dropdown.cloneNode(true);
+        dropdown.parentNode.replaceChild(newDropdown, dropdown);
+        
+        // Re-reference the new dropdown
+        const freshDropdown = document.getElementById(`${fieldId}-dropdown`);
+
         const toggleDropdown = () => {
-            dropdown.classList.toggle('open');
+            freshDropdown.classList.toggle('open');
         };
 
         const selectOption = (btn) => {
@@ -2914,18 +3620,21 @@ class FarmerDashboard {
             const label = btn.getAttribute('data-label');
             input.value = label;
             input.dataset.value = value;
-            dropdown.classList.remove('open');
-            dropdown.querySelectorAll('.custom-select-option').forEach(opt => opt.classList.remove('selected'));
+            freshDropdown.classList.remove('open');
+            freshDropdown.querySelectorAll('.custom-select-option').forEach(opt => opt.classList.remove('selected'));
             btn.classList.add('selected');
             input.dispatchEvent(new Event('change', { bubbles: true }));
         };
 
-        input.addEventListener('click', toggleDropdown);
-        input.addEventListener('focus', () => {
-            if (!dropdown.classList.contains('open')) toggleDropdown();
-        });
+        // Attach click to wrapper instead of readonly input
+        const inputWrap = input.closest('.custom-select-input-wrap');
+        if (inputWrap) {
+            inputWrap.addEventListener('click', toggleDropdown);
+        } else {
+            input.addEventListener('click', toggleDropdown);
+        }
 
-        dropdown.querySelectorAll('.custom-select-option').forEach(btn => {
+        freshDropdown.querySelectorAll('.custom-select-option').forEach(btn => {
             btn.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 selectOption(btn);
@@ -2933,8 +3642,8 @@ class FarmerDashboard {
         });
 
         document.addEventListener('click', (e) => {
-            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-                dropdown.classList.remove('open');
+            if (!input.contains(e.target) && !freshDropdown.contains(e.target) && (!inputWrap || !inputWrap.contains(e.target))) {
+                freshDropdown.classList.remove('open');
             }
         });
     }
@@ -3085,14 +3794,11 @@ class FarmerDashboard {
                 }).join('');
             };
 
+            // Unified add product form
             const addInput = document.getElementById('product-category');
             const addDropdown = document.getElementById('product-category-dropdown');
             const editInput = document.getElementById('edit-product-category');
             const editDropdown = document.getElementById('edit-product-category-dropdown');
-            const availableInput = document.getElementById('available-category');
-            const availableDropdown = document.getElementById('available-category-dropdown');
-            const preorderInput = document.getElementById('preorder-category');
-            const preorderDropdown = document.getElementById('preorder-category-dropdown');
 
             if (addDropdown) {
                 addDropdown.innerHTML = renderCustomOptions(addInput?.value || '');
@@ -3102,20 +3808,10 @@ class FarmerDashboard {
                 editDropdown.innerHTML = renderCustomOptions(editInput?.value || '');
                 this.setupCustomSelectDropdown('edit-product-category');
             }
-            if (availableDropdown) {
-                availableDropdown.innerHTML = renderCustomOptions(availableInput?.value || '');
-                this.setupCustomSelectDropdown('available-category');
-            }
-            if (preorderDropdown) {
-                preorderDropdown.innerHTML = renderCustomOptions(preorderInput?.value || '');
-                this.setupCustomSelectDropdown('preorder-category');
-            }
 
             await this.loadProductCatalogNames(addInput?.value || null);
             this.syncProductNameAvailability('add');
             this.syncProductNameAvailability('edit');
-            this.syncProductNameAvailability('available');
-            this.syncProductNameAvailability('preorder');
         } catch (error) {
             console.error('Error loading categories:', error);
         }
@@ -3125,30 +3821,20 @@ class FarmerDashboard {
         let categoryInput, nameInput, hint, priceInput;
         let listElId;
 
-        if (mode === 'edit') {
+        if (mode === 'add') {
+            categoryInput = document.getElementById('product-category');
+            nameInput = document.getElementById('product-name');
+            hint = document.getElementById('product-name-hint');
+            priceInput = document.getElementById('product-price');
+            listElId = 'product-name-list';
+        } else if (mode === 'edit') {
             categoryInput = document.getElementById('edit-product-category');
             nameInput = document.getElementById('edit-product-name');
             hint = document.getElementById('edit-product-price-suggestion');
             priceInput = document.getElementById('edit-price');
             listElId = 'edit-product-name-suggestions';
-        } else if (mode === 'available') {
-            categoryInput = document.getElementById('available-category');
-            nameInput = document.getElementById('available-name');
-            hint = document.getElementById('available-price-suggestion');
-            priceInput = document.getElementById('available-price');
-            listElId = 'available-name-suggestions';
-        } else if (mode === 'preorder') {
-            categoryInput = document.getElementById('preorder-category');
-            nameInput = document.getElementById('preorder-name');
-            hint = document.getElementById('preorder-price-suggestion');
-            priceInput = document.getElementById('preorder-price');
-            listElId = 'preorder-name-suggestions';
         } else {
-            categoryInput = document.getElementById('product-category');
-            nameInput = document.getElementById('product-name');
-            hint = document.getElementById('product-price-suggestion');
-            priceInput = document.getElementById('product-price');
-            listElId = 'product-name-suggestions';
+            return;
         }
 
         if (!nameInput) return;
@@ -3179,21 +3865,30 @@ class FarmerDashboard {
         const addCategory = document.getElementById('product-category');
         const editCategory = document.getElementById('edit-product-category');
 
-        // Available modal
-        const availableName = document.getElementById('available-name');
-        const availableCategory = document.getElementById('available-category');
-
-        // Pre-order modal
-        const preorderName = document.getElementById('preorder-name');
-        const preorderCategory = document.getElementById('preorder-category');
-
         if (addName) {
             addName.readOnly = true;
-            addName.addEventListener('change', () => this.updatePriceSuggestion('add'));
+            const addNameWrap = addName.closest('.product-name-input-wrap');
+            if (addNameWrap) {
+                addNameWrap.addEventListener('click', () => {
+                    if (!addName.disabled) {
+                        this.renderProductNameSuggestions('add', true);
+                    }
+                });
+            }
+            addName.addEventListener('change', () => {
+                this.updatePriceSuggestion('add');
+                // Auto-load previous values when product name changes and selling mode is selected
+                const productName = addName.value;
+                const availableCard = document.getElementById('selling-mode-available');
+                const preorderCard = document.getElementById('selling-mode-preorder');
+                const isPreorder = preorderCard?.classList.contains('border-warning') || false;
+
+                if (productName && (availableCard?.classList.contains('border-success') || preorderCard?.classList.contains('border-warning'))) {
+                    this.loadPreviousProductValues(productName, isPreorder);
+                }
+            });
             addName.addEventListener('blur', () => this.updatePriceSuggestion('add'));
-            addName.addEventListener('focus', () => this.renderProductNameSuggestions('add', true));
             addName.addEventListener('keydown', (e) => this.handleProductNameKeydown('add', e));
-            addName.addEventListener('click', () => this.renderProductNameSuggestions('add', true));
             addName.addEventListener('blur', () => setTimeout(() => {
                 const list = document.getElementById('product-name-suggestions');
                 if (list) list.classList.remove('open');
@@ -3201,40 +3896,23 @@ class FarmerDashboard {
         }
         if (editName) {
             editName.readOnly = true;
+            const editNameWrap = editName.closest('.product-name-input-wrap');
+            if (editNameWrap) {
+                editNameWrap.addEventListener('click', () => {
+                    if (!editName.disabled) {
+                        this.renderProductNameSuggestions('edit', true);
+                    }
+                });
+            }
             editName.addEventListener('change', () => this.updatePriceSuggestion('edit'));
             editName.addEventListener('blur', () => this.updatePriceSuggestion('edit'));
-            editName.addEventListener('focus', () => this.renderProductNameSuggestions('edit', true));
             editName.addEventListener('keydown', (e) => this.handleProductNameKeydown('edit', e));
-            editName.addEventListener('click', () => this.renderProductNameSuggestions('edit', true));
             editName.addEventListener('blur', () => setTimeout(() => {
                 const list = document.getElementById('edit-product-name-suggestions');
                 if (list) list.classList.remove('open');
             }, 120));
         }
-        if (availableName) {
-            availableName.readOnly = true;
-            availableName.addEventListener('change', () => this.updatePriceSuggestion('available'));
-            availableName.addEventListener('blur', () => this.updatePriceSuggestion('available'));
-            availableName.addEventListener('focus', () => this.renderProductNameSuggestions('available', true));
-            availableName.addEventListener('keydown', (e) => this.handleProductNameKeydown('available', e));
-            availableName.addEventListener('click', () => this.renderProductNameSuggestions('available', true));
-            availableName.addEventListener('blur', () => setTimeout(() => {
-                const list = document.getElementById('available-name-suggestions');
-                if (list) list.classList.remove('open');
-            }, 120));
-        }
-        if (preorderName) {
-            preorderName.readOnly = true;
-            preorderName.addEventListener('change', () => this.updatePriceSuggestion('preorder'));
-            preorderName.addEventListener('blur', () => this.updatePriceSuggestion('preorder'));
-            preorderName.addEventListener('focus', () => this.renderProductNameSuggestions('preorder', true));
-            preorderName.addEventListener('keydown', (e) => this.handleProductNameKeydown('preorder', e));
-            preorderName.addEventListener('click', () => this.renderProductNameSuggestions('preorder', true));
-            preorderName.addEventListener('blur', () => setTimeout(() => {
-                const list = document.getElementById('preorder-name-suggestions');
-                if (list) list.classList.remove('open');
-            }, 120));
-        }
+
         if (addCategory) addCategory.addEventListener('change', async () => {
             this.syncProductNameAvailability('add');
             const addNameEl = document.getElementById('product-name');
@@ -3264,34 +3942,6 @@ class FarmerDashboard {
             }
             this.updatePriceSuggestion('edit');
         });
-        if (availableCategory) availableCategory.addEventListener('change', async () => {
-            this.syncProductNameAvailability('available');
-            const availableNameEl = document.getElementById('available-name');
-            if (availableNameEl) {
-                availableNameEl.disabled = true;
-                availableNameEl.placeholder = 'Loading products...';
-            }
-            await this.loadProductCatalogNames(availableCategory.dataset.value || availableCategory.value || null);
-            if (availableNameEl) {
-                availableNameEl.disabled = false;
-                availableNameEl.placeholder = 'Select a product';
-            }
-            this.updatePriceSuggestion('available');
-        });
-        if (preorderCategory) preorderCategory.addEventListener('change', async () => {
-            this.syncProductNameAvailability('preorder');
-            const preorderNameEl = document.getElementById('preorder-name');
-            if (preorderNameEl) {
-                preorderNameEl.disabled = true;
-                preorderNameEl.placeholder = 'Loading products...';
-            }
-            await this.loadProductCatalogNames(preorderCategory.dataset.value || preorderCategory.value || null);
-            if (preorderNameEl) {
-                preorderNameEl.disabled = false;
-                preorderNameEl.placeholder = 'Select a product';
-            }
-            this.updatePriceSuggestion('preorder');
-        });
 
         const addPrice = document.getElementById('product-price');
         if (addPrice) addPrice.addEventListener('focus', () => this.updatePriceSuggestion('add'));
@@ -3299,16 +3949,8 @@ class FarmerDashboard {
         const editPrice = document.getElementById('edit-price');
         if (editPrice) editPrice.addEventListener('focus', () => this.updatePriceSuggestion('edit'));
 
-        const availablePrice = document.getElementById('available-price');
-        if (availablePrice) availablePrice.addEventListener('focus', () => this.updatePriceSuggestion('available'));
-
-        const preorderPrice = document.getElementById('preorder-price');
-        if (preorderPrice) preorderPrice.addEventListener('focus', () => this.updatePriceSuggestion('preorder'));
-
         this.syncProductNameAvailability('add');
         this.syncProductNameAvailability('edit');
-        this.syncProductNameAvailability('available');
-        this.syncProductNameAvailability('preorder');
     }
 
     async submitCustomProductRequest() {
@@ -3362,16 +4004,6 @@ class FarmerDashboard {
             categoryInput = document.getElementById('edit-product-category');
             hint = document.getElementById('edit-product-price-suggestion');
             priceInput = document.getElementById('edit-price');
-        } else if (mode === 'available') {
-            nameInput = document.getElementById('available-name');
-            categoryInput = document.getElementById('available-category');
-            hint = document.getElementById('available-price-suggestion');
-            priceInput = document.getElementById('available-price');
-        } else if (mode === 'preorder') {
-            nameInput = document.getElementById('preorder-name');
-            categoryInput = document.getElementById('preorder-category');
-            hint = document.getElementById('preorder-price-suggestion');
-            priceInput = document.getElementById('preorder-price');
         } else {
             nameInput = document.getElementById('product-name');
             categoryInput = document.getElementById('product-category');
@@ -5126,14 +5758,28 @@ class FarmerDashboard {
             user: 'bi-person text-info',
             system: 'bi-gear text-secondary',
             payment: 'bi-credit-card text-warning',
+            harvest: 'bi-calendar-check text-success',
+            harvest_reminder: 'bi-calendar-event text-warning',
+            harvest_reminder_7days: 'bi-calendar-event text-warning',
+            harvest_reminder_3days: 'bi-calendar-event text-warning',
+            harvest_reminder_1day: 'bi-calendar-event text-warning',
+            harvest_reminder_today: 'bi-calendar-event text-danger',
+            harvest_overdue: 'bi-exclamation-triangle-fill text-danger',
+            harvest_date_changed: 'bi-calendar-x text-info',
+            harvest_adjustment_alert: 'bi-calendar-x text-danger',
+            harvest_completed: 'bi-check-circle text-success',
         };
+        const harvestNotifTypes = ['harvest', 'harvest_reminder', 'harvest_reminder_7days', 'harvest_reminder_3days',
+            'harvest_reminder_1day', 'harvest_reminder_today', 'harvest_overdue', 'harvest_date_changed',
+            'harvest_adjustment_alert', 'harvest_completed'];
         list.innerHTML = items.map(n => {
             const iconClass  = iconMap[n.type] || 'bi-bell text-muted';
             const readStatus = n.is_read ? 'read' : 'unread';
             const relTime    = this._relativeTime(new Date(n.created_at));
-            const cursorCls  = n.is_read ? '' : 'cursor-pointer';
+            const isHarvestNotif = harvestNotifTypes.includes(n.type);
+            const cursorCls  = isHarvestNotif ? 'cursor-pointer harvest-notif-clickable' : (n.is_read ? '' : 'cursor-pointer');
             return `
-            <div class="notification-item ${readStatus} ${cursorCls}" data-id="${n.id}">
+            <div class="notification-item ${readStatus} ${cursorCls}" data-id="${n.id}" data-type="${this.escapeHtml(n.type || '')}" data-product-id="${n.product_id || ''}" data-order-id="${n.order_id || ''}" data-product-name="${this.escapeHtml(n.product_name || '')}">
                 <div class="notification-icon">
                     <i class="bi ${iconClass}"></i>
                 </div>
@@ -5170,8 +5816,48 @@ class FarmerDashboard {
                     const btn = item.querySelector('.notification-mark-read-btn');
                     if (btn) this.markNotifRead(id, btn);
                 }
+                // Navigate to orders for harvest-related notifications
+                const notifType = item.dataset.type || '';
+                if (harvestNotifTypes.includes(notifType)) {
+                    const productId = item.dataset.productId || '';
+                    const orderId = item.dataset.orderId || '';
+                    const productName = item.dataset.productName || '';
+                    this.navigateToOrderFromHarvestNotif(productId, orderId, productName);
+                }
             });
         });
+    }
+
+    async navigateToOrderFromHarvestNotif(productId, orderId, productName) {
+        // Navigate to orders section
+        this.showSection('orders');
+
+        // Switch to Pre-order Reserved tab
+        this.switchOrderTab('preorder_reserved');
+
+        // If we have an order_id, directly open the order modal
+        if (orderId && orderId !== 'null' && Number(orderId) > 0) {
+            // Wait for orders to load, then open modal
+            setTimeout(() => {
+                this.openOrderModal(Number(orderId));
+            }, 500);
+            return;
+        }
+
+        // Otherwise, try to find a matching order by product_id
+        if (productId && Number(productId) > 0) {
+            // Wait for orders to load, then try to find matching order
+            setTimeout(() => {
+                const orders = this.lastOrdersById;
+                for (const [id, order] of orders) {
+                    if (order.product_id === Number(productId) ||
+                        (order.items && order.items[0] && order.items[0].product_id === Number(productId))) {
+                        this.openOrderModal(id);
+                        return;
+                    }
+                }
+            }, 500);
+        }
     }
 
     async markNotifRead(id, btn, skipReload = false) {
@@ -5436,13 +6122,8 @@ class FarmerDashboard {
                 const data = await response.json();
                 this.myProductsCache = Array.isArray(data.products) ? data.products : [];
                 
-                // Initialize KPI cards and filter visibility (show Available Now by default)
-                document.getElementById('kpi-available').style.display = 'flex';
-                document.getElementById('kpi-preorder').style.display = 'none';
-                document.getElementById('kpi-approval').style.display = 'none';
-                document.getElementById('filter-available').style.display = 'flex';
-                document.getElementById('filter-preorder').style.display = 'none';
-                document.getElementById('filter-approval').style.display = 'none';
+                // Note: KPI and filter visibility are managed by tab event listeners
+                // Do not reset them here to preserve current tab state during refresh
                 
                 // Split products by is_preorder flag
                 const availableProducts = this.myProductsCache.filter(p => !p.is_preorder);
@@ -5454,6 +6135,15 @@ class FarmerDashboard {
                 
                 // Update KPI cards
                 this.updateProductKPIs(this.myProductsCache);
+                
+                // Update tab counts
+                const tabAvailableCount = document.getElementById('tab-available-count');
+                const tabPreorderCount = document.getElementById('tab-preorder-count');
+                const tabApprovalCount = document.getElementById('tab-approval-count');
+                
+                if (tabAvailableCount) tabAvailableCount.textContent = availableProducts.length;
+                if (tabPreorderCount) tabPreorderCount.textContent = preorderProducts.length;
+                if (tabApprovalCount) tabApprovalCount.textContent = this.myProductsCache.filter(p => p.status === 'pending').length;
                 
                 // Show product limit warning for unverified farmers
                 try {
@@ -5479,20 +6169,10 @@ class FarmerDashboard {
                     }
                 } catch (_) { /* ignore user check error */ }
                 
-                // Reset filters to default
-                const availableStatusFilter = document.getElementById('available-status-filter');
-                const availableCategoryFilter = document.getElementById('available-category-filter');
-                const availableSearchInput = document.getElementById('available-search-input');
-                const preorderStatusFilter = document.getElementById('preorder-status-filter');
-                const preorderCategoryFilter = document.getElementById('preorder-category-filter');
-                const preorderSearchInput = document.getElementById('preorder-search-input');
-                
-                if (availableStatusFilter) availableStatusFilter.value = '';
-                if (availableCategoryFilter) availableCategoryFilter.value = '';
-                if (availableSearchInput) availableSearchInput.value = '';
-                if (preorderStatusFilter) preorderStatusFilter.value = '';
-                if (preorderCategoryFilter) preorderCategoryFilter.value = '';
-                if (preorderSearchInput) preorderSearchInput.value = '';
+                // Restore saved filters and re-apply
+                this.restoreProductFilters();
+                this.filterAvailableProducts();
+                this.filterPreorderProducts();
             }
         } catch (error) {
             console.error('Error loading products:', error);
@@ -6559,7 +7239,7 @@ class FarmerDashboard {
                     ${this.fmtNumber(stock)}
                     ${product.is_preorder && product.reserved_quantity ? `<br><small class="text-muted">Reserved: ${this.fmtNumber(product.reserved_quantity)}</small>` : ''}
                 </td>
-                <td ${statusClickHandler}>${statusWithReason}</td>
+                <td ${statusClickHandler}>${statusWithReason}${this.getHarvestBadgeHtml(product.harvest_date, product.status)}</td>
                 <td class="text-muted">${reviewCount} (${avgRating}★)</td>
                 <td>
                     ${editButton}
@@ -6582,10 +7262,16 @@ class FarmerDashboard {
         const tbody = document.getElementById('available-products-tbody');
         if (!tbody) return;
         
+        // Destroy existing sortable table
+        this.destroySortableTable('available-products-table');
+        
         tbody.innerHTML = '';
         
         if (products.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">No available products found</td></tr>';
+            // Clear pagination
+            const paginationContainer = document.getElementById('available-products-pagination');
+            if (paginationContainer) paginationContainer.innerHTML = '';
             return;
         }
         
@@ -6610,46 +7296,98 @@ class FarmerDashboard {
             const reviewCount = Number(product.total_reviews || 0);
             const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
             
+            // Selling mode badges
+            let sellingModeBadges = '';
+            if (product.is_preorder) {
+                sellingModeBadges += `<span class="badge bg-warning text-dark" style="font-size:0.65rem;">🟠 Pre-order</span> `;
+            }
+            if (stock > 0 || (!product.is_preorder && stock >= 0)) {
+                sellingModeBadges += `<span class="badge bg-success" style="font-size:0.65rem;">Available Now</span>`;
+            }
+
             const row = `
                 <tr>
                     <td>${thumb}</td>
                     <td>
                         <div class="fw-semibold small">${this.escapeHtml(product.name)}</div>
+                        <div class="mt-1">${sellingModeBadges}</div>
                     </td>
                     <td class="small">${this.escapeHtml(product.category_name || 'N/A')}</td>
                     <td class="small">₱${this.fmtNumber(product.price)}</td>
                     <td class="small">${this.fmtNumber(stock)}</td>
-                    <td>${statusBadge}</td>
+                    <td>${statusBadge}${this.getHarvestBadgeHtml(product.harvest_date, product.status)}</td>
                     <td class="small">${reviewCount} <i class="bi bi-star-fill text-warning"></i> ${avgRating}</td>
                     <td class="col-actions">
-                        <button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}">Edit</button>
+                        <button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}"${product.is_admin_disabled ? ' disabled' : ''}>Edit</button>
                     </td>
                 </tr>
             `;
             tbody.innerHTML += row;
+            
+            // Debug: Log link information
+            if (product.linked_product_id) {
+                const linkedProduct = this.myProductsCache?.find(p => p.id === product.linked_product_id);
+                console.log(`[LINK] ${product.name} (ID:${product.id}) ↔ ${linkedProduct?.name || 'Unknown'} (ID:${product.linked_product_id})`);
+            }
         });
+        
+        // Initialize sortable table with pagination
+        this.refreshSortableTable('available-products-table', {
+            columns: [
+                { select: 0, sortable: false },  // Image column
+                { select: 7, sortable: false }   // Actions column
+            ],
+            paging: true,
+            perPage: 10,
+            perPageSelect: [5, 10, 25, 50]
+        });
+        
+        // Reset to first page after initialization
+        setTimeout(() => {
+            const dataTable = this.sortableTables['available-products-table'];
+            if (dataTable && typeof dataTable.page === 'function') {
+                dataTable.page(1);
+            }
+        }, 50);
     }
 
     renderPreorderProducts(products) {
         const tbody = document.getElementById('preorder-products-tbody');
         if (!tbody) return;
-        
+
+        // Destroy existing sortable table
+        this.destroySortableTable('preorder-products-table');
+
         tbody.innerHTML = '';
-        
+
         if (products.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4">No pre-order products found</td></tr>';
+            // Clear pagination
+            const paginationContainer = document.getElementById('preorder-products-pagination');
+            if (paginationContainer) paginationContainer.innerHTML = '';
             return;
         }
-        
+
         // Update category filter options
         this.refreshProductCategoryFilterOptions(this.myProductsCache);
-        
+
+        // Calculate harvest reminder counts for dashboard
+        let harvestToday = 0;
+        let harvest3Days = 0;
+        let harvestOverdue = 0;
+
         products.forEach(product => {
             const statusBadge = this.getPreorderStatusBadge(product);
-            const progressPercent = product.max_preorder_quantity > 0 
-                ? (product.reserved_quantity / product.max_preorder_quantity) * 100 
+            const progressPercent = product.max_preorder_quantity > 0
+                ? (product.reserved_quantity / product.max_preorder_quantity) * 100
                 : 0;
-            
+
+            // Calculate harvest status
+            const harvestStatus = this.getHarvestStatus(product);
+            if (harvestStatus.today) harvestToday++;
+            if (harvestStatus.within3Days) harvest3Days++;
+            if (harvestStatus.overdue) harvestOverdue++;
+
             // Normalize image URL
             let productImageUrl = product.image_url || '';
             if (productImageUrl && !productImageUrl.startsWith('http') && !productImageUrl.startsWith('/')) {
@@ -6661,31 +7399,115 @@ class FarmerDashboard {
 
             const thumb = `<img src="${this.escapeHtml(productImageUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;" alt="" onerror="this.src='/images/logo.png'">`;
 
+            // Harvest badge for status column
+            const harvestBadge = this.getHarvestBadgeHtml(product.harvest_date, product.status);
+
+            // Reservation disabled indicator
+            let reservationIndicator = '';
+            if (product.reservations_disabled === true || product.reservations_disabled === 't' || product.reservations_disabled === 'true') {
+                reservationIndicator = `<div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle"></i> Reservations Temporarily Unavailable</div>`;
+            }
+
+            // Action buttons
+            let actionButtons = `<button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}"${product.is_admin_disabled ? ' disabled' : ''}>Edit</button>`;
+            if (harvestStatus.today || harvestStatus.overdue) {
+                actionButtons += ` <button class="btn btn-sm btn-success btn-harvest-now" data-product-id="${product.id}">Harvest Now</button>`;
+            }
+
             const row = `
                 <tr>
                     <td>${thumb}</td>
                     <td>
                         <div class="fw-semibold small">${this.escapeHtml(product.name)}</div>
+                        ${reservationIndicator}
                     </td>
                     <td class="small">${this.escapeHtml(product.category_name || 'N/A')}</td>
-                    <td class="small">${product.preorder_availability_date ? new Date(product.preorder_availability_date).toLocaleDateString() : 'N/A'}</td>
+                    <td class="small">${product.harvest_date ? new Date(product.harvest_date).toLocaleDateString() : 'N/A'}</td>
                     <td>
-                        <div class="small">Reserved: ${this.fmtNumber(product.reserved_quantity)} / ${this.fmtNumber(product.max_preorder_quantity)}</div>
-                        <div class="d-flex align-items-center gap-2 mt-1">
-                            <div class="progress flex-grow-1" style="height:8px;">
-                                <div class="progress-bar bg-success" style="width:${progressPercent}%"></div>
-                            </div>
-                            <span class="small fw-semibold text-muted" style="min-width:40px;text-align:right;">${Math.round(progressPercent)}%</span>
-                        </div>
+                        ${progressPercent >= 100
+                            ? `<div class="small fw-bold text-success"><i class="bi bi-check-circle-fill me-1"></i>Reserved Full</div>`
+                            : `<div class="small">Reserved: ${this.fmtNumber(product.reserved_quantity)} / ${this.fmtNumber(product.max_preorder_quantity)}</div>
+                               <div class="d-flex align-items-center gap-2 mt-1">
+                                   <div class="progress flex-grow-1" style="height:8px;">
+                                       <div class="progress-bar bg-success" style="width:${progressPercent}%"></div>
+                                   </div>
+                                   <span class="small fw-semibold text-muted" style="min-width:40px;text-align:right;">${Math.round(progressPercent)}%</span>
+                               </div>`
+                        }
                     </td>
-                    <td>${statusBadge}</td>
+                    <td>${statusBadge}${harvestBadge}</td>
                     <td class="col-actions">
-                        <button class="btn btn-sm btn-outline-primary btn-action-edit" data-product-id="${product.id}">Edit</button>
+                        <div class="d-flex gap-1 flex-wrap">
+                            ${actionButtons}
+                        </div>
                     </td>
                 </tr>
             `;
             tbody.innerHTML += row;
+            
+            // Debug: Log link information
+            if (product.linked_product_id) {
+                const linkedProduct = this.myProductsCache?.find(p => p.id === product.linked_product_id);
+                console.log(`[LINK] ${product.name} (ID:${product.id}) ↔ ${linkedProduct?.name || 'Unknown'} (ID:${product.linked_product_id})`);
+            }
         });
+
+        // Update harvest reminder dashboard card
+        this.updateHarvestReminderCard(harvestToday, harvest3Days, harvestOverdue);
+        
+        // Initialize sortable table with pagination
+        this.refreshSortableTable('preorder-products-table', {
+            columns: [
+                { select: 0, sortable: false },  // Image column
+                { select: 6, sortable: false }   // Actions column
+            ],
+            paging: true,
+            perPage: 10,
+            perPageSelect: [5, 10, 25, 50]
+        });
+        
+        // Reset to first page after initialization
+        setTimeout(() => {
+            const dataTable = this.sortableTables['preorder-products-table'];
+            if (dataTable && typeof dataTable.page === 'function') {
+                dataTable.page(1);
+            }
+        }, 50);
+    }
+
+    getHarvestStatus(product) {
+        if (!product.harvest_date) {
+            return { status: null, today: false, within3Days: false, overdue: false, daysOverdue: 0 };
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const harvestDate = new Date(product.harvest_date);
+        harvestDate.setHours(0, 0, 0, 0);
+
+        const diffTime = harvestDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) {
+            return { status: 'Today', today: true, within3Days: false, overdue: false, daysOverdue: 0 };
+        } else if (diffDays > 0 && diffDays <= 3) {
+            return { status: `${diffDays} Days`, today: false, within3Days: true, overdue: false, daysOverdue: 0 };
+        } else if (diffDays < 0) {
+            const daysOverdue = Math.abs(diffDays);
+            return { status: 'Harvest Update Required', today: false, within3Days: false, overdue: true, daysOverdue };
+        }
+
+        return { status: null, today: false, within3Days: false, overdue: false, daysOverdue: 0 };
+    }
+
+    updateHarvestReminderCard(harvestToday, harvest3Days, harvestOverdue) {
+        const todayEl = document.getElementById('harvest-today');
+        const days3El = document.getElementById('harvest-3days');
+        const overdueEl = document.getElementById('harvest-overdue');
+
+        if (todayEl) todayEl.textContent = harvestToday;
+        if (days3El) days3El.textContent = `Harvesting in 3 Days: ${harvest3Days} Item(s)`;
+        if (overdueEl) overdueEl.textContent = `Overdue: ${harvestOverdue} Item(s)`;
     }
 
     getAvailableStatusBadge(product) {
@@ -6719,6 +7541,29 @@ class FarmerDashboard {
             return '<span class="badge bg-success">Harvest Ready</span>';
         }
         return '<span class="badge bg-primary">Active</span>';
+    }
+
+    getHarvestBadgeHtml(harvestDate, productStatus) {
+        if (productStatus === 'harvested') {
+            return '<div class="mt-1"><span class="badge bg-secondary" style="font-size:0.6rem;">Harvested</span></div>';
+        }
+        if (!harvestDate) return '';
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const hDate = new Date(harvestDate);
+        hDate.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((hDate - today) / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) {
+            return '<div class="mt-1"><span class="badge bg-danger" style="font-size:0.6rem;">Harvest Today</span></div>';
+        } else if (diffDays > 0 && diffDays <= 3) {
+            return `<div class="mt-1"><span class="badge bg-warning text-dark" style="font-size:0.6rem;">Harvest in ${diffDays} Day${diffDays > 1 ? 's' : ''}</span></div>`;
+        } else if (diffDays < 0) {
+            const daysOverdue = Math.abs(diffDays);
+            return `<div class="mt-1"><span class="badge bg-danger" style="font-size:0.6rem;">${daysOverdue} Day${daysOverdue > 1 ? 's' : ''} Overdue</span></div>`;
+        }
+        return '';
     }
 
     updateProductKPIs(products) {
@@ -6770,19 +7615,39 @@ class FarmerDashboard {
             const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
             return isAvailable && !isAdminDisabled && p.status !== 'harvest_ready';
         }).length;
+        const harvestDay = preorderProducts.filter(p => {
+            const isAvailable = (p.is_available === true || p.is_available === 't' || p.is_available === 'true' || p.is_available === 1 || p.is_available === '1');
+            const isAdminDisabled = (p.is_admin_disabled === true || p.is_admin_disabled === 't' || p.is_admin_disabled === 'true' || p.is_admin_disabled === 1 || p.is_admin_disabled === '1');
+            if (!isAvailable || isAdminDisabled || !p.preorder_availability_date) return false;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const harvestDate = new Date(p.preorder_availability_date);
+            harvestDate.setHours(0, 0, 0, 0);
+            const diffDays = Math.ceil((harvestDate - today) / (1000 * 60 * 60 * 24));
+            return diffDays === 0;
+        }).length;
 
-        const reservedMaxEl = document.getElementById('kpi-preorder-reserved-max');
+        const reservedMaxEl = document.getElementById('kpi-preorder-progress');
         const pendingEl = document.getElementById('kpi-preorder-pending');
+        const dueSoonEl = document.getElementById('kpi-preorder-due-soon');
 
         if (reservedMaxEl) reservedMaxEl.textContent = reservedMaxReached;
         if (pendingEl) pendingEl.textContent = pendingHarvest;
+        if (dueSoonEl) dueSoonEl.textContent = harvestDay;
     }
 
     updateApprovalKPIs(products) {
         const pending = products.filter(p => p.status === 'pending').length;
+        const rejected = products.filter(p => p.status === 'rejected').length;
+        const approved = products.filter(p => p.status === 'approved').length;
 
         const pendingEl = document.getElementById('kpi-approval-pending');
+        const rejectedEl = document.getElementById('kpi-approval-rejected');
+        const approvedEl = document.getElementById('kpi-approval-approved');
+
         if (pendingEl) pendingEl.textContent = pending;
+        if (rejectedEl) rejectedEl.textContent = rejected;
+        if (approvedEl) approvedEl.textContent = approved;
     }
 
     updateBatchBar() {
@@ -7011,6 +7876,7 @@ class FarmerDashboard {
         if (!product) return;
 
         const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
+        const isAdminDisabled = (product.is_admin_disabled === true || product.is_admin_disabled === 't' || product.is_admin_disabled === 'true' || product.is_admin_disabled === 1 || product.is_admin_disabled === '1');
         const status = isAvailable ? 'Available' : 'Disabled';
         const toggleLabel = isAvailable ? 'Disable' : 'Enable';
         const toggleArg = !isAvailable;
@@ -7032,7 +7898,26 @@ class FarmerDashboard {
                 previewImageUrl = '/images/logo.png';
             }
 
+        // Admin disable banner
+        let adminDisableBanner = '';
+        if (isAdminDisabled && product.admin_disable_reason) {
+            adminDisableBanner = `
+                <div class="alert alert-warning alert-dismissible fade show" role="alert" style="margin-bottom:1rem;">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Disabled by Admin:</strong> ${this.escapeHtml(product.admin_disable_reason)}
+                </div>
+            `;
+        } else if (isAdminDisabled) {
+            adminDisableBanner = `
+                <div class="alert alert-warning alert-dismissible fade show" role="alert" style="margin-bottom:1rem;">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>Disabled by Admin:</strong> This product has been disabled by an administrator. Contact support for assistance.
+                </div>
+            `;
+        }
+
         body.innerHTML = `
+            ${adminDisableBanner}
             <div class="farmer-product-preview-grid" style="display:grid;grid-template-columns:minmax(220px,320px) 1fr;gap:1.15rem;align-items:start;">
                 <img src="${this.escapeAttr(previewImageUrl)}" alt="${this.escapeAttr(product.name)}" style="width:100%;max-width:260px;border-radius:12px;border:1px solid #e2e8f0;object-fit:cover;" onerror="this.src='/images/logo.png'">
                 <div>
@@ -7052,8 +7937,8 @@ class FarmerDashboard {
                         <div><strong>Description:</strong> ${this.escapeHtml(product.description || 'No description provided.')}</div>
                     </div>
                     <div class="product-preview-actions" style="display:flex;gap:0.55rem;flex-wrap:wrap;margin-top:1rem;">
-                        <button type="button" class="btn product-preview-action-btn" onclick="farmerDashboard.closeMyProductPreview(); farmerDashboard.editProduct(${product.id});">Edit</button>
-                        <button type="button" class="btn product-preview-action-btn" onclick="farmerDashboard.closeMyProductPreview(); farmerDashboard.toggleProductStatus(${product.id}, ${toggleArg});">${toggleLabel}</button>
+                        <button type="button" class="btn product-preview-action-btn" onclick="farmerDashboard.closeMyProductPreview(); farmerDashboard.editProduct(${product.id});"${isAdminDisabled ? ' disabled' : ''}>Edit</button>
+                        <button type="button" class="btn product-preview-action-btn" onclick="farmerDashboard.closeMyProductPreview(); farmerDashboard.toggleProductStatus(${product.id}, ${toggleArg});"${isAdminDisabled ? ' disabled' : ''}>${toggleLabel}</button>
                         <button type="button" class="btn btn-danger product-preview-action-btn" onclick="farmerDashboard.closeMyProductPreview(); farmerDashboard.deleteProduct(${product.id});">Delete</button>
                     </div>
                 </div>
@@ -7081,23 +7966,7 @@ class FarmerDashboard {
         // Determine field IDs based on form
         let category, name, price, location, harvestDate, maxQuantity, stockQuantity, expiryDate, imageInput;
 
-        if (formId === 'add-available-form') {
-            category = document.getElementById('available-category');
-            name = document.getElementById('available-name');
-            price = document.getElementById('available-price');
-            location = document.getElementById('available-location-display');
-            stockQuantity = document.getElementById('available-stock');
-            expiryDate = document.getElementById('available-expiry');
-            imageInput = document.getElementById('available-image');
-        } else if (formId === 'add-preorder-form') {
-            category = document.getElementById('preorder-category');
-            name = document.getElementById('preorder-name');
-            price = document.getElementById('preorder-price');
-            location = document.getElementById('preorder-location-display');
-            harvestDate = document.getElementById('preorder-harvest-date');
-            maxQuantity = document.getElementById('preorder-max-quantity');
-            imageInput = document.getElementById('preorder-image');
-        } else if (formId === 'edit-product-form') {
+        if (formId === 'edit-product-form') {
             category = document.getElementById('edit-product-category');
             name = document.getElementById('edit-product-name');
             price = document.getElementById('edit-price');
@@ -7108,7 +7977,7 @@ class FarmerDashboard {
             expiryDate = document.getElementById('edit-expiry-date');
             imageInput = document.getElementById('edit-product-image');
         } else {
-            // Legacy add-product-form support
+            // add-product-form
             category = document.getElementById('product-category');
             name = document.getElementById('product-name');
             price = document.getElementById('product-price');
@@ -7142,7 +8011,7 @@ class FarmerDashboard {
         }
 
         // Validate image is required for add forms (not edit)
-        if (formId === 'add-available-form' || formId === 'add-preorder-form') {
+        if (formId !== 'edit-product-form') {
             if (!imageInput || !imageInput.files || imageInput.files.length === 0) {
                 if (imageInput) imageInput.classList.add('is-invalid');
                 errors.push('Product image is required');
@@ -7169,243 +8038,6 @@ class FarmerDashboard {
         return { valid: errors.length === 0, errors };
     }
 
-    async handleAddAvailable(e) {
-        this.debugLog('Form Submit', { form: 'add-available-form' });
-        e.preventDefault();
-
-        if (this.isSubmittingAddProduct) {
-            return;
-        }
-
-        const validation = this.validateProductForm('add-available-form', false);
-
-        if (!validation.valid) {
-            this.showMessage(validation.errors.join(', '), 'error');
-            return;
-        }
-
-        const submitBtn = document.querySelector('#add-available-form button[type="submit"]');
-        const originalSubmitText = submitBtn ? submitBtn.innerHTML : '';
-        this.isSubmittingAddProduct = true;
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Adding...';
-        }
-
-        try {
-            const name = document.getElementById('available-name').value;
-            const description = document.getElementById('available-description').value;
-            const categoryInput = document.getElementById('available-category');
-            const category_id = categoryInput?.dataset.value || categoryInput?.value;
-            const unitInput = document.getElementById('available-unit');
-            const unit = unitInput?.value || 'kg';
-            const locationDisplay = document.getElementById('available-location-display');
-            const location = locationDisplay?.value || document.getElementById('available-location').value;
-
-            const price = document.getElementById('available-price').value;
-            const stock_quantity = document.getElementById('available-stock').value;
-            const expiryDate = document.getElementById('available-expiry').value || '';
-
-            if (Number(price) < 0 || Number(stock_quantity) < 0) {
-                throw new Error('Price and stock must be zero or higher.');
-            }
-
-            // Send product data to backend first to get product_id
-            const formData = new FormData();
-            formData.append('name', name);
-            formData.append('description', description);
-            formData.append('price', price);
-            formData.append('category_id', category_id);
-            formData.append('stock_quantity', stock_quantity);
-            formData.append('unit', unit);
-            formData.append('location', location);
-            formData.append('harvest_date', '');
-            formData.append('expiry_date', expiryDate);
-            formData.append('is_preorder', 'false');
-
-            const response = await fetch(`${this.apiBase}/products`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${this.token}` },
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to add product');
-            }
-
-            // Upload image with product_id for direct categorized storage
-            let imageUrl = '';
-            let imagePublicId = '';
-            const imageFile = document.getElementById('available-image').files[0];
-            if (imageFile) {
-                const uploaded = await this.uploadProductImage(imageFile, {
-                    name,
-                    category_id,
-                    category_name: categoryInput?.selectedOptions?.[0]?.text || '',
-                    product_id: data.product.id
-                });
-                imageUrl = uploaded.imageUrl || '';
-                imagePublicId = uploaded.public_id || '';
-
-                // Update product with image URL
-                const updateFormData = new FormData();
-                updateFormData.append('image_url', imageUrl);
-                updateFormData.append('cloudinary_public_id', imagePublicId);
-
-                const updateResponse = await fetch(`${this.apiBase}/products/${data.product.id}`, {
-                    method: 'PUT',
-                    headers: { Authorization: `Bearer ${this.token}` },
-                    body: updateFormData
-                });
-
-                if (!updateResponse.ok) {
-                    console.error('Failed to update product image:', await updateResponse.json());
-                }
-            }
-
-            this.showMessage('Product added successfully!', 'success');
-            document.getElementById('add-available-form').reset();
-            const preview = document.getElementById('available-image-preview');
-            if (preview) preview.innerHTML = '';
-            this.closeAddAvailableModal();
-            this.loadMyProducts();
-            this.loadFarmerStats();
-        } catch (error) {
-            console.error('Error adding product:', error);
-            this.showMessage(error.message || 'Error adding product', 'error');
-        } finally {
-            this.isSubmittingAddProduct = false;
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalSubmitText || 'Add Product';
-            }
-        }
-    }
-
-    async handleAddPreorder(e) {
-        this.debugLog('Form Submit', { form: 'add-preorder-form' });
-        e.preventDefault();
-
-        if (this.isSubmittingAddProduct) {
-            return;
-        }
-
-        const validation = this.validateProductForm('add-preorder-form', true);
-
-        if (!validation.valid) {
-            this.showMessage(validation.errors.join(', '), 'error');
-            return;
-        }
-
-        const submitBtn = document.querySelector('#add-preorder-form button[type="submit"]');
-        const originalSubmitText = submitBtn ? submitBtn.innerHTML : '';
-        this.isSubmittingAddProduct = true;
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Adding...';
-        }
-
-        try {
-            const name = document.getElementById('preorder-name').value;
-            const description = document.getElementById('preorder-description').value;
-            const categoryInput = document.getElementById('preorder-category');
-            const category_id = categoryInput?.dataset.value || categoryInput?.value;
-            const unitInput = document.getElementById('preorder-unit');
-            const unit = unitInput?.value || 'kg';
-            const locationDisplay = document.getElementById('preorder-location-display');
-            const location = locationDisplay?.value || document.getElementById('preorder-location').value;
-
-            const price = document.getElementById('preorder-price').value;
-            const preorderAvailabilityDate = document.getElementById('preorder-harvest-date').value;
-            const maxPreorderQuantity = document.getElementById('preorder-max-quantity').value;
-
-            if (Number(price) < 0) {
-                throw new Error('Price must be zero or higher.');
-            }
-
-            if (!preorderAvailabilityDate) {
-                throw new Error('Expected harvest date is required for pre-orders.');
-            }
-
-            // Send product data to backend first to get product_id
-            const formData = new FormData();
-            formData.append('name', name);
-            formData.append('description', description);
-            formData.append('price', price);
-            formData.append('category_id', category_id);
-            formData.append('stock_quantity', '0');
-            formData.append('unit', unit);
-            formData.append('location', location);
-            formData.append('harvest_date', '');
-            formData.append('expiry_date', '');
-            formData.append('is_preorder', 'true');
-            formData.append('max_preorder_quantity', maxPreorderQuantity);
-            formData.append('preorder_availability_date', preorderAvailabilityDate);
-
-            const response = await fetch(`${this.apiBase}/products`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${this.token}` },
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to add product');
-            }
-
-            // Upload image with product_id for direct categorized storage
-            let imageUrl = '';
-            let imagePublicId = '';
-            const imageFile = document.getElementById('preorder-image').files[0];
-            if (imageFile) {
-                const uploaded = await this.uploadProductImage(imageFile, {
-                    name,
-                    category_id,
-                    category_name: categoryInput?.selectedOptions?.[0]?.text || '',
-                    product_id: data.product.id
-                });
-                imageUrl = uploaded.imageUrl || '';
-                imagePublicId = uploaded.public_id || '';
-
-                // Update product with image URL
-                const updateFormData = new FormData();
-                updateFormData.append('image_url', imageUrl);
-                updateFormData.append('cloudinary_public_id', imagePublicId);
-
-                const updateResponse = await fetch(`${this.apiBase}/products/${data.product.id}`, {
-                    method: 'PUT',
-                    headers: { Authorization: `Bearer ${this.token}` },
-                    body: updateFormData
-                });
-
-                if (!updateResponse.ok) {
-                    console.error('Failed to update product image:', await updateResponse.json());
-                }
-            }
-
-            this.showMessage('Product added successfully!', 'success');
-            document.getElementById('add-preorder-form').reset();
-            const preview = document.getElementById('preorder-image-preview');
-            if (preview) preview.innerHTML = '';
-            this.closeAddPreorderModal();
-            this.loadMyProducts();
-            this.loadFarmerStats();
-        } catch (error) {
-            console.error('Error adding product:', error);
-            this.showMessage(error.message || 'Error adding product', 'error');
-        } finally {
-            this.isSubmittingAddProduct = false;
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalSubmitText || 'Add Product';
-            }
-        }
-    }
-
-
     async handleEditProduct(e) {
         this.debugLog('Form Submit', { form: 'edit-product-form' });
         e.preventDefault();
@@ -7419,8 +8051,8 @@ class FarmerDashboard {
         const resubmitFromId = this._resubmitFromProductId;
 
         // Validate form before submission
-        const isPreorder = document.getElementById('edit-preorder-date-group')?.style.display !== 'none' ||
-                          document.getElementById('edit-preorder-quantity-group')?.style.display !== 'none';
+        const preorderSection = document.getElementById('edit-preorder-section');
+        const isPreorder = preorderSection && preorderSection.style.display !== 'none';
         const validation = this.validateProductForm('edit-product-form', isPreorder);
 
         if (!validation.valid) {
@@ -7465,7 +8097,25 @@ class FarmerDashboard {
                 // Normal edit flow
                 const formData = new FormData();
                 formData.append('name', document.getElementById('edit-product-name').value);
-                formData.append('description', document.getElementById('edit-product-description').value);
+                
+                // Get description from appropriate field based on selling mode
+                const availableDescription = document.getElementById('edit-available-description')?.value || '';
+                const preorderDescription = document.getElementById('edit-preorder-description')?.value || '';
+                const commonDescription = document.getElementById('edit-product-description')?.value || '';
+                
+                // Use available description if available section is visible, otherwise use preorder, otherwise common
+                const availableSection = document.getElementById('edit-available-section');
+                const preorderSection = document.getElementById('edit-preorder-section');
+                
+                let description = commonDescription;
+                if (availableSection && availableSection.style.display !== 'none') {
+                    description = availableDescription || commonDescription;
+                } else if (preorderSection && preorderSection.style.display !== 'none') {
+                    description = preorderDescription || commonDescription;
+                }
+                
+                formData.append('description', description);
+                
                 const editCategoryInput = document.getElementById('edit-product-category');
                 const editUnitInput = document.getElementById('edit-product-unit');
                 formData.append('category_id', editCategoryInput?.dataset.value || editCategoryInput?.value);
@@ -7491,31 +8141,19 @@ class FarmerDashboard {
                 }
                 formData.append('location', location);
 
-                // Handle management fields based on visible section
-                const preorderDateGroup = document.getElementById('edit-preorder-date-group');
-                const preorderQuantityGroup = document.getElementById('edit-preorder-quantity-group');
-                const isPreorder = (preorderDateGroup && preorderDateGroup.style.display !== 'none') ||
-                                   (preorderQuantityGroup && preorderQuantityGroup.style.display !== 'none');
+                // Handle management fields based on visible section (reuse section variables from above)
+                const hasAvailable = availableSection && availableSection.style.display !== 'none';
+                const hasPreorder = preorderSection && preorderSection.style.display !== 'none';
 
                 let price, stock_quantity, harvestDate, expiryDate, preorderAvailabilityDate, maxPreorderQuantity;
 
-                if (isPreorder) {
-                    // Pre-order fields are visible
-                    price = document.getElementById('edit-price').value;
-                    stock_quantity = document.getElementById('edit-stock-quantity').value;
-                    harvestDate = document.getElementById('edit-preorder-availability-date').value;
-                    expiryDate = '';
-                    preorderAvailabilityDate = document.getElementById('edit-preorder-availability-date').value;
-                    maxPreorderQuantity = document.getElementById('edit-max-preorder-quantity').value;
-                } else {
-                    // Available Now fields are visible
-                    price = document.getElementById('edit-price').value;
-                    stock_quantity = document.getElementById('edit-stock-quantity').value;
-                    harvestDate = '';
-                    expiryDate = document.getElementById('edit-expiry-date').value || '';
-                    preorderAvailabilityDate = '';
-                    maxPreorderQuantity = '0';
-                }
+                // Get values based on which sections are visible
+                price = document.getElementById('edit-price').value;
+                stock_quantity = hasAvailable ? document.getElementById('edit-stock-quantity').value : '0';
+                expiryDate = hasAvailable ? (document.getElementById('edit-expiry-date').value || '') : '';
+                preorderAvailabilityDate = hasPreorder ? document.getElementById('edit-preorder-availability-date').value : '';
+                maxPreorderQuantity = hasPreorder ? document.getElementById('edit-max-preorder-quantity').value : '0';
+                harvestDate = '';
 
                 formData.append('price', price);
                 formData.append('stock_quantity', stock_quantity);
@@ -7526,13 +8164,13 @@ class FarmerDashboard {
                     throw new Error('Price and stock must be zero or higher.');
                 }
 
-                if (isPreorder && !preorderAvailabilityDate) {
+                if (hasPreorder && !preorderAvailabilityDate) {
                     throw new Error('Expected harvest date is required for pre-orders.');
                 }
 
                 formData.append('harvest_date', harvestDate);
                 formData.append('expiry_date', expiryDate);
-                if (isPreorder) {
+                if (hasPreorder) {
                     formData.append('max_preorder_quantity', maxPreorderQuantity);
                     formData.append('preorder_availability_date', preorderAvailabilityDate);
                 }
@@ -7564,7 +8202,13 @@ class FarmerDashboard {
                 const data = await response.json().catch(() => ({}));
 
                 if (response.ok) {
-                    this.showMessage('Product updated successfully!', 'success');
+                    // Show approval-specific message if image was submitted for approval
+                    const imageFile = document.getElementById('edit-product-image').files[0];
+                    if (this.featureFlags.require_product_approval === true && imageFile) {
+                        this.showMessage('Product submitted for approval. Your product will be visible once approved.', 'success');
+                    } else {
+                        this.showMessage('Product updated successfully!', 'success');
+                    }
                     this.closeEditModal(true);
                     this.loadMyProducts();
                     this.loadFarmerStats();
@@ -7585,21 +8229,133 @@ class FarmerDashboard {
         }
     }
 
-    openHarvestFulfillModal() {
-        const productId = document.getElementById('edit-product-id').value;
-        const product = this.myProductsCache?.find(p => String(p.id) === String(productId));
+    openHarvestFulfillModal(productId) {
+        // If productId is provided, use it; otherwise get from edit modal
+        const targetProductId = productId || document.getElementById('edit-product-id').value;
+        const product = this.myProductsCache?.find(p => String(p.id) === String(targetProductId));
         if (!product) return;
 
         const reservedQty = Number(product.reserved_quantity || 0);
-        const maxQty = Number(product.max_preorder_quantity || 0);
-        const remainingQty = Math.max(maxQty - reservedQty, 0);
+        const currentStock = Number(product.stock_quantity || 0);
 
-        document.getElementById('harvest-modal-reserved-qty').textContent = this.fmtNumber(reservedQty);
-        document.getElementById('harvest-modal-remaining-qty').textContent = this.fmtNumber(remainingQty);
         document.getElementById('harvest-fulfill-quantity').value = reservedQty > 0 ? reservedQty : '';
-        document.getElementById('confirm-harvest-fulfill-btn').dataset.productId = productId;
+        document.getElementById('confirm-harvest-fulfill-btn').dataset.productId = targetProductId;
         this.updateHarvestFulfillPreview();
         document.getElementById('harvest-fulfill-modal').classList.add('open');
+    }
+
+    openHarvestLifecycleModal(productId) {
+        const targetProductId = productId || document.getElementById('edit-product-id').value;
+        const product = this.myProductsCache?.find(p => String(p.id) === String(targetProductId));
+        if (!product) return;
+
+        document.getElementById('harvest-lifecycle-quantity').value = '';
+        document.getElementById('harvest-lifecycle-yes-btn').dataset.productId = targetProductId;
+        document.getElementById('harvest-lifecycle-no-btn').dataset.productId = targetProductId;
+        document.getElementById('harvest-lifecycle-modal').classList.add('open');
+    }
+
+    async handleHarvestLifecycle(productId, quantity, makeAvailable) {
+        try {
+            const response = await fetch(`${this.apiBase}/products/${productId}/harvest-lifecycle`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    harvest_quantity: quantity,
+                    make_available: makeAvailable
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showToast(data.message, 'success');
+                await this.loadMyProducts();
+                await this.loadFarmerStats();
+            } else {
+                this.showToast(data.message || 'Failed to process harvest', 'error');
+            }
+        } catch (error) {
+            console.error('Error in harvest lifecycle:', error);
+            this.showToast('Error processing harvest', 'error');
+        }
+    }
+
+    openUpdateHarvestDateModal(productId) {
+        const product = this.myProductsCache?.find(p => String(p.id) === String(productId));
+        if (!product) return;
+
+        document.getElementById('update-harvest-product-id').value = productId;
+        document.getElementById('update-harvest-date').value = product.harvest_date || '';
+        document.getElementById('update-harvest-reason').value = '';
+        document.getElementById('update-harvest-date-modal').classList.add('open');
+    }
+
+    closeUpdateHarvestDateModal() {
+        document.getElementById('update-harvest-date-modal').classList.remove('open');
+        document.getElementById('update-harvest-date-form').reset();
+    }
+
+    async submitUpdateHarvestDate() {
+        const productId = document.getElementById('update-harvest-product-id').value;
+        const harvestDate = document.getElementById('update-harvest-date').value;
+        const reason = document.getElementById('update-harvest-reason').value.trim();
+
+        // Validation: Product ID required
+        if (!productId) {
+            this.showToast('Product ID not found. Please close the modal and try again.', 'error');
+            this.closeUpdateHarvestDateModal();
+            return;
+        }
+
+        // Validation: Reject past dates
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const selectedDate = new Date(harvestDate);
+        selectedDate.setHours(0, 0, 0, 0);
+
+        if (selectedDate < today) {
+            this.showToast('Harvest date cannot be in the past', 'error');
+            return;
+        }
+
+        // Validation: Reason required
+        if (!reason) {
+            this.showToast('Please provide a reason for updating the harvest date', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/products/${productId}/harvest-date`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    harvest_date: harvestDate,
+                    reason: reason
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.showToast('Harvest date updated successfully', 'success');
+                this.closeUpdateHarvestDateModal();
+
+                // Automatic refresh after update
+                await this.loadMyProducts();
+            } else {
+                const error = await response.json();
+                this.showToast(error.message || 'Failed to update harvest date', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating harvest date:', error);
+            this.showToast('Error updating harvest date', 'error');
+        }
     }
 
     updateHarvestFulfillPreview() {
@@ -7610,20 +8366,27 @@ class FarmerDashboard {
         const quantityInput = document.getElementById('harvest-fulfill-quantity');
         const quantity = parseInt(quantityInput?.value || '0', 10);
         const reservedQty = Number(product.reserved_quantity || 0);
-        const maxQty = Number(product.max_preorder_quantity || 0);
-        const remainingQty = Math.max(maxQty - reservedQty, 0);
+        const currentStock = Number(product.stock_quantity || 0);
 
-        const fulfillQty = Math.min(quantity, reservedQty);
         const surplusQty = Math.max(quantity - reservedQty, 0);
         const shortageQty = Math.max(reservedQty - quantity, 0);
+        const availableAfterHarvest = currentStock + surplusQty;
 
-        document.getElementById('preview-fulfill-qty').textContent = this.fmtNumber(fulfillQty);
-        document.getElementById('preview-surplus-qty').textContent = this.fmtNumber(surplusQty);
-        document.getElementById('preview-shortage-qty').textContent = this.fmtNumber(shortageQty);
+        // Update summary
+        document.getElementById('summary-reserved-qty').textContent = this.fmtNumber(reservedQty) + ' kg';
+        document.getElementById('summary-available-qty').textContent = this.fmtNumber(availableAfterHarvest) + ' kg';
 
-        const previewEl = document.getElementById('harvest-fulfill-preview');
-        if (previewEl) {
-            previewEl.style.display = quantity > 0 ? 'block' : 'none';
+        // Show/hide summary
+        const summaryEl = document.getElementById('harvest-fulfill-summary');
+        if (summaryEl) {
+            summaryEl.style.display = quantity > 0 ? 'block' : 'none';
+        }
+
+        // Show/hide warning
+        const warningEl = document.getElementById('harvest-fulfill-warning');
+        if (warningEl) {
+            warningEl.style.display = shortageQty > 0 ? 'block' : 'none';
+            document.getElementById('warning-needed-qty').textContent = this.fmtNumber(shortageQty) + ' kg';
         }
 
         const confirmBtn = document.getElementById('confirm-harvest-fulfill-btn');
@@ -7633,48 +8396,89 @@ class FarmerDashboard {
     }
 
     async handleHarvestFulfill(productId, quantity) {
-        this.debugLog('API Call', { method: 'POST', endpoint: `/products/${productId}/convert-preorders`, action: 'harvest_fulfill', productId, quantity });
+        // Check if product has reservations to determine which endpoint to use
+        const product = this.myProductsCache?.find(p => String(p.id) === String(productId));
+        const reservedQty = Number(product?.reserved_quantity || 0);
+
+        this.debugLog('API Call', { method: 'POST', endpoint: reservedQty > 0 ? '/convert-preorders' : '/harvest-lifecycle', action: 'harvest_fulfill', productId, quantity, reservedQty });
+
         try {
-            const response = await fetch(`${this.apiBase}/products/${productId}/convert-preorders`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ harvest_quantity: quantity })
-            });
+            let response, data;
 
-            const data = await response.json();
+            if (reservedQty > 0) {
+                // Use convert-preorders for products with reservations
+                response = await fetch(`${this.apiBase}/products/${productId}/convert-preorders`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${this.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ harvest_quantity: quantity })
+                });
 
-            if (response.ok) {
-                const allocated = data.allocated_quantity || 0;
-                const surplus = data.surplus_quantity || 0;
-                const shortage = data.shortage_quantity || 0;
-                const fulfilled = data.fully_allocated || 0;
-                const partial = data.partially_allocated || 0;
-                const newStock = data.new_stock_quantity || 0;
+                data = await response.json();
 
-                let message = `Harvested ${quantity} units. `;
-                if (allocated > 0) {
-                    message += `${allocated} allocated to pre-orders (${fulfilled} full, ${partial} partial). `;
+                if (response.ok) {
+                    const allocated = data.allocated_quantity || 0;
+                    const surplus = data.surplus_quantity || 0;
+                    const shortage = data.shortage_quantity || 0;
+                    const fulfilled = data.fully_allocated || 0;
+                    const partial = data.partially_allocated || 0;
+                    const newStock = data.new_stock_quantity || 0;
+
+                    let message = `Harvested ${quantity} units. `;
+                    if (allocated > 0) {
+                        message += `${allocated} allocated to pre-orders (${fulfilled} full, ${partial} partial). `;
+                    }
+                    if (surplus > 0) {
+                        message += `${surplus} added to Available Now stock. `;
+                    }
+                    if (shortage > 0) {
+                        message += `Shortage: ${shortage} units not enough to fulfill all reservations. `;
+                    }
+                    message += `New stock: ${newStock}.`;
+
+                    this.showMessage(message, 'success');
+                    this.loadMyProducts();
+                    this.loadFarmerStats();
+                } else {
+                    this.showMessage(data.message || 'Failed to harvest and fulfill pre-orders', 'error');
                 }
-                if (surplus > 0) {
-                    message += `${surplus} added to Available Now stock. `;
-                }
-                if (shortage > 0) {
-                    message += `Shortage: ${shortage} units not enough to fulfill all reservations. `;
-                }
-                message += `New stock: ${newStock}.`;
-
-                this.showMessage(message, 'success');
-                this.loadMyProducts();
-                this.loadFarmerStats();
             } else {
-                this.showMessage(data.message || 'Failed to harvest and fulfill pre-orders', 'error');
+                // Use harvest-lifecycle for products without reservations (Harvest YES workflow)
+                response = await fetch(`${this.apiBase}/products/${productId}/harvest-lifecycle`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${this.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ harvest_quantity: quantity, make_available: true })
+                });
+
+                data = await response.json();
+
+                if (response.ok) {
+                    const action = data.action || 'created';
+                    const newStock = data.new_stock_quantity || quantity;
+                    const availableProductId = data.available_product_id;
+
+                    let message = `Harvested ${quantity} units. `;
+                    if (action === 'transferred') {
+                        message += `Stock transferred to linked Available product. New stock: ${newStock}.`;
+                    } else {
+                        message += `New Available product created with ${newStock} units in stock.`;
+                    }
+
+                    this.showMessage(message, 'success');
+                    this.loadMyProducts();
+                    this.loadFarmerStats();
+                } else {
+                    this.showMessage(data.message || 'Failed to complete harvest', 'error');
+                }
             }
         } catch (error) {
-            console.error('Error harvesting and fulfilling pre-orders:', error);
-            this.showMessage('Error harvesting and fulfilling pre-orders', 'error');
+            console.error('Error harvesting:', error);
+            this.showMessage('Error completing harvest', 'error');
         }
     }
 
@@ -7692,24 +8496,24 @@ class FarmerDashboard {
             const data = await response.json();
 
             if (response.ok) {
-                this.showMessage('Product disabled successfully!', 'success');
+                this.showMessage('Product made unavailable successfully!', 'success');
                 this.loadMyProducts();
                 this.loadFarmerStats();
                 
                 // Update the toggle status button in the edit modal
                 const toggleStatusBtn = document.getElementById('edit-toggle-status-btn');
                 if (toggleStatusBtn) {
-                    toggleStatusBtn.textContent = 'Enable Product';
+                    toggleStatusBtn.textContent = 'Make Available';
                     toggleStatusBtn.classList.remove('btn-danger', 'btn-secondary');
                     toggleStatusBtn.classList.add('btn-success');
                     toggleStatusBtn.disabled = false;
                 }
             } else {
-                this.showMessage(data.message || 'Failed to disable product', 'error');
+                this.showMessage(data.message || 'Failed to make product unavailable', 'error');
             }
         } catch (error) {
-            console.error('Error disabling product:', error);
-            this.showMessage('Error disabling product', 'error');
+            console.error('Error making product unavailable:', error);
+            this.showMessage('Error making product unavailable', 'error');
         }
     }
 
@@ -7727,24 +8531,24 @@ class FarmerDashboard {
             const data = await response.json();
 
             if (response.ok) {
-                this.showMessage('Product enabled successfully!', 'success');
+                this.showMessage('Product made available successfully!', 'success');
                 this.loadMyProducts();
                 this.loadFarmerStats();
                 
                 // Update the toggle status button in the edit modal
                 const toggleStatusBtn = document.getElementById('edit-toggle-status-btn');
                 if (toggleStatusBtn) {
-                    toggleStatusBtn.textContent = 'Disable Product';
+                    toggleStatusBtn.textContent = 'Make Unavailable';
                     toggleStatusBtn.classList.remove('btn-success', 'btn-secondary');
                     toggleStatusBtn.classList.add('btn-danger');
                     toggleStatusBtn.disabled = false;
                 }
             } else {
-                this.showMessage(data.message || 'Failed to enable product', 'error');
+                this.showMessage(data.message || 'Failed to make product available', 'error');
             }
         } catch (error) {
-            console.error('Error enabling product:', error);
-            this.showMessage('Error enabling product', 'error');
+            console.error('Error making product available:', error);
+            this.showMessage('Error making product available', 'error');
         }
     }
 
@@ -7847,42 +8651,51 @@ class FarmerDashboard {
 
                 // Determine if product is preorder and show correct fields
                 const isPreorder = product.is_preorder === true || product.is_preorder === 't' || product.is_preorder === 'true' || product.is_preorder === 1 || product.is_preorder === '1';
+                const isAvailable = product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1';
+                const hasPreorder = product.max_preorder_quantity > 0;
                 
                 // Show/hide field sections based on product type
-                const priceGroup = document.getElementById('edit-price-group');
-                const availableStockGroup = document.getElementById('edit-available-stock-group');
-                const availableExpiryGroup = document.getElementById('edit-available-expiry-group');
-                const preorderDateGroup = document.getElementById('edit-preorder-date-group');
-                const preorderQuantityGroup = document.getElementById('edit-preorder-quantity-group');
-                const preorderFields = document.getElementById('edit-preorder-fields');
+                const availableSection = document.getElementById('edit-available-section');
+                const preorderSection = document.getElementById('edit-preorder-section');
                 const harvestFulfillBtn = document.getElementById('edit-harvest-fulfill-btn');
                 const modalTitle = document.getElementById('edit-product-modal-title');
                 
                 // Update modal title based on product type
                 if (modalTitle) {
                     if (isPreorder) {
-                        modalTitle.innerHTML = '<i class="bi bi-pencil-square me-2 text-primary"></i>Edit Pre-order Product';
-                    } else {
+                        modalTitle.innerHTML = '<i class="bi bi-pencil-square me-2 text-warning"></i>Edit Pre-order Product';
+                    } else if (isAvailable && !hasPreorder) {
                         modalTitle.innerHTML = '<i class="bi bi-pencil-square me-2 text-success"></i>Edit Available Now Product';
+                    } else {
+                        modalTitle.innerHTML = '<i class="bi bi-pencil-square me-2 text-primary"></i>Edit Hybrid Product';
                     }
                 }
                 
-                if (isPreorder) {
-                    if (priceGroup) priceGroup.style.display = 'block';
-                    if (availableStockGroup) availableStockGroup.style.display = 'none';
-                    if (availableExpiryGroup) availableExpiryGroup.style.display = 'none';
-                    if (preorderDateGroup) preorderDateGroup.style.display = 'block';
-                    if (preorderQuantityGroup) preorderQuantityGroup.style.display = 'block';
-                    if (preorderFields) preorderFields.style.display = 'block';
-                    if (harvestFulfillBtn) harvestFulfillBtn.style.display = 'inline-block';
-                } else {
-                    if (priceGroup) priceGroup.style.display = 'block';
-                    if (availableStockGroup) availableStockGroup.style.display = 'block';
-                    if (availableExpiryGroup) availableExpiryGroup.style.display = 'block';
-                    if (preorderDateGroup) preorderDateGroup.style.display = 'none';
-                    if (preorderQuantityGroup) preorderQuantityGroup.style.display = 'none';
-                    if (preorderFields) preorderFields.style.display = 'none';
-                    if (harvestFulfillBtn) harvestFulfillBtn.style.display = 'none';
+                // Show/hide sections based on selling modes
+                if (availableSection) {
+                    const shouldShow = (isAvailable && !isPreorder);
+                    availableSection.style.display = shouldShow ? 'block' : 'none';
+                    // Disable stock_quantity input when section is hidden to prevent browser validation
+                    const stockQuantityInput = document.getElementById('edit-stock-quantity');
+                    if (stockQuantityInput) {
+                        stockQuantityInput.disabled = !shouldShow;
+                    }
+                }
+                if (preorderSection) {
+                    preorderSection.style.display = isPreorder ? 'block' : 'none';
+                }
+                if (harvestFulfillBtn) {
+                    harvestFulfillBtn.style.display = hasPreorder ? 'inline-block' : 'none';
+                }
+                
+                // Show/hide update harvest date button for pre-order products
+                const updateHarvestDateBtn = document.getElementById('edit-update-harvest-date-btn');
+                if (updateHarvestDateBtn) {
+                    updateHarvestDateBtn.style.display = isPreorder ? 'inline-block' : 'none';
+                    updateHarvestDateBtn.onclick = () => {
+                        this.closeEditModal(true);
+                        this.openUpdateHarvestDateModal(productId);
+                    };
                 }
 
                 // Populate edit form
@@ -7893,7 +8706,6 @@ class FarmerDashboard {
                 // Set toggle status button based on product availability and admin disabled status
                 const toggleStatusBtn = document.getElementById('edit-toggle-status-btn');
                 const adminDisabledBanner = document.getElementById('edit-admin-disabled-banner');
-                const isAvailable = (product.is_available === true || product.is_available === 't' || product.is_available === 'true' || product.is_available === 1 || product.is_available === '1');
                 const isAdminDisabled = (product.is_admin_disabled === true || product.is_admin_disabled === 't' || product.is_admin_disabled === 'true' || product.is_admin_disabled === 1 || product.is_admin_disabled === '1');
                 
                 // Show/hide admin disabled banner
@@ -7923,16 +8735,15 @@ class FarmerDashboard {
                         // Show toggle button and set state
                         toggleStatusBtn.style.display = 'inline-block';
                         if (isAvailable) {
-                            toggleStatusBtn.textContent = 'Disable Product';
+                            toggleStatusBtn.textContent = 'Make Unavailable';
                             toggleStatusBtn.classList.remove('btn-success', 'btn-secondary');
                             toggleStatusBtn.classList.add('btn-danger');
-                            toggleStatusBtn.disabled = false;
                         } else {
-                            toggleStatusBtn.textContent = 'Enable Product';
+                            toggleStatusBtn.textContent = 'Make Available';
                             toggleStatusBtn.classList.remove('btn-danger', 'btn-secondary');
                             toggleStatusBtn.classList.add('btn-success');
-                            toggleStatusBtn.disabled = false;
                         }
+                        toggleStatusBtn.disabled = false;
                     }
                 }
                 
@@ -7951,7 +8762,11 @@ class FarmerDashboard {
                 }
 
                 document.getElementById('edit-stock-quantity').value = product.stock_quantity;
-                document.getElementById('edit-product-description').value = product.description || '';
+                
+                // Load description into appropriate field based on selling mode
+                const description = product.description || '';
+                document.getElementById('edit-available-description').value = description;
+                document.getElementById('edit-preorder-description').value = description;
                 
                 // Set date values from database (format to YYYY-MM-DD for date input)
                 const expiryEl = document.getElementById('edit-expiry-date');
@@ -8024,7 +8839,7 @@ class FarmerDashboard {
                 
                 // Parse and populate PSGC address fields
                 const productLocation = product.location || '';
-                const shopLocation = this.currentShopProfile?.location || '';
+                const shopLocation = this.currentShopProfile?.location || this.authProfile?.address || '';
                 const location = productLocation || shopLocation;
                 const zoneEl = document.getElementById('product-location-zone');
                 const provinceEl = document.getElementById('product-location-province');
@@ -8035,8 +8850,11 @@ class FarmerDashboard {
                 
                 const displayEl = document.getElementById('edit-product-location-display');
                 
-                if (location) {
-                    if (displayEl) displayEl.value = location;
+                // Always set location - use product location if available, otherwise shop profile address
+                if (displayEl) {
+                    displayEl.value = location;
+                    // Set placeholder to shop profile address
+                    displayEl.placeholder = shopLocation;
                 }
                 
                 if (location && window.PSGC) {
@@ -8080,23 +8898,25 @@ class FarmerDashboard {
                 this.syncProductNameAvailability('edit');
                 this.updatePriceSuggestion('edit');
                 
-                // Show current image
-                const preview = document.getElementById('edit-product-image-preview');
-                if (preview) {
-                    let editPreviewUrl = product.image_url || '';
-                    if (editPreviewUrl && !editPreviewUrl.startsWith('http') && !editPreviewUrl.startsWith('/')) {
-                        editPreviewUrl = '/' + editPreviewUrl;
-                    }
-                    if (!editPreviewUrl || editPreviewUrl === 'null' || editPreviewUrl === 'undefined') {
-                        editPreviewUrl = '/images/logo.png';
-                    }
-                    preview.innerHTML = `<img src="${this.escapeAttr(editPreviewUrl)}" alt="Current product image" style="max-width: 200px; margin-top: 10px;">`;
+                // Show current image in preview area
+                const editImagePreview = document.getElementById('edit-product-image-preview');
+                let editPreviewUrl = product.image_url || '';
+                if (editPreviewUrl && !editPreviewUrl.startsWith('http') && !editPreviewUrl.startsWith('/')) {
+                    editPreviewUrl = '/' + editPreviewUrl;
+                }
+                if (!editPreviewUrl || editPreviewUrl === 'null' || editPreviewUrl === 'undefined') {
+                    editPreviewUrl = '/images/logo.png';
+                }
+                if (editImagePreview) {
+                    editImagePreview.innerHTML = `<img src="${editPreviewUrl}" alt="Current product image" style="width:100%;height:auto;object-fit:cover;border-radius:6px;">`;
                 }
 
                 // Store current product status for resubmit logic
                 this.currentEditProductStatus = product.status || 'approved';
 
                 // Show modal with appropriate button text and title
+                // For rejected products, always show "Resubmit Product"
+                // For approved products, show "Update Product" (only changes to "Submit for Approval" if image is changed)
                 const submitLabel = this.currentEditProductStatus === 'rejected' ? 'Resubmit Product' : 'Update Product';
                 const modalTitleEl = document.getElementById('edit-product-modal-title');
                 if (modalTitleEl) {
@@ -8217,6 +9037,34 @@ class FarmerDashboard {
         this.renderMyProducts(filtered);
     }
 
+    saveProductFilters() {
+        try {
+            const filters = {
+                availableStatus: document.getElementById('available-status-filter')?.value || '',
+                availableCategory: document.getElementById('available-category-filter')?.value || '',
+                preorderStatus: document.getElementById('preorder-status-filter')?.value || '',
+                preorderCategory: document.getElementById('preorder-category-filter')?.value || ''
+            };
+            localStorage.setItem('farmerProductFilters', JSON.stringify(filters));
+        } catch (e) { /* ignore storage errors */ }
+    }
+
+    restoreProductFilters() {
+        try {
+            const saved = localStorage.getItem('farmerProductFilters');
+            if (!saved) return;
+            const filters = JSON.parse(saved);
+            const availableStatus = document.getElementById('available-status-filter');
+            const availableCategory = document.getElementById('available-category-filter');
+            const preorderStatus = document.getElementById('preorder-status-filter');
+            const preorderCategory = document.getElementById('preorder-category-filter');
+            if (availableStatus && filters.availableStatus) availableStatus.value = filters.availableStatus;
+            if (availableCategory && filters.availableCategory) availableCategory.value = filters.availableCategory;
+            if (preorderStatus && filters.preorderStatus) preorderStatus.value = filters.preorderStatus;
+            if (preorderCategory && filters.preorderCategory) preorderCategory.value = filters.preorderCategory;
+        } catch (e) { /* ignore parse errors */ }
+    }
+
     filterAvailableProducts() {
         // Filter available products from cache and re-render
         if (!this.myProductsCache || !Array.isArray(this.myProductsCache)) {
@@ -8261,6 +9109,9 @@ class FarmerDashboard {
             return nameMatch && statusMatch && categoryMatch;
         });
 
+        // Destroy sortable table before filtering to ensure clean state
+        this.destroySortableTable('available-products-table');
+        
         this.renderAvailableProducts(filtered);
     }
 
@@ -8304,6 +9155,9 @@ class FarmerDashboard {
             return nameMatch && statusMatch && categoryMatch;
         });
 
+        // Destroy sortable table before filtering to ensure clean state
+        this.destroySortableTable('preorder-products-table');
+        
         this.renderPreorderProducts(filtered);
     }
 
@@ -8916,7 +9770,7 @@ class FarmerDashboard {
             const productName = item.product_name || order.product_name || 'Product';
             const quantity = item.quantity || order.quantity || 1;
             const price = Number(String(item.price || order.price || 0).replace(/[^\d.-]/g, '')) || 0;
-            const totalAmount = Number(String(item.total_amount || order.total_amount || 0).replace(/[^\d.-]/g, '')) || 0;
+            const totalAmount = price * quantity;
             const orderId = Number(order.id);
             const orderDate = order.created_at ? new Date(order.created_at) : null;
             const deliveryAddress = String(order.delivery_address || '').trim();
@@ -9013,7 +9867,7 @@ class FarmerDashboard {
         const productUnit = item.unit || order.unit || 'kg';
         const quantity = item.quantity || order.quantity || 1;
         const price = Number(String(item.price || order.price || 0).replace(/[^\d.-]/g, '')) || 0;
-        const totalAmount = Number(String(item.total_amount || order.total_amount || 0).replace(/[^\d.-]/g, '')) || 0;
+        const totalAmount = price * quantity;
         const customerName = String(order.customer_name || '—').trim();
         const customerEmail = String(order.customer_email || '—').trim();
         const customerPhone = String(order.customer_phone || '—').trim();
