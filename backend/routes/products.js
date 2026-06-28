@@ -1376,15 +1376,16 @@ router.post('/', multer().none(), async (req, res) => {
 
     // Log product creation to activity logger (async, non-blocking)
     activityLogger.logAddProduct(
-      decoded.id, 
-      decoded.role, 
-      req.sessionID, 
-      createdProduct.id, 
+      decoded.id,
+      decoded.role,
+      req.sessionID,
+      createdProduct.id,
       createdProduct.name,
       {},
       getClientIp(req),
       req.headers['user-agent'],
-      generateRequestId()
+      generateRequestId(),
+      req.headers['referer'] || req.originalUrl
     );
 
     // Send notification to admin about new product submission (only if approval is required)
@@ -1787,14 +1788,15 @@ router.put('/:id', multer().none(), async (req, res) => {
 
     // Log product update to activity logger (async, non-blocking)
     activityLogger.logEditProduct(
-      decoded.id, 
-      decoded.role, 
-      req.sessionID, 
-      id, 
+      decoded.id,
+      decoded.role,
+      req.sessionID,
+      id,
       nextName,
       {},
       getClientIp(req),
       req.headers['user-agent'],
+      req.headers['referer'] || req.originalUrl,
       generateRequestId()
     );
 
@@ -1868,11 +1870,11 @@ router.post('/:id/convert-preorders', async (req, res) => {
       const surplusQuantity = Math.max(harvestQuantity - product.reserved_quantity, 0);
       const shortageQuantity = Math.max(product.reserved_quantity - harvestQuantity, 0);
 
-      // Update product: add surplus to stock, reduce reserved by allocated amount
+      // Update product: add surplus to stock (treat null as 0), reduce reserved by allocated amount
       // Also reset harvest tracking fields and enable reservations again
       await client.query(`
         UPDATE products
-        SET stock_quantity = stock_quantity + $1,
+        SET stock_quantity = COALESCE(stock_quantity, 0) + $1,
             reserved_quantity = reserved_quantity - $2,
             harvest_overdue_days = 0,
             reservations_disabled = false
@@ -2303,15 +2305,16 @@ router.delete('/:id', async (req, res) => {
 
     // Log product deletion to activity logger (async, non-blocking)
     activityLogger.logDeleteProduct(
-      decoded.id, 
-      decoded.role, 
-      req.sessionID, 
-      id, 
+      decoded.id,
+      decoded.role,
+      req.sessionID,
+      id,
       imageUrl || 'Product',
       {},
       getClientIp(req),
       req.headers['user-agent'],
-      generateRequestId()
+      generateRequestId(),
+      req.headers['referer'] || req.originalUrl
     );
 
     res.json({ message: 'Product deleted successfully' });

@@ -403,7 +403,7 @@ class ActivityLogger {
     /**
      * Log login activity (asynchronous, non-blocking)
      */
-    logLogin(userId, role, sessionId, metadata = {}, ipAddress = null, userAgent = null, requestId = null) {
+    logLogin(userId, role, sessionId, metadata = {}, ipAddress = null, userAgent = null, requestId = null, currentPage = null) {
         this.log({
             session_id: sessionId,
             user_id: userId,
@@ -411,6 +411,7 @@ class ActivityLogger {
             action: 'login',
             description: 'User logged in successfully',
             status: 'success',
+            current_page: currentPage,
             metadata,
             ip_address: ipAddress,
             user_agent: userAgent,
@@ -439,7 +440,7 @@ class ActivityLogger {
     /**
      * Log failed login activity (asynchronous, non-blocking)
      */
-    logFailedLogin(email, role, sessionId, reason = 'Invalid credentials', metadata = {}, ipAddress = null, userAgent = null, requestId = null) {
+    logFailedLogin(email, role, sessionId, reason = 'Invalid credentials', metadata = {}, ipAddress = null, userAgent = null, requestId = null, currentPage = null) {
         this.log({
             session_id: sessionId,
             user_id: null,
@@ -447,6 +448,7 @@ class ActivityLogger {
             action: 'failed_login',
             description: `Failed login attempt: ${reason}`,
             status: 'failed',
+            current_page: currentPage,
             metadata: { ...metadata, email, reason },
             ip_address: ipAddress,
             user_agent: userAgent,
@@ -595,7 +597,7 @@ class ActivityLogger {
     /**
      * Log place order (asynchronous, non-blocking)
      */
-    logPlaceOrder(userId, role, sessionId, orderId, metadata = {}, ipAddress = null, userAgent = null, requestId = null) {
+    logPlaceOrder(userId, role, sessionId, orderId, metadata = {}, ipAddress = null, userAgent = null, requestId = null, currentPage = null) {
         this.log({
             session_id: sessionId,
             user_id: userId,
@@ -605,6 +607,7 @@ class ActivityLogger {
             entity_id: orderId,
             description: `Placed order #${orderId}`,
             status: 'success',
+            current_page: currentPage,
             metadata: { ...metadata, order_id: orderId },
             ip_address: ipAddress,
             user_agent: userAgent,
@@ -615,7 +618,7 @@ class ActivityLogger {
     /**
      * Log cancel order (asynchronous, non-blocking)
      */
-    logCancelOrder(userId, role, sessionId, orderId, reason, metadata = {}, ipAddress = null, userAgent = null, requestId = null) {
+    logCancelOrder(userId, role, sessionId, orderId, reason, metadata = {}, ipAddress = null, userAgent = null, requestId = null, currentPage = null) {
         this.log({
             session_id: sessionId,
             user_id: userId,
@@ -625,6 +628,7 @@ class ActivityLogger {
             entity_id: orderId,
             description: `Cancelled order #${orderId}: ${reason}`,
             status: 'success',
+            current_page: currentPage,
             metadata: { ...metadata, order_id: orderId, reason },
             ip_address: ipAddress,
             user_agent: userAgent,
@@ -635,7 +639,7 @@ class ActivityLogger {
     /**
      * Log add product (farmer) - asynchronous, non-blocking
      */
-    logAddProduct(userId, role, sessionId, productId, productName, metadata = {}, ipAddress = null, userAgent = null, requestId = null) {
+    logAddProduct(userId, role, sessionId, productId, productName, metadata = {}, ipAddress = null, userAgent = null, requestId = null, currentPage = null) {
         this.log({
             session_id: sessionId,
             user_id: userId,
@@ -645,6 +649,7 @@ class ActivityLogger {
             entity_id: productId,
             description: `Created new product: ${productName}`,
             status: 'success',
+            current_page: currentPage,
             metadata: { ...metadata, product_name: productName },
             ip_address: ipAddress,
             user_agent: userAgent,
@@ -655,7 +660,7 @@ class ActivityLogger {
     /**
      * Log edit product (farmer) - asynchronous, non-blocking
      */
-    logEditProduct(userId, role, sessionId, productId, productName, metadata = {}, ipAddress = null, userAgent = null, requestId = null) {
+    logEditProduct(userId, role, sessionId, productId, productName, metadata = {}, ipAddress = null, userAgent = null, requestId = null, currentPage = null) {
         this.log({
             session_id: sessionId,
             user_id: userId,
@@ -665,6 +670,7 @@ class ActivityLogger {
             entity_id: productId,
             description: `Updated product: ${productName}`,
             status: 'success',
+            current_page: currentPage,
             metadata: { ...metadata, product_name: productName },
             ip_address: ipAddress,
             user_agent: userAgent,
@@ -675,7 +681,7 @@ class ActivityLogger {
     /**
      * Log delete product (farmer) - asynchronous, non-blocking
      */
-    logDeleteProduct(userId, role, sessionId, productId, productName, metadata = {}, ipAddress = null, userAgent = null, requestId = null) {
+    logDeleteProduct(userId, role, sessionId, productId, productName, metadata = {}, ipAddress = null, userAgent = null, requestId = null, currentPage = null) {
         this.log({
             session_id: sessionId,
             user_id: userId,
@@ -685,6 +691,7 @@ class ActivityLogger {
             entity_id: productId,
             description: `Deleted product: ${productName}`,
             status: 'success',
+            current_page: currentPage,
             metadata: { ...metadata, product_name: productName },
             ip_address: ipAddress,
             user_agent: userAgent,
@@ -735,7 +742,7 @@ class ActivityLogger {
     /**
      * Log security event - asynchronous, non-blocking
      */
-    logSecurityEvent(userId, role, sessionId, eventType, description, metadata = {}, ipAddress = null, userAgent = null, requestId = null) {
+    logSecurityEvent(userId, role, sessionId, eventType, description, metadata = {}, ipAddress = null, userAgent = null, requestId = null, currentPage = null) {
         this.log({
             session_id: sessionId,
             user_id: userId,
@@ -743,6 +750,7 @@ class ActivityLogger {
             action: 'security_event',
             description: `Security event: ${description}`,
             status: 'success',
+            current_page: currentPage,
             metadata: { ...metadata, event_type: eventType },
             ip_address: ipAddress,
             user_agent: userAgent,
@@ -753,7 +761,7 @@ class ActivityLogger {
     /**
      * Log admin settings change - asynchronous, non-blocking
      */
-    logAdminSettingsChange(userId, role, sessionId, settingName, oldValue, newValue, metadata = {}, ipAddress = null, userAgent = null, requestId = null) {
+    logAdminSettingsChange(userId, role, sessionId, settingName, oldValue, newValue, metadata = {}, ipAddress = null, userAgent = null, requestId = null, currentPage = null) {
         this.log({
             session_id: sessionId,
             user_id: userId,
@@ -762,6 +770,7 @@ class ActivityLogger {
             entity_type: 'settings',
             description: `Changed setting: ${settingName}`,
             status: 'success',
+            current_page: currentPage,
             metadata: { ...metadata, setting_name: settingName, old_value: oldValue, new_value: newValue },
             ip_address: ipAddress,
             user_agent: userAgent,

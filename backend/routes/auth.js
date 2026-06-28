@@ -119,7 +119,8 @@ async function requireRecaptcha(req, res) {
       { reason: 'missing_token', endpoint: req.path },
       getClientIp(req),
       req.headers['user-agent'],
-      generateRequestId()
+      generateRequestId(),
+      req.headers['referer'] || req.originalUrl
     );
     res.status(400).json({ message: 'Please complete the CAPTCHA before submitting. If the CAPTCHA is not visible, please refresh the page.' });
     return false;
@@ -515,14 +516,15 @@ router.post('/login', async (req, res) => {
       
       // Log failed login to activity logger (async, non-blocking)
       activityLogger.logFailedLogin(
-        loginIdentifier, 
-        'customer', 
-        req.sessionID, 
+        loginIdentifier,
+        'customer',
+        req.sessionID,
         'User not found',
         {},
         getClientIp(req),
         req.headers['user-agent'],
-        generateRequestId()
+        generateRequestId(),
+        req.headers['referer'] || req.originalUrl
       );
       
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -543,14 +545,15 @@ router.post('/login', async (req, res) => {
       
       // Log failed login to activity logger (async, non-blocking)
       activityLogger.logFailedLogin(
-        loginIdentifier, 
-        user.role, 
-        req.sessionID, 
+        loginIdentifier,
+        user.role,
+        req.sessionID,
         'Account disabled',
         {},
         getClientIp(req),
         req.headers['user-agent'],
-        generateRequestId()
+        generateRequestId(),
+        req.headers['referer'] || req.originalUrl
       );
       
       return res.status(403).json({ message: 'Account disabled. Please contact support.' });
@@ -613,14 +616,15 @@ router.post('/login', async (req, res) => {
       
       // Log failed login to activity logger (async, non-blocking)
       activityLogger.logFailedLogin(
-        loginIdentifier, 
-        user.role, 
-        req.sessionID, 
+        loginIdentifier,
+        user.role,
+        req.sessionID,
         'Invalid password',
         {},
         getClientIp(req),
         req.headers['user-agent'],
-        generateRequestId()
+        generateRequestId(),
+        req.headers['referer'] || req.originalUrl
       );
       
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -658,13 +662,14 @@ router.post('/login', async (req, res) => {
 
     // Log successful login to activity logger (async, non-blocking)
     activityLogger.logLogin(
-      user.id, 
-      user.role, 
+      user.id,
+      user.role,
       req.sessionID,
       {},
       getClientIp(req),
       req.headers['user-agent'],
-      generateRequestId()
+      generateRequestId(),
+      req.headers['referer'] || req.originalUrl
     );
 
     res.json({
@@ -747,12 +752,13 @@ router.post('/logout', async (req, res) => {
       
       // Log logout to activity logger (async, non-blocking)
       activityLogger.logLogout(
-        userId, 
-        userRole, 
+        userId,
+        userRole,
         req.sessionID,
         {},
         getClientIp(req),
         req.headers['user-agent'],
+        req.headers['referer'] || req.originalUrl,
         generateRequestId()
       );
     }
@@ -1071,7 +1077,8 @@ router.post('/forgot', async (req, res) => {
         { email, reason: rl.reason, retry_after_seconds: rl.retryAfterSeconds },
         getClientIp(req),
         req.headers['user-agent'],
-        generateRequestId()
+        generateRequestId(),
+        req.headers['referer'] || req.originalUrl
       );
       return res.status(429).json({ message: genericMessage, retryAfter: rl.retryAfterSeconds, cooldownSeconds: rl.retryAfterSeconds });
     }
@@ -1171,7 +1178,8 @@ router.post('/forgot/resend', async (req, res) => {
         { email, reason: rl.reason, retry_after_seconds: rl.retryAfterSeconds },
         getClientIp(req),
         req.headers['user-agent'],
-        generateRequestId()
+        generateRequestId(),
+        req.headers['referer'] || req.originalUrl
       );
       return res.status(429).json({ message: genericMessage, retryAfter: rl.retryAfterSeconds, cooldownSeconds: rl.retryAfterSeconds });
     }

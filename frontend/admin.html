@@ -3838,6 +3838,15 @@
                                     <div id="am-detail-current-page">--</div>
                                 </div>
                                 <div class="mb-3">
+                                    <label class="form-label small text-muted">IP Address</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="font-monospace small" id="am-detail-ip">--</div>
+                                        <button class="btn btn-sm btn-outline-secondary" id="am-copy-ip-btn" title="Copy IP Address">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
                                     <label class="form-label small text-muted">Timestamp</label>
                                     <div id="am-detail-timestamp">--</div>
                                 </div>
@@ -4086,6 +4095,17 @@
                         <input type="email" id="edit-user-email"
                                class="form-control" placeholder="Email" required>
                     </div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label" for="edit-user-role">Role</label>
+                    <select id="edit-user-role" class="form-select" disabled>
+                        <option value="customer">Customer</option>
+                        <option value="farmer">Farmer</option>
+                        <option value="admin">Admin</option>
+                        <option value="super_admin">Super Admin</option>
+                    </select>
+                    <div class="form-hint text-muted small">Role can only be changed from All Users section</div>
                 </div>
 
                 <div class="form-group mb-3">
@@ -4560,6 +4580,7 @@
             <div class="modal-footer">
                 <button class="btn btn-danger btn-sm" id="sub-detail-expire-btn" style="display:none">Expire Subscription</button>
                 <button class="btn btn-danger btn-sm" id="sub-detail-reject-btn" style="display:none">Reject</button>
+                <button class="btn btn-warning btn-sm" id="sub-detail-resume-btn" style="display:none">Resume Subscription</button>
                 <button class="btn btn-success btn-sm ms-auto" id="sub-detail-approve-btn" style="display:none">Approve</button>
             </div>
         </div>

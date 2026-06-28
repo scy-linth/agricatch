@@ -12,6 +12,7 @@ const cloudinary = require('../utils/cloudinary');
 const { sendVerificationEmail, sendUnverificationEmail, sendPremiumUpgradeEmail, sendPremiumExpiredEmail } = require('../utils/emailService');
 const activityLogger = require('../services/activityLogger');
 const { restoreInventoryOnCancel, updateStatisticsOnDeliver, getOrderForBusinessLogic } = require('../utils/orderBusinessLogic');
+const { getValidStatuses } = require('../utils/orderTransitions');
 
 const router = express.Router();
 
@@ -463,7 +464,8 @@ const disableUserHandler = async (req, res, reasonOverride = null) => {
       { userId, email: userResult.rows[0]?.email },
       req.ip,
       req.headers['user-agent'],
-      null
+      null,
+      req.headers['referer'] || req.originalUrl
     );
     broadcastEvent('admin.audit', { action: 'user.disable', entity: 'users', entity_id: userId, actor_admin_id: req.user.id });
 
@@ -546,7 +548,8 @@ const enableUserHandler = async (req, res) => {
       { userId, email: userResult.rows[0]?.email },
       req.ip,
       req.headers['user-agent'],
-      null
+      null,
+      req.headers['referer'] || req.originalUrl
     );
     broadcastEvent('admin.audit', { action: 'user.enable', entity: 'users', entity_id: userId, actor_admin_id: req.user.id });
 
@@ -4540,10 +4543,10 @@ router.put('/subscriptions/:id/expire', requireRole('admin', 'super_admin'), asy
     const farmerEmail = farmerRes.rows[0]?.email;
     const farmerFirstName = farmerRes.rows[0]?.first_name;
     await pool.query(
-      `UPDATE farmer_subscriptions SET status = 'expired', expires_at = CURRENT_TIMESTAMP, expiry_reason = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      `UPDATE farmer_subscriptions SET status = 'admin_expire', expires_at = CURRENT_TIMESTAMP, expiry_reason = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
       [reason || null, id]
     );
-    const after = { status: 'expired', farmer_id: sub.farmer_id, tier: sub.tier, expires_at: new Date().toISOString(), expiry_reason: reason };
+    const after = { status: 'admin_expire', farmer_id: sub.farmer_id, tier: sub.tier, expires_at: new Date().toISOString(), expiry_reason: reason };
     try {
       await writeAdminAuditLog(pool, {
         actor_admin_id: adminId,
@@ -4579,6 +4582,65 @@ router.put('/subscriptions/:id/expire', requireRole('admin', 'super_admin'), asy
     res.json({ message: 'Subscription expired' });
   } catch (err) {
     console.error('Subscription expire error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── PUT /api/admin/subscriptions/:id/resume ─────────────────────────────────
+router.put('/subscriptions/:id/resume', requireRole('admin', 'super_admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user.id;
+    const subRes = await pool.query(
+      'SELECT * FROM farmer_subscriptions WHERE id = $1 AND status = $2', [id, 'admin_expire']
+    );
+    if (subRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Admin-expired subscription not found' });
+    }
+    const sub = subRes.rows[0];
+    const before = { status: sub.status, farmer_id: sub.farmer_id, tier: sub.tier, expires_at: sub.expires_at };
+
+    // Calculate remaining time from original expiry
+    const originalExpiresAt = new Date(sub.expires_at);
+    const now = new Date();
+    const remainingMs = originalExpiresAt - now;
+    
+    // Set new expiry date to now + remaining time (minimum 1 day if remaining time is negative or very small)
+    const newExpiresAt = remainingMs > 86400000 ? new Date(now.getTime() + remainingMs) : new Date(now.getTime() + 86400000);
+
+    await pool.query(
+      `UPDATE farmer_subscriptions SET status = 'active', expires_at = $1, expiry_reason = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [newExpiresAt.toISOString(), id]
+    );
+    const after = { status: 'active', farmer_id: sub.farmer_id, tier: sub.tier, expires_at: newExpiresAt.toISOString() };
+    try {
+      await writeAdminAuditLog(pool, {
+        actor_admin_id: adminId,
+        action: 'restored',
+        entity: 'subscription',
+        entity_id: id,
+        before,
+        after,
+        req
+      });
+    } catch (auditErr) {
+      console.error('Audit log error (non-fatal):', auditErr);
+    }
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+         VALUES ($1, 'subscription_restored',
+          'Premium Subscription Restored', $2, false, CURRENT_TIMESTAMP)`,
+        [sub.farmer_id, 'Your Premium subscription has been restored by an admin.']
+      );
+      broadcastEvent('notification.created', { farmer_id: sub.farmer_id });
+    } catch (notifErr) {
+      console.error('Notification error (non-fatal):', notifErr);
+    }
+
+    res.json({ message: 'Subscription resumed' });
+  } catch (err) {
+    console.error('Subscription resume error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

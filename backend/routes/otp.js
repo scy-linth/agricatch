@@ -99,7 +99,8 @@ router.post('/send', async (req, res) => {
           { reason: 'verification_failed', error: captcha.message, endpoint: req.path, email },
           req.ip || req.connection?.remoteAddress,
           req.headers['user-agent'],
-          null
+          null,
+          req.headers['referer'] || req.originalUrl
         );
         return res.status(captcha.status || 403).json({ message: captcha.message || 'CAPTCHA verification failed' });
       }

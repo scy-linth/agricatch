@@ -366,7 +366,8 @@ router.put('/settings',  requireRole('super_admin'), async (req, res) => {
             {},
             req.ip || req.connection?.remoteAddress || 'unknown',
             req.headers['user-agent'],
-            `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+            `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            req.headers['referer'] || req.originalUrl
         );
 
         // Return updated settings

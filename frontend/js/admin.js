@@ -4502,6 +4502,7 @@ class AdminDashboard {
                 actionIcon: this.getActionIcon(activity.action),
                 description: activity.description || '',
                 currentPage: activity.current_page || 'N/A',
+                ipAddress: activity.ip_address || 'N/A',
                 timestamp: activity.created_at,
                 status: activity.status,
                 sessionId: activity.session_id || 'N/A',
@@ -4895,6 +4896,7 @@ class AdminDashboard {
         document.getElementById('am-detail-action').textContent = activity.actionLabel;
         document.getElementById('am-detail-description').textContent = activity.description;
         document.getElementById('am-detail-current-page').textContent = activity.currentPage;
+        document.getElementById('am-detail-ip').textContent = activity.ipAddress || 'N/A';
         document.getElementById('am-detail-timestamp').textContent = new Date(activity.timestamp).toLocaleString('en-PH', {
             timeZone: 'Asia/Manila',
             year: 'numeric',
@@ -5109,6 +5111,18 @@ class AdminDashboard {
                     this.showMessage('Session ID copied to clipboard', 'success');
                 }).catch(() => {
                     this.showMessage('Failed to copy Session ID', 'error');
+                });
+            }
+        });
+
+        // Copy IP Address button
+        document.getElementById('am-copy-ip-btn')?.addEventListener('click', () => {
+            const ipAddress = document.getElementById('am-detail-ip')?.textContent;
+            if (ipAddress && ipAddress !== 'N/A') {
+                navigator.clipboard.writeText(ipAddress).then(() => {
+                    this.showMessage('IP Address copied to clipboard', 'success');
+                }).catch(() => {
+                    this.showMessage('Failed to copy IP Address', 'error');
                 });
             }
         });
@@ -9168,6 +9182,15 @@ class AdminDashboard {
 
         if (usernameEl) usernameEl.value = user.username || '';
         if (emailEl) emailEl.value = user.email || '';
+        
+        // Set role and enable/disable based on section
+        const roleEl = document.getElementById('edit-user-role');
+        if (roleEl) {
+            roleEl.value = user.role || 'customer';
+            // Only enable role editing when called from all-users section
+            roleEl.disabled = this.previousModalId !== 'all-users-detail-modal';
+        }
+        
         if (passwordEl) passwordEl.value = '';
         if (phoneEl) {
             // Format phone with spaces (9XX XXX XXXX)
@@ -11562,16 +11585,18 @@ class AdminDashboard {
             const statusElement = document.getElementById('sub-detail-status');
             const statusClass = subscription.status === 'active' ? 'success' :
                                subscription.status === 'pending' ? 'warning' :
-                               subscription.status === 'rejected' ? 'danger' : 'secondary';
-            statusElement.innerHTML = `<span class="badge bg-${statusClass}">${subscription.status}</span>`;
+                               subscription.status === 'rejected' ? 'danger' :
+                               subscription.status === 'admin_expire' ? 'danger' : 'secondary';
+            const statusLabel = subscription.status === 'admin_expire' ? 'Admin Expired' : subscription.status;
+            statusElement.innerHTML = `<span class="badge bg-${statusClass}">${statusLabel}</span>`;
 
-            // Reason field for rejected/expired subscriptions
+            // Reason field for rejected/expired/admin_expire subscriptions
             const reasonContainer = document.getElementById('sub-detail-reason-container');
             const reasonElement = document.getElementById('sub-detail-reason');
             if (subscription.status === 'rejected' && subscription.rejection_reason) {
                 reasonContainer.style.display = 'block';
                 reasonElement.textContent = subscription.rejection_reason;
-            } else if (subscription.status === 'expired' && subscription.expiry_reason) {
+            } else if ((subscription.status === 'expired' || subscription.status === 'admin_expire') && subscription.expiry_reason) {
                 reasonContainer.style.display = 'block';
                 reasonElement.textContent = subscription.expiry_reason;
             } else {
@@ -11590,9 +11615,10 @@ class AdminDashboard {
                 // Show expire button for active subscriptions
                 document.getElementById('sub-detail-expire-btn').style.display = 'block';
                 document.getElementById('sub-detail-expire-btn').dataset.id = subscription.id;
-                // Hide approve/reject buttons for active subscriptions
+                // Hide approve/reject/resume buttons for active subscriptions
                 document.getElementById('sub-detail-approve-btn').style.display = 'none';
                 document.getElementById('sub-detail-reject-btn').style.display = 'none';
+                document.getElementById('sub-detail-resume-btn').style.display = 'none';
             } else if (subscription.status === 'pending') {
                 document.getElementById('sub-detail-starts-at-container').style.display = 'none';
                 document.getElementById('sub-detail-expires-at-container').style.display = 'none';
@@ -11601,15 +11627,27 @@ class AdminDashboard {
                 document.getElementById('sub-detail-approve-btn').dataset.id = subscription.id;
                 document.getElementById('sub-detail-reject-btn').style.display = 'block';
                 document.getElementById('sub-detail-reject-btn').dataset.id = subscription.id;
-                // Hide expire button for pending subscriptions
+                // Hide expire/resume button for pending subscriptions
+                document.getElementById('sub-detail-expire-btn').style.display = 'none';
+                document.getElementById('sub-detail-resume-btn').style.display = 'none';
+            } else if (subscription.status === 'admin_expire') {
+                document.getElementById('sub-detail-starts-at-container').style.display = 'none';
+                document.getElementById('sub-detail-expires-at-container').style.display = 'none';
+                // Show resume button for admin_expire subscriptions
+                document.getElementById('sub-detail-resume-btn').style.display = 'block';
+                document.getElementById('sub-detail-resume-btn').dataset.id = subscription.id;
+                // Hide approve/reject/expire buttons for admin_expire subscriptions
+                document.getElementById('sub-detail-approve-btn').style.display = 'none';
+                document.getElementById('sub-detail-reject-btn').style.display = 'none';
                 document.getElementById('sub-detail-expire-btn').style.display = 'none';
             } else {
                 document.getElementById('sub-detail-starts-at-container').style.display = 'none';
                 document.getElementById('sub-detail-expires-at-container').style.display = 'none';
-                // Hide all action buttons for non-active, non-pending subscriptions
+                // Hide all action buttons for other statuses
                 document.getElementById('sub-detail-approve-btn').style.display = 'none';
                 document.getElementById('sub-detail-reject-btn').style.display = 'none';
                 document.getElementById('sub-detail-expire-btn').style.display = 'none';
+                document.getElementById('sub-detail-resume-btn').style.display = 'none';
             }
             
             // Payment proof
@@ -11970,6 +12008,41 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Error expiring subscription:', err);
             adminDashboard.showToast('Error expiring subscription', 'error');
+        }
+    });
+
+    // Resume subscription button (event delegation)
+    document.addEventListener('click', async (e) => {
+        if (e.target.matches('#sub-detail-resume-btn') || e.target.closest('#sub-detail-resume-btn')) {
+            const btn = e.target.matches('#sub-detail-resume-btn') ? e.target : e.target.closest('#sub-detail-resume-btn');
+            const id = btn.dataset.id;
+            if (!id) return;
+
+            if (!confirm('Are you sure you want to resume this subscription? The remaining time will be restored.')) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`${adminDashboard.apiBase}/admin/subscriptions/${id}/resume`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${adminDashboard.token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    adminDashboard.showToast('Subscription resumed successfully', 'success');
+                    const detailsModal = bootstrap.Modal.getInstance(document.getElementById('subscription-details-modal'));
+                    if (detailsModal) detailsModal.hide();
+                    adminDashboard.loadSubscriptionRequests('all');
+                } else {
+                    adminDashboard.showToast(data.message || 'Failed to resume subscription', 'error');
+                }
+            } catch (err) {
+                console.error('Error resuming subscription:', err);
+                adminDashboard.showToast('Error resuming subscription', 'error');
+            }
         }
     });
 

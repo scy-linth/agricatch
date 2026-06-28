@@ -277,9 +277,11 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
       return res.status(403).json({ message: 'You can only update your own orders' });
     }
 
+    if (order.status === 'cancelled') {
       return res.status(400).json({ message: 'Cancelled orders cannot be updated' });
     }
 
+    if (order.status === 'delivered') {
       return res.status(400).json({ message: 'Delivered orders cannot be updated' });
     }
 
@@ -501,7 +503,6 @@ router.post('/', async (req, res) => {
 
       if (cartResult.rows.length === 0) {
         await client.query('ROLLBACK');
-        client.release();
         return res.status(400).json({ message: 'Cart is empty' });
       }
 
@@ -513,7 +514,6 @@ router.post('/', async (req, res) => {
 
       if (unavailableItems.length > 0) {
         await client.query('ROLLBACK');
-        client.release();
         const names = unavailableItems.map((item) => item.name).filter(Boolean);
         return res.status(400).json({
           message: 'Your cart has unavailable items. Please remove them before checkout.',
@@ -526,7 +526,6 @@ router.post('/', async (req, res) => {
         if (!item.product_id || !item.price || !item.quantity) {
           console.error('[Create Order] Invalid cart item:', item);
           await client.query('ROLLBACK');
-          client.release();
           return res.status(400).json({
             message: 'Invalid cart item. Please refresh your cart and try again.'
           });
@@ -711,14 +710,15 @@ router.post('/', async (req, res) => {
       // Log order placement to activity logger (async, non-blocking)
       for (const orderId of createdOrderIds) {
         activityLogger.logPlaceOrder(
-          decoded.id, 
-          decoded.role, 
-          req.sessionID, 
+          decoded.id,
+          decoded.role,
+          req.sessionID,
           orderId,
           {},
           getClientIp(req),
           req.headers['user-agent'],
-          generateRequestId()
+          generateRequestId(),
+          req.headers['referer'] || req.originalUrl
         );
       }
 
@@ -824,19 +824,18 @@ router.put('/:id/status', async (req, res) => {
 
     const orderInfo = await pool.query('SELECT user_id FROM orders WHERE id = $1', [orderId]);
     if (orderInfo.rows.length === 0) {
+      return res.status(404).json({ message: 'Order not found' });
     }
 
     // Get current order status for validation
-    const orderStatusResult = await pool.query('SELECT status FROM orders WHERE id = ', [id]);
+    const orderStatusResult = await pool.query('SELECT status FROM orders WHERE id = $1', [orderId]);
     const currentStatus = orderStatusResult.rows[0]?.status;
     const userRole = userResult.rows[0]?.role || 'farmer';
 
     // Use shared transition matrix for validation
-    const validation = validateTransition(currentStatus, 'cancelled', userRole);
+    const validation = validateTransition(currentStatus, status, userRole);
     if (!validation.valid) {
       return res.status(400).json({ message: validation.message });
-    }
-      return res.status(404).json({ message: 'Order not found' });
     }
 
     // Get order details for farmer_id
@@ -853,22 +852,12 @@ router.put('/:id/status', async (req, res) => {
 
     const orderData = orderDetails.rows[0];
 
-    // Get current order status for validation
-    const currentOrderStatus = await pool.query('SELECT status FROM orders WHERE id = $1', [orderId]);
-    if (currentOrderStatus.rows.length === 0) {
-      return res.status(404).json({ message: 'Order not found' });
+    // Check if order can be cancelled
+    if (currentStatus === 'cancelled') {
+      return res.status(400).json({ message: 'Order is already cancelled' });
     }
-    const currentStatus = currentOrderStatus.rows[0].status;
-
-    // Use shared transition matrix for validation
-    const validation = validateTransition(currentStatus, status, role);
-    if (!validation.valid) {
-      return res.status(400).json({ message: validation.message });
-    }
-      return res.status(400).json({ message: 'Cancelled orders cannot be updated' });
-    }
-
-      return res.status(400).json({ message: 'Delivered orders cannot be updated' });
+    if (currentStatus === 'delivered') {
+      return res.status(400).json({ message: 'Delivered orders cannot be cancelled' });
     }
 
     // Use transaction for consistency
@@ -1016,15 +1005,16 @@ router.put('/:id/cancel', async (req, res) => {
 
       // Log order cancellation to activity logger (async, non-blocking)
       activityLogger.logCancelOrder(
-        decoded.id, 
-        decoded.role, 
-        req.sessionID, 
-        id, 
+        decoded.id,
+        decoded.role,
+        req.sessionID,
+        id,
         reason || 'Customer request',
         {},
         getClientIp(req),
         req.headers['user-agent'],
-        generateRequestId()
+        generateRequestId(),
+        req.headers['referer'] || req.originalUrl
       );
 
       // Send notification to customer
@@ -1258,10 +1248,11 @@ router.put('/:id/cancel-farmer', async (req, res) => {
       [id]
     );
     if (orderInfo.rows.length === 0) {
+      return res.status(404).json({ message: 'Order not found' });
     }
 
     // Get current order status for validation
-    const orderStatusResult = await pool.query('SELECT status FROM orders WHERE id = ', [id]);
+    const orderStatusResult = await pool.query('SELECT status FROM orders WHERE id = $1', [id]);
     const currentStatus = orderStatusResult.rows[0]?.status;
     const userRole = userResult.rows[0]?.role || 'farmer';
 
@@ -1269,8 +1260,6 @@ router.put('/:id/cancel-farmer', async (req, res) => {
     const validation = validateTransition(currentStatus, 'cancelled', userRole);
     if (!validation.valid) {
       return res.status(400).json({ message: validation.message });
-    }
-      return res.status(404).json({ message: 'Order not found' });
     }
 
     const client = await pool.connect();
