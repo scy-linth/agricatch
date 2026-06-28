@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="/vendor/simple-datatables/style.css">
     <!-- AgriCatch SaaS overrides — loaded LAST -->
     <link rel="stylesheet" href="/css/agricatch-admin.css?v=sections-rebuild-20260609">
+    <link rel="stylesheet" href="/css/agricatch-polish.css?v=2">
 
     <script>
     // Authorization check - run immediately in head before page loads
@@ -3914,7 +3915,7 @@
                             <div class="progress mb-2" style="height: 24px;">
                                 <div class="progress-bar bg-primary" role="progressbar" style="width: 11.5%;" id="am-storage-bar">2.3 MB / 20 MB</div>
                             </div>
-                            <small class="text-muted">2.3 MB of 20 MB used (11.5%)</small>
+                            <small class="text-muted" id="am-storage-text">Loading storage stats...</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label small fw-bold">Auto Delete Oldest</label>

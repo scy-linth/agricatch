@@ -1,6 +1,10 @@
 # AgriCatch System Inventory
 
-Read-only architecture inventory completed. No code generated.
+**Purpose:** Technical inventory and discovery document for the AgriCatch codebase.
+
+This document provides a detailed read-only inventory of the system architecture, including file locations, dependencies, and implementation details. It serves as a technical reference for understanding the codebase structure.
+
+**Note:** For primary documentation on business rules, architecture, database schema, and APIs, refer to the dedicated documentation files in the docs/ directory. This inventory complements those documents with implementation-specific details.
 
 # 1. User Roles
 
@@ -524,30 +528,35 @@ Main API modules are mounted from `D:/Codings/AgriCatch/backend/server.js:768-95
   - **Relationships:** References categories/users.
   - **Roles:** Farmer product forms, admin catalog.
   - Runtime schema: `D:/Codings/AgriCatch/backend/routes/products.js:187-200`
+  - **Documentation:** docs/DATABASE.md
 
 - **`product_name_requests`**
   - **Purpose:** Farmer requests for custom product names/categories.
   - **Relationships:** References categories/requesting/reviewing users.
   - **Roles:** Farmer, admin.
   - Runtime schema: `D:/Codings/AgriCatch/backend/routes/products.js:202-218`
+  - **Documentation:** docs/DATABASE.md
 
 - **`verification_requests`**
   - **Purpose:** Farmer verification workflow.
   - **Relationships:** References farmer users and reviewing admin.
   - **Roles:** Farmer, admin.
   - Creation script: `D:/Codings/AgriCatch/backend/run_verification_requests_migration.js:14-20`
+  - **Documentation:** docs/DATABASE.md
 
 - **`support_tickets`**
   - **Purpose:** Customer/farmer support cases.
   - **Relationships:** References creating user.
   - **Roles:** Customer, farmer, admin.
   - Creation script: `D:/Codings/AgriCatch/backend/create_support_tables.js:24-29`
+  - **Documentation:** docs/DATABASE.md, docs/BUSINESS_RULES.md
 
 - **`support_messages`**
   - **Purpose:** Support ticket chat messages.
   - **Relationships:** References support ticket and sender user.
   - **Roles:** Customer, farmer, admin.
   - Creation script: `D:/Codings/AgriCatch/backend/create_support_tables.js:39-44`
+  - **Documentation:** docs/DATABASE.md
 
 - **`admin_audit_logs`**
   - **Purpose:** Admin/security audit trail.

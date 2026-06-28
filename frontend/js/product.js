@@ -130,14 +130,21 @@ class ProductPage {
         if (!list || !this.productId) return;
 
         try {
-            list.innerHTML = '<div class="empty-state">Loading similar offers...</div>';
+            list.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-spinner fa-pulse',
+                title: 'Loading similar offers...'
+            });
             const response = await fetch(`${this.apiBase}/products/${this.productId}/similar-sellers`);
             if (!response.ok) throw new Error('Failed to load similar sellers');
 
             const data = await response.json();
             const similar = Array.isArray(data.similar) ? data.similar : [];
             if (!similar.length) {
-                list.innerHTML = '<div class="empty-state">No similar sellers found yet.</div>';
+                list.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-store',
+                    title: 'No similar sellers found yet',
+                    description: 'Check back later for more options.'
+                });
                 return;
             }
 
@@ -157,7 +164,11 @@ class ProductPage {
             `).join('');
         } catch (error) {
             console.error('Error loading similar sellers:', error);
-            list.innerHTML = '<div class="empty-state">Unable to load similar offers right now.</div>';
+            list.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-exclamation-circle',
+                title: 'Unable to load similar offers',
+                description: 'Please try again later.'
+            });
         }
     }
 
@@ -178,7 +189,11 @@ class ProductPage {
         if (!list) return;
 
         if (!reviews.length) {
-            list.innerHTML = '<div class="empty-state">No reviews yet.</div>';
+            list.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-star',
+                title: 'No reviews yet',
+                description: 'Be the first to share your experience!'
+            });
             return;
         }
 

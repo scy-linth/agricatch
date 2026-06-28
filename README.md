@@ -1,7 +1,6 @@
-# Agricatch: “A Web Application for Pre-Ordering Fresh Produce from Farmers for Trabajo Market”
+# AgriCatch: Agricultural E-Commerce Platform
 
-
-A modern e-commerce platform connecting farmers directly with consumers for fresh farm products. Features guest browsing, cart functionality, and user authentication for ordering.
+A production-ready agricultural e-commerce platform connecting customers directly with verified farmers. Supports both Available Now and Hybrid Pre-order products.
 
 ## Features
 
@@ -9,18 +8,28 @@ A modern e-commerce platform connecting farmers directly with consumers for fres
 - **User Authentication**: Register and login for placing orders
 - **Product Categories**: Agricultural Products (farm products only)
 - **Shopping Cart**: Persistent cart for both guest and logged-in users
+- **Hybrid Pre-order**: Reserve products before harvest
+- **Wishlist**: Save products for later
 - **Cash on Delivery**: Philippine payment method
 - **Responsive Design**: Works on desktop and mobile devices
 - **Real-time Cart Updates**: Live cart count and totals
 - **Product Search & Filtering**: Find products by category and search terms
+- **Messaging**: Customer-farmer communication
+- **Notifications**: Order status and platform updates
+- **Reviews**: Product and customer ratings
+- **Farmer Dashboard**: Product management, analytics, orders
+- **Admin Dashboard**: Product approval, farmer verification, user management
+- **Super Admin**: Platform settings, feature flags, system maintenance
 
 ## Technology Stack
 
 - **Backend**: Node.js, Express.js
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL (Supabase)
 - **Frontend**: HTML5, CSS3, Vanilla JavaScript
 - **Authentication**: JWT (JSON Web Tokens)
-- **Styling**: Custom CSS with responsive design
+- **Styling**: Bootstrap 5.3.3, Bootstrap Icons, Font Awesome
+- **Storage**: Cloudinary
+- **Deployment**: Vercel (frontend), Render (backend)
 
 ## Project Structure
 

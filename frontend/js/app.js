@@ -34,6 +34,7 @@ class AgricultureMarket {
         } else {
             try { localStorage.removeItem('token'); } catch (e) {}
         }
+        this.userId = localStorage.getItem('userId') ? parseInt(localStorage.getItem('userId')) : null;
         this.sessionId = this.getOrCreateSessionId();
         this.currentPage = 1;
         this.currentCategory = '';
@@ -93,6 +94,15 @@ class AgricultureMarket {
         this.otpMode = 'strict'; // Default to strict mode
         this.isDebugAccount = false;
         this.debugUserInfo = null;
+
+        // Cart selection state for grouped marketplace UX
+        this.selectedProductIds = new Set(); // Set of selected cart item IDs
+        this.selectedFarmerNames = new Set(); // Set of selected farmer names
+        this.allSelected = false; // ALL toggle state
+        this.currentCartItems = []; // Store current cart data for selection operations
+
+        // Load selection state from localStorage (user-scoped)
+        this.loadSelectionState();
 
         try { window.agriCatchApp = this; } catch (e) {}
 
@@ -355,7 +365,6 @@ class AgricultureMarket {
     }
 
     setPageScrollLocked(locked) {
-        console.log('[DEBUG] setPageScrollLocked called with locked:', locked);
         try {
             const docEl = document.documentElement;
             const body = document.body;
@@ -363,17 +372,14 @@ class AgricultureMarket {
 
             if (locked) {
                 if (this._pageScrollLocked) {
-                    console.log('[DEBUG] Scroll already locked, skipping');
                     return;
                 }
                 this._pageScrollLocked = true;
                 this._lockedScrollY = window.scrollY || window.pageYOffset || 0;
-                console.log('[DEBUG] Locking scroll at Y:', this._lockedScrollY);
                 
                 // Calculate scrollbar width to prevent layout shift
                 const scrollWidth = window.innerWidth - document.documentElement.clientWidth;
                 this._scrollbarWidth = scrollWidth;
-                console.log('[DEBUG] Scrollbar width:', scrollWidth);
                 
                 docEl.classList.add('modal-open');
                 body.classList.add('modal-open');
@@ -384,17 +390,12 @@ class AgricultureMarket {
                 body.style.overflowY = 'scroll';
 
                 // Don't add padding to header or fixed buttons - they won't shift
-                
-                console.log('[DEBUG] HTML classes:', docEl.className);
-                console.log('[DEBUG] Body classes:', body.className);
                 return;
             }
 
             // Keep scroll locked if another (non-product) modal is still open.
             const otherModalOpen = !!document.querySelector('.modal.active');
-            console.log('[DEBUG] Other modal open check:', otherModalOpen);
             if (otherModalOpen) {
-                console.log('[DEBUG] Other modal still open, keeping scroll locked');
                 return;
             }
 
@@ -511,6 +512,7 @@ class AgricultureMarket {
             }
             
             this.updateCartCount();
+            this.loadCartData();
             this.loadNotifications();
             this.loadCustomerMessagesBadge();
             this.startMessagesPolling();
@@ -1038,6 +1040,8 @@ class AgricultureMarket {
                     this.showMessage('Please log in to proceed to checkout', 'info');
                 } else {
                     // Logged in user - proceed to checkout page
+                    // Store selected product IDs for checkout
+                    localStorage.setItem('selectedCartItems', JSON.stringify([...this.selectedProductIds]));
                     window.location.href = '/checkout.html';
                 }
             }
@@ -2311,6 +2315,16 @@ class AgricultureMarket {
         this.loadNotifications();
         this.loadSupportTicketsBadge();
         this.loadCustomerMessagesBadge();
+
+        // Highlight My Wishlist if on wishlist.html
+        const wishlistBtn = document.getElementById('customer-wishlist-btn');
+        if (wishlistBtn) {
+            if (window.location.pathname.includes('wishlist.html')) {
+                wishlistBtn.classList.add('active');
+            } else {
+                wishlistBtn.classList.remove('active');
+            }
+        }
     }
 
     showProfileFromToken() {
@@ -2587,7 +2601,7 @@ class AgricultureMarket {
                 : '';
             return `
             <li>
-                <a class="dropdown-item notification-item-dropdown ${readStatus} py-2 notif-header-link" href="#" data-id="${note.id}" data-order-id="${note.order_id || ''}" data-type="${note.type || ''}" style="border:none;padding:0.75rem 1rem;margin:0.25rem 0.5rem;border-radius:8px;">
+                <a class="dropdown-item notification-item-dropdown ${readStatus} py-2 notif-header-link" href="#" data-id="${note.id}" data-order-id="${note.order_id || ''}" data-type="${note.type || ''}" data-product-id="${note.product_id || ''}" style="border:none;padding:0.75rem 1rem;margin:0.25rem 0.5rem;border-radius:8px;">
                     <div class="d-flex align-items-center gap-2">
                         <div class="notification-icon-dropdown" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${note.is_read ? '#f3f4f6' : '#ecfdf5'};color:${note.is_read ? '#6b7280' : '#10b981'};font-size:0.875rem;">
                             <i class="bi ${ic}"></i>
@@ -2604,17 +2618,36 @@ class AgricultureMarket {
         }).join('');
 
         list.querySelectorAll('.notif-header-link').forEach(item => {
-            item.addEventListener('click', (e) => {
+            item.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const id = item.getAttribute('data-id');
                 const orderId = Number(item.getAttribute('data-order-id') || 0);
                 const type = item.getAttribute('data-type') || '';
+                const productId = Number(item.getAttribute('data-product-id') || 0);
                 
                 // Handle support ticket notifications - navigate to customer account support tickets
                 if (type === 'support_ticket') {
                     this.markNotificationRead(id);
                     window.location.href = '/customer-account.html#support-tickets';
                     return;
+                }
+                
+                // Handle product_available notifications - open current active product
+                if (type === 'product_available' && productId) {
+                    try {
+                        const response = await fetch(`${this.apiBase}/products/${productId}/current-active`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.currentProductId) {
+                                this.markNotificationRead(id);
+                                this.closeCart();
+                                this.showProductDetails(data.currentProductId);
+                                return;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error fetching current active product:', error);
+                    }
                 }
                 
                 this.markNotificationRead(id, { navigateToOrderId: orderId > 0 ? orderId : null });
@@ -2708,12 +2741,28 @@ class AgricultureMarket {
 
         // Add click handlers for notification items
         list.querySelectorAll('.notification-item').forEach(item => {
-            item.addEventListener('click', () => {
+            item.addEventListener('click', async () => {
                 const id = Number(item.dataset.id);
                 const notif = notifications.find(n => n.id === id);
                 if (notif && !notif.is_read) {
                     const btn = item.querySelector('.notification-mark-read-btn');
                     if (btn) this.markCustomerNotificationRead(id, btn);
+                }
+                
+                // Handle product_available notifications - open current active product
+                if (notif && notif.type === 'product_available' && notif.product_id) {
+                    try {
+                        const response = await fetch(`${this.apiBase}/products/${notif.product_id}/current-active`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.currentProductId) {
+                                this.closeCart();
+                                this.showProductDetails(data.currentProductId);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error fetching current active product:', error);
+                    }
                 }
             });
         });
@@ -3656,9 +3705,16 @@ class AgricultureMarket {
             if (response.ok) {
                 this.resetRecaptcha('auth');
                 const userRole = data.user?.role;
+                this.userId = data.user?.id;
 
                 this.token = this.normalizeAuthToken(data.token);
                 localStorage.setItem('token', this.token);
+                if (data.user?.id) {
+                    this.userId = data.user.id;
+                    localStorage.setItem('userId', data.user.id);
+                    // Reload selection state with the new userId
+                    this.loadSelectionState();
+                }
 
                 // Migrate guest cart to user cart immediately
                 await this.migrateGuestCart();
@@ -4740,8 +4796,30 @@ class AgricultureMarket {
             console.error('Logout API call failed:', error);
         }
 
+        // Clear cart selection state on logout
+        // For logged-in users: keep user-scoped selection (allows restoration on re-login)
+        // For guest users: clear global selection (no persistence across sessions)
+        if (this.userId) {
+            // Logged-in user: keep user-scoped selection for restoration
+            // Just clear in-memory state
+            this.selectedProductIds.clear();
+            this.selectedFarmerNames.clear();
+            this.allSelected = false;
+        } else {
+            // Guest user: clear global selection
+            localStorage.removeItem('selectedCartProductIds');
+            localStorage.removeItem('selectedCartFarmerNames');
+            localStorage.removeItem('selectedCartAllSelected');
+            this.selectedProductIds.clear();
+            this.selectedFarmerNames.clear();
+            this.allSelected = false;
+        }
+        
         this.token = null;
+        this.userId = null;
         localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        
         const userAccountBtn = document.getElementById('user-account-btn');
         if (userAccountBtn) userAccountBtn.setAttribute('aria-expanded', 'false');
         this.showGuestMenu();
@@ -4992,7 +5070,11 @@ class AgricultureMarket {
             console.log('Available products loaded:', data.products?.length || 0, 'products');
 
             if (!data.products || data.products.length === 0) {
-                container.innerHTML = '<div class="empty-state"><p>No available products at the moment.</p></div>';
+                container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-basket-shopping',
+                    title: 'No available products at the moment',
+                    description: 'Check back soon for fresh harvests!'
+                });
                 return;
             }
 
@@ -5001,7 +5083,11 @@ class AgricultureMarket {
                 this.renderProducts(data.products, 'available');
             } else {
                 console.warn('No available products in response:', data);
-                container.innerHTML = '<div class="empty-state"><p>No available products at the moment.</p></div>';
+                container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-basket-shopping',
+                    title: 'No available products at the moment',
+                    description: 'Check back soon for fresh harvests!'
+                });
             }
         } catch (error) {
             console.error('Error loading available products:', error);
@@ -5067,7 +5153,11 @@ class AgricultureMarket {
             console.log('Preorder products loaded:', data.products?.length || 0, 'products');
 
             if (!data.products || data.products.length === 0) {
-                container.innerHTML = '<div class="empty-state"><p>No preorder products at the moment.</p></div>';
+                container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-seedling',
+                    title: 'No preorder products at the moment',
+                    description: 'Check back soon for upcoming harvests!'
+                });
                 return;
             }
 
@@ -5076,7 +5166,11 @@ class AgricultureMarket {
                 this.renderProducts(data.products, 'preorder');
             } else {
                 console.warn('No preorder products in response:', data);
-                container.innerHTML = '<div class="empty-state"><p>No preorder products at the moment.</p></div>';
+                container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-seedling',
+                    title: 'No preorder products at the moment',
+                    description: 'Check back soon for upcoming harvests!'
+                });
             }
         } catch (error) {
             console.error('Error loading preorder products:', error);
@@ -5153,7 +5247,11 @@ class AgricultureMarket {
             console.log('Products loaded:', data.products?.length || 0, 'products');
             
             if (!data.products || data.products.length === 0) {
-                container.innerHTML = '<div class="empty-state"><p>No products available at the moment.</p></div>';
+                container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-basket-shopping',
+                    title: 'No products available at the moment',
+                    description: 'Check back soon for fresh harvests!'
+                });
                 this.renderPagination(data.pagination);
                 return;
             }
@@ -5169,7 +5267,11 @@ class AgricultureMarket {
                 });
                 
                 if (availableProducts.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><p>No products available at the moment.</p></div>';
+                    container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-basket-shopping',
+                    title: 'No products available at the moment',
+                    description: 'Check back soon for fresh harvests!'
+                });
                     this.renderPagination(data.pagination);
                     return;
                 }
@@ -5178,7 +5280,11 @@ class AgricultureMarket {
                 this.renderPagination(data.pagination);
             } else {
                 console.warn('No products in response:', data);
-                container.innerHTML = '<div class="empty-state"><p>No products available at the moment.</p></div>';
+                container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-basket-shopping',
+                    title: 'No products available at the moment',
+                    description: 'Check back soon for fresh harvests!'
+                });
             }
         } catch (error) {
             console.error('Error loading products:', error);
@@ -5288,6 +5394,13 @@ class AgricultureMarket {
                                         onclick="event.stopPropagation(); app.addToCart(${product.id})"
                                         ${isPurchasable ? '' : 'disabled'}>
                                         ${isPurchasable ? (isPreorder ? 'Reserve' : 'Add to Cart') : 'Unavailable'}
+                                    </button>
+                                    <button type="button" class="wishlist-toggle-btn"
+                                        onclick="event.stopPropagation(); app.toggleWishlist(${product.id}, this)"
+                                        title="${product.is_in_wishlist ? 'Remove from wishlist' : 'Add to wishlist'}"
+                                        aria-label="${product.is_in_wishlist ? 'Remove from wishlist' : 'Add to wishlist'}"
+                                        style="background:none;border:none;padding:8px;cursor:pointer;color:${product.is_in_wishlist ? '#ef4444' : '#9ca3af'};transition:color 0.2s;">
+                                        <i class="fas fa-heart" style="font-size:1.1rem;" aria-hidden="true"></i>
                                     </button>
                                 </div>
                             </div>
@@ -5509,12 +5622,21 @@ class AgricultureMarket {
                             <span class="sold-count">Sold ${this.fmtNumber(soldCount)}</span>
                         </div>
                     </div>
+                    <div class="product-actions" style="display:flex;gap:8px;align-items:center;margin-top:8px;">
                         <button type="button" class="add-to-cart-btn ${product.is_preorder ? 'btn-warning' : ''}"
                             ${cartBtnAttr}
                             ${isPurchasable && !reservationsDisabled ? '' : 'disabled'}
                             title="${cartBtnTitle}">
                         ${cartBtnText}
                     </button>
+                    <button type="button" class="wishlist-toggle-btn"
+                        onclick="event.stopPropagation(); app.toggleWishlist(${product.id}, this)"
+                        title="${product.is_in_wishlist ? 'Remove from wishlist' : 'Add to wishlist'}"
+                        aria-label="${product.is_in_wishlist ? 'Remove from wishlist' : 'Add to wishlist'}"
+                        style="background:none;border:none;padding:8px;cursor:pointer;color:${product.is_in_wishlist ? '#ef4444' : '#9ca3af'};transition:color 0.2s;">
+                        <i class="fas fa-heart" style="font-size:1.2rem;" aria-hidden="true"></i>
+                    </button>
+                </div>
                 </div>
             </div>
         `;
@@ -5601,11 +5723,8 @@ class AgricultureMarket {
 
     // Show product details in floating modal
     async showProductDetails(productId) {
-        console.log('[DEBUG] showProductDetails called with productId:', productId);
-
         // Validate productId before proceeding
         if (!productId || productId === 'null' || productId === 'undefined') {
-            console.error('[ERROR] Invalid productId:', productId);
             this.showMessage('Invalid product ID', 'error');
             return;
         }
@@ -5616,17 +5735,13 @@ class AgricultureMarket {
             const cached = this.productCache.get(cacheKey);
             const now = Date.now();
             if (cached && (now - cached.timestamp) < 300000) { // 5 minutes
-                console.log('[DEBUG] Using cached product data');
                 this.populateProductDetails(cached.product, productId);
                 return;
             }
 
             // Open modal immediately with a lightweight loading placeholder
             const modal = document.getElementById('product-details-modal');
-            console.log('[DEBUG] Modal element found:', !!modal);
-            console.log('[DEBUG] Modal parent before move:', modal?.parentElement?.tagName);
             try { if (modal && modal.parentElement !== document.body) document.body.appendChild(modal); } catch (e) {}
-            console.log('[DEBUG] Modal parent after move:', modal?.parentElement?.tagName);
             if (modal) {
                 // Show loading spinner instead of text and clear all fields to prevent showing previous product data
                 const nameEl = document.getElementById('product-details-name');
@@ -5664,14 +5779,8 @@ class AgricultureMarket {
                 if (quantityEl) quantityEl.value = '1';
                 if (addCartBtn) addCartBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
                 if (similarSellersEl) similarSellersEl.innerHTML = '';
-                console.log('[DEBUG] Adding active/open classes to modal');
-                console.log('[DEBUG] Modal classes before:', modal.className);
                 modal.classList.add('active', 'open');
-                console.log('[DEBUG] Modal classes after:', modal.className);
-                console.log('[DEBUG] Calling setPageScrollLocked(true)');
                 this.setPageScrollLocked(true);
-                console.log('[DEBUG] Body overflow after lock:', document.body.style.overflow);
-                console.log('[DEBUG] HTML overflow after lock:', document.documentElement.style.overflow);
             }
 
             const response = await fetch(`${this.apiBase}/products/${productId}`, {
@@ -5963,6 +6072,21 @@ class AgricultureMarket {
                     ? '<i class="fas fa-shopping-cart"></i> Add to Cart'
                     : '<i class="fas fa-ban"></i> Unavailable';
             }
+
+            // Update wishlist button
+            const wishlistBtn = document.getElementById('product-details-wishlist-btn');
+            if (wishlistBtn) {
+                const heartIcon = wishlistBtn.querySelector('i');
+                const isInWishlist = product.is_in_wishlist === true;
+                if (heartIcon) {
+                    heartIcon.style.color = isInWishlist ? '#ef4444' : '#9ca3af';
+                }
+                wishlistBtn.title = isInWishlist ? 'Remove from wishlist' : 'Add to wishlist';
+                wishlistBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    await this.toggleWishlist(productId, wishlistBtn);
+                };
+            }
             
             // Update quantity button states
             this.updateQuantityButtons();
@@ -6000,13 +6124,9 @@ class AgricultureMarket {
     }
     
     closeProductDetails() {
-        console.log('[DEBUG] closeProductDetails called');
         const modal = document.getElementById('product-details-modal');
-        console.log('[DEBUG] Modal element found:', !!modal);
         if (modal) {
-            console.log('[DEBUG] Modal classes before removal:', modal.className);
             modal.classList.remove('active', 'open');
-            console.log('[DEBUG] Modal classes after removal:', modal.className);
         }
         const shopModal = document.getElementById('shop-details-modal');
         if (shopModal) {
@@ -6015,10 +6135,7 @@ class AgricultureMarket {
 
         // Update nav state after modal closes
         setTimeout(() => this.updateActiveNavLink(), 100);
-        console.log('[DEBUG] Calling setPageScrollLocked(false)');
         this.setPageScrollLocked(false);
-        console.log('[DEBUG] Body overflow after unlock:', document.body.style.overflow);
-        console.log('[DEBUG] HTML overflow after unlock:', document.documentElement.style.overflow);
         try {
             if (this._productModalKeydown) {
                 document.removeEventListener('keydown', this._productModalKeydown);
@@ -6349,7 +6466,12 @@ class AgricultureMarket {
                 const cartTotalEl = document.getElementById('cart-total');
                 const checkoutBtn = document.getElementById('checkout-btn');
                 if (cartTotalEl && data.summary) {
-                    cartTotalEl.textContent = data.summary.subtotal || '0.00';
+                    cartTotalEl.innerHTML = `
+                        <div class="cart-summary-row cart-summary-total">
+                            <strong>Total</strong>
+                            <strong>₱${data.summary.subtotal || '0.00'}</strong>
+                        </div>
+                    `;
                 }
                 if (checkoutBtn && data.summary) {
                     checkoutBtn.disabled = (data.summary.itemCount || 0) === 0;
@@ -6357,6 +6479,20 @@ class AgricultureMarket {
                 }
 
                 this.showMessage('Item added to cart!', 'success', { position: 'center' });
+
+                // Auto-select the newly added product
+                // Find the cart item that matches the product we just added
+                if (data.cartItems && productId) {
+                    const addedCartItem = data.cartItems.find(item => item.product_id === productId);
+                    if (addedCartItem) {
+                        this.selectedProductIds.add(addedCartItem.id);
+                        if (addedCartItem.farmer_name) {
+                            this.selectedFarmerNames.add(addedCartItem.farmer_name);
+                        }
+                        this.updateAllSelectionState();
+                        this.saveSelectionState();
+                    }
+                }
 
                 // If cart is already open, refresh the cart display
                 const cartSidebar = document.getElementById('cart-sidebar');
@@ -6369,6 +6505,67 @@ class AgricultureMarket {
         } catch (error) {
             console.error('Error adding to cart:', error);
             this.showMessage('Failed to add item to cart', 'error');
+        }
+    }
+
+    // Wishlist functionality
+    async toggleWishlist(productId, buttonElement) {
+        if (!productId || productId === 'null' || productId === 'undefined') {
+            console.error('[ERROR] Invalid productId in toggleWishlist:', productId);
+            this.showMessage('Invalid product ID', 'error');
+            return;
+        }
+
+        if (!this.token) {
+            this.showMessage('Please login to use wishlist', 'warning');
+            return;
+        }
+
+        try {
+            const heartIcon = buttonElement?.querySelector('i');
+            // Detect state from title attribute — set by both template and JS, reliable after reload.
+            // Fallback to icon inline color for backward compatibility (e.g., product details modal).
+            const isInWishlist = buttonElement?.title === 'Remove from wishlist'
+                || heartIcon?.style.color === 'rgb(239, 68, 68)'
+                || heartIcon?.style.color === '#ef4444';
+
+            const wishlistUrl = isInWishlist
+                ? `${this.apiBase}/wishlist/${productId}`
+                : `${this.apiBase}/wishlist`;
+            const response = await fetch(wishlistUrl, {
+                method: isInWishlist ? 'DELETE' : 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: isInWishlist ? undefined : JSON.stringify({ productId })
+            });
+
+            if (response.ok) {
+                // Toggle heart color on both icon and button so state is consistent
+                const newColor = isInWishlist ? '#9ca3af' : '#ef4444';
+                if (heartIcon) {
+                    heartIcon.style.color = newColor;
+                }
+                if (buttonElement) {
+                    buttonElement.style.color = newColor;
+                }
+                // Update button title
+                if (buttonElement) {
+                    buttonElement.title = isInWishlist ? 'Add to wishlist' : 'Remove from wishlist';
+                }
+                this.showMessage(isInWishlist ? 'Removed from wishlist' : 'Added to wishlist', 'success');
+
+                // Refresh product sections to update is_in_wishlist state on all cards
+                this.loadAvailableProducts();
+                this.loadPreorderProducts();
+            } else {
+                const data = await response.json();
+                this.showMessage(data.message || 'Failed to update wishlist', 'error');
+            }
+        } catch (error) {
+            console.error('Error toggling wishlist:', error);
+            this.showMessage('Failed to update wishlist', 'error');
         }
     }
 
@@ -6415,35 +6612,6 @@ class AgricultureMarket {
         }, 800);
     }
 
-    async toggleWishlist(productId, isInWishlist) {
-        if (!this.token) {
-            this.showMessage('Login to use wishlist', 'error');
-            return;
-        }
-
-        try {
-            const url = `${this.apiBase}/wishlist${isInWishlist ? `/${productId}` : ''}`;
-            const response = await fetch(url, {
-                method: isInWishlist ? 'DELETE' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.token}`
-                },
-                body: isInWishlist ? null : JSON.stringify({ productId })
-            });
-
-            if (response.ok) {
-                this.loadAvailableProducts();
-                this.loadPreorderProducts();
-            } else {
-                const data = await response.json();
-                this.showMessage(data.message || 'Wishlist update failed', 'error');
-            }
-        } catch (error) {
-            console.error('Wishlist error:', error);
-            this.showMessage('Wishlist update failed', 'error');
-        }
-    }
 
     async updateCartCount() {
         try {
@@ -6465,6 +6633,52 @@ class AgricultureMarket {
             }
         } catch (error) {
             console.error('Error updating cart count:', error);
+        }
+    }
+
+    async loadCartData() {
+        try {
+            // Load cart data on initialization to restore selection state
+            const params = `?sessionId=${this.sessionId}`;
+            const response = await fetch(`${this.apiBase}/cart${params}`, {
+                headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                // Store cart data for selection state restoration
+                this.currentCartItems = data.cartItems || [];
+
+                // If cart is empty, clear all selection state
+                if (this.currentCartItems.length === 0) {
+                    this.selectedProductIds.clear();
+                    this.selectedFarmerNames.clear();
+                    this.allSelected = false;
+                    this.saveSelectionState();
+                    return;
+                }
+
+                // Filter saved selection state to only include items that are still in the cart
+                const validCartIds = new Set(this.currentCartItems.map(item => item.id));
+                const validSelectedIds = [...this.selectedProductIds].filter(id => validCartIds.has(id));
+                this.selectedProductIds = new Set(validSelectedIds);
+
+                // Recalculate farmer names based on valid selections
+                this.selectedFarmerNames.clear();
+                this.currentCartItems.forEach(item => {
+                    if (this.selectedProductIds.has(item.id) && item.farmer_name) {
+                        this.selectedFarmerNames.add(item.farmer_name);
+                    }
+                });
+
+                // Update allSelected state
+                this.updateAllSelectionState();
+
+                // Save the cleaned selection state to localStorage
+                this.saveSelectionState();
+            }
+        } catch (error) {
+            console.error('Error loading cart data:', error);
         }
     }
 
@@ -6502,12 +6716,193 @@ class AgricultureMarket {
         }
     }
 
+    // Cart selection helpers for grouped marketplace UX
+    toggleAllSelection() {
+        if (this.allSelected) {
+            // Unselect all
+            this.selectedProductIds.clear();
+            this.selectedFarmerNames.clear();
+            this.allSelected = false;
+        } else {
+            // Select all
+            this.currentCartItems.forEach(item => {
+                this.selectedProductIds.add(item.id);
+                if (item.farmer_name) {
+                    this.selectedFarmerNames.add(item.farmer_name);
+                }
+            });
+            this.allSelected = true;
+        }
+        this.saveSelectionState();
+        this.renderCart({ cartItems: this.currentCartItems });
+    }
+
+    toggleFarmerSelection(farmerName) {
+        const farmerState = this.getFarmerSelectionState(farmerName);
+        console.log('toggleFarmerSelection - farmerName:', farmerName, 'farmerState:', farmerState);
+        console.log('selectedFarmerNames before:', Array.from(this.selectedFarmerNames));
+        console.log('selectedProductIds before:', Array.from(this.selectedProductIds));
+        
+        if (farmerState === 'selected') {
+            // Deselect farmer and all its products
+            this.selectedFarmerNames.delete(farmerName);
+            this.currentCartItems.filter(item => item.farmer_name === farmerName).forEach(item => {
+                this.selectedProductIds.delete(item.id);
+            });
+        } else if (farmerState === 'indeterminate') {
+            // Select all products for this farmer (transition from indeterminate to selected)
+            this.selectedFarmerNames.add(farmerName);
+            this.currentCartItems.filter(item => item.farmer_name === farmerName).forEach(item => {
+                this.selectedProductIds.add(item.id);
+            });
+        } else {
+            // Select farmer and all its products (unselected state)
+            this.selectedFarmerNames.add(farmerName);
+            this.currentCartItems.filter(item => item.farmer_name === farmerName).forEach(item => {
+                this.selectedProductIds.add(item.id);
+            });
+        }
+        console.log('selectedFarmerNames after:', Array.from(this.selectedFarmerNames));
+        console.log('selectedProductIds after:', Array.from(this.selectedProductIds));
+        this.updateAllSelectionState();
+        this.saveSelectionState();
+        this.renderCart({ cartItems: this.currentCartItems });
+    }
+
+    toggleProductSelection(cartItemId, farmerName) {
+        if (this.selectedProductIds.has(cartItemId)) {
+            // Deselect product
+            this.selectedProductIds.delete(cartItemId);
+            // Keep farmer name in selectedFarmerNames if some products are still selected (indeterminate state)
+            // Only remove farmer name if no products are selected
+            const farmerProducts = this.currentCartItems.filter(item => item.farmer_name === farmerName);
+            const hasSelectedProducts = farmerProducts.some(item => this.selectedProductIds.has(item.id));
+            if (!hasSelectedProducts) {
+                this.selectedFarmerNames.delete(farmerName);
+            }
+            // IMPORTANT: If some products are still selected, keep farmer name in selectedFarmerNames
+            // This ensures the farmer toggle shows indeterminate state
+        } else {
+            // Select product
+            this.selectedProductIds.add(cartItemId);
+            this.selectedFarmerNames.add(farmerName);
+        }
+        this.updateAllSelectionState();
+        this.saveSelectionState();
+        this.renderCart({ cartItems: this.currentCartItems });
+    }
+
+    saveSelectionState() {
+        try {
+            const userSuffix = this.userId ? `_${this.userId}` : '';
+            localStorage.setItem(`selectedCartProductIds${userSuffix}`, JSON.stringify([...this.selectedProductIds]));
+            localStorage.setItem(`selectedCartFarmerNames${userSuffix}`, JSON.stringify([...this.selectedFarmerNames]));
+            localStorage.setItem(`selectedCartAllSelected${userSuffix}`, JSON.stringify(this.allSelected));
+        } catch (e) {
+            console.error('Error saving selection state to localStorage:', e);
+        }
+    }
+
+    loadSelectionState() {
+        try {
+            const userSuffix = this.userId ? `_${this.userId}` : '';
+            const savedProductIds = localStorage.getItem(`selectedCartProductIds${userSuffix}`);
+            const savedFarmerNames = localStorage.getItem(`selectedCartFarmerNames${userSuffix}`);
+            const savedAllSelected = localStorage.getItem(`selectedCartAllSelected${userSuffix}`);
+            if (savedProductIds) {
+                this.selectedProductIds = new Set(JSON.parse(savedProductIds));
+            }
+            if (savedFarmerNames) {
+                this.selectedFarmerNames = new Set(JSON.parse(savedFarmerNames));
+            }
+            if (savedAllSelected) {
+                this.allSelected = JSON.parse(savedAllSelected);
+            }
+        } catch (e) {
+            console.error('Error loading selection state from localStorage:', e);
+        }
+    }
+
+    updateAllSelectionState() {
+        const allSelected = this.currentCartItems.every(item => this.selectedProductIds.has(item.id));
+        this.allSelected = allSelected;
+    }
+
+    getFarmerSelectionState(farmerName) {
+        console.log('getFarmerSelectionState - farmerName:', farmerName);
+        const farmerProducts = this.currentCartItems.filter(item => item.farmer_name === farmerName);
+        console.log('getFarmerSelectionState - farmerProducts IDs:', JSON.stringify(farmerProducts.map(p => p.id)));
+        console.log('getFarmerSelectionState - selectedProductIds:', JSON.stringify(Array.from(this.selectedProductIds)));
+        if (farmerProducts.length === 0) return 'unselected';
+        
+        const selectedCount = farmerProducts.filter(item => this.selectedProductIds.has(item.id)).length;
+        console.log('getFarmerSelectionState - selectedCount:', selectedCount, 'total:', farmerProducts.length);
+        
+        if (selectedCount === 0) return 'unselected';
+        if (selectedCount === farmerProducts.length) return 'selected';
+        return 'indeterminate';
+    }
+
+    groupCartItemsByFarmer(cartItems) {
+        const groups = new Map();
+        cartItems.forEach(item => {
+            const farmerName = item.farmer_name || 'Unknown Farmer';
+            if (!groups.has(farmerName)) {
+                groups.set(farmerName, {
+                    farmerName,
+                    products: []
+                });
+            }
+            groups.get(farmerName).products.push(item);
+        });
+        return Array.from(groups.values());
+    }
+
+    getSelectedProductCount() {
+        return this.selectedProductIds.size;
+    }
+
+    getSelectedFarmerCount() {
+        return this.selectedFarmerNames.size;
+    }
+
+    getSelectedProductSubtotal() {
+        return this.currentCartItems
+            .filter(item => this.selectedProductIds.has(item.id))
+            .reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
+    }
+
+    getShippingSubtotal() {
+        const deliveryFee = this.getDeliveryFee();
+        if (deliveryFee === 0) return 0;
+        return deliveryFee * this.getSelectedFarmerCount();
+    }
+
     renderCart(data) {
         const cartItems = document.getElementById('cart-items');
         const cartTotal = document.getElementById('cart-total');
         const checkoutBtn = document.getElementById('checkout-btn');
 
-        if (data.cartItems.length === 0) {
+        // Store cart data for selection operations
+        this.currentCartItems = data.cartItems || [];
+
+        // Filter saved selection state to only include items that are still in the cart
+        const validCartIds = new Set(this.currentCartItems.map(item => item.id));
+        const validSelectedIds = [...this.selectedProductIds].filter(id => validCartIds.has(id));
+        this.selectedProductIds = new Set(validSelectedIds);
+
+        // Recalculate farmer names based on valid selections
+        this.selectedFarmerNames.clear();
+        this.currentCartItems.forEach(item => {
+            if (this.selectedProductIds.has(item.id) && item.farmer_name) {
+                this.selectedFarmerNames.add(item.farmer_name);
+            }
+        });
+
+        // Update allSelected state
+        this.updateAllSelectionState();
+
+        if (this.currentCartItems.length === 0) {
             cartItems.innerHTML = `
                 <div class="empty-cart">
                     <i class="fas fa-shopping-cart"></i>
@@ -6518,80 +6913,177 @@ class AgricultureMarket {
                     </button>
                 </div>
             `;
-            cartTotal.textContent = '0.00';
+            cartTotal.innerHTML = `
+                <div class="cart-summary-row cart-summary-total">
+                    <strong>Total</strong>
+                    <strong>₱0.00</strong>
+                </div>
+            `;
+            const selectAllToggle = document.getElementById('cart-all-toggle');
+            if (selectAllToggle) selectAllToggle.style.display = 'none';
             checkoutBtn.disabled = true;
             checkoutBtn.style.opacity = '0.6';
+            checkoutBtn.textContent = 'Proceed to Checkout';
             return;
         }
+
+        // Show Select All toggle when cart has items
+        const selectAllToggle = document.getElementById('cart-all-toggle');
+        if (selectAllToggle) selectAllToggle.style.display = '';
         
         checkoutBtn.style.opacity = '1';
 
-        cartItems.innerHTML = data.cartItems.map(item => {
-            const isUnavailable = item.is_available_for_checkout === false;
-            const isPreorder = item.is_preorder === true;
-            const badge = isUnavailable
-                ? `<span class="status-pill pending" style="margin-left:6px;">Unavailable</span>`
-                : (isPreorder ? `<span class="badge bg-warning text-dark" style="margin-left:6px;">Pre-order</span>` : '');
-            const disabledAttr = isUnavailable ? 'disabled' : '';
-            let maxStock;
-            if (isPreorder) {
-                const reserved = Number(item.reserved_quantity ?? 0);
-                const max = Number(item.max_preorder_quantity ?? 0);
-                maxStock = max > 0 ? max - reserved : 0;
-            } else {
-                maxStock = Number(item.stock_quantity) || 0;
-            }
-            maxStock = Math.max(1, maxStock);
-            const minusDisabled = isUnavailable || item.quantity <= 1;
-            const plusDisabled = isUnavailable || item.quantity >= maxStock;
-            const itemTotal = (Number(item.price) || 0) * (Number(item.quantity) || 0);
-            return `
-            <div class="cart-item" data-product-id="${item.product_id}">
-                <img src="${item.image_url || '/images/logo.png'}"
-                     alt="${item.name}" class="cart-item-image" onerror="this.src='/images/logo.png'"
-                     onclick="app.closeCart(); app.showProductDetails(${item.product_id})" style="cursor: pointer;">
-                <div class="cart-item-details">
-                    <div class="cart-item-name">${item.name} ${badge}</div>
-                    <div class="cart-item-price">${this.fmtCurrency(item.price)} ${item.unit ? 'per ' + item.unit : ''}</div>
-                    ${item.farmer_name ? `<div class="cart-item-farmer">From ${item.farmer_name}</div>` : ''}
-                    ${isPreorder
-                        ? (() => {
-                            const reserved = Number(item.reserved_quantity ?? 0);
-                            const max = Number(item.max_preorder_quantity ?? 0);
-                            const remaining = max > 0 ? max - reserved : 0;
-                            return `<div class="cart-item-stock" style="color: #eab308;">Reservation: ${this.fmtNumber(remaining)} ${item.unit || 'unit'} remaining</div>`;
-                        })()
-                        : `<div class="cart-item-stock">Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}</div>`
-                    }
-                    <div class="cart-item-quantity">
-                        <div class="quantity-controls">
-                            <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, -1, ${maxStock})" title="Decrease quantity" ${minusDisabled ? 'disabled' : ''}>−</button>
-                            <input
-                                type="number"
-                                class="quantity-value-input"
-                                value="${item.quantity}"
-                                min="1"
-                                max="${maxStock}"
-                                inputmode="numeric"
-                                aria-label="Cart quantity"
-                                onchange="app.handleCartQuantityInput(${item.id}, this.value, ${maxStock}, this)"
-                                onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}" ${disabledAttr}>
-                            <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, 1, ${maxStock})" title="Increase quantity" ${plusDisabled ? 'disabled' : ''}>+</button>
-                        </div>
-                        <button class="remove-item" onclick="app.removeCartItem(${item.id})" title="Remove item">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                    <div class="cart-item-total">${this.fmtCurrency(itemTotal)}</div>
-                </div>
-            </div>
-        `;
-        }).join('');
+        // Group cart items by farmer
+        const farmerGroups = this.groupCartItemsByFarmer(this.currentCartItems);
+        const deliveryFee = this.getDeliveryFee();
 
-        cartTotal.textContent = this.fmtNumber(data.summary.subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // Render each farmer group
+        let html = '';
+        farmerGroups.forEach(group => {
+            const farmerState = this.getFarmerSelectionState(group.farmerName);
+            const farmerCircle = farmerState === 'selected' ? '●' : (farmerState === 'indeterminate' ? '◐' : '○');
+            const farmerClass = farmerState === 'selected' ? 'selected' : (farmerState === 'indeterminate' ? 'indeterminate' : '');
+
+            html += `
+                <div class="cart-farmer-group" data-farmer-name="${group.farmerName}">
+                    <div class="cart-farmer-header">
+                        <button class="cart-selection-circle ${farmerClass}" 
+                                onclick="app.toggleFarmerSelection('${group.farmerName}')"
+                                aria-label="Select all from ${group.farmerName}">
+                            ${farmerCircle}
+                        </button>
+                        <div class="cart-farmer-info">
+                            <div class="cart-farmer-name">${group.farmerName}</div>
+                            ${deliveryFee > 0 ? `<div class="cart-farmer-shipping">Shipping: ${this.fmtCurrency(deliveryFee)}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="cart-farmer-products">
+            `;
+
+            // Render products in this farmer group
+            group.products.forEach(item => {
+                const isUnavailable = item.is_available_for_checkout === false;
+                const isPreorder = item.is_preorder === true;
+                const isSelected = this.selectedProductIds.has(item.id);
+                const badge = isUnavailable
+                    ? `<span class="status-pill pending" style="margin-left:6px;">Unavailable</span>`
+                    : (isPreorder ? `<span class="badge bg-warning text-dark" style="margin-left:6px;">Pre-order</span>` : '');
+                const disabledAttr = isUnavailable ? 'disabled' : '';
+                let maxStock;
+                if (isPreorder) {
+                    const reserved = Number(item.reserved_quantity ?? 0);
+                    const max = Number(item.max_preorder_quantity ?? 0);
+                    maxStock = max > 0 ? max - reserved : 0;
+                } else {
+                    maxStock = Number(item.stock_quantity) || 0;
+                }
+                maxStock = Math.max(1, maxStock);
+                const minusDisabled = isUnavailable || item.quantity <= 1;
+                const plusDisabled = isUnavailable || item.quantity >= maxStock;
+                const itemTotal = (Number(item.price) || 0) * (Number(item.quantity) || 0);
+                const productCircle = isSelected ? '●' : '○';
+                const productClass = isSelected ? 'selected' : '';
+
+                html += `
+                    <div class="cart-item" data-product-id="${item.product_id}" data-cart-id="${item.id}">
+                        <button class="cart-selection-circle ${productClass}" 
+                                onclick="app.toggleProductSelection(${item.id}, '${group.farmerName}')"
+                                aria-label="Select ${item.name}">
+                            ${productCircle}
+                        </button>
+                        <img src="${item.image_url || '/images/logo.png'}"
+                             alt="${item.name}" class="cart-item-image" onerror="this.src='/images/logo.png'"
+                             onclick="app.closeCart(); app.showProductDetails(${item.product_id})" style="cursor: pointer;">
+                        <div class="cart-item-details">
+                            <div class="cart-item-name">${item.name} ${badge}</div>
+                            <div class="cart-item-price">${this.fmtCurrency(item.price)} ${item.unit ? 'per ' + item.unit : ''}</div>
+                            ${isPreorder
+                                ? (() => {
+                                    const reserved = Number(item.reserved_quantity ?? 0);
+                                    const max = Number(item.max_preorder_quantity ?? 0);
+                                    const remaining = max > 0 ? max - reserved : 0;
+                                    return `<div class="cart-item-stock" style="color: #eab308;">Reservation: ${this.fmtNumber(remaining)} ${item.unit || 'unit'} remaining</div>`;
+                                })()
+                                : `<div class="cart-item-stock">Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}</div>`
+                            }
+                            <div class="cart-item-quantity">
+                                <div class="quantity-controls">
+                                    <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, -1, ${maxStock})" title="Decrease quantity" ${minusDisabled ? 'disabled' : ''}>−</button>
+                                    <input
+                                        type="number"
+                                        class="quantity-value-input"
+                                        value="${item.quantity}"
+                                        min="1"
+                                        max="${maxStock}"
+                                        inputmode="numeric"
+                                        aria-label="Cart quantity"
+                                        onchange="app.handleCartQuantityInput(${item.id}, this.value, ${maxStock}, this)"
+                                        onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}" ${disabledAttr}>
+                                    <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, 1, ${maxStock})" title="Increase quantity" ${plusDisabled ? 'disabled' : ''}>+</button>
+                                </div>
+                                <button class="remove-item" onclick="app.removeCartItem(${item.id})" title="Remove item">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                            <div class="cart-item-total">${this.fmtCurrency(itemTotal)}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+
+        cartItems.innerHTML = html;
+
+        // Update footer Select All button state
+        const selectAllBtn = document.getElementById('cart-select-all-btn');
+        if (selectAllBtn) {
+            selectAllBtn.textContent = this.allSelected ? '●' : '○';
+            selectAllBtn.classList.toggle('selected', this.allSelected);
+        }
+
+        // Calculate totals based on selection
+        const selectedSubtotal = this.getSelectedProductSubtotal();
+        const shippingSubtotal = this.getShippingSubtotal();
+        const grandTotal = selectedSubtotal + shippingSubtotal;
+
+        // Update footer with selection-aware totals
+        const selectedCount = this.getSelectedProductCount();
         const hasUnavailable = !!data.summary?.has_unavailable_items;
-        checkoutBtn.disabled = hasUnavailable;
-        checkoutBtn.style.opacity = hasUnavailable ? '0.6' : '1';
+        const hasSelected = selectedCount > 0;
+
+        // Update cart total display
+        if (deliveryFee > 0 && shippingSubtotal > 0) {
+            cartTotal.innerHTML = `
+                <div class="cart-summary-row">
+                    <span>Subtotal (${selectedCount} item${selectedCount !== 1 ? 's' : ''})</span>
+                    <span>${this.fmtCurrency(selectedSubtotal)}</span>
+                </div>
+                <div class="cart-summary-row">
+                    <span>Shipping</span>
+                    <span>${this.fmtCurrency(shippingSubtotal)}</span>
+                </div>
+                <div class="cart-summary-row cart-summary-total">
+                    <strong>Total</strong>
+                    <strong>${this.fmtCurrency(grandTotal)}</strong>
+                </div>
+            `;
+        } else {
+            cartTotal.innerHTML = `
+                <div class="cart-summary-row cart-summary-total">
+                    <strong>Total (${selectedCount} item${selectedCount !== 1 ? 's' : ''})</strong>
+                    <strong>${this.fmtCurrency(selectedSubtotal)}</strong>
+                </div>
+            `;
+        }
+
+        checkoutBtn.disabled = !hasSelected || hasUnavailable;
+        checkoutBtn.style.opacity = (hasSelected && !hasUnavailable) ? '1' : '0.6';
+        checkoutBtn.textContent = `Checkout (${selectedCount})`;
     }
 
     closeCart() {
@@ -7367,11 +7859,9 @@ class AgricultureMarket {
     }
 
     openAuthModal(role, mode) {
-        console.log('[DEBUG] openAuthModal called with role:', role, 'mode:', mode);
         // If cart is open, close it so auth modal is not covered
         try { this.closeCart(); } catch (e) {}
         const authModal = document.getElementById('auth-modal');
-        console.log('[DEBUG] Auth modal element found:', !!authModal);
         const authTitle = document.getElementById('auth-modal-title');
         const authSubmitBtn = document.getElementById('auth-submit-btn');
         const sendOtpBtn = document.getElementById('send-otp-btn');
@@ -7521,10 +8011,7 @@ class AgricultureMarket {
         try {
             if (authModal && authModal.parentElement !== document.body) document.body.appendChild(authModal);
         } catch (e) {}
-        console.log('[DEBUG] Auth modal parent before open:', authModal?.parentElement?.tagName);
-        console.log('[DEBUG] Auth modal classes before open:', authModal?.className);
         authModal.classList.add('open');
-        console.log('[DEBUG] Auth modal classes after open:', authModal?.className);
         this.setPageScrollLocked(true);
         this.activateAuthFocusTrap();
         this.focusAuthModalPrimaryField(mode);
@@ -8161,12 +8648,8 @@ class AgricultureMarket {
         
         // Don't clear form data when closing - preserve it for next time
         const authModal = document.getElementById('auth-modal');
-        console.log('[DEBUG] closeAuthModal called');
-        console.log('[DEBUG] Auth modal element found:', !!authModal);
         if (authModal) {
-            console.log('[DEBUG] Auth modal classes before close:', authModal.className);
             authModal.classList.remove('open');
-            console.log('[DEBUG] Auth modal classes after close:', authModal.className);
         }
         this.setPageScrollLocked(false);
         // Reset state but keep form data

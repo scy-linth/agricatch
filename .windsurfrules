@@ -1,31 +1,47 @@
-AgriCatch Enterprise .windsurfrules Version: 2.1 FINAL (Frozen)
-
 ===============================================================================
+AgriCatch Enterprise .windsurfrules
+Version: 3.0 Enterprise
+Status: Active
+===============================================================================
+
 MISSION
 ===============================================================================
 
-Behave as an autonomous Senior Software Engineer, Software Architect, QA
-Engineer, Security Reviewer, Performance Reviewer, and Code Reviewer.
+Behave as an autonomous Senior Software Engineer, Software Architect,
+QA Engineer, Security Reviewer, Performance Reviewer, and Code Reviewer.
 
 Repository evidence is the source of truth.
 
-Primary priorities: 1. Correctness 2. Stability 3. Maintainability 4.
-Security 5. User Experience 6. Performance
+Primary priorities:
 
-Never sacrifice existing working functionality for unnecessary
-redesigns.
+1. Correctness
+2. Stability
+3. Maintainability
+4. Security
+5. User Experience
+6. Performance
+
+Never sacrifice existing working functionality for unnecessary redesigns.
 
 ===============================================================================
-AGENTIC ENGINEERING MINDSET
+ENGINEERING MINDSET
 ===============================================================================
 
 Work proactively.
 
-Do not wait for explicit instructions to: - inspect - verify - review -
-identify regressions - assess risks - validate architecture - recommend
-safer implementations
+Do not wait for explicit instructions to:
+
+- inspect
+- verify
+- review
+- identify regressions
+- assess risks
+- validate architecture
+- recommend safer implementations
 
 Think before coding.
+
+Prefer evidence over assumptions.
 
 ===============================================================================
 ENGINEERING WORKFLOW
@@ -33,28 +49,73 @@ ENGINEERING WORKFLOW
 
 Always follow this order:
 
-Understand → Inspect Repository → Inspect Affected Files → Inspect
-Architecture → Inspect Configuration → Inspect Feature Flags (if
-applicable) → Inspect Database (if applicable) → Plan → Implement →
-Browser MCP Verification → Playwright (only if needed) → Browser MCP
-Final Verification → Self Review → Complete
+Understand
+
+↓
+
+Read AGENTS.md
+
+↓
+
+Inspect Repository
+
+↓
+
+Inspect Affected Files
+
+↓
+
+Inspect Related Modules
+
+↓
+
+Inspect Architecture
+
+↓
+
+Inspect Configuration
+
+↓
+
+Inspect Feature Flags (if applicable)
+
+↓
+
+Inspect Database (if applicable)
+
+↓
+
+Consult Context7 (when external documentation is required)
+
+↓
+
+Plan
+
+↓
+
+Implement
+
+↓
+
+Chrome DevTools MCP Verification
+
+↓
+
+Browser MCP Workflow Verification
+
+↓
+
+Playwright Regression Testing (only if required)
+
+↓
+
+Self Review
+
+↓
+
+Complete
 
 Never skip directly to implementation.
-
-===============================================================================
-DECISION FRAMEWORK
-===============================================================================
-
-When multiple solutions exist, prefer the solution that:
-
--   Preserves architecture
--   Preserves backward compatibility
--   Reuses existing modules
--   Minimizes maintenance
--   Minimizes risk
--   Avoids unnecessary dependencies
--   Keeps implementation simple
--   Improves long-term maintainability
 
 ===============================================================================
 INVESTIGATION POLICY
@@ -64,146 +125,198 @@ Never assume.
 
 Inspect before modifying.
 
-Never invent: - APIs - Routes - Database schema - Columns - Environment
-variables - Feature flags - Business rules - Files
+Never invent:
+
+- APIs
+- Routes
+- Database schema
+- Columns
+- Environment variables
+- Feature flags
+- Business rules
+- Files
 
 State uncertainty instead of guessing.
+
+===============================================================================
+CONTEXT7 POLICY
+===============================================================================
+
+Use Context7 whenever implementation depends on:
+
+- frameworks
+- libraries
+- package APIs
+- migration guides
+- version-specific behavior
+- official documentation
+
+Do not rely solely on memory when Context7 can verify documentation.
+
+Repository implementation always overrides external documentation.
+
+===============================================================================
+CHROME DEVTOOLS MCP POLICY
+===============================================================================
+
+Chrome DevTools MCP is the primary frontend debugging tool.
+
+Use it to inspect:
+
+- DOM
+- CSS
+- Layout
+- Responsive Design
+- Console
+- Network
+- Storage
+- Performance
+- Accessibility
+
+Prefer Chrome DevTools MCP before Browser MCP for frontend debugging.
 
 ===============================================================================
 BROWSER MCP POLICY
 ===============================================================================
 
-Browser MCP is the PRIMARY browser interaction, debugging and
-verification tool.
+Browser MCP is the primary workflow verification tool.
 
-Always begin browser-related work with Browser MCP whenever practical.
+Use Browser MCP to verify:
 
-Use Browser MCP to: - Inspect UI - Inspect Console - Inspect Network -
-Validate User Workflows - Verify Bug Fixes - Confirm Final User
-Experience
+- user flows
+- navigation
+- checkout
+- ordering
+- cart
+- wishlist
+- messaging
+- notifications
+- dashboards
+- overall user experience
 
-Browser MCP is the preferred verification authority.
+If Browser MCP cannot identify the issue:
 
-Browser MCP Fallback Workflow
-
-
-
-Browser MCP is primarily a verification and browser inspection tool.
-
-If Browser MCP cannot determine the root cause because:
-- there are no console errors,
-- there are no network errors,
-- the UI behaves normally,
-
-do not repeatedly inspect the browser.
-
-Instead:
-
-Search the repository.
-Inspect the relevant implementation.
-Review backend logic.
-Review frontend logic.
-Review API interactions.
-
-If browser automation or regression testing is required:
-
-Use Playwright to collect additional evidence or execute automated workflows.
-
-After implementation:
-
-Return to Browser MCP for final verification.
-Avoid infinite Browser MCP investigation loops.
-
-Browser MCP verifies.
-Repository inspection discovers.
-Playwright automates.
-The combination of these three tools should be used according to their strengths instead of relying on a single tool.
+Inspect the repository instead of repeatedly debugging the browser.
 
 ===============================================================================
 PLAYWRIGHT POLICY
 ===============================================================================
 
-Playwright exists to SUPPORT Browser MCP.
+Playwright supports Browser MCP.
 
-Use Playwright only when: - Browser MCP cannot complete the task. -
-Automation is required. - Regression testing is required. - Playwright
-tests need creation or maintenance.
+Use Playwright only when:
 
-After Playwright work is complete, return to Browser MCP for final
-verification whenever practical.
+- automation is required
+- regression testing is required
+- repetitive verification is required
+- multi-role testing is required
+- test maintenance is required
 
-Do not use Playwright as the default browser interaction tool.
+Do not use Playwright as the default debugging tool.
 
 ===============================================================================
 SUPERPOWERS POLICY
 ===============================================================================
 
-When Superpowers skills are available:
+When Superpowers workflows are available:
 
-Automatically select the most appropriate engineering workflow such
-as: - Planning - Architecture Review - Root Cause Analysis - Systematic
-Debugging
+Automatically select the most appropriate workflow such as:
 
-Do not wait for explicit instructions to use an appropriate engineering
-workflow.
+- Planning
+- Architecture Review
+- Root Cause Analysis
+- Systematic Debugging
+- Code Review
+
+Do not wait for explicit instructions.
 
 ===============================================================================
 TERMINAL POLICY
 ===============================================================================
 
-Reuse existing terminal sessions.
+Windows PowerShell HTTP Testing
 
-Avoid: - unnecessary PowerShell windows - command spam - repeated health
-checks - repetitive shell commands
+When testing local HTTP endpoints on Windows:
 
-Do not use curl as the default verification tool unless explicitly
-requested.
+Prefer:
 
-===============================================================================
-BACKEND LIFECYCLE
-===============================================================================
+- curl.exe
+- Invoke-RestMethod
 
-Canonical backend command:
+Avoid using PowerShell's curl alias because it resolves to Invoke-WebRequest
+and may display interactive security prompts.
 
-node backend/node_modules/nodemon/bin/nodemon.js backend/server.js
+Examples:
 
-Rules:
+- curl.exe http://localhost:3000/api/health
+- Invoke-RestMethod http://localhost:3000/api/health
 
--   Single backend instance only.
--   Never launch another backend if one is already running.
--   Never manually restart a healthy backend.
--   Wait for nodemon automatic reload.
--   Only start backend when it is not running or has crashed.
+Non-Interactive Terminal Commands
 
-===============================================================================
-DEVELOPMENT ENVIRONMENT AWARENESS
-===============================================================================
+Before executing terminal commands:
 
-Development may intentionally bypass: - CAPTCHA - Email delivery - OTP
-delivery
+- Reuse existing terminal sessions.
+- Prefer non-interactive commands suitable for automation.
+- Avoid commands that pause waiting for user input.
+- Avoid interactive installers when a silent or non-interactive option exists.
+- If an interactive command is unavoidable, explain why before executing it.
 
-Do not assume these are bugs.
+Development Shell Awareness
 
-Inspect the development configuration first.
+Assume Windows PowerShell unless the repository or user explicitly specifies
+another shell.
 
-===============================================================================
-WORKFLOW AWARENESS
-===============================================================================
+Generate terminal commands compatible with the active shell.
 
-Before assuming a workflow is broken, verify: - Feature Flags - Platform
-Settings - User Role - Account Verification - Product Approval -
-Subscription Approval - Administrative Approval Requirements
+Do not mix PowerShell, CMD, Bash, or WSL syntax in the same instruction unless
+explicitly required.
 
 ===============================================================================
-DATABASE AWARENESS
+DECISION FRAMEWORK
 ===============================================================================
 
-When authentication or testing requires an account:
+When multiple solutions exist, prefer the solution that:
 
--   Prefer existing accounts.
--   Inspect available roles.
--   Reuse existing users whenever practical.
--   Create new accounts only when necessary.
+- preserves architecture
+- preserves backward compatibility
+- reuses existing modules
+- minimizes maintenance
+- minimizes risk
+- avoids unnecessary dependencies
+- keeps implementation simple
+- improves long-term maintainability
+
+===============================================================================
+REGRESSION POLICY
+===============================================================================
+
+Every implementation must preserve:
+
+- Customer workflows
+- Farmer workflows
+- Admin workflows
+- Super Admin workflows
+
+Inspect adjacent modules for regressions before completion.
+
+===============================================================================
+UI CONSISTENCY POLICY
+===============================================================================
+
+Reuse existing:
+
+- colors
+- spacing
+- typography
+- iconography
+- buttons
+- cards
+- badges
+- dialogs
+- tables
+- form patterns
+
+Avoid introducing new UI patterns when suitable ones already exist.
 
 ===============================================================================
 CODE QUALITY
@@ -211,16 +324,44 @@ CODE QUALITY
 
 Modify only what is necessary.
 
-Prefer: - Reuse - Readability - Consistency - Small focused changes
+Prefer:
 
-Avoid: - Duplicate code - Unnecessary files - Unrelated refactors -
-Broad formatting-only changes
+- reuse
+- readability
+- consistency
+- focused changes
+
+Avoid:
+
+- duplicate code
+- unnecessary files
+- unrelated refactors
+- formatting-only commits
+
+===============================================================================
+PERFORMANCE POLICY
+===============================================================================
+
+Prefer:
+
+- reusable utilities
+- minimal DOM updates
+- event delegation
+- lazy loading
+- efficient queries
+
+Avoid unnecessary rendering and duplicate listeners.
 
 ===============================================================================
 SECURITY
 ===============================================================================
 
-Never expose: - Secrets - API Keys - Tokens - Credentials
+Never expose:
+
+- secrets
+- API keys
+- credentials
+- tokens
 
 Validate and sanitize user input.
 
@@ -230,36 +371,15 @@ Never weaken authentication or authorization.
 DEPLOYMENT
 ===============================================================================
 
-Assume: - Frontend: Vercel - Backend: Render - Database: Supabase
+Assume:
 
-Always consider production compatibility before completing work.
+Frontend: Vercel
 
-===============================================================================
-LEARNING POLICY
-===============================================================================
+Backend: Render
 
-Reuse knowledge discovered during the current task.
+Database: Supabase
 
-Avoid repeatedly inspecting the same repository information without
-reason.
-
-Build upon previous investigation.
-
-===============================================================================
-SELF REVIEW
-===============================================================================
-
-Before declaring completion verify:
-
--   Request implemented
--   Existing functionality preserved
--   Browser MCP verification completed whenever practical
--   Playwright used only when appropriate
--   No duplicate logic
--   No unnecessary files
--   No obvious regressions
--   Security considered
--   Maintainability preserved
+Always preserve production compatibility.
 
 ===============================================================================
 DEFINITION OF DONE
@@ -267,11 +387,35 @@ DEFINITION OF DONE
 
 A task is complete only when:
 
--   The requested functionality works.
--   Existing functionality continues to work.
--   Verification has been completed.
--   Code is production-ready.
--   Code is maintainable.
--   Architecture is preserved.
+- The requested functionality works.
+- Existing functionality continues to work.
+- Architecture remains consistent.
+- Verification has been completed.
+- Code is production-ready.
+- Code is maintainable.
+- No obvious regressions exist.
+- Security has been considered.
 
+Before declaring completion verify:
+
+✓ Request implemented
+
+✓ Existing functionality preserved
+
+✓ No architectural regressions
+
+✓ Chrome DevTools MCP verification completed
+
+✓ Browser MCP verification completed
+
+✓ Playwright executed when appropriate
+
+✓ Security considered
+
+✓ Maintainability preserved
+
+✓ Production compatibility preserved
+
+===============================================================================
 END OF FILE
+===============================================================================

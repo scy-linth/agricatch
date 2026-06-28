@@ -115,6 +115,7 @@ router.get('/', async (req, res) => {
 // Add item to cart
 router.post('/', async (req, res) => {
   try {
+    console.log('[BUG2 TRACE] POST /cart called');
     // Dev logging: show incoming payload and minimal headers to aid debugging
     if (process.env.NODE_ENV !== 'production') {
       try {
@@ -123,12 +124,15 @@ router.post('/', async (req, res) => {
       } catch (e) {}
     }
     let { productId, quantity = 1 } = req.body;
+    console.log('[BUG2 TRACE] Raw productId:', productId, 'quantity:', quantity);
     productId = parseInt(productId, 10);
     quantity = parseInt(quantity, 10) || 1;
+    console.log('[BUG2 TRACE] Parsed productId:', productId, 'quantity:', quantity);
     const token = req.headers.authorization?.split(' ')[1];
     const sessionId = req.body.sessionId;
 
     if (!productId) {
+      console.log('[BUG2 TRACE] productId is null/undefined, returning 400');
       return res.status(400).json({ message: 'Product ID is required' });
     }
 
@@ -136,20 +140,25 @@ router.post('/', async (req, res) => {
     if (token) {
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('[BUG2 TRACE] User from token:', { id: decoded.id, username: decoded.username, role: decoded.role });
         if (decoded.role === 'super_admin') {
+          console.log('[BUG2 TRACE] Superadmin attempted to add to cart, returning 403');
           return res.status(403).json({ message: 'Super admin cannot add items to cart' });
         }
       } catch (e) {
+        console.log('[BUG2 TRACE] Invalid token, continuing as guest');
         // Invalid token, continue as guest
       }
     }
 
     // Check if product exists and is available
+    console.log('[BUG2 TRACE] Looking up product with ID:', productId);
     const productResult = await pool.query(
       `SELECT p.id, p.stock_quantity, p.is_available, p.expiry_date, p.is_preorder,
               p.reserved_quantity, p.max_preorder_quantity,
               COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
-              COALESCE(u.is_disabled, false) as farmer_is_disabled
+              COALESCE(u.is_disabled, false) as farmer_is_disabled,
+              p.linked_product_id, p.name
        FROM products p
        LEFT JOIN users u ON p.farmer_id = u.id
        WHERE p.id = $1`,
@@ -157,40 +166,62 @@ router.post('/', async (req, res) => {
     );
 
     if (productResult.rows.length === 0) {
+      console.log('[BUG2 TRACE] Product not found, returning 404');
       return res.status(404).json({ message: 'Product not found' });
     }
 
     const product = productResult.rows[0];
+    console.log('[BUG2 TRACE] Product found:', {
+      id: product.id,
+      name: product.name,
+      is_available: product.is_available,
+      is_preorder: product.is_preorder,
+      stock_quantity: product.stock_quantity,
+      is_admin_disabled: product.is_admin_disabled,
+      farmer_is_disabled: product.farmer_is_disabled,
+      linked_product_id: product.linked_product_id
+    });
+
     if (product.is_admin_disabled) {
+      console.log('[BUG2 TRACE] Product is admin disabled, returning 400');
       return res.status(400).json({ message: 'Product is not available' });
     }
 
     if (product.farmer_is_disabled) {
+      console.log('[BUG2 TRACE] Farmer is disabled, returning 400');
       return res.status(400).json({ message: 'Product is not available' });
     }
 
     if (!product.is_available) {
+      console.log('[BUG2 TRACE] Product is not available, returning 400');
       return res.status(400).json({ message: 'Product is not available' });
     }
 
     if (product.expiry_date && new Date(product.expiry_date) < new Date(new Date().toDateString())) {
+      console.log('[BUG2 TRACE] Product is expired, returning 400');
       return res.status(400).json({ message: 'Product is already expired' });
     }
 
     // Validate stock/reservation based on product type
     if (product.is_preorder) {
+      console.log('[BUG2 TRACE] Product is preorder, checking capacity');
       // Preorder: check capacity
       const availableCapacity = product.max_preorder_quantity 
         ? product.max_preorder_quantity - product.reserved_quantity 
         : Infinity;
+      console.log('[BUG2 TRACE] Available capacity:', availableCapacity, 'requested:', quantity);
       if (quantity > availableCapacity) {
+        console.log('[BUG2 TRACE] Not enough preorder capacity, returning 400');
         return res.status(400).json({ 
           message: `Not enough preorder capacity available. Maximum: ${product.max_preorder_quantity || 'unlimited'}` 
         });
       }
     } else {
+      console.log('[BUG2 TRACE] Product is regular, checking stock');
       // Regular product: check stock
+      console.log('[BUG2 TRACE] Stock quantity:', product.stock_quantity, 'requested:', quantity);
       if (quantity > product.stock_quantity) {
+        console.log('[BUG2 TRACE] Not enough stock, returning 400');
         return res.status(400).json({ message: 'Not enough stock available' });
       }
     }

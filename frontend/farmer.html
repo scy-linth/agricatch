@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Farmer Dashboard — AgriCatch</title>
+    <title>Farmer Dashboard � AgriCatch</title>
 
     <!-- Google Fonts (match admin.html exactly) -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -19,8 +19,9 @@
     <!-- NiceAdmin base template CSS -->
     <link rel="stylesheet" href="/css/nicemain.css">
     <link rel="stylesheet" href="/vendor/simple-datatables/style.css">
-    <!-- AgriCatch SaaS overrides — loaded LAST -->
+    <!-- AgriCatch SaaS overrides � loaded LAST -->
     <link rel="stylesheet" href="/css/agricatch-admin.css?v=farmer-rebuild-20260614">
+    <link rel="stylesheet" href="/css/agricatch-polish.css?v=2">
 
     <script>
     // Authorization check - run immediately in head before page loads
@@ -42,7 +43,7 @@
 </head>
 
 <style>
-/* FARMER DASHBOARD — PAGE-SCOPED OVERRIDES (complement agricatch-admin.css) */
+/* FARMER DASHBOARD � PAGE-SCOPED OVERRIDES (complement agricatch-admin.css) */
 /* Override admin.css modal header green gradient for farmer modals */
 #customer-rating-modal .modal-header,
 #product-address-modal .modal-header {
@@ -64,7 +65,7 @@
 #farmer-sidebar-dropdown-menu button:hover {
   background: var(--ac-bg);
 }
-/* Top profile header arrow — visible even when shop name is truncated */
+/* Top profile header arrow � visible even when shop name is truncated */
 #header .nav-profile .profile-arrow {
   color: rgba(255,255,255,.75);
   font-size: .75rem;
@@ -424,7 +425,7 @@
 .order-tabs .tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:18px; padding:1px 5px; border-radius:10px; font-size:.72rem; background:#ef4444; color:#fff; margin-left:4px; vertical-align:middle; }
 .orders-list { display:flex; flex-direction:column; gap:.65rem; }
 #products-batch-bar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; background:var(--ac-bg,#f5f7f5); border:1px solid var(--ac-border,#e2e8f0); border-radius:8px; padding:.5rem .75rem; margin-bottom:.75rem; }
-/* Product Name Combobox — Modern */
+/* Product Name Combobox � Modern */
 .product-name-field { position:relative; }
 .product-name-input-wrap { position:relative; display:flex; align-items:center; }
 .product-name-input-wrap .form-control { padding-right:2rem; cursor:pointer; }
@@ -440,10 +441,10 @@
 .product-name-option { display:flex; align-items:center; width:100%; padding:.5rem .75rem; border:none; border-radius:7px; background:none; text-align:left; font-size:.875rem; font-weight:500; color:var(--ac-text,#1a2e1e); cursor:pointer; transition:background .1s,color .1s; line-height:1.3; }
 .product-name-option:hover { background:var(--ac-bg,#f5f7f5); color:var(--ac-primary,#2d7a3a); }
 .product-name-option.selected { background:var(--ac-primary-light,#e8f5e9); color:var(--ac-primary,#2d7a3a); font-weight:600; }
-.product-name-option.selected::after { content:'✓'; margin-left:auto; font-size:.8rem; font-weight:700; color:var(--ac-primary,#2d7a3a); }
+.product-name-option.selected::after { content:'?'; margin-left:auto; font-size:.8rem; font-weight:700; color:var(--ac-primary,#2d7a3a); }
 .product-name-option.active { background:var(--ac-primary,#2d7a3a); color:#fff; }
 .product-name-option.active::after { color:#fff; }
-/* Custom Select Dropdowns (Category, Unit) — Same style as product name */
+/* Custom Select Dropdowns (Category, Unit) � Same style as product name */
 .custom-select-field { position:relative; }
 .custom-select-input-wrap { position:relative; display:flex; align-items:center; }
 .custom-select-input-wrap .form-control { padding-right:2rem; cursor:pointer; }
@@ -456,7 +457,7 @@
 .custom-select-option { display:flex; align-items:center; width:100%; padding:.5rem .75rem; border:none; border-radius:7px; background:none; text-align:left; font-size:.875rem; font-weight:500; color:var(--ac-text,#1a2e1e); cursor:pointer; transition:background .1s,color .1s; line-height:1.3; }
 .custom-select-option:hover { background:var(--ac-bg,#f5f7f5); color:var(--ac-primary,#2d7a3a); }
 .custom-select-option.selected { background:var(--ac-primary-light,#e8f5e9); color:var(--ac-primary,#2d7a3a); font-weight:600; }
-.custom-select-option.selected::after { content:'✓'; margin-left:auto; font-size:.8rem; font-weight:700; color:var(--ac-primary,#2d7a3a); }
+.custom-select-option.selected::after { content:'?'; margin-left:auto; font-size:.8rem; font-weight:700; color:var(--ac-primary,#2d7a3a); }
 .custom-select-option.active { background:var(--ac-primary,#2d7a3a); color:#fff; }
 .custom-select-option.active::after { color:#fff; }
 /* Unit input fields - read-only with no cursor */
@@ -797,7 +798,7 @@
     box-sizing: border-box;
 }
 
-/* Subscription Section Styles — matches existing verification-tabs pattern */
+/* Subscription Section Styles � matches existing verification-tabs pattern */
 .subscription-tabs {
     display: flex;
     gap: 0.5rem;
@@ -1269,7 +1270,7 @@
             <i class="bi bi-info-circle"></i>
             <span id="verification-banner-message"></span>
             <button type="button" class="btn btn-sm btn-primary ms-2" id="open-chat-btn">Open Chat</button>
-            <button type="button" class="btn-close" onclick="dismissVerificationBanner()"></button>
+            <button type="button" class="btn-close" onclick="dismissVerificationBanner()" aria-label="Close"></button>
         </div>
 
         <!-- KPI Cards Row 1: Harvest Reminders and My Products -->
@@ -1597,7 +1598,7 @@
                         <div class="card-body py-2">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="text-muted mb-0 small">Low Stock <span id="low-stock-threshold-label" class="small">| ≤15</span></h6>
+                                    <h6 class="text-muted mb-0 small">Low Stock <span id="low-stock-threshold-label" class="small">| =15</span></h6>
                                     <h4 class="mb-0 fw-bold" style="color: #d39e00;" id="kpi-available-low-stock">--</h4>
                                 </div>
                                 <div class="dropdown">
@@ -1715,7 +1716,7 @@
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm" style="width: 250px;">
-                                <input type="text" id="available-search-input" class="form-control" placeholder="Product name…">
+                                <input type="text" id="available-search-input" class="form-control" placeholder="Product name�">
                                 <button id="available-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search"></i></button>
                             </div>
                             <button id="available-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
@@ -1753,7 +1754,7 @@
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm" style="width: 250px;">
-                                <input type="text" id="preorder-search-input" class="form-control" placeholder="Product name…">
+                                <input type="text" id="preorder-search-input" class="form-control" placeholder="Product name�">
                                 <button id="preorder-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search"></i></button>
                             </div>
                             <button id="preorder-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
@@ -1782,7 +1783,7 @@
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm" style="width: 250px;">
-                                <input type="text" id="approval-search-input" class="form-control" placeholder="Product name…">
+                                <input type="text" id="approval-search-input" class="form-control" placeholder="Product name�">
                                 <button id="approval-search-btn" class="btn btn-sm btn-ac-green" type="button"><i class="bi bi-search"></i></button>
                             </div>
                             <button id="approval-refresh-btn" class="btn btn-outline-secondary btn-sm" type="button" aria-label="Refresh listings"><i class="bi bi-arrow-clockwise"></i></button>
@@ -1993,7 +1994,7 @@
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm flex-grow-1">
                                 <input type="text" id="orders-search-input" class="form-control me-2"
-                                       placeholder="Order ID, product name, or customer…">
+                                       placeholder="Order ID, product name, or customer�">
                                 <button id="orders-search-btn" class="btn btn-sm btn-ac-green" type="button">
                                     <i class="bi bi-search me-1"></i>Search
                                 </button>
@@ -2099,7 +2100,7 @@
                                 <div class="col-12">
                                     <label class="form-label small fw-semibold">Farm / Pick-up Location</label>
                                     <div class="d-flex gap-2 align-items-center">
-                                        <textarea id="shop-location-input" class="form-control form-control-sm" rows="2" placeholder="No address set — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
+                                        <textarea id="shop-location-input" class="form-control form-control-sm" rows="2" placeholder="No address set � click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
                                         <button type="button" id="open-shop-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
                                             <i class="bi bi-geo-alt me-1"></i>Set Location
                                         </button>
@@ -2143,7 +2144,7 @@
                     </h3>
                     <div class="support-search-wrap">
                         <i class="bi bi-search support-search-icon"></i>
-                        <input type="text" id="admin-chat-search-input" class="support-search-input" placeholder="Search conversations…" autocomplete="off">
+                        <input type="text" id="admin-chat-search-input" class="support-search-input" placeholder="Search conversations�" autocomplete="off">
                     </div>
                 </div>
                 <div id="conversation-list" class="conversation-list"></div>
@@ -2176,7 +2177,7 @@
                         <input id="chat-input"
                                class="chat-compose-input"
                                type="text"
-                               placeholder="Type a message…"
+                               placeholder="Type a message�"
                                autocomplete="off"
                                maxlength="500"
                                required>
@@ -2253,7 +2254,7 @@
                     </div>
                     <div class="support-search-wrap">
                         <i class="bi bi-search support-search-icon"></i>
-                        <input type="text" id="support-chat-search-input" class="support-search-input" placeholder="Search tickets…" autocomplete="off">
+                        <input type="text" id="support-chat-search-input" class="support-search-input" placeholder="Search tickets�" autocomplete="off">
                     </div>
                 </div>
                 <div id="support-chat-conversation-list" class="conversation-list"></div>
@@ -2266,7 +2267,7 @@
                     <button class="support-page-btn" id="support-chat-prev-btn" disabled>
                         <i class="bi bi-chevron-left"></i>
                     </button>
-                    <span id="support-chat-page-info" class="support-page-info">1–10 of 0</span>
+                    <span id="support-chat-page-info" class="support-page-info">1�10 of 0</span>
                     <button class="support-page-btn" id="support-chat-next-btn" disabled>
                         <i class="bi bi-chevron-right"></i>
                     </button>
@@ -2301,7 +2302,7 @@
                         <input id="support-chat-input"
                                class="chat-compose-input"
                                type="text"
-                               placeholder="Type a message…"
+                               placeholder="Type a message�"
                                autocomplete="off"
                                maxlength="500"
                                required>
@@ -2370,9 +2371,9 @@
                             <img src="/images/resendlogo.png" alt="Profile" class="rounded-circle" id="profile-avatar-img" style="width:80px;height:80px;object-fit:cover">
                             <span class="profile-initial-lg" id="profile-avatar-initial" style="display:none"></span>
                         </div>
-                        <h2 class="fw-semibold" id="profile-shop-name">—</h2>
-                        <h3 class="text-muted small" id="profile-owner-name">—</h3>
-                        <span class="badge bg-primary mt-2" id="profile-role">—</span>
+                        <h2 class="fw-semibold" id="profile-shop-name">�</h2>
+                        <h3 class="text-muted small" id="profile-owner-name">�</h3>
+                        <span class="badge bg-primary mt-2" id="profile-role">�</span>
                     </div>
                 </div>
             </div>
@@ -2401,27 +2402,27 @@
                                 <h5 class="card-title">Profile Details</h5>
                                 <div class="row mb-2">
                                     <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Shop Name</div>
-                                    <div class="col-lg-9 col-md-8" id="po-shop-name">—</div>
+                                    <div class="col-lg-9 col-md-8" id="po-shop-name">�</div>
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Full Name</div>
-                                    <div class="col-lg-9 col-md-8" id="po-owner-name">—</div>
+                                    <div class="col-lg-9 col-md-8" id="po-owner-name">�</div>
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Email</div>
-                                    <div class="col-lg-9 col-md-8" id="po-email">—</div>
+                                    <div class="col-lg-9 col-md-8" id="po-email">�</div>
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Phone</div>
-                                    <div class="col-lg-9 col-md-8" id="po-phone">—</div>
+                                    <div class="col-lg-9 col-md-8" id="po-phone">�</div>
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Role</div>
-                                    <div class="col-lg-9 col-md-8" id="po-role">—</div>
+                                    <div class="col-lg-9 col-md-8" id="po-role">�</div>
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-lg-3 col-md-4 label fw-semibold text-muted small">Joined</div>
-                                    <div class="col-lg-9 col-md-8" id="po-joined">—</div>
+                                    <div class="col-lg-9 col-md-8" id="po-joined">�</div>
                                 </div>
                             </div>
 
@@ -2707,7 +2708,7 @@
                 </div>
                 <div id="subscription-active-panel" style="display:none;">
                     <div class="alert alert-success"><i class="bi bi-gem"></i> <strong>Premium Partner</strong></div>
-                    <p>Expires: <strong id="subscription-expiry-date">—</strong></p>
+                    <p>Expires: <strong id="subscription-expiry-date">�</strong></p>
                     <div id="subscription-expiry-warning" style="display:none;"></div>
 
                     <div class="card border-0 mb-4" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
@@ -2962,7 +2963,7 @@
                 <div class="form-group">
                     <label for="product-location-display">Farm / Pick-up Location <span class="text-danger">*</span></label>
                     <div style="display:flex;gap:.5rem;align-items:center;">
-                        <textarea id="product-location-display" class="form-control form-control-sm" rows="2" placeholder="Auto-filled from shop address — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
+                        <textarea id="product-location-display" class="form-control form-control-sm" rows="2" placeholder="Auto-filled from shop address � click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
                         <button type="button" id="open-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;">
                             <i class="bi bi-geo-alt me-1"></i>Set Location
                         </button>
@@ -3151,7 +3152,7 @@
                             <input type="text" id="edit-product-unit" class="form-control form-control-sm" value="kg" readonly>
                         </div>
                         <div class="form-group" style="flex:1;">
-                            <label for="edit-price" class="form-label small fw-semibold">Price (₱) <span class="text-danger">*</span></label>
+                            <label for="edit-price" class="form-label small fw-semibold">Price (?) <span class="text-danger">*</span></label>
                             <input type="number" id="edit-price" class="form-control form-control-sm" name="price" min="0" step="0.01" required>
                         </div>
                     </div>
@@ -3215,7 +3216,7 @@
                 </div>
                 <div class="card-body">
                     <div style="display:flex;gap:.5rem;align-items:flex-start;">
-                        <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
+                        <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set � click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
                         <button type="button" id="open-edit-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;margin-top:0;">
                             <i class="bi bi-geo-alt me-1"></i>Set Location
                         </button>
@@ -3436,7 +3437,7 @@
 <div id="order-details-modal" class="modal">
     <div class="modal-content order-details-modal-content">
         <div class="modal-header order-details-modal-header">
-            <h3><i class="bi bi-bag-check me-2 text-white"></i>Order #<span id="order-details-id" class="order-details-id">—</span></h3>
+            <h3><i class="bi bi-bag-check me-2 text-white"></i>Order #<span id="order-details-id" class="order-details-id">�</span></h3>
             <button class="close-btn order-details-close-btn" id="close-order-details-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
         </div>
         <div id="order-details-body" class="order-details-body">
@@ -3638,8 +3639,8 @@
             </div>
             <div class="modal-body">
                 <div id="subscription-current-info" class="alert alert-light border mb-3" style="display:none;">
-                    <p class="mb-1"><strong>Current expiry:</strong> <span id="sub-current-expiry">—</span></p>
-                    <p class="mb-0"><strong>New expiry:</strong> <span id="sub-new-expiry">—</span></p>
+                    <p class="mb-1"><strong>Current expiry:</strong> <span id="sub-current-expiry">�</span></p>
+                    <p class="mb-0"><strong>New expiry:</strong> <span id="sub-new-expiry">�</span></p>
                 </div>
                 
                 <div class="card mb-3 border-0 shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 12px; overflow: hidden;">
@@ -3702,15 +3703,15 @@
                         <option value="">Loading accounts...</option>
                     </select>
                     <div id="sub-payment-details" class="mt-2 p-2 border rounded" style="display:none; background:var(--ac-bg,#f5f7f5);">
-                        <p class="mb-1 small"><strong>Name:</strong> <span id="sub-pay-name">—</span></p>
-                        <p class="mb-1 small"><strong>Number:</strong> <span id="sub-pay-number">—</span></p>
-                        <p class="mb-0 small"><strong>Type:</strong> <span id="sub-pay-type">—</span></p>
+                        <p class="mb-1 small"><strong>Name:</strong> <span id="sub-pay-name">�</span></p>
+                        <p class="mb-1 small"><strong>Number:</strong> <span id="sub-pay-number">�</span></p>
+                        <p class="mb-0 small"><strong>Type:</strong> <span id="sub-pay-type">�</span></p>
                     </div>
                 </div>
                 <div class="card mb-3" style="background:var(--ac-bg,#f5f7f5); border-color:var(--ac-border,#e2e8e0);">
                     <div class="card-body">
                         <h6><i class="bi bi-cash-stack"></i> Amount to Send</h6>
-                        <p class="mb-0"><strong id="sub-amount-total" style="color:var(--ac-primary,#2d7a3a); font-size:1.25rem;">—</strong></p>
+                        <p class="mb-0"><strong id="sub-amount-total" style="color:var(--ac-primary,#2d7a3a); font-size:1.25rem;">�</strong></p>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -3745,7 +3746,7 @@
   <div class="modal-content">
     <div class="modal-header">
       <h3>Verification Request Rejected</h3>
-      <button class="close-btn" onclick="closeRejectionModal()">✕</button>
+      <button class="close-btn" onclick="closeRejectionModal()">?</button>
     </div>
     <div class="modal-body">
       <p id="rejection-reason-text"></p>

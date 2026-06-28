@@ -95,7 +95,7 @@ async function getRatingEligibility(userId, productId) {
   }
 
   const now = new Date();
-  if (now > editableUntil) {
+  if (now >= editableUntil) {
     return {
       allowed: false,
       reason: 'Rating window has ended. Ratings are editable for 1 month after delivery.',
@@ -142,7 +142,7 @@ async function getCustomerRatingEligibility(farmerId, orderId) {
   }
 
   const now = new Date();
-  if (now > editableUntil) {
+  if (now >= editableUntil) {
     return {
       allowed: false,
       reason: 'Rating window has ended. Ratings are editable for 1 month after delivery.',
@@ -170,6 +170,7 @@ router.get('/products/:id/reviews/eligibility', async (req, res) => {
     }
 
     const eligibility = await getRatingEligibility(user.id, productId);
+
     const myReview = await pool.query(
       `SELECT id, rating, comment, created_at, updated_at FROM reviews WHERE product_id = $1 AND user_id = $2 LIMIT 1`,
       [productId, user.id]

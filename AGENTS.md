@@ -1,138 +1,250 @@
-AGENTS.md AgriCatch AI Project Handbook Version: 1.0 Final
+# AgriCatch AI Project Handbook
+Version: 2.0 Enterprise
+Status: Active
 
-# AI Onboarding
+==============================================================================
+AI ONBOARDING
+==============================================================================
 
 Before starting work:
 
 1. Read AGENTS.md.
-2. Follow .windsurfrules.
+2. Read .windsurfrules.
 3. Inspect the repository.
-4. Confirm assumptions using the implementation.
+4. Verify assumptions using the implementation.
 5. Begin work.
 
-==============================================================================
-PURPOSE
-==============================================================================
-
-This document describes the AgriCatch project for AI coding agents.
-
-.windsurfrules defines HOW the AI should behave. AGENTS.md defines WHAT
-the project is.
-
-The repository is the source of truth.
+Repository evidence is always the source of truth.
 
 ==============================================================================
 PROJECT OVERVIEW
 ==============================================================================
 
-AgriCatch is a production-quality agricultural e-commerce platform.
+AgriCatch is a production-ready agricultural e-commerce platform that
+connects customers directly with verified farmers.
 
-Primary goals: - Connect customers with farmers. - Support available and
-pre-order products. - Maintain secure and scalable architecture. -
-Preserve maintainability and production readiness.
+The platform supports both Available Now and Hybrid Pre-order products,
+while maintaining a secure, scalable, and maintainable architecture.
+
+Primary goals:
+
+- Connect customers with farmers
+- Support agricultural commerce
+- Maintain production-quality code
+- Preserve architecture consistency
+- Protect existing business workflows
 
 ==============================================================================
 TECH STACK
 ==============================================================================
 
-Frontend - HTML - CSS - JavaScript
+Frontend
 
-Backend - Node.js - Express.js
+- HTML
+- CSS
+- JavaScript
 
-Database - PostgreSQL (Supabase)
+Backend
 
-Hosting - Frontend: Vercel - Backend: Render
+- Node.js
+- Express.js
 
-Storage - Cloudinary
+Database
 
-Testing - Browser MCP - Playwright
+- PostgreSQL (Supabase)
+
+Storage
+
+- Cloudinary
+
+Deployment
+
+- Frontend: Vercel
+- Backend: Render
+
+Development Tooling
+
+- Context7
+- Chrome DevTools MCP
+- Browser MCP
+- Playwright
+- Superpowers
+
+==============================================================================
+SYSTEM ARCHITECTURE
+==============================================================================
+
+Frontend
+
+Responsible for:
+
+- User Interface
+- Client Validation
+- State Management
+- API Communication
+
+Backend
+
+Responsible for:
+
+- Business Logic
+- Authentication
+- Authorization
+- Validation
+- API Endpoints
+- Database Operations
+
+Database
+
+Responsible for:
+
+- Data Integrity
+- Constraints
+- Relationships
+- Persistent Storage
+
+Business logic belongs in the backend whenever applicable.
 
 ==============================================================================
 PRIMARY USER ROLES
 ==============================================================================
 
-Customer - Browse - Wishlist - Cart - Checkout - Orders - Reviews -
+Customer
+
+- Browse products
+- Wishlist
+- Cart
+- Checkout
+- Orders
+- Reviews
+- Messaging
+- Notifications
+
+Farmer
+
+- Product Management
+- Hybrid Pre-order
+- Inventory
+- Analytics
+- Orders
+- Messaging
+
+Admin
+
+- Product Approval
+- Farmer Verification
+- Subscription Approval
+- User Management
+- Reports
+
+Super Admin
+
+- Platform Settings
+- System Maintenance
+- Full Administrative Control
+
+==============================================================================
+CORE MODULES
+==============================================================================
+
+Authentication
+
+Authorization
+
+Products
+
+Categories
+
+Wishlist
+
+Cart
+
+Checkout
+
+Orders
+
+Hybrid Pre-order
+
+Inventory
+
+Addresses
+
 Messaging
 
-Farmer - Product management - Inventory - Hybrid pre-order - Analytics -
-Subscription
+Notifications
 
-Admin - Product approval - Farmer verification - Subscription approval -
-User management - Reports
+Reviews
 
-Super Admin - Full administrative access - Platform configuration -
-Maintenance mode
+Subscriptions
 
-==============================================================================
-CORE BUSINESS MODULES
-==============================================================================
+Analytics
 
-Authentication Authorization Products Categories Cart Wishlist Orders
-Hybrid Pre-order Inventory Addresses Messaging Notifications Reviews
-Farmer Dashboard Customer Dashboard Admin Dashboard Reports
+Reports
+
+Platform Settings
 
 ==============================================================================
-PROJECT ARCHITECTURE
+PROTECTED MODULES
 ==============================================================================
 
-Frontend: Presentation and user interaction.
+The following modules are considered core architecture.
 
-Backend: Business logic, APIs, authentication, authorization, database
-operations.
+Do not redesign without explicit approval.
 
-Database: Persistent storage and integrity.
-
-Business logic should remain centralized.
+- Authentication
+- Authorization
+- Hybrid Pre-order
+- Wishlist
+- Cart
+- Checkout
+- Orders
+- Messaging
+- Notifications
+- Farmer Dashboard
+- Admin Dashboard
+- Platform Settings
 
 ==============================================================================
 HYBRID PRE-ORDER
 ==============================================================================
 
-The Hybrid Pre-order System is a protected core architecture.
+Hybrid Pre-order is a protected business workflow.
 
-Do not redesign it without explicit approval.
+Protect:
 
-Protect: - reservation workflow - inventory synchronization - preorder
-conversion - checkout validation - farmer workflow - admin workflow
+- reservation logic
+- inventory synchronization
+- checkout validation
+- farmer workflow
+- admin workflow
+- customer workflow
 
-==============================================================================
-DEVELOPMENT ENVIRONMENT
-==============================================================================
-
-Development intentionally differs from production.
-
-Current development behaviors may include:
-
--   CAPTCHA bypass
--   Email delivery bypass
--   Development OTP modes
--   Feature flag overrides
--   Development-friendly rate limits
-
-Always inspect configuration before assuming defects.
+Avoid architectural redesigns.
 
 ==============================================================================
 APPROVAL WORKFLOWS
 ==============================================================================
 
-Many workflows require approval.
+Several workflows depend on administrative approval.
 
 Examples:
 
--   Farmer verification
--   Product approval
--   Subscription approval
+- Farmer Verification
+- Product Approval
+- Subscription Approval
 
-Always inspect approval status before debugging.
+Inspect approval status before debugging.
 
 ==============================================================================
-FEATURE FLAGS
+FEATURE FLAGS & PLATFORM SETTINGS
 ==============================================================================
 
-Many system behaviors are controlled by feature flags and platform
-settings.
+Some system behavior is controlled through:
 
-Inspect feature flags before assuming business logic is broken.
+- Feature Flags
+- Platform Settings
+
+Always inspect configuration before assuming defects.
 
 ==============================================================================
 AUTHENTICATION
@@ -142,94 +254,113 @@ Authentication uses JWT.
 
 Authorization is role-based.
 
-Never bypass existing permission boundaries.
+Never bypass permission boundaries.
 
-Inspect existing users before creating test accounts.
+Prefer existing accounts for testing.
 
 ==============================================================================
 DATABASE
 ==============================================================================
 
-Database provider: PostgreSQL (Supabase)
+Database Provider:
 
-Prefer additive schema changes.
+PostgreSQL (Supabase)
 
-Protect production data.
+Guidelines:
 
-Preserve backwards compatibility.
+- Prefer additive schema changes
+- Preserve backwards compatibility
+- Avoid destructive migrations
+- Protect production data
 
 ==============================================================================
 DEPLOYMENT
 ==============================================================================
 
-Frontend: Vercel
+Production Environment
 
-Backend: Render
+Frontend
 
-Storage: Cloudinary
+Vercel
 
-Always consider production compatibility.
+Backend
+
+Render
+
+Database
+
+Supabase
+
+Storage
+
+Cloudinary
+
+Always maintain production compatibility.
 
 ==============================================================================
 TESTING STRATEGY
 ==============================================================================
 
-Preferred order:
+Preferred verification order:
 
-1.  Browser MCP
-2.  Existing automated tests
-3.  Playwright
-4.  Manual reasoning
+1. Chrome DevTools MCP
+2. Browser MCP
+3. Existing automated tests
+4. Playwright
+5. Manual reasoning
+
+Use Context7 whenever official documentation is required.
 
 ==============================================================================
 COMMON DEBUGGING CHECKLIST
 ==============================================================================
 
-Before debugging verify:
+Before assuming a bug, verify:
 
--   Configuration
--   Environment variables
--   Feature flags
--   Platform settings
--   User role
--   Account status
--   Approval workflow
--   Browser console
--   Network requests
--   Backend logs
+- Configuration
+- Environment Variables
+- Feature Flags
+- Platform Settings
+- User Role
+- Account Status
+- Approval Status
+- Browser Console
+- Network Requests
+- Backend Logs
+- Database Constraints
 
 ==============================================================================
 PROJECT PRINCIPLES
 ==============================================================================
 
-Prefer: - reuse - maintainability - consistency - backwards
-compatibility - production quality
+Prefer:
 
-Avoid: - duplicate implementations - unnecessary files - unnecessary
-refactors - breaking existing workflows
+- Reuse
+- Maintainability
+- Consistency
+- Simplicity
+- Backwards Compatibility
+
+Avoid:
+
+- Duplicate Implementations
+- Unnecessary Files
+- Unnecessary Refactors
+- Breaking Existing Workflows
 
 ==============================================================================
-AI ONBOARDING
+AI COMPLETION STANDARD
 ==============================================================================
 
-A new AI agent should understand:
+A task should only be considered complete when:
 
--   project goals
--   architecture
--   user roles
--   core workflows
--   deployment model
--   testing strategy
--   approval workflows
--   hybrid pre-order
--   development environment differences
-
-before implementing significant changes.
+- Requested functionality works
+- Existing functionality remains intact
+- No obvious regressions exist
+- Architecture remains consistent
+- Verification has been completed
+- Code is production-ready
 
 ==============================================================================
 END
 ==============================================================================
-
-Behavioral instructions belong in .windsurfrules.
-
-Project knowledge belongs in AGENTS.md.

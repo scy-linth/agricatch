@@ -1,7 +1,6 @@
 ﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
-const { requirePriceDropAlertsEnabled } = require('../middleware/featureFlags');
 
 const router = express.Router();
 
@@ -24,9 +23,16 @@ router.get('/', async (req, res) => {
     }
 
     const result = await pool.query(`
-      SELECT w.id, p.*
+      SELECT w.id, w.created_at as added_at,
+             p.*,
+             COALESCE(u.shop_name, u.full_name) as farmer_name,
+             p.location as farm_location,
+             COALESCE(u.is_verified, false) as farmer_verified,
+             c.name as category_name
       FROM wishlist w
       JOIN products p ON w.product_id = p.id
+      LEFT JOIN users u ON p.farmer_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
       WHERE w.user_id = $1
       ORDER BY w.created_at DESC
     `, [user.id]);
@@ -39,7 +45,7 @@ router.get('/', async (req, res) => {
 });
 
 // Add to wishlist
-router.post('/', requirePriceDropAlertsEnabled, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const user = getUserFromToken(req);
     if (!user) {

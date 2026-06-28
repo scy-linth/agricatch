@@ -475,6 +475,8 @@ router.post('/', async (req, res) => {
       await client.query('BEGIN');
 
       // Get user's cart items INSIDE transaction (include cart_id for deletion)
+      // Filter by cart_item_ids if provided (for selective checkout)
+      const { cart_item_ids } = req.body;
       const userCartQuery = `
         SELECT c.id as cart_id, c.quantity, p.id as product_id, p.price, p.stock_quantity, p.name,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
@@ -483,7 +485,7 @@ router.post('/', async (req, res) => {
         FROM cart c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN users u ON p.farmer_id = u.id
-        WHERE c.user_id = $1
+        WHERE c.user_id = $1${cart_item_ids && cart_item_ids.length > 0 ? ' AND c.id = ANY($2::int[])' : ''}
       `;
       const sessionCartQuery = `
         SELECT c.id as cart_id, c.quantity, p.id as product_id, p.price, p.stock_quantity, p.name,
@@ -493,12 +495,19 @@ router.post('/', async (req, res) => {
         FROM cart c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN users u ON p.farmer_id = u.id
-        WHERE c.session_id = $1
+        WHERE c.session_id = $1${cart_item_ids && cart_item_ids.length > 0 ? ' AND c.id = ANY($2::int[])' : ''}
       `;
-      let cartResult = await client.query(userCartQuery, [decoded.id]);
-
-      if (cartResult.rows.length === 0 && sessionId) {
-        cartResult = await client.query(sessionCartQuery, [sessionId]);
+      let cartResult;
+      if (cart_item_ids && cart_item_ids.length > 0) {
+        cartResult = await client.query(userCartQuery, [decoded.id, cart_item_ids]);
+        if (cartResult.rows.length === 0 && sessionId) {
+          cartResult = await client.query(sessionCartQuery, [sessionId, cart_item_ids]);
+        }
+      } else {
+        cartResult = await client.query(userCartQuery, [decoded.id]);
+        if (cartResult.rows.length === 0 && sessionId) {
+          cartResult = await client.query(sessionCartQuery, [sessionId]);
+        }
       }
 
       if (cartResult.rows.length === 0) {

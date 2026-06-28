@@ -4507,6 +4507,9 @@ class AdminDashboard {
             
             // Store current activities for realtime updates
             this.currentActivities = activities;
+
+            // Store pagination metadata for pagination rendering
+            this._activityPagination = data.pagination || null;
             
             // Update Last Updated timestamp
             const lastUpdated = document.getElementById('am-last-updated');
@@ -4547,7 +4550,7 @@ class AdminDashboard {
                 return;
             }
 
-            const eventSource = new EventSource(`/api/activity-monitor/stream?token=${encodeURIComponent(token)}`);
+            const eventSource = new EventSource(`${this.apiBase}/activity-monitor/stream?token=${encodeURIComponent(token)}`);
 
             eventSource.onmessage = (event) => {
                 try {
@@ -4558,6 +4561,7 @@ class AdminDashboard {
                         this.handleNewActivity(message.data);
                     } else if (message.type === 'connected') {
                         console.log('Activity Monitor stream connected');
+                        this._activityMonitorRetries = 0;
                     }
                 } catch (error) {
                     console.error('Error parsing SSE message:', error);
@@ -4566,7 +4570,22 @@ class AdminDashboard {
 
             eventSource.onerror = (error) => {
                 console.error('Activity Monitor stream error:', error);
-                this.stopActivityMonitorStream();
+                eventSource.close();
+                this._activityMonitorEventSource = null;
+
+                // Auto-reconnect with backoff (max 5 retries)
+                this._activityMonitorRetries = (this._activityMonitorRetries || 0) + 1;
+                if (this._activityMonitorRetries <= 5) {
+                    const delay = Math.min(this._activityMonitorRetries * 3000, 15000);
+                    console.log(`Activity Monitor stream reconnecting in ${delay / 1000}s (attempt ${this._activityMonitorRetries}/5)...`);
+                    setTimeout(() => {
+                        if (localStorage.getItem('token')) {
+                            this.startActivityMonitorStream();
+                        }
+                    }, delay);
+                } else {
+                    console.warn('Activity Monitor stream max retries reached, giving up');
+                }
             };
 
             this._activityMonitorEventSource = eventSource;
@@ -4607,8 +4626,13 @@ class AdminDashboard {
         }
         this.currentActivities.unshift(newActivity);
 
-        // Re-render with new activity
-        this.renderActivityMonitor(this.currentActivities);
+        // Re-render, respecting any active quick filter
+        const activeFilter = document.querySelector('.am-quick-filter.active');
+        if (activeFilter && activeFilter.dataset.filter && activeFilter.dataset.filter !== 'all') {
+            this.filterActivities(activeFilter.dataset.filter);
+        } else {
+            this.renderActivityMonitor(this.currentActivities);
+        }
 
         // Update last updated timestamp
         const lastUpdated = document.getElementById('am-last-updated');
@@ -4628,7 +4652,7 @@ class AdminDashboard {
 
     async loadActivityDashboardSummary() {
         try {
-            const response = await fetch('/api/activity-monitor/dashboard', {
+            const response = await fetch(`${this.apiBase}/activity-monitor/dashboard`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
                 }
@@ -4665,6 +4689,19 @@ class AdminDashboard {
             }
             if (adminActionsCard) {
                 adminActionsCard.textContent = data.adminActions || 0;
+            }
+
+            // Update trend and status subtitles
+            const todayTrend = document.getElementById('am-today-trend');
+            if (todayTrend) {
+                const count = data.todayActivities || 0;
+                todayTrend.textContent = count === 1 ? '1 activity today' : `${count} activities today`;
+            }
+
+            const onlineStatus = document.getElementById('am-online-status');
+            if (onlineStatus) {
+                const count = data.onlineUsers || 0;
+                onlineStatus.textContent = count === 1 ? '1 user online' : `${count} users online`;
             }
 
         } catch (error) {
@@ -4820,8 +4857,13 @@ class AdminDashboard {
             });
         });
 
-        // Render pagination placeholder
-        this.renderActivityPagination(activities.length);
+        // Render pagination using API total count
+        const pagination = this._activityPagination;
+        if (pagination) {
+            this.renderActivityPagination(pagination.total, pagination.page, pagination.limit);
+        } else {
+            this.renderActivityPagination(activities.length, 1, activities.length);
+        }
     }
 
     getRiskBadge(riskLevel, riskScore) {
@@ -4854,28 +4896,256 @@ class AdminDashboard {
         return badges[status] || `<span class="badge bg-secondary">⚪ ${status}</span>`;
     }
 
-    renderActivityPagination(totalItems) {
+    renderActivityPagination(totalItems, currentPage, perPage) {
         const container = document.getElementById('am-pagination');
         if (!container) return;
 
-        const perPage = parseInt(document.getElementById('am-entries-per-page')?.value || 25);
+        perPage = perPage || parseInt(document.getElementById('am-entries-per-page')?.value || 25);
+        currentPage = currentPage || 1;
         const totalPages = Math.ceil(totalItems / perPage);
 
         if (totalPages <= 1) {
-            container.innerHTML = '';
+            container.innerHTML = `<small class="text-muted">Showing ${totalItems} activit${totalItems === 1 ? 'y' : 'ies'}</small>`;
             return;
         }
 
+        const startItem = (currentPage - 1) * perPage + 1;
+        const endItem = Math.min(currentPage * perPage, totalItems);
+
         let html = '<div class="d-flex justify-content-between align-items-center">';
-        html += `<small class="text-muted">Showing 1-${Math.min(perPage, totalItems)} of ${totalItems} activities</small>`;
+        html += `<small class="text-muted">Showing ${startItem}-${endItem} of ${totalItems} activities</small>`;
         html += '<div class="pagination">';
-        
-        for (let i = 1; i <= totalPages; i++) {
-            html += `<button class="btn btn-sm ${i === 1 ? 'btn-primary' : 'btn-outline-secondary'} me-1">${i}</button>`;
+
+        // Previous button
+        if (currentPage > 1) {
+            html += `<button class="btn btn-sm btn-outline-secondary me-1 am-page-btn" data-page="${currentPage - 1}">&laquo;</button>`;
         }
-        
+
+        // Page buttons (show max 7 pages with ellipsis)
+        const maxButtons = 7;
+        let startPage = Math.max(1, currentPage - 3);
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+        if (endPage - startPage < maxButtons - 1) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        if (startPage > 1) {
+            html += `<button class="btn btn-sm btn-outline-secondary me-1 am-page-btn" data-page="1">1</button>`;
+            if (startPage > 2) html += '<span class="px-1 text-muted">...</span>';
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<button class="btn btn-sm ${i === currentPage ? 'btn-primary' : 'btn-outline-secondary'} me-1 am-page-btn" data-page="${i}">${i}</button>`;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) html += '<span class="px-1 text-muted">...</span>';
+            html += `<button class="btn btn-sm btn-outline-secondary me-1 am-page-btn" data-page="${totalPages}">${totalPages}</button>`;
+        }
+
+        // Next button
+        if (currentPage < totalPages) {
+            html += `<button class="btn btn-sm btn-outline-secondary me-1 am-page-btn" data-page="${currentPage + 1}">&raquo;</button>`;
+        }
+
         html += '</div></div>';
         container.innerHTML = html;
+
+        // Wire up page button click handlers
+        container.querySelectorAll('.am-page-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const page = parseInt(e.target.dataset.page);
+                if (page) {
+                    this.loadActivityMonitorPage(page);
+                }
+            });
+        });
+    }
+
+    async loadActivityMonitorPage(page) {
+        try {
+            const params = new URLSearchParams({
+                page: page,
+                limit: document.getElementById('am-entries-per-page')?.value || 25
+            });
+
+            const searchValue = document.getElementById('am-search-user')?.value;
+            if (searchValue) params.append('search', searchValue);
+
+            const roleValue = document.getElementById('am-role-filter')?.value;
+            if (roleValue) params.append('role', roleValue);
+
+            const actionValue = document.getElementById('am-action-filter')?.value;
+            if (actionValue) params.append('action', actionValue);
+
+            const statusValue = document.getElementById('am-status-filter')?.value;
+            if (statusValue) params.append('status', statusValue);
+
+            const sessionValue = document.getElementById('am-session-filter')?.value;
+            if (sessionValue) params.append('session', sessionValue);
+
+            const dateFromValue = document.getElementById('am-date-from')?.value;
+            if (dateFromValue) params.append('dateFrom', dateFromValue);
+
+            const dateToValue = document.getElementById('am-date-to')?.value;
+            if (dateToValue) params.append('dateTo', dateToValue);
+
+            const response = await fetch(`${this.apiBase}/activity-monitor/activities?${params.toString()}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch activities');
+            }
+
+            const data = await response.json();
+
+            const activities = data.activities.map(activity => ({
+                id: activity.id,
+                user: activity.full_name || activity.username || 'Unknown',
+                email: activity.email || 'N/A',
+                role: activity.role,
+                action: activity.action,
+                actionLabel: this.getActionLabel(activity.action),
+                actionIcon: this.getActionIcon(activity.action),
+                description: activity.description || '',
+                currentPage: activity.current_page || 'N/A',
+                ipAddress: activity.ip_address || 'N/A',
+                timestamp: activity.created_at,
+                status: activity.status,
+                sessionId: activity.session_id || 'N/A',
+                riskLevel: activity.risk_level || 'low',
+                riskScore: activity.risk_score || 0
+            }));
+
+            this.renderActivityMonitor(activities);
+            this.currentActivities = activities;
+            this._activityPagination = data.pagination || null;
+
+            const pagination = this._activityPagination;
+            if (pagination) {
+                this.renderActivityPagination(pagination.total, pagination.page, pagination.limit);
+            }
+
+        } catch (error) {
+            console.error('Error loading activity monitor page:', error);
+            this.showMessage('Failed to load activities', 'error');
+        }
+    }
+
+    async loadActivityMonitorSettings() {
+        try {
+            const response = await fetch(`${this.apiBase}/activity-monitor/settings`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (!response.ok) {
+                console.warn('Failed to fetch activity monitor settings');
+                return;
+            }
+
+            const data = await response.json();
+            const s = data.settings || {};
+
+            const enableMonitoring = document.getElementById('am-enable-monitoring');
+            if (enableMonitoring) enableMonitoring.checked = s.enableMonitoring !== false;
+
+            const retentionPeriod = document.getElementById('am-retention-period');
+            if (retentionPeriod) retentionPeriod.value = s.retentionDays || 90;
+
+            const maxRecords = document.getElementById('am-max-records');
+            if (maxRecords) maxRecords.value = s.maxRecords || 100000;
+
+            const autoDelete = document.getElementById('am-auto-delete');
+            if (autoDelete) autoDelete.checked = s.autoDelete !== false;
+
+            const enableCustomer = document.getElementById('am-enable-customer');
+            if (enableCustomer) enableCustomer.checked = s.enableCustomer !== false;
+
+            const enableFarmer = document.getElementById('am-enable-farmer');
+            if (enableFarmer) enableFarmer.checked = s.enableFarmer !== false;
+
+            const enableAdmin = document.getElementById('am-enable-admin');
+            if (enableAdmin) enableAdmin.checked = s.enableAdmin !== false;
+
+            // Fetch storage stats
+            this.loadActivityMonitorStorage();
+
+        } catch (error) {
+            console.error('Error loading activity monitor settings:', error);
+        }
+    }
+
+    async loadActivityMonitorStorage() {
+        try {
+            const response = await fetch(`${this.apiBase}/activity-monitor/storage`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (!response.ok) return;
+
+            const data = await response.json();
+            const storageBar = document.getElementById('am-storage-bar');
+            const storageText = document.getElementById('am-storage-text');
+            if (storageBar && data.totalSize) {
+                const recordCount = data.recordCount || 0;
+                const maxRecords = parseInt(document.getElementById('am-max-records')?.value || 100000);
+                const pct = Math.min((recordCount / maxRecords) * 100, 100);
+                storageBar.style.width = `${pct}%`;
+                storageBar.textContent = `${data.totalSize} (${recordCount} records)`;
+            }
+            if (storageText && data.totalSize) {
+                const recordCount = data.recordCount || 0;
+                const maxRecords = parseInt(document.getElementById('am-max-records')?.value || 100000);
+                const pct = Math.min((recordCount / maxRecords) * 100, 100).toFixed(1);
+                storageText.textContent = `${data.totalSize} — ${recordCount} of ${maxRecords} records (${pct}%)`;
+            }
+        } catch (error) {
+            console.error('Error loading storage stats:', error);
+        }
+    }
+
+    async saveActivityMonitorSettings() {
+        try {
+            const body = {
+                enableMonitoring: document.getElementById('am-enable-monitoring')?.checked !== false,
+                retentionDays: parseInt(document.getElementById('am-retention-period')?.value || 90),
+                maxRecords: parseInt(document.getElementById('am-max-records')?.value || 100000),
+                autoDelete: document.getElementById('am-auto-delete')?.checked !== false,
+                enableCustomer: document.getElementById('am-enable-customer')?.checked !== false,
+                enableFarmer: document.getElementById('am-enable-farmer')?.checked !== false,
+                enableAdmin: document.getElementById('am-enable-admin')?.checked !== false
+            };
+
+            const response = await fetch(`${this.apiBase}/activity-monitor/settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save settings');
+            }
+
+            this.showMessage('Activity Monitor settings saved successfully', 'success');
+            const modal = document.getElementById('activity-settings-modal');
+            if (modal) {
+                modal.classList.remove('open');
+                modal.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error saving activity monitor settings:', error);
+            this.showMessage('Failed to save settings', 'error');
+        }
     }
 
     async openActivityDetailsModal(activity) {
@@ -5072,6 +5342,7 @@ class AdminDashboard {
             if (modal) {
                 modal.classList.add('open');
                 modal.style.display = 'flex';
+                this.loadActivityMonitorSettings();
             }
         });
 
@@ -5088,12 +5359,7 @@ class AdminDashboard {
 
         // Save settings button
         document.getElementById('am-save-settings')?.addEventListener('click', () => {
-            this.showMessage('Activity Monitor settings saved successfully', 'success');
-            const modal = document.getElementById('activity-settings-modal');
-            if (modal) {
-                modal.classList.remove('open');
-                modal.style.display = 'none';
-            }
+            this.saveActivityMonitorSettings();
         });
 
         // Copy Session ID button
@@ -11443,13 +11709,9 @@ class AdminDashboard {
     }
 
     async handleReviewAction(action) {
-        console.log('[DEBUG] handleReviewAction called with action:', action);
-        console.log('[DEBUG] currentReviewRequestId:', this.currentReviewRequestId);
-
         if (!this.currentReviewRequestId) return;
 
         const rejectionReason = document.getElementById('rejection-reason-input').value;
-        console.log('[DEBUG] rejectionReason:', rejectionReason);
 
         if (action === 'rejected' && !rejectionReason.trim()) {
             this.showToast('Rejection reason is required', 'error');
@@ -11460,7 +11722,6 @@ class AdminDashboard {
             status: action,
             rejection_reason: action === 'rejected' ? rejectionReason : null
         };
-        console.log('[DEBUG] Sending payload:', payload);
 
         try {
             const response = await fetch(`${this.apiBase}/admin/verification-requests/${this.currentReviewRequestId}/review`, {
@@ -11473,8 +11734,6 @@ class AdminDashboard {
             });
 
             const data = await response.json();
-            console.log('[DEBUG] Response status:', response.status);
-            console.log('[DEBUG] Response data:', data);
 
             if (response.ok) {
                 this.closeReviewModal();

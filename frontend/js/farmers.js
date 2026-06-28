@@ -54,7 +54,11 @@ class FarmersPage {
         if (!grid) return;
 
         if (!farmers.length) {
-            grid.innerHTML = '<p class="empty-state">No farmers found.</p>';
+            grid.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-tractor',
+                title: 'No farmers found',
+                description: 'Farmer profiles will appear here.'
+            });
             return;
         }
 

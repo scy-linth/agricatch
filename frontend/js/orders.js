@@ -125,8 +125,7 @@ class OrdersPage {
     }
 
     showGuestLoginPrompt() {
-        // Show toast message
-        this.showToast('Please log in to view your orders', 'info');
+        showToast('Please log in to view your orders', 'info');
         
         // Store return URL
         const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
@@ -135,51 +134,6 @@ class OrdersPage {
         setTimeout(() => {
             window.location.href = `/?login=1&returnUrl=${returnUrl}`;
         }, 1500);
-    }
-
-    showToast(message, type = 'info') {
-        // Create toast element
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            padding: 12px 20px;
-            border-radius: 8px;
-            background: ${type === 'info' ? '#0ea5e9' : '#ef4444'};
-            color: white;
-            font-weight: 500;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            animation: slideIn 0.3s ease;
-        `;
-        toast.textContent = message;
-        
-        // Add animation keyframes if not exists
-        if (!document.getElementById('toast-animations')) {
-            const style = document.createElement('style');
-            style.id = 'toast-animations';
-            style.textContent = `
-                @keyframes slideIn {
-                    from { transform: translateX(100%); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
-                }
-                @keyframes slideOut {
-                    from { transform: translateX(0); opacity: 1; }
-                    to { transform: translateX(100%); opacity: 0; }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        
-        document.body.appendChild(toast);
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-            toast.style.animation = 'slideOut 0.3s ease forwards';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
     }
 
     normalizeReturnTo(value) {
@@ -233,6 +187,18 @@ class OrdersPage {
         document.getElementById('order-reason-view-modal')?.addEventListener('click', (e) => {
             if (e.target && e.target.id === 'order-reason-view-modal') {
                 this.closeReasonViewer();
+            }
+        });
+
+        document.getElementById('close-product-unavailable-modal')?.addEventListener('click', () => this.closeUnavailableProductDialog());
+        document.getElementById('close-product-unavailable-btn')?.addEventListener('click', () => this.closeUnavailableProductDialog());
+        document.getElementById('browse-marketplace-btn')?.addEventListener('click', () => {
+            this.closeUnavailableProductDialog();
+            window.location.href = '/index.html#products';
+        });
+        document.getElementById('product-unavailable-modal')?.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'product-unavailable-modal') {
+                this.closeUnavailableProductDialog();
             }
         });
 
@@ -533,7 +499,11 @@ class OrdersPage {
 
         if (filtered.length === 0) {
             const tabLabel = this.formatTabLabel(this.currentTab);
-            container.innerHTML = `<div class="empty-state">No ${tabLabel} orders found${q ? ' matching your search' : ''}.</div>`;
+            container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-clipboard-list',
+                title: `No ${tabLabel} orders found${q ? ' matching your search' : ''}`,
+                description: 'Orders you place will appear here.'
+            });
             return;
         }
 
@@ -629,8 +599,8 @@ class OrdersPage {
                                 </button>
                             ` : ''}
                             ${isDelivered ? `
-                                <button class="btn btn-small btn-secondary" onclick="ordersPage.reorder(${order.id})" title="Add items back to cart">
-                                    <i class="fas fa-redo"></i> Reorder
+                                <button class="btn btn-small btn-secondary" onclick="ordersPage.viewProduct(${item.product_id})" title="View product details">
+                                    <i class="fas fa-eye"></i> View Product
                                 </button>
                             ` : ''}
                             ${canRateNow ? `
@@ -699,7 +669,7 @@ class OrdersPage {
     }
 
     syncModalLockState() {
-        const hasOpenModal = ['order-rating-modal', 'order-cancel-modal', 'order-reason-view-modal']
+        const hasOpenModal = ['order-rating-modal', 'order-cancel-modal', 'order-reason-view-modal', 'product-unavailable-modal']
             .some((id) => document.getElementById(id)?.classList.contains('open'));
         this.setModalLock(hasOpenModal);
     }
@@ -813,7 +783,9 @@ class OrdersPage {
     }
 
     async rateOrderProduct(productId) {
-        if (!productId) return;
+        if (!productId) {
+            return;
+        }
 
         try {
             const eligibilityRes = await fetch(`${this.apiBase}/products/${productId}/reviews/eligibility`, {
@@ -918,7 +890,11 @@ class OrdersPage {
         tabs.forEach(tab => {
             const container = document.getElementById(`${tab}-orders-list`);
             if (container) {
-                container.innerHTML = '<div class="empty-state">No orders found.</div>';
+                container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-clipboard-list',
+                    title: 'No orders found',
+                    description: 'Orders you place will appear here.'
+                });
             }
         });
         // Reset orders by status
@@ -965,34 +941,53 @@ class OrdersPage {
         window.location.href = `/chat.html?farmerId=${farmerId}&orderId=${orderId}&productName=${encodeURIComponent(productName)}&quantity=${safeQty}&returnUrl=${encodeURIComponent(returnUrl)}`;
     }
 
-    async reorder(orderId) {
-        const allOrders = Object.values(this.ordersByStatus).flat();
-        const order = allOrders.find((o) => Number(o.id) === Number(orderId));
-        if (!order) { showToast('Order not found.', 'error'); return; }
-        const item = (order.items && order.items[0]) || order;
-        const productId = item.product_id;
-        const quantity = Number(item.quantity || 1) || 1;
-        if (!productId) { showToast('Product information not available.', 'error'); return; }
+    async viewProduct(productId) {
+        if (!productId) {
+            showToast('Product information not available.', 'error');
+            return;
+        }
 
         try {
-            const response = await this.fetchWithApiFallback('/cart', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.token}`
-                },
-                body: JSON.stringify({ product_id: productId, quantity })
+            // Check if there's a current active product for this product ID
+            const response = await this.fetchWithApiFallback(`/products/${productId}/current-active`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
             });
-            if (response.ok) {
-                showToast(`${item.product_name || 'Item'} added to your cart!`, 'success');
+
+            if (!response.ok) {
+                showToast('Unable to check product availability.', 'error');
+                return;
+            }
+
+            const data = await response.json();
+
+            if (data.currentProductId) {
+                // Case 1 or 2: Product is available (original or linked)
+                // Redirect to index.html with the product ID to open product details
+                window.location.href = `/index.html?openProductId=${data.currentProductId}#products`;
             } else {
-                const data = await response.json().catch(() => ({}));
-                showToast(data.message || 'Unable to add item to cart.', 'error');
+                // Case 3: No active product available
+                this.showUnavailableProductDialog();
             }
         } catch (err) {
-            console.error('Reorder error:', err);
-            showToast('Unable to add item to cart right now.', 'error');
+            console.error('View product error:', err);
+            showToast('Unable to view product right now.', 'error');
         }
+    }
+
+    showUnavailableProductDialog() {
+        const modal = document.getElementById('product-unavailable-modal');
+        if (modal) {
+            modal.classList.add('open');
+            this.setModalLock(true);
+        }
+    }
+
+    closeUnavailableProductDialog() {
+        const modal = document.getElementById('product-unavailable-modal');
+        if (modal && modal.classList.contains('open')) {
+            modal.classList.remove('open');
+        }
+        this.syncModalLockState();
     }
 
     getStatusColor(status) {

@@ -1,7 +1,8 @@
 // Checkout Page Logic
 class CheckoutPage {
     constructor() {
-        this.apiBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        const hostname = String(window.location.hostname || '').toLowerCase();
+        this.apiBase = (hostname === 'localhost' || hostname === '127.0.0.1')
             ? 'http://localhost:3000/api'
             : 'https://agricatch.onrender.com/api';
         this.token = localStorage.getItem('token');
@@ -158,8 +159,7 @@ class CheckoutPage {
     }
 
     showGuestLoginPrompt() {
-        // Show toast message
-        this.showToast('Please log in to proceed to checkout', 'info');
+        showToast('Please log in to proceed to checkout', 'info');
         
         // Store return URL
         const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
@@ -168,51 +168,6 @@ class CheckoutPage {
         setTimeout(() => {
             window.location.href = `/?login=1&returnUrl=${returnUrl}`;
         }, 1500);
-    }
-
-    showToast(message, type = 'info') {
-        // Create toast element
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            padding: 12px 20px;
-            border-radius: 8px;
-            background: ${type === 'info' ? '#0ea5e9' : '#ef4444'};
-            color: white;
-            font-weight: 500;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            animation: slideIn 0.3s ease;
-        `;
-        toast.textContent = message;
-        
-        // Add animation keyframes if not exists
-        if (!document.getElementById('toast-animations')) {
-            const style = document.createElement('style');
-            style.id = 'toast-animations';
-            style.textContent = `
-                @keyframes slideIn {
-                    from { transform: translateX(100%); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
-                }
-                @keyframes slideOut {
-                    from { transform: translateX(0); opacity: 1; }
-                    to { transform: translateX(100%); opacity: 0; }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        
-        document.body.appendChild(toast);
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-            toast.style.animation = 'slideOut 0.3s ease forwards';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
     }
 
     async loadDeliveryAddressSetting() {
@@ -234,7 +189,6 @@ class CheckoutPage {
     updateAddressDisplay() {
         const addressSection = document.querySelector('.co-card-header i.fa-truck')?.closest('.co-card');
         if (!addressSection) {
-            console.log('Address section not found');
             return;
         }
 
@@ -243,7 +197,6 @@ class CheckoutPage {
         const setAddressBtn = document.getElementById('set-address-btn');
         
         if (!addressNotice) {
-            console.log('Address notice not found');
             return;
         }
 
@@ -625,8 +578,21 @@ class CheckoutPage {
             if (response.ok) {
                 const data = await response.json();
 
+                // Filter cart items to only include selected products
+                const selectedCartItemsStr = localStorage.getItem('selectedCartItems');
+                if (selectedCartItemsStr) {
+                    try {
+                        const selectedCartIds = JSON.parse(selectedCartItemsStr);
+                        data.cartItems = data.cartItems.filter(item => selectedCartIds.includes(item.id));
+                        // Store selected IDs for later use (order placement, cart deletion)
+                        this.selectedCartIds = selectedCartIds;
+                    } catch (error) {
+                        console.error('Error parsing selected cart items:', error);
+                    }
+                }
+
                 if (data.cartItems.length === 0) {
-                    this.showMessage('Your cart is empty', 'error');
+                    this.showMessage('No products selected for checkout', 'error');
                     setTimeout(() => { window.location.href = '/index.html#products'; }, 2000);
                     return;
                 }
@@ -726,8 +692,16 @@ class CheckoutPage {
         `;
         }).join('');
 
-        const subtotal = parseFloat(data.summary.subtotal) || 0;
-        const deliveryFee = this.getDeliveryFee();
+        // Recalculate subtotal based on filtered cart items
+        const subtotal = data.cartItems.reduce((sum, item) => {
+            return sum + (parseFloat(item.price) * item.quantity);
+        }, 0);
+        
+        // Calculate delivery fee based on unique farmers in filtered cart items
+        const uniqueFarmers = new Set(data.cartItems.map(item => item.farmer_name));
+        const globalDeliveryFee = 35; // Global delivery fee per farmer
+        const deliveryFee = uniqueFarmers.size * globalDeliveryFee;
+        
         const grandTotal = subtotal + (deliveryFee > 0 ? deliveryFee : 0);
 
         if (checkoutSubtotal) {
@@ -864,7 +838,8 @@ class CheckoutPage {
                     recipient_phone: phone,
                     special_instructions: specialInstructions || null,
                     delivery_address: deliveryAddress,
-                    delivery_date: deliveryDate
+                    delivery_date: deliveryDate,
+                    cart_item_ids: this.selectedCartIds
                 })
             });
 
@@ -874,6 +849,9 @@ class CheckoutPage {
 
                 // Clear draft checkout info after successful order
                 this.clearDraftCheckoutInfo();
+
+                // Clear selected cart items after successful order
+                localStorage.removeItem('selectedCartItems');
 
                 const successMessage = hasPreorder ? 'Pre-order placed successfully! Redirecting…' : 'Order placed successfully! Redirecting…';
                 this.showMessage(successMessage, 'success');

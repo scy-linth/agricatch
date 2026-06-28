@@ -200,6 +200,34 @@ window.showToast = (function () {
   };
 }());
 
+// Global empty-state HTML generator — standardizes empty state markup across all pages
+// Usage: renderEmptyState({ icon, title, description, actionText, actionHref })
+window.renderEmptyState = function renderEmptyState(opts = {}) {
+    const {
+        icon = 'fas fa-inbox',
+        title = '',
+        description = '',
+        actionText = '',
+        actionHref = ''
+    } = opts;
+
+    let html = '<div class="empty-state">';
+    if (icon) {
+        html += `<i class="${icon}" aria-hidden="true"></i>`;
+    }
+    if (title) {
+        html += `<p class="empty-state-title">${title}</p>`;
+    }
+    if (description) {
+        html += `<p class="empty-state-description">${description}</p>`;
+    }
+    if (actionText && actionHref) {
+        html += `<a href="${actionHref}" class="btn btn-primary">${actionText}</a>`;
+    }
+    html += '</div>';
+    return html;
+};
+
 // Global confirm utility — replaces native confirm() across all pages
 // Returns a Promise<boolean>
 window.showConfirm = (function () {

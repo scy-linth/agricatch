@@ -490,13 +490,10 @@ router.get('/stream', async (req, res) => {
             res.write(`: keepalive\n\n`);
         }, 30000);
 
-        // Clean up on disconnect
-        req.on('close', () => {
-            clearInterval(keepalive);
-            global.activityMonitorClients?.delete(clientId);
-        });
-
-        req.on('end', () => {
+        // Clean up on disconnect — use res.on('close') not req.on('end')
+        // req.on('end') fires immediately for GET requests (no body), which would
+        // remove the client before any realtime updates can be sent.
+        res.on('close', () => {
             clearInterval(keepalive);
             global.activityMonitorClients?.delete(clientId);
         });
@@ -506,6 +503,6 @@ router.get('/stream', async (req, res) => {
     }
 });
 
-// Export the broadcast function for use in activityLogger
-module.exports.broadcastNewActivity = broadcastNewActivity;
+// Attach broadcast function to router for use in activityLogger
+router.broadcastNewActivity = broadcastNewActivity;
 module.exports = router;

@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="/css/nicemain.css">
     <!-- AgriCatch SaaS overrides -->
     <link rel="stylesheet" href="/css/agricatch-admin.css">
+    <link rel="stylesheet" href="/css/agricatch-polish.css?v=2">
 
 
 <style>
@@ -620,6 +621,24 @@
         </div>
         <div class="form-actions">
             <button type="button" class="btn btn-sm btn-outline-secondary" id="close-order-reason-view-btn">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Product Unavailable Modal ─────────────────────────────────────── -->
+<div id="product-unavailable-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header" style="background:#f59e0b;">
+            <h3><i class="fas fa-exclamation-triangle me-1"></i> Product Currently Unavailable</h3>
+            <button type="button" class="close-btn" id="close-product-unavailable-modal" aria-label="Close">&times;</button>
+        </div>
+        <div class="order-reason-view-body">
+            <p>This product is not available at the moment.</p>
+            <p>The farmer currently has no active listing for this product.</p>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-sm btn-primary" id="browse-marketplace-btn">Browse Marketplace</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="close-product-unavailable-btn">Close</button>
         </div>
     </div>
 </div>

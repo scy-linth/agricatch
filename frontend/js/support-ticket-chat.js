@@ -375,7 +375,11 @@ class SupportTicketChat {
         const wasNearBottom = this.isNearBottom(container);
 
         if (!messages || messages.length === 0) {
-            container.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
+            container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-comments',
+                title: 'No messages yet',
+                description: 'Start the conversation!'
+            });
             return;
         }
 

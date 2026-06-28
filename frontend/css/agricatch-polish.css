@@ -1,0 +1,1292 @@
+/* ============================================================
+   AgriCatch UI Polish Layer
+   Version: 1.0
+   Purpose: Cross-system consistency, accessibility, micro-interactions
+   Loaded AFTER all other CSS files to act as an enhancement layer
+   ============================================================ */
+
+/* ============================================================
+   1. Accessibility — Focus Visible States
+   ============================================================ */
+
+:root {
+    --polish-focus-ring: 0 0 0 3px rgba(74, 222, 128, 0.4);
+    --polish-focus-ring-dark: 0 0 0 3px rgba(45, 122, 58, 0.35);
+    --polish-transition-fast: 0.15s ease;
+    --polish-transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --polish-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --polish-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.10);
+    --polish-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --polish-empty-icon: #d1d5db;
+    --polish-empty-text: #6b7280;
+    --polish-empty-bg: #fafafa;
+    --polish-radius: 12px;
+}
+
+/* Visible focus ring for keyboard navigation only */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+.btn:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.filter-select:focus-visible,
+.search-input:focus-visible,
+.carousel-dot:focus-visible,
+.page-btn:focus-visible,
+.detail-panel-close:focus-visible,
+.toggle-switch:focus-visible + .toggle-slider,
+.ac-toggle-switch:focus-visible + .ac-toggle-slider {
+    outline: none;
+    box-shadow: var(--polish-focus-ring);
+    border-radius: var(--polish-radius);
+}
+
+/* Admin/dark-theme focus ring */
+.admin-theme a:focus-visible,
+.admin-theme button:focus-visible,
+.admin-theme .btn:focus-visible,
+.admin-theme .form-control:focus-visible,
+.admin-theme .form-select:focus-visible,
+.admin-theme .page-btn:focus-visible,
+.admin-theme .detail-panel-close:focus-visible,
+.admin-theme .admin-tab:focus-visible {
+    box-shadow: var(--polish-focus-ring-dark);
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Screen-reader-only utility */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ============================================================
+   2. Empty State Component — Standardized
+   ============================================================ */
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: var(--polish-empty-text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-height: 200px;
+}
+
+.empty-state i,
+.empty-state .empty-state-icon {
+    font-size: 3rem;
+    color: var(--polish-empty-icon);
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.empty-state p,
+.empty-state .empty-state-text {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--polish-empty-text);
+    max-width: 400px;
+}
+
+.empty-state .empty-state-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 0;
+}
+
+.empty-state .empty-state-description {
+    font-size: 0.9rem;
+    color: var(--polish-empty-text);
+    margin: 0;
+}
+
+.empty-state .btn,
+.empty-state a.btn {
+    margin-top: 0.5rem;
+}
+
+/* Admin-panel variant */
+.panel-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 200px;
+    color: var(--ac-text-subtle, #9ca3af);
+}
+
+.panel-empty-state i {
+    font-size: 2.5rem;
+    opacity: 0.4;
+}
+
+.panel-empty-state p {
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+/* ============================================================
+   3. Button Polish — Disabled, Active, Loading States
+   ============================================================ */
+
+/* Standard disabled state */
+.btn:disabled,
+.btn.disabled,
+button:disabled,
+button.disabled,
+input[type="submit"]:disabled,
+input[type="button"]:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Active/pressed state for tactile feedback */
+.btn:active:not(:disabled),
+button:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+/* Loading state */
+.btn.is-loading,
+button.is-loading {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.btn.is-loading::after,
+button.is-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: polish-spin 0.6s linear infinite;
+}
+
+@keyframes polish-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   4. Card Micro-interactions
+   ============================================================ */
+
+/* Product card hover enhancement (customer-facing) */
+.product-card {
+    will-change: transform, box-shadow;
+}
+
+.product-card:hover {
+    box-shadow: var(--polish-shadow-lg);
+}
+
+/* Admin card hover */
+.admin-section-card .card,
+.admin-section-card .ac-card {
+    transition: box-shadow var(--polish-transition-normal), transform var(--polish-transition-normal);
+}
+
+.admin-section-card .card:hover,
+.admin-section-card .ac-card:hover {
+    box-shadow: var(--polish-shadow-md);
+}
+
+/* Stat card hover */
+.stat-card,
+.ac-stat-card {
+    transition: transform var(--polish-transition-fast), box-shadow var(--polish-transition-fast);
+}
+
+.stat-card:hover,
+.ac-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--polish-shadow-md);
+}
+
+/* ============================================================
+   5. Table Responsive Overflow
+   ============================================================ */
+
+/* Wrap tables for horizontal scroll on small screens */
+.table-responsive-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--polish-radius);
+}
+
+.table-responsive-wrapper table {
+    min-width: 600px;
+}
+
+/* Sticky header for scrollable tables */
+.table-responsive-wrapper thead th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    z-index: 1;
+}
+
+/* Admin table sticky header */
+.admin-theme .table-responsive-wrapper thead th {
+    background: var(--ac-surface-alt, #f8fafc);
+}
+
+/* ============================================================
+   6. Toast Polish
+   ============================================================ */
+
+/* Toast container — ensure it doesn't block clicks */
+#toast-container {
+    pointer-events: none;
+}
+
+#toast-container > * {
+    pointer-events: auto;
+}
+
+/* Toast entrance/exit animations */
+@keyframes polish-toast-in {
+    from {
+        opacity: 0;
+        transform: translateX(32px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes polish-toast-out {
+    to {
+        opacity: 0;
+        transform: translateX(32px);
+    }
+}
+
+.toast {
+    animation: polish-toast-in 0.3s ease-out;
+}
+
+.toast.toast-centered {
+    animation: toastInCenter 0.18s ease;
+}
+
+/* Admin toast styling */
+.admin-toast {
+    animation: polish-toast-in 0.3s ease-out;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: var(--polish-shadow-md);
+}
+
+/* ============================================================
+   7. Modal Polish — Smoother Animations
+   ============================================================ */
+
+/* Fade-in backdrop */
+@keyframes polish-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Scale-in dialog */
+@keyframes polish-scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Product details modal */
+.product-details-modal.active {
+    animation: polish-fade-in 0.2s ease;
+}
+
+.product-details-modal .product-details-content {
+    animation: polish-scale-in 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Bootstrap modal enhancement */
+.modal.show .modal-dialog {
+    animation: polish-scale-in 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+   8. Image Loading — Fade-in
+   ============================================================ */
+
+img {
+    transition: opacity 0.3s ease;
+}
+
+img.is-loading {
+    opacity: 0;
+}
+
+img.is-loaded {
+    opacity: 1;
+}
+
+/* Product image placeholder */
+.product-image {
+    background: linear-gradient(135deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+    background-size: 200% 200%;
+    animation: polish-shimmer 1.5s infinite;
+}
+
+@keyframes polish-shimmer {
+    0% { background-position: 200% 200%; }
+    100% { background-position: -200% -200%; }
+}
+
+.product-image[src],
+.product-image:not([src=""]) {
+    animation: none;
+    background: var(--light-gray, #f3f4f6);
+}
+
+/* ============================================================
+   9. Scrollbar Styling
+   ============================================================ */
+
+/* Webkit scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+/* Admin theme scrollbar */
+.admin-theme ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.12);
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+/* ============================================================
+   10. Link & Interaction Polish
+   ============================================================ */
+
+/* Smooth color transition on links */
+a {
+    transition: color var(--polish-transition-fast);
+}
+
+/* Smooth background transition on nav items */
+.nav-link,
+.header-nav a,
+.sidebar-nav a,
+.admin-tab {
+    transition: color var(--polish-transition-fast), background var(--polish-transition-fast), border-color var(--polish-transition-fast);
+}
+
+/* ============================================================
+   11. Form Input Polish
+   ============================================================ */
+
+/* Consistent placeholder color */
+input::placeholder,
+textarea::placeholder {
+    color: #9ca3af;
+    opacity: 1;
+}
+
+/* Select arrow consistency */
+select {
+    cursor: pointer;
+}
+
+/* Checkbox/radio focus */
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+    box-shadow: var(--polish-focus-ring);
+}
+
+/* ============================================================
+   12. Badge Polish
+   ============================================================ */
+
+.status-pill,
+.badge-role-super_admin,
+.badge-role-admin,
+.badge-role-farmer,
+.badge-role-customer,
+.badge-active,
+.badge-disabled,
+.badge-verified,
+.badge-unverified,
+.badge-low-stock,
+.badge-out-stock {
+    transition: transform var(--polish-transition-fast);
+}
+
+.status-pill:hover,
+.badge-role-super_admin:hover,
+.badge-role-admin:hover,
+.badge-role-farmer:hover,
+.badge-role-customer:hover {
+    transform: scale(1.05);
+}
+
+/* ============================================================
+   13. 404 Page Polish
+   ============================================================ */
+
+.error-404 {
+    text-align: center;
+    padding: 4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+}
+
+.error-404 .error-code {
+    font-size: 6rem;
+    font-weight: 800;
+    color: var(--primary-color, #4ade80);
+    line-height: 1;
+    margin-bottom: 1rem;
+}
+
+.error-404 .error-message {
+    font-size: 1.25rem;
+    color: #374151;
+    margin-bottom: 2rem;
+}
+
+/* ============================================================
+   14. Print Styles
+   ============================================================ */
+
+@media print {
+    .sidebar,
+    .header,
+    .footer,
+    .btn,
+    .toast,
+    #toast-container,
+    .admin-chat-drawer,
+    .admin-detail-panel,
+    .carousel-dots,
+    .featured-carousel-wrapper .carousel-nav {
+        display: none !important;
+    }
+
+    .main {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body {
+        background: #fff !important;
+        color: #000 !important;
+    }
+}
+
+/* ============================================================
+   15. Unified Design Tokens — Cross-System Bridge
+   ============================================================ */
+
+:root {
+    /* Shared semantic colors that work across both design systems */
+    --uni-primary: #2d7a3a;
+    --uni-primary-dark: #1e5429;
+    --uni-primary-light: #e8f5e9;
+    --uni-primary-bright: #4ade80;
+    --uni-secondary: #0ea5e9;
+    --uni-danger: #dc2626;
+    --uni-danger-light: #fef2f2;
+    --uni-warning: #d97706;
+    --uni-warning-light: #fffbeb;
+    --uni-success: #059669;
+    --uni-success-light: #ecfdf5;
+    --uni-info: #2563eb;
+    --uni-info-light: #eff6ff;
+
+    /* Shared spacing */
+    --uni-radius-sm: 6px;
+    --uni-radius: 8px;
+    --uni-radius-lg: 12px;
+    --uni-radius-pill: 999px;
+
+    /* Shared shadows */
+    --uni-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --uni-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --uni-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.10);
+    --uni-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+    /* Shared transitions */
+    --uni-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Shared button metrics */
+    --uni-btn-height: 38px;
+    --uni-btn-height-sm: 30px;
+    --uni-btn-height-lg: 48px;
+    --uni-btn-radius: 8px;
+    --uni-btn-font-size: 0.875rem;
+    --uni-btn-font-weight: 500;
+
+    /* Shared input metrics */
+    --uni-input-height: 38px;
+    --uni-input-radius: 8px;
+    --uni-input-border: #d1d5db;
+    --uni-input-border-focus: var(--uni-primary);
+    --uni-input-placeholder: #9ca3af;
+}
+
+/* ============================================================
+   15.1 Admin/Farmer Theme Body Fallback
+   ============================================================ */
+
+body.admin-theme {
+    background: var(--uni-primary-light, #f5f7f5);
+    color: #1a2e1e;
+    margin: 0;
+    padding: 0;
+}
+
+body.admin-theme .header {
+    display: none;
+}
+
+body.admin-theme .footer {
+    display: none;
+}
+
+body.admin-theme .container {
+    max-width: 100%;
+    padding: 0;
+}
+
+body.farmer-theme .admin-welcome-banner .welcome-title i,
+body.farmer-theme .sidebar-logo {
+    animation: none !important;
+    transform: none !important;
+}
+
+/* ============================================================
+   16. Typography Consistency
+   ============================================================ */
+
+/* Ensure all headings use the same font family across systems */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Nunito', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Consistent heading sizes */
+.pagetitle h1,
+.page-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.section-header h2,
+.section-header h3,
+.admin-section-card h2,
+.admin-section-card h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+/* Consistent body font fallback */
+body {
+    font-family: 'Inter', 'Nunito', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ============================================================
+   17. Button Consistency
+   ============================================================ */
+
+/* Standardize .btn base across both systems */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: var(--uni-btn-height);
+    padding: 0.5rem 1rem;
+    border-radius: var(--uni-btn-radius);
+    font-size: var(--uni-btn-font-size);
+    font-weight: var(--uni-btn-font-weight);
+    line-height: 1.4;
+    transition: background var(--uni-transition), border-color var(--uni-transition),
+                color var(--uni-transition), box-shadow var(--uni-transition),
+                transform var(--uni-transition);
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+    vertical-align: middle;
+}
+
+/* Consistent hover transform for all buttons */
+.btn:not(:disabled):not(.disabled):hover,
+button:not(:disabled):not(.disabled):hover {
+    transform: translateY(-1px);
+}
+
+/* Small button variant — unified */
+.btn-small,
+.btn-sm {
+    min-height: var(--uni-btn-height-sm);
+    padding: 0.25rem 0.625rem;
+    font-size: 0.76rem;
+    border-radius: var(--uni-radius-sm);
+}
+
+/* Large button variant — unified */
+.btn-large,
+.btn-lg {
+    min-height: var(--uni-btn-height-lg);
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    border-radius: var(--uni-radius-lg);
+}
+
+/* Primary button — unified green across systems */
+.btn-primary {
+    background-color: var(--uni-primary);
+    border-color: var(--uni-primary);
+    color: #fff;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--uni-primary-dark) !important;
+    border-color: var(--uni-primary-dark) !important;
+    color: #fff;
+}
+
+/* Secondary button — unified */
+.btn-secondary {
+    background-color: #f3f4f6;
+    border-color: #e5e7eb;
+    color: #374151;
+}
+
+.btn-secondary:hover {
+    background-color: #e5e7eb;
+    color: #1f2937;
+}
+
+/* Outline button — unified */
+.btn-outline,
+.btn-outline-primary {
+    background: transparent;
+    border: 1px solid var(--uni-primary);
+    color: var(--uni-primary);
+}
+
+.btn-outline:hover,
+.btn-outline-primary:hover {
+    background: var(--uni-primary);
+    color: #fff;
+}
+
+/* Ghost primary (admin) */
+.btn-ghost-primary,
+.ac-btn-outline-muted {
+    background: transparent;
+    border: 1px solid var(--uni-primary);
+    color: var(--uni-primary);
+    border-radius: var(--uni-radius);
+}
+
+.btn-ghost-primary:hover,
+.ac-btn-outline-muted:hover {
+    background: var(--uni-primary-light);
+    color: var(--uni-primary-dark);
+}
+
+/* Ghost danger */
+.btn-ghost-danger {
+    background: transparent;
+    border: 1px solid var(--uni-danger);
+    color: var(--uni-danger);
+    border-radius: var(--uni-radius);
+}
+
+.btn-ghost-danger:hover {
+    background: var(--uni-danger-light);
+}
+
+/* Danger button */
+.btn-danger,
+.btn-ac-red,
+.ac-btn-danger {
+    background-color: var(--uni-danger);
+    border-color: var(--uni-danger);
+    color: #fff;
+}
+
+.btn-danger:hover,
+.btn-ac-red:hover,
+.ac-btn-danger:hover {
+    background-color: #b91c1c;
+    color: #fff;
+}
+
+/* Full-width button */
+.btn-full,
+.btn-block {
+    width: 100%;
+}
+
+/* ============================================================
+   18. Form Input Consistency
+   ============================================================ */
+
+/* Standardize input/select/textarea base */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+input[type="date"],
+select,
+textarea {
+    min-height: var(--uni-input-height);
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--uni-input-border);
+    border-radius: var(--uni-input-radius);
+    font-size: 0.875rem;
+    color: #1f2937;
+    background: #fff;
+    transition: border-color var(--uni-transition), box-shadow var(--uni-transition);
+    width: 100%;
+}
+
+/* Bootstrap form-control alignment */
+.form-control,
+.form-select {
+    min-height: var(--uni-input-height);
+    border-radius: var(--uni-input-radius);
+    border: 1px solid var(--uni-input-border);
+    font-size: 0.875rem;
+}
+
+/* Consistent focus state */
+input:focus,
+select:focus,
+textarea:focus,
+.form-control:focus,
+.form-select:focus,
+.filter-select:focus {
+    outline: none;
+    border-color: var(--uni-input-border-focus);
+    box-shadow: 0 0 0 3px rgba(45, 122, 58, 0.12);
+}
+
+/* Consistent label */
+.form-label,
+.form-group label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 0.375rem;
+    color: #374151;
+}
+
+/* Consistent form group spacing */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+/* Validation styles — unified */
+input.invalid,
+textarea.invalid,
+input.input-error,
+textarea.input-error {
+    border-color: var(--uni-danger) !important;
+    background-color: #fef2f2;
+}
+
+input.invalid:focus,
+textarea.invalid:focus,
+input.input-error:focus,
+textarea.input-error:focus {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+input.valid:not([type="password"]),
+textarea.valid {
+    border-color: var(--uni-success);
+}
+
+/* ============================================================
+   19. Card Consistency
+   ============================================================ */
+
+/* Unify card radius and shadow across systems */
+.card,
+.admin-section-card,
+.ac-card,
+.stat-card,
+.ac-stat-card,
+.admin-chart-card {
+    border-radius: var(--uni-radius-lg);
+    box-shadow: var(--uni-shadow-xs);
+    border: 1px solid #e5e7eb;
+}
+
+/* Consistent card hover */
+.card:hover,
+.admin-section-card:hover,
+.ac-card:hover {
+    box-shadow: var(--uni-shadow-sm);
+}
+
+/* Product card hover — unified */
+.product-card {
+    border-radius: var(--uni-radius-lg);
+    box-shadow: var(--uni-shadow-sm);
+    transition: transform var(--uni-transition), box-shadow var(--uni-transition);
+}
+
+.product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--uni-shadow-lg);
+}
+
+/* Stat card hover — unified */
+.stat-card:hover,
+.ac-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--uni-shadow-md);
+}
+
+/* ============================================================
+   20. Badge Consistency
+   ============================================================ */
+
+/* Unified badge base */
+.badge,
+.status-pill,
+.badge-pending,
+.badge-confirmed,
+.badge-preparing,
+.badge-ready,
+.badge-delivered,
+.badge-cancelled,
+.badge-active,
+.badge-disabled,
+.badge-verified,
+.badge-unverified,
+.badge-low-stock,
+.badge-out-stock,
+.badge-role-super_admin,
+.badge-role-admin,
+.badge-role-farmer,
+.badge-role-customer {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: var(--uni-radius-sm);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+/* Status colors — unified */
+.badge-active,
+.badge-verified,
+.badge-role-farmer {
+    background: var(--uni-success-light);
+    color: #065f46;
+}
+
+.badge-disabled,
+.badge-cancelled,
+.badge-out-stock {
+    background: var(--uni-danger-light);
+    color: #991b1b;
+}
+
+.badge-pending,
+.badge-unverified,
+.badge-low-stock {
+    background: var(--uni-warning-light);
+    color: #92400e;
+}
+
+.badge-confirmed,
+.badge-role-admin {
+    background: var(--uni-info-light);
+    color: #075985;
+}
+
+.badge-preparing {
+    background: #f5f3ff;
+    color: #6d28d9;
+}
+
+.badge-ready,
+.badge-delivered {
+    background: var(--uni-success-light);
+    color: var(--uni-primary);
+}
+
+.badge-role-super_admin {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge-role-customer {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+/* ============================================================
+   21. Table Consistency
+   ============================================================ */
+
+/* Unified table header */
+.table thead th,
+.admin-table thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: #6b7280;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.625rem 0.75rem;
+}
+
+/* Unified table cell */
+.table td,
+.admin-table td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: middle;
+    font-size: 0.875rem;
+}
+
+/* Unified table hover */
+.table tbody tr:hover td,
+.admin-table tbody tr:hover td {
+    background: #f9fafb;
+}
+
+/* ============================================================
+   22. Modal Consistency
+   ============================================================ */
+
+/* Unified modal animation */
+.modal.show .modal-dialog,
+.admin-modal-backdrop.open .admin-modal {
+    animation: polish-scale-in 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Unified modal header */
+.modal-header,
+.admin-modal .modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #eef2ef;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Unified modal body */
+.modal-body,
+.admin-modal .modal-body {
+    padding: 20px;
+    overflow-y: auto;
+}
+
+/* Unified modal footer */
+.modal-footer,
+.admin-modal .modal-footer {
+    padding: 16px 20px;
+    border-top: 1px solid #eef2ef;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* Unified close button */
+.modal .btn-close,
+.admin-modal .modal-close,
+.close-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--uni-radius);
+    background: transparent;
+    color: #6b7280;
+    font-size: 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background var(--uni-transition), color var(--uni-transition);
+}
+
+.modal .btn-close:hover,
+.admin-modal .modal-close:hover,
+.close-btn:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+}
+
+/* ============================================================
+   23. Toast Consistency
+   ============================================================ */
+
+/* Unified toast base */
+.toast,
+.admin-toast {
+    border-radius: var(--uni-radius);
+    padding: 0.75rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: var(--uni-shadow-md);
+    animation: polish-toast-in 0.3s ease-out;
+}
+
+/* Unified toast variants */
+.toast-success,
+.admin-toast.toast-success {
+    background: var(--uni-success);
+    color: #fff;
+}
+
+.toast-error,
+.admin-toast.toast-error {
+    background: var(--uni-danger);
+    color: #fff;
+}
+
+.toast-info,
+.admin-toast.toast-info {
+    background: var(--uni-info);
+    color: #fff;
+}
+
+/* Warning toast — add missing variant */
+.toast-warning,
+.admin-toast.toast-warning {
+    background: var(--uni-warning);
+    color: #fff;
+}
+
+/* ============================================================
+   24. Loading State Consistency
+   ============================================================ */
+
+/* Unified inline loading spinner */
+.loading-spinner-inline {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: polish-spin 0.6s linear infinite;
+}
+
+/* Section loading — unified */
+.section-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-height: 200px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+}
+
+.section-loading::before {
+    content: '';
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e5e7eb;
+    border-top-color: var(--uni-primary);
+    border-radius: 50%;
+    animation: polish-spin 0.8s linear infinite;
+}
+
+.section-loading-text {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+/* ============================================================
+   25. Responsive Fixes
+   ============================================================ */
+
+/* Prevent text overflow on small screens */
+@media (max-width: 768px) {
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.25rem; }
+    h3 { font-size: 1.1rem; }
+
+    .page-title,
+    .pagetitle h1 {
+        font-size: 1.1rem;
+    }
+
+    .section-header h2,
+    .admin-section-card h2 {
+        font-size: 1rem;
+    }
+
+    /* Prevent button text clipping */
+    .btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    /* Ensure form inputs don't overflow */
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    /* Stack modal footer buttons on mobile */
+    .modal-footer {
+        flex-direction: column-reverse;
+    }
+
+    .modal-footer .btn {
+        width: 100%;
+    }
+}
+
+/* Prevent horizontal overflow */
+body {
+    overflow-x: hidden;
+}
+
+/* Ensure tables scroll on small screens */
+.table-responsive,
+.table-responsive-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ============================================================
+   26. Accessibility Enhancements
+   ============================================================ */
+
+/* Ensure all interactive elements have visible focus */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+.btn:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(45, 122, 58, 0.3);
+}
+
+/* Ensure links have discernible text */
+a:not([aria-label]):not([aria-labelledby]):empty {
+    visibility: hidden;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .btn {
+        border-width: 2px;
+    }
+
+    .badge {
+        border: 1px solid currentColor;
+    }
+}
+
+/* ============================================================
+   27. Icon Consistency
+   ============================================================ */
+
+/* Ensure icons in buttons are properly aligned */
+.btn i,
+.btn-small i,
+.btn-ghost-primary i,
+.btn-ghost-danger i,
+.ac-btn-primary i,
+.ac-btn-outline-muted i {
+    font-size: 0.85em;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+/* Ensure icons in badges are consistent */
+.badge i,
+.status-pill i {
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+/* ============================================================
+   END
+   ============================================================ */

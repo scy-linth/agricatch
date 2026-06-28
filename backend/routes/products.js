@@ -490,6 +490,7 @@ router.get('/', async (req, res) => {
       WHERE p.is_available = true
         AND COALESCE(p.is_admin_disabled, false) = false
         AND COALESCE(u.is_disabled, false) = false
+        AND p.status = 'approved'
         AND ${NON_EXPIRED_PRODUCT_SQL}
         AND (p.is_preorder = false OR p.is_preorder = true) -- Allow pre-order products
         AND (
@@ -817,6 +818,8 @@ router.get('/featured', async (req, res) => {
     await ensureProductCatalogSchema();
     const limit = Math.min(Math.max(parseInt(req.query.limit || '6', 10), 1), 12);
     const category = String(req.query.category || '').trim();
+    const featuredUser = getUserFromToken(req);
+    const featuredUserId = featuredUser?.id || null;
 
     let categoryFilterSql = '';
     const params = [limit];
@@ -847,6 +850,7 @@ router.get('/featured', async (req, res) => {
          AND p.is_available = true
          AND COALESCE(p.is_admin_disabled, false) = false
          AND COALESCE(u.is_disabled, false) = false
+         AND p.status = 'approved'
          AND (p.stock_quantity > 0 OR p.is_preorder = true) -- Allow pre-order products with 0 stock
          AND ${NON_EXPIRED_PRODUCT_SQL}
          AND (
@@ -866,9 +870,24 @@ router.get('/featured', async (req, res) => {
       params
     );
 
+    const annotateFeaturedWishlist = async (products) => {
+      if (!featuredUserId || !products.length) {
+        products.forEach(p => { p.is_in_wishlist = false; });
+        return products;
+      }
+      const ids = products.map(p => p.id);
+      const wRes = await pool.query(
+        'SELECT product_id FROM wishlist WHERE user_id = $1 AND product_id = ANY($2)',
+        [featuredUserId, ids]
+      );
+      const inWishlist = new Set(wRes.rows.map(r => r.product_id));
+      products.forEach(p => { p.is_in_wishlist = inWishlist.has(p.id); });
+      return products;
+    };
+
     // If we have enough featured products, return them
     if (featuredResult.rows.length >= limit) {
-      return res.json({ products: featuredResult.rows });
+      return res.json({ products: await annotateFeaturedWishlist(featuredResult.rows) });
     }
 
     // Otherwise, fallback to best-selling low-price products to fill the remaining slots
@@ -898,6 +917,7 @@ router.get('/featured', async (req, res) => {
         WHERE p.is_available = true
           AND COALESCE(p.is_admin_disabled, false) = false
           AND COALESCE(u.is_disabled, false) = false
+          AND p.status = 'approved'
           AND p.stock_quantity > 0
           AND COALESCE(s.sold_qty, 0) > 0
           AND ${NON_EXPIRED_PRODUCT_SQL}
@@ -924,7 +944,7 @@ router.get('/featured', async (req, res) => {
     const combinedProducts = [...featuredResult.rows, ...fallbackResult.rows];
     
     if (combinedProducts.length > 0) {
-      return res.json({ products: combinedProducts });
+      return res.json({ products: await annotateFeaturedWishlist(combinedProducts) });
     }
 
     return res.json({ products: [] });
@@ -947,6 +967,7 @@ router.get('/:id', async (req, res) => {
     const availabilityFilter = `p.is_available = true
       AND COALESCE(p.is_admin_disabled, false) = false
       AND COALESCE(u.is_disabled, false) = false
+      AND p.status = 'approved'
       AND ${NON_EXPIRED_PRODUCT_SQL}`;
 
     let whereClause = 'WHERE p.id = $1';
@@ -1007,6 +1028,73 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Get current active product for a given product ID (for View Product feature in orders)
+// This handles the Product Lifecycle: if the original product is no longer available,
+// it returns the linked active product (e.g., after Harvest YES created a new Available product)
+router.get('/:id/current-active', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const productId = Number(id);
+
+    if (!Number.isFinite(productId) || productId <= 0) {
+      return res.status(400).json({ message: 'Invalid product ID' });
+    }
+
+    // Get the original product
+    const originalRes = await pool.query(
+      `SELECT id, name, farmer_id, is_available, is_admin_disabled, status, linked_product_id, is_preorder, expiry_date
+       FROM products WHERE id = $1`,
+      [productId]
+    );
+
+    if (originalRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const original = originalRes.rows[0];
+
+    // Check if original product is still active and available
+    const isOriginalActive = original.is_available === true
+      && original.is_admin_disabled === false
+      && original.status === 'approved'
+      && (original.expiry_date === null || original.expiry_date >= new Date());
+
+    if (isOriginalActive) {
+      // Case 1: Original product is still active
+      return res.json({ currentProductId: original.id, isOriginal: true });
+    }
+
+    // Case 2: Check for linked active product
+    if (original.linked_product_id) {
+      const linkedRes = await pool.query(
+        `SELECT id, name, farmer_id, is_available, is_admin_disabled, status, is_preorder, expiry_date
+         FROM products WHERE id = $1`,
+        [original.linked_product_id]
+      );
+
+      if (linkedRes.rows.length > 0) {
+        const linked = linkedRes.rows[0];
+        const isLinkedActive = linked.is_available === true
+          && linked.is_admin_disabled === false
+          && linked.status === 'approved'
+          && (linked.expiry_date === null || linked.expiry_date >= new Date());
+
+        if (isLinkedActive) {
+          // Case 2: Linked product is active
+          return res.json({ currentProductId: linked.id, isOriginal: false });
+        }
+      }
+    }
+
+    // Case 3: No active product available
+    return res.json({ currentProductId: null, isOriginal: false });
+
+  } catch (error) {
+    console.error('Get current active product error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Similar products from other farmer shops for product details modal
 router.get('/:id/similar-sellers', async (req, res) => {
   try {
@@ -1060,6 +1148,7 @@ router.get('/:id/similar-sellers', async (req, res) => {
           AND p.is_available = true
           AND COALESCE(p.is_admin_disabled, false) = false
           AND COALESCE(u.is_disabled, false) = false
+          AND p.status = 'approved'
           AND (p.stock_quantity > 0 OR p.is_preorder = true)
           AND ${NON_EXPIRED_PRODUCT_SQL}
           ${preorderFilter}
@@ -2107,6 +2196,40 @@ router.post('/:id/harvest-lifecycle', async (req, res) => {
             [productId]
           );
 
+          // Notify customers who wishlisted the original pre-order product
+          try {
+            const wishlistResult = await client.query(
+              'SELECT user_id FROM wishlist WHERE product_id = $1',
+              [productId]
+            );
+            
+            for (const row of wishlistResult.rows) {
+              // Prevent duplicate notifications for the same availability event
+              const existingNotif = await client.query(
+                `SELECT id FROM notifications 
+                 WHERE user_id = $1 AND type = 'product_available' AND product_id = $2 
+                 AND created_at > NOW() - INTERVAL '1 hour'`,
+                [row.user_id, availableProductId]
+              );
+              
+              if (existingNotif.rows.length === 0) {
+                await client.query(
+                  `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+                   VALUES ($1, 'product_available', 'Product Available Again', 
+                           $2, $3, false, CURRENT_TIMESTAMP)`,
+                  [
+                    row.user_id,
+                    `"${product.name}" is now available again!`,
+                    availableProductId
+                  ]
+                );
+              }
+            }
+          } catch (wishlistErr) {
+            console.error('Failed to send wishlist notifications:', wishlistErr);
+            // Don't fail the harvest if notification fails
+          }
+
           await client.query('COMMIT');
           client.release();
 
@@ -2154,6 +2277,40 @@ router.post('/:id/harvest-lifecycle', async (req, res) => {
             'UPDATE products SET linked_product_id = $1, status = \'harvested\', is_available = false, stock_quantity = 0, reserved_quantity = 0 WHERE id = $2',
             [newAvailableProduct.id, productId]
           );
+
+          // Notify customers who wishlisted the original pre-order product
+          try {
+            const wishlistResult = await client.query(
+              'SELECT user_id FROM wishlist WHERE product_id = $1',
+              [productId]
+            );
+            
+            for (const row of wishlistResult.rows) {
+              // Prevent duplicate notifications for the same availability event
+              const existingNotif = await client.query(
+                `SELECT id FROM notifications 
+                 WHERE user_id = $1 AND type = 'product_available' AND product_id = $2 
+                 AND created_at > NOW() - INTERVAL '1 hour'`,
+                [row.user_id, newAvailableProduct.id]
+              );
+              
+              if (existingNotif.rows.length === 0) {
+                await client.query(
+                  `INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
+                   VALUES ($1, 'product_available', 'Product Available Again', 
+                           $2, $3, false, CURRENT_TIMESTAMP)`,
+                  [
+                    row.user_id,
+                    `"${product.name}" is now available again!`,
+                    newAvailableProduct.id
+                  ]
+                );
+              }
+            }
+          } catch (wishlistErr) {
+            console.error('Failed to send wishlist notifications:', wishlistErr);
+            // Don't fail the harvest if notification fails
+          }
 
           await client.query('COMMIT');
           client.release();

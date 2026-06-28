@@ -3824,21 +3824,157 @@ body.modal-open {
     transform: scale(0.95) rotate(-5deg);
 }
 
+/* Cart Selection Controls - Circular */
+.cart-selection-circle {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #d1d5db;
+    background: var(--white);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #4b5563;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    padding: 0;
+    line-height: 1;
+}
+
+.cart-selection-circle:hover {
+    border-color: var(--primary-color);
+    transform: scale(1.1);
+}
+
+.cart-selection-circle.selected {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--white);
+}
+
+.cart-selection-circle.indeterminate {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--white);
+}
+
+/* ALL Toggle */
+.cart-all-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--white);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* ALL Toggle inside footer — flat, no card styling */
+.cart-footer .cart-all-toggle {
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    margin-bottom: 0.75rem;
+    box-shadow: none;
+}
+
+.cart-all-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-color);
+}
+
+/* Farmer Group */
+.cart-farmer-group {
+    background: var(--white);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cart-farmer-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f4 100%);
+    border-bottom: 1px solid #e2e8e4;
+}
+
+.cart-farmer-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.cart-farmer-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--primary-dark);
+}
+
+.cart-farmer-shipping {
+    font-size: 0.75rem;
+    color: var(--gray);
+    font-weight: 600;
+}
+
+.cart-farmer-products {
+    padding: 0.5rem;
+}
+
+/* Cart Item with Selection */
+.cart-item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: var(--white);
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cart-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-color: var(--primary-color);
+}
+
+/* Cart Summary Rows */
+.cart-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    font-size: 0.9rem;
+    color: var(--gray);
+}
+
+.cart-summary-total {
+    border-top: 2px solid #e5e7eb;
+    margin-top: 0.5rem;
+    padding-top: 0.6rem;
+    font-size: 1.1rem;
+    color: var(--text-color);
+}
+
 .cart-footer {
-    padding: 1.5rem;
+    padding: 1rem 1.5rem;
     border-top: 2px solid var(--light-gray);
     background: var(--white);
     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .cart-total {
-    margin-bottom: 1.25rem;
-    padding: 1rem;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
     background: linear-gradient(135deg, rgba(74, 222, 128, 0.1), rgba(14, 165, 233, 0.1));
     border-radius: var(--border-radius);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
 }
 
 .cart-total strong {
@@ -3846,7 +3982,6 @@ body.modal-open {
     color: var(--text-color);
 }
 
-.cart-total span,
 .cart-currency {
     font-size: 1.5rem;
     font-weight: 700;
@@ -6408,16 +6543,6 @@ textarea.invalid:focus {
     padding: 0 1rem;
 }
 
-.empty-state {
-    text-align: center;
-    padding: 3rem;
-    color: var(--gray);
-}
-
-.empty-state p {
-    margin: 0.5rem 0;
-}
-
 /* Tab Styles */
 .product-tabs, .order-tabs {
     display: flex;
@@ -7921,12 +8046,6 @@ textarea.invalid:focus {
     transform: translateX(20px);
 }
 
-.empty-state {
-    text-align: center;
-    color: var(--gray);
-    padding: 20px;
-}
-
 .product-actions {
     display: flex;
     justify-content: flex-end;
@@ -8405,13 +8524,6 @@ textarea.invalid:focus {
     color: var(--gray);
     font-size: 0.85rem;
     font-weight: normal;
-}
-
-.empty-state {
-    padding: 40px 20px;
-    text-align: center;
-    color: var(--gray);
-    font-size: 0.95rem;
 }
 
 .error-state {

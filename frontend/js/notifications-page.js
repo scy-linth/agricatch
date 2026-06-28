@@ -101,7 +101,10 @@ class NotificationsPage {
         this.currentPage = page;
         const list = document.getElementById('notifications-page-list');
         const subtitle = document.getElementById('notif-page-subtitle');
-        if (list) list.innerHTML = '<div class="empty-state" style="text-align:center;padding:32px;">Loading...</div>';
+        if (list) list.innerHTML = (window.renderEmptyState || function() { return ''; })({
+            icon: 'fas fa-spinner fa-pulse',
+            title: 'Loading...'
+        });
 
         try {
             const response = await fetch(
@@ -130,17 +133,22 @@ class NotificationsPage {
             this._renderPagination(totalPages);
         } catch (err) {
             console.error('Load notifications error:', err);
-            if (list) list.innerHTML = '<div class="empty-state" style="text-align:center;padding:32px;color:#ef4444;">Unable to load notifications. Please try again.</div>';
+            if (list) list.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-exclamation-circle',
+                title: 'Unable to load notifications',
+                description: 'Please try again.'
+            });
         }
     }
 
     _renderList(notifications, container) {
         if (!container) return;
         if (!notifications.length) {
-            container.innerHTML = `<div class="empty-state" style="text-align:center;padding:48px 24px;">
-                <i class="fas fa-bell-slash" style="font-size:3rem;color:#d1d5db;margin-bottom:16px;display:block;"></i>
-                <p style="font-size:1.1rem;color:#6b7280;">No notifications yet.</p>
-            </div>`;
+            container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-bell-slash',
+                title: 'No notifications yet',
+                description: 'You\'ll see updates here when there\'s new activity.'
+            });
             return;
         }
 

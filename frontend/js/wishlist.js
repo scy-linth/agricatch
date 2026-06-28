@@ -136,50 +136,78 @@ class WishlistPage {
         if (addAllBtn) addAllBtn.style.display = list.length > 0 ? 'inline-flex' : 'none';
 
         if (!list.length) {
-            grid.innerHTML = `<div class="empty-state" style="text-align:center;padding:48px 24px;">
-                <i class="fas fa-heart-broken" style="font-size:3rem;color:#d1d5db;margin-bottom:16px;display:block;"></i>
-                <p style="font-size:1.1rem;color:#6b7280;margin-bottom:16px;">Your wishlist is empty.</p>
-                <a href="/#products" class="btn btn-primary">Browse Products</a>
-            </div>`;
+            grid.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-heart-broken',
+                title: 'Your wishlist is empty',
+                description: 'Save products you love by tapping the heart icon.',
+                actionText: 'Browse Products',
+                actionHref: '/#products'
+            });
             return;
         }
 
-        grid.innerHTML = list.map(item => {
-            const savedPrice = this._savedPrices[item.id];
-            const currentPrice = Number(item.price || 0);
-            const priceDrop = savedPrice && currentPrice < savedPrice;
-            const priceIncrease = savedPrice && currentPrice > savedPrice;
-            const priceDropBadge = priceDrop
-                ? `<span style="background:#dcfce7;color:#166534;font-size:0.78rem;padding:2px 6px;border-radius:4px;font-weight:600;"><i class="fas fa-arrow-down"></i> Price dropped from ${this.fmtCurrency(savedPrice)}</span>`
-                : priceIncrease
-                ? `<span style="background:#fff7ed;color:#9a3412;font-size:0.78rem;padding:2px 6px;border-radius:4px;font-weight:600;"><i class="fas fa-arrow-up"></i> Price updated</span>`
-                : '';
+        // Group items by farmer (like Cart)
+        const groupedByFarmer = list.reduce((acc, item) => {
+            const farmerName = item.farmer_name || 'Unknown Farmer';
+            if (!acc[farmerName]) {
+                acc[farmerName] = [];
+            }
+            acc[farmerName].push(item);
+            return acc;
+        }, {});
 
-            const isAvailable = item.status !== 'disabled' && Number(item.stock_quantity ?? 0) > 0;
+        // Render grouped items
+        grid.innerHTML = Object.entries(groupedByFarmer).map(([farmerName, farmerItems]) => {
+            const farmerSection = farmerItems.map(item => {
+                const savedPrice = this._savedPrices[item.id];
+                const currentPrice = Number(item.price || 0);
+                const priceDrop = savedPrice && currentPrice < savedPrice;
+                const priceIncrease = savedPrice && currentPrice > savedPrice;
+                const priceDropBadge = priceDrop
+                    ? `<span style="background:#dcfce7;color:#166534;font-size:0.78rem;padding:2px 6px;border-radius:4px;font-weight:600;"><i class="fas fa-arrow-down"></i> Price dropped from ${this.fmtCurrency(savedPrice)}</span>`
+                    : priceIncrease
+                    ? `<span style="background:#fff7ed;color:#9a3412;font-size:0.78rem;padding:2px 6px;border-radius:4px;font-weight:600;"><i class="fas fa-arrow-up"></i> Price updated</span>`
+                    : '';
+
+                const isAvailable = item.status !== 'disabled' && Number(item.stock_quantity ?? 0) > 0;
+
+                return `
+                <div class="product-card" style="cursor:pointer;" onclick="wishlistPage.openProduct(${item.id})">
+                    <img src="${this.escapeHtml(item.image_url || window.__PLACEHOLDER_IMAGE__)}"
+                         alt="${this.escapeHtml(item.name)}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
+                    <div class="product-info">
+                        <h3 class="product-name">${this.escapeHtml(item.name)}</h3>
+                        <div class="product-price">${this.fmtCurrency(item.price)} per ${this.escapeHtml(item.unit || '')}</div>
+                        ${priceDropBadge ? `<div style="margin:4px 0;">${priceDropBadge}</div>` : ''}
+                        <div class="product-details">${item.description ? this.escapeHtml(item.description.substring(0, 100)) + '...' : ''}</div>
+                        <div class="product-meta">
+                            <span>Stock: ${this.fmtNumber(item.stock_quantity ?? 0)}</span>
+                            ${item.category_name ? `<span>${this.escapeHtml(item.category_name)}</span>` : ''}
+                        </div>
+                        <div class="wishlist-actions" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                            <button class="btn btn-primary btn-small" onclick="event.stopPropagation(); wishlistPage.addToCart(${item.id})" ${!isAvailable ? 'disabled title="Out of stock"' : ''}>
+                                <i class="fas fa-cart-plus"></i> Add to Cart
+                            </button>
+                            <button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); wishlistPage.removeFromWishlist(${item.id})">
+                                <i class="fas fa-heart-broken"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
 
             return `
-            <div class="product-card">
-                <img src="${this.escapeHtml(item.image_url || window.__PLACEHOLDER_IMAGE__)}"
-                     alt="${this.escapeHtml(item.name)}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
-                <div class="product-info">
-                    <h3 class="product-name">${this.escapeHtml(item.name)}</h3>
-                    <div class="product-price">${this.fmtCurrency(item.price)} per ${this.escapeHtml(item.unit || '')}</div>
-                    ${priceDropBadge ? `<div style="margin:4px 0;">${priceDropBadge}</div>` : ''}
-                    <div class="product-details">${item.description ? this.escapeHtml(item.description.substring(0, 100)) + '...' : ''}</div>
-                    <div class="product-meta">
-                        <span>Stock: ${this.fmtNumber(item.stock_quantity ?? 0)}</span>
-                        ${item.category_name ? `<span>${this.escapeHtml(item.category_name)}</span>` : ''}
+                <div class="farmer-group-section" style="margin-bottom: 32px;">
+                    <div class="farmer-group-header" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #e5e7eb;">
+                        <i class="fas fa-store" style="color:#0d6efd;font-size:1.2rem;"></i>
+                        <h3 style="margin:0;font-size:1.25rem;font-weight:600;color:#1f2937;">${this.escapeHtml(farmerName)}</h3>
+                        <span style="background:#e5e7eb;color:#4b5563;font-size:0.75rem;padding:2px 8px;border-radius:12px;font-weight:500;">${farmerItems.length} item${farmerItems.length !== 1 ? 's' : ''}</span>
                     </div>
-                    <div class="wishlist-actions" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-                        <button class="btn btn-primary btn-small" onclick="wishlistPage.addToCart(${item.id})" ${!isAvailable ? 'disabled title="Out of stock"' : ''}>
-                            <i class="fas fa-cart-plus"></i> Add to Cart
-                        </button>
-                        <button class="btn btn-secondary btn-small" onclick="wishlistPage.removeFromWishlist(${item.id})">
-                            <i class="fas fa-heart-broken"></i> Remove
-                        </button>
+                    <div class="products-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;">
+                        ${farmerSection}
                     </div>
                 </div>
-            </div>`;
+            `;
         }).join('');
     }
 
@@ -191,7 +219,7 @@ class WishlistPage {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.token}`
                 },
-                body: JSON.stringify({ product_id: productId, quantity: 1 })
+                body: JSON.stringify({ productId: productId, quantity: 1 })
             });
             if (response.ok) {
                 const item = this._items.find((i) => i.id === productId);
@@ -221,7 +249,7 @@ class WishlistPage {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${this.token}`
                     },
-                    body: JSON.stringify({ product_id: item.id, quantity: 1 })
+                    body: JSON.stringify({ productId: item.id, quantity: 1 })
                 });
                 if (response.ok) successCount++;
             } catch (_) {}
@@ -242,6 +270,56 @@ class WishlistPage {
         } catch (error) {
             console.error('Error removing wishlist item:', error);
         }
+    }
+
+    async openProduct(productId) {
+        try {
+            // Use current-active endpoint to get the active product ID
+            const response = await fetch(`${this.apiBase}/products/${productId}/current-active`);
+            const data = await response.json();
+
+            if (response.ok && data.currentProductId) {
+                // Active listing exists - open product details
+                if (window.app && typeof window.app.showProductDetails === 'function') {
+                    window.app.showProductDetails(data.currentProductId);
+                } else {
+                    // Fallback: navigate to product page
+                    window.location.href = `/product.html?id=${data.currentProductId}`;
+                }
+            } else {
+                // No active listing - show friendly dialog
+                this.showUnavailableDialog();
+            }
+        } catch (error) {
+            console.error('Error checking product availability:', error);
+            this.showUnavailableDialog();
+        }
+    }
+
+    showUnavailableDialog() {
+        // Create and show a friendly "Product Currently Unavailable" dialog
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+        dialog.innerHTML = `
+            <div style="background: white; padding: 32px; border-radius: 12px; max-width: 400px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
+                <i class="fas fa-box-open" style="font-size: 3rem; color: #9ca3af; margin-bottom: 16px;"></i>
+                <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 1.25rem;">Product Currently Unavailable</h3>
+                <p style="margin: 0 0 24px 0; color: #6b7280; line-height: 1.5;">This product is no longer available. The farmer may have harvested it or it may be temporarily out of stock.</p>
+                <button onclick="this.closest('div[style*=\"position: fixed\"]').remove()" style="background: #0d6efd; color: white; border: none; padding: 10px 24px; border-radius: 6px; cursor: pointer; font-size: 0.95rem; font-weight: 500;">Close</button>
+            </div>
+        `;
+        document.body.appendChild(dialog);
     }
 }
 

@@ -3461,10 +3461,6 @@ class FarmerDashboard {
             // Get the limit for this product type
             const limit = productType === 'available' ? this.maxProductsPerNameAvailable : this.maxProductsPerNamePreorder;
 
-            console.log('[DEBUG] Product name filtering - Type:', productType, 'Limit:', limit);
-            console.log('[DEBUG] Total catalog names:', source.length);
-            console.log('[DEBUG] Total products in cache:', this.myProductsCache.length);
-
             // Count occurrences of each product name for the selected type (excluding admin-disabled products)
             const nameCounts = {};
             this.myProductsCache.forEach(p => {
@@ -3476,19 +3472,12 @@ class FarmerDashboard {
                 }
             });
 
-            console.log('[DEBUG] Name counts:', nameCounts);
-
             // Filter out names that have reached or exceeded the limit
             filteredSource = source.filter(item => {
                 const count = nameCounts[String(item.name).trim().toLowerCase()] || 0;
                 const allowed = count < limit;
-                if (!allowed) {
-                    console.log('[DEBUG] Filtered out:', item.name, '(count:', count, '>= limit:', limit + ')');
-                }
                 return allowed;
             });
-
-            console.log('[DEBUG] Filtered catalog names:', filteredSource.length);
         }
 
         const matches = filteredSource
@@ -3503,7 +3492,6 @@ class FarmerDashboard {
                         return productName === itemName && isAdminDisabled;
                     });
                     if (hasAdminDisabled) {
-                        console.log('[DEBUG] Filtered out admin-disabled product:', item.name);
                         return false;
                     }
                 }
@@ -5316,7 +5304,6 @@ class FarmerDashboard {
     }
 
     async loadNotifications(page = 1) {
-        console.log('[DEBUG] loadNotifications called with page:', page, 'activeSection:', this.activeSection);
         try {
             // Load notifications (no loading spinner for polling)
             const limit = 20;
@@ -5626,7 +5613,6 @@ class FarmerDashboard {
         this.notifPollFailures = 0;
         this.notifPollInterval = setInterval(() => {
             // Don't poll if user is viewing notifications section to avoid pagination reset
-            console.log('[DEBUG] Polling check - activeSection:', this.activeSection, 'is notifications?', this.activeSection === 'notifications');
             if (this.activeSection === 'notifications') return;
             this.loadNotifications(1).catch(err => {
                 this.notifPollFailures++;
@@ -7036,7 +7022,11 @@ class FarmerDashboard {
             .slice(0, 8);
 
         if (low.length === 0) {
-            wrap.innerHTML = '<div class="empty-state"><p>No low stock items.</p></div>';
+            wrap.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-check-circle',
+                title: 'No low stock items',
+                description: 'All your products are well-stocked.'
+            });
             return;
         }
 
@@ -7756,20 +7746,31 @@ class FarmerDashboard {
         this._reviewsPage = page;
         const listEl = document.getElementById('reviews-list');
         const paginationEl = document.getElementById('reviews-pagination');
-        if (listEl) listEl.innerHTML = '<div class="empty-state"><p>Loading reviews...</p></div>';
+        if (listEl) listEl.innerHTML = (window.renderEmptyState || function() { return ''; })({
+            icon: 'fas fa-spinner fa-pulse',
+            title: 'Loading reviews...'
+        });
         try {
             const res = await fetch(`${this.apiBase}/reviews/mine?page=${page}&limit=20`, {
                 headers: { Authorization: `Bearer ${this.token}` }
             });
             if (!res.ok) {
-                if (listEl) listEl.innerHTML = '<div class="empty-state"><p>Unable to load reviews.</p></div>';
+                if (listEl) listEl.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-exclamation-circle',
+                    title: 'Unable to load reviews',
+                    description: 'Please try again later.'
+                });
                 return;
             }
             const data = await res.json();
             this._renderReviews(data, listEl, paginationEl);
         } catch (e) {
             console.error('Load reviews error:', e);
-            if (listEl) listEl.innerHTML = '<div class="empty-state"><p>Unable to load reviews.</p></div>';
+            if (listEl) listEl.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-exclamation-circle',
+                title: 'Unable to load reviews',
+                description: 'Please try again later.'
+            });
         }
     }
 
@@ -7791,7 +7792,11 @@ class FarmerDashboard {
         if (!listEl) return;
         const reviews = Array.isArray(data.reviews) ? data.reviews : [];
         if (!reviews.length) {
-            listEl.innerHTML = '<div class="empty-state"><p>No reviews yet.</p></div>';
+            listEl.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                icon: 'fas fa-star',
+                title: 'No reviews yet',
+                description: 'Customer reviews will appear here.'
+            });
             if (paginationEl) paginationEl.innerHTML = '';
             return;
         }
@@ -9573,7 +9578,11 @@ class FarmerDashboard {
             const container = document.getElementById(`${status}-orders-list`);
             if (container) {
                 const statusLabel = this.formatStatusLabel(status);
-                container.innerHTML = `<div class="empty-state"><p>No ${statusLabel} orders found.</p></div>`;
+                container.innerHTML = (window.renderEmptyState || function() { return ''; })({
+                    icon: 'fas fa-clipboard-list',
+                    title: `No ${statusLabel} orders found`,
+                    description: 'Orders will appear here.'
+                });
             }
         });
         this.updateOrdersTabCounts();
