@@ -66,13 +66,7 @@ async function loginAsCustomer(page) {
   await page.reload();
 }
 
-// Re-export from auth-helper for convenience
-module.exports.loginAsFarmer = require('../auth-helper').loginAsFarmer;
-module.exports.loginAsAdmin = require('../auth-helper').loginAsAdmin;
-module.exports.getFarmerToken = getFarmerToken;
-module.exports.getCustomerToken = getCustomerToken;
-module.exports.getAdminToken = getAdminToken;
-module.exports.loginAsCustomer = loginAsCustomer;
+// Auth functions are exported in the final module.exports object below
 
 // ---------------------------------------------------------------------------
 // API Helpers — all return { status, body } objects
@@ -210,7 +204,7 @@ async function apiAddToCart(token, productId, quantity) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ product_id: productId, quantity: quantity || 1 }),
+    body: JSON.stringify({ productId, quantity: quantity || 1 }),
   });
   const body = await res.json().catch(() => ({}));
   return { status: res.status, body };
@@ -260,7 +254,8 @@ async function dbGetProduct(productId) {
   const pool = getPool();
   const result = await pool.query(
     `SELECT id, name, stock_quantity, reserved_quantity, is_preorder, is_available,
-            max_preorder_quantity, farmer_id, COALESCE(is_admin_disabled, false) as is_admin_disabled
+            max_preorder_quantity, farmer_id, sales_count,
+            COALESCE(is_admin_disabled, false) as is_admin_disabled
      FROM products WHERE id = $1`,
     [productId]
   );
@@ -526,6 +521,13 @@ function buildCheckoutPayload(opts = {}) {
 // ---------------------------------------------------------------------------
 
 module.exports = {
+  // Auth (re-exported from auth-helper + local)
+  getFarmerToken,
+  getCustomerToken,
+  getAdminToken,
+  loginAsCustomer,
+  loginAsFarmer: require('../auth-helper').loginAsFarmer,
+  loginAsAdmin: require('../auth-helper').loginAsAdmin,
   // DB
   getPool,
   closePool,

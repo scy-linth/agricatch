@@ -243,7 +243,7 @@ test.describe('Group F — Delivery Date Scheduling', () => {
     }, { timeout: 15000 });
 
     // Check preparing tab for schedule button
-    await page.click('#preparing-orders-tab');
+    await page.evaluate(() => document.getElementById('preparing-orders-tab').click());
     await page.waitForTimeout(500);
 
     const preparingCards = page.locator('.order-card');

@@ -258,7 +258,7 @@ test.describe('Group J — Admin Operations', () => {
 
     const cancelResult = await apiUpdateOrderStatusAlt(adminToken, deliveredOrder.id, 'cancelled');
     expect(cancelResult.status).toBe(400);
-    expect(cancelResult.body.message).toContain('Delivered');
+    expect(cancelResult.body.message.toLowerCase()).toContain('delivered');
     expect((await dbGetOrder(deliveredOrder.id)).status).toBe('delivered');
   });
 

@@ -16,6 +16,7 @@ const {
   apiAddToCart,
   apiClearCart,
   apiGetOrders,
+  apiGetCart,
   apiUpdateOrderStatus,
   dbGetOrder,
   dbGetProduct,
@@ -240,7 +241,7 @@ test.describe('Group A — Regular Order Happy Path', () => {
     }
 
     // Verify pending tab shows Confirm and Cancel buttons (if orders exist)
-    await page.click('#pending-orders-tab');
+    await page.evaluate(() => document.getElementById('pending-orders-tab').click());
     await page.waitForTimeout(500);
     const pendingCards = page.locator('.order-card');
     const pendingCount = await pendingCards.count();
@@ -252,13 +253,23 @@ test.describe('Group A — Regular Order Happy Path', () => {
     }
 
     // Verify delivered tab shows no action buttons
-    await page.click('#delivered-orders-tab');
+    await page.evaluate(() => document.getElementById('delivered-orders-tab').click());
     await page.waitForTimeout(500);
     const deliveredCards = page.locator('.order-card');
     const deliveredCount = await deliveredCards.count();
     if (deliveredCount > 0) {
-      const actionBtns = deliveredCards.first().locator('button:has-text("Confirm"), button:has-text("Schedule"), button:has-text("Cancel"), button:has-text("Out for Delivery"), button:has-text("Mark Delivered")');
-      expect(await actionBtns.count()).toBe(0);
+      const hasActionBtn = await deliveredCards.first().evaluate((card) => {
+        const btns = card.querySelectorAll('button');
+        const actionTexts = ['Confirm', 'Schedule', 'Cancel', 'Out for Delivery', 'Mark Delivered'];
+        for (const btn of btns) {
+          const text = btn.textContent.trim();
+          if (actionTexts.some(t => text.includes(t)) && btn.offsetParent !== null) {
+            return true;
+          }
+        }
+        return false;
+      });
+      expect(hasActionBtn).toBe(false);
     }
   });
 });

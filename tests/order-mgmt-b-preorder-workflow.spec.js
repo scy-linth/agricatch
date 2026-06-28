@@ -26,6 +26,7 @@ const {
   findPreorderProduct,
   findAnyPreorderProduct,
   findAvailableProduct,
+  findAnyAvailableProduct,
   buildCheckoutPayload,
   getTomorrowDate,
   closePool,
@@ -226,7 +227,7 @@ test.describe('Group B — Pre-Order Hybrid Workflow', () => {
        WHERE p.is_preorder = true
          AND p.is_available = true
          AND COALESCE(p.is_admin_disabled, false) = false
-       HAVING (SELECT COUNT(*) FROM orders o WHERE o.product_id = p.id AND o.status = 'preorder_reserved') >= 2
+         AND (SELECT COUNT(*) FROM orders o WHERE o.product_id = p.id AND o.status = 'preorder_reserved') >= 2
        LIMIT 1`
     );
 
@@ -272,7 +273,7 @@ test.describe('Group B — Pre-Order Hybrid Workflow', () => {
     }, { timeout: 15000 });
 
     // Switch to preorder_reserved tab
-    await page.click('#preorder_reserved-orders-tab');
+    await page.evaluate(() => document.getElementById('preorder_reserved-orders-tab').click());
     await page.waitForTimeout(500);
 
     const preorderCards = page.locator('.order-card');

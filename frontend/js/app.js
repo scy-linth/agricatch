@@ -4891,7 +4891,15 @@ class AgricultureMarket {
     }
 
     isProductPurchasable(product) {
-        const stock = Number(product?.stock_quantity ?? 0);
+        const isPreorder = product?.is_preorder === true;
+        let stock;
+        if (isPreorder) {
+            const reserved = Number(product?.reserved_quantity ?? 0);
+            const max = Number(product?.max_preorder_quantity ?? 0);
+            stock = max > 0 ? max - reserved : 0;
+        } else {
+            stock = Number(product?.stock_quantity ?? 0);
+        }
         const isAvailable = (
             product?.is_available === undefined
             || product?.is_available === true
@@ -5444,15 +5452,22 @@ class AgricultureMarket {
             // Cart button logic - disable if reservations disabled for preorder
             let cartBtnAttr;
             let cartBtnText;
+            let cartBtnTitle = '';
             if (reservationsDisabled && isPreorder) {
                 cartBtnAttr = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
                 cartBtnText = 'Reservations Temporarily Unavailable';
+                cartBtnTitle = 'Reservations are temporarily disabled for this product';
+            } else if (!isPurchasable) {
+                cartBtnAttr = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
+                cartBtnText = isPreorder ? 'Reserve' : 'Add to Cart';
+                cartBtnTitle = isPreorder ? 'This product is not currently available for reservation' : 'This product is not currently available';
             } else if (hasValidId) {
                 cartBtnAttr = `onclick="event.stopPropagation(); app.addToCart(${product.id})"`;
                 cartBtnText = isPreorder ? 'Reserve' : 'Add to Cart';
             } else {
                 cartBtnAttr = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
                 cartBtnText = 'Unavailable';
+                cartBtnTitle = 'Product unavailable';
             }
 
             return `
@@ -5496,7 +5511,8 @@ class AgricultureMarket {
                     </div>
                         <button type="button" class="add-to-cart-btn ${product.is_preorder ? 'btn-warning' : ''}"
                             ${cartBtnAttr}
-                            ${isPurchasable && !reservationsDisabled ? '' : 'disabled'}>
+                            ${isPurchasable && !reservationsDisabled ? '' : 'disabled'}
+                            title="${cartBtnTitle}">
                         ${cartBtnText}
                     </button>
                 </div>
@@ -6899,7 +6915,6 @@ class AgricultureMarket {
 
     _updateCheckoutTotals() {
         const checkoutSubtotal = document.getElementById('checkout-subtotal');
-        const checkoutTotal = document.getElementById('checkout-total');
         const checkoutTotalFooter = document.getElementById('checkout-total-footer');
 
         const itemTotals = Array.from(document.querySelectorAll('.checkout-item-price')).map(el =>
@@ -6911,9 +6926,6 @@ class AgricultureMarket {
 
         if (checkoutSubtotal) {
             checkoutSubtotal.textContent = this.fmtNumber(subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-        if (checkoutTotal) {
-            checkoutTotal.textContent = this.fmtNumber(grandTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         if (checkoutTotalFooter) {
             checkoutTotalFooter.textContent = this.fmtNumber(grandTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });

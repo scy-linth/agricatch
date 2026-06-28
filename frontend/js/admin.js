@@ -799,6 +799,7 @@ class AdminDashboard {
             this.loadUsersAll();
             this.loadUsers();
         } else if (sectionId === 'products') {
+            this.loadCategories();
             this.loadProductsAll();
             this.loadProducts();
         } else if (sectionId === 'categories') {
@@ -1268,23 +1269,15 @@ class AdminDashboard {
 
         // Approve button in details modal
         document.getElementById('approve-from-details-btn')?.addEventListener('click', async (e) => {
-            console.log('[DEBUG] Approve button clicked', e.target);
             const requestId = e.target.dataset.requestId;
-            console.log('[DEBUG] Request ID from dataset:', requestId);
-            console.log('[DEBUG] Calling closeVerificationDetailsModal...');
             this.closeVerificationDetailsModal();
-            console.log('[DEBUG] Calling openReviewModal with approve...');
             await this.openReviewModal(requestId, 'approve');
         });
 
         // Reject button in details modal
         document.getElementById('reject-from-details-btn')?.addEventListener('click', async (e) => {
-            console.log('[DEBUG] Reject button clicked', e.target);
             const requestId = e.target.dataset.requestId;
-            console.log('[DEBUG] Request ID from dataset:', requestId);
-            console.log('[DEBUG] Calling closeVerificationDetailsModal...');
             this.closeVerificationDetailsModal();
-            console.log('[DEBUG] Calling openReviewModal with reject...');
             await this.openReviewModal(requestId, 'reject');
         });
 
@@ -5488,14 +5481,13 @@ class AdminDashboard {
                 <td class="fw-semibold">
                     ${this.escapeHtml(product.name)}
                     <div class="mt-1">${preorderBadge}</div>
-                    ${linkedProductHtml}
                 </td>
                 <td class="text-muted">${this.escapeHtml(product.category_name || '—')}</td>
                 <td>${this.fmtCurrency(product.price)}</td>
                 <td>${this.fmtNumber(product.stock_quantity ?? 0)}</td>
                 <td>
                     <div class="fw-semibold">${this.escapeHtml(product.farmer_shop_name || product.farmer_name || 'Unassigned')}</div>
-                    ${product.farmer_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(product.farmer_name)}${product.farmer_username ? ` (${this.escapeHtml(product.farmer_username)})` : ''}</div>` : ''}
+                    ${product.farmer_name && product.farmer_name !== product.farmer_shop_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(product.farmer_name)}${product.farmer_username ? ` (${this.escapeHtml(product.farmer_username)})` : ''}</div>` : ''}
                     ${product.farmer_email ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(product.farmer_email)}</div>` : ''}
                 </td>
                 <td>${this.renderStatus(statusLabel, statusKey)}${harvestBadge}</td>
@@ -5562,7 +5554,7 @@ class AdminDashboard {
                             <td class="small">${this.escapeHtml(o.product_name || (o.items && o.items[0] && o.items[0].product_name) || '—')}</td>
                             <td class="small">
                                 <div class="fw-semibold">${this.escapeHtml(o.farmer_shop_name || o.farmer_name || '—')}</div>
-                                ${o.farmer_name && o.farmer_shop_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(o.farmer_name)}</div>` : ''}
+                                ${o.farmer_name && o.farmer_name !== o.farmer_shop_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(o.farmer_name)}</div>` : ''}
                                 ${o.farmer_address ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(o.farmer_address)}</div>` : ''}
                             </td>
                             <td>${this.renderStatus(this.formatStatus(o.status), o.status)}</td>
@@ -7638,7 +7630,7 @@ class AdminDashboard {
                 <td class="small">${this.escapeHtml(p.category_name || '—')}</td>
                 <td class="small">
                     <div class="fw-semibold">${this.escapeHtml(p.farmer_shop_name || p.farmer_name || '—')}</div>
-                    ${p.farmer_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(p.farmer_name)}</div>` : ''}
+                    ${p.farmer_name && p.farmer_name !== p.farmer_shop_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(p.farmer_name)}</div>` : ''}
                     ${p.is_preorder && p.reservations_disabled ? `<div class="text-danger" style="font-size:.75rem"><i class="bi bi-exclamation-triangle"></i> Reservations Disabled</div>` : ''}
                     ${p.is_preorder && p.preorder_availability_date ? `<div class="text-muted" style="font-size:.75rem">Available: ${new Date(p.preorder_availability_date).toLocaleDateString()}</div>` : ''}
                     ${p.is_preorder && p.max_preorder_quantity ? `<div class="text-muted" style="font-size:.75rem">Max: ${this.fmtNumber(p.max_preorder_quantity)}</div>` : ''}
@@ -9617,6 +9609,16 @@ class AdminDashboard {
             `<option value="${cn.id}" ${cn.id === product.catalog_name_id ? 'selected' : ''}>${this.escapeHtml(cn.name)}</option>`
         ).join('');
 
+        // Calculate status label and key
+        const isAdminDisabled = product.is_admin_disabled;
+        const isFarmerDisabled = product.is_farmer_disabled;
+        const statusLabel = isAdminDisabled
+            ? 'Admin Disabled'
+            : isFarmerDisabled
+                ? 'Farmer Disabled'
+                : (product.is_available ? 'Available' : 'Unavailable');
+        const statusKey = isAdminDisabled ? 'admin_disabled' : isFarmerDisabled ? 'farmer_disabled' : (product.is_available ? 'available' : 'unavailable');
+
         // Populate panel content
         content.innerHTML = `
             <input type="hidden" id="edit-product-id" value="${productId}">
@@ -10009,7 +10011,7 @@ class AdminDashboard {
         const { page, total, limit } = pg;
         const totalPages = Math.max(1, Math.ceil(total / limit));
 
-        const start = (page - 1) * limit + 1;
+        const start = total > 0 ? (page - 1) * limit + 1 : 0;
         const end = Math.min(page * limit, total);
 
         // Always show count info; only show page buttons when needed
@@ -11218,13 +11220,11 @@ class AdminDashboard {
         approveBtn.removeEventListener('click', this.boundHandleApprove);
         rejectBtn.removeEventListener('click', this.boundHandleReject);
         this.boundHandleApprove = (e) => {
-            console.log('[DEBUG] Approve button in review modal clicked', e);
             e.preventDefault();
             e.stopPropagation();
             this.handleReviewAction('approved');
         };
         this.boundHandleReject = (e) => {
-            console.log('[DEBUG] Reject button in review modal clicked', e);
             e.preventDefault();
             e.stopPropagation();
             this.handleReviewAction('rejected');

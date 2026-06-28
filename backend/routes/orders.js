@@ -273,7 +273,7 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
     if (order.is_disabled) {
       return res.status(400).json({ message: 'Order is disabled and cannot be updated' });
     }
-    if (role !== 'admin' && Number(order.farmer_id) !== Number(decoded.id)) {
+    if (role !== 'admin' && role !== 'super_admin' && Number(order.farmer_id) !== Number(decoded.id)) {
       return res.status(403).json({ message: 'You can only update your own orders' });
     }
 
@@ -796,7 +796,7 @@ router.put('/:id/status', async (req, res) => {
     // Check if user is admin or farmer who owns the products in the order
     const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [decoded.id]);
 
-    if (userResult.rows[0].role !== 'admin') {
+    if (userResult.rows[0].role !== 'admin' && userResult.rows[0].role !== 'super_admin') {
       // Check if user is a farmer who owns the product in this order (per-item order)
       const farmerCheck = await pool.query(`
         SELECT p.farmer_id
@@ -870,9 +870,9 @@ router.put('/:id/status', async (req, res) => {
         UPDATE orders 
         SET status = $1, 
             updated_at = CURRENT_TIMESTAMP,
-            delivered_at = CASE WHEN $1 = 'delivered' THEN CURRENT_TIMESTAMP ELSE delivered_at END,
-            cancelled_at = CASE WHEN $1 = 'cancelled' THEN CURRENT_TIMESTAMP ELSE cancelled_at END,
-            cancelled_by = CASE WHEN $1 = 'cancelled' THEN 'farmer' ELSE cancelled_by END
+            delivered_at = CASE WHEN $1::varchar = 'delivered'::varchar THEN CURRENT_TIMESTAMP ELSE delivered_at END,
+            cancelled_at = CASE WHEN $1::varchar = 'cancelled'::varchar THEN CURRENT_TIMESTAMP ELSE cancelled_at END,
+            cancelled_by = CASE WHEN $1::varchar = 'cancelled'::varchar THEN 'farmer'::varchar ELSE cancelled_by END
         WHERE id = $2
       `, [status, orderId]);
 

@@ -1049,9 +1049,7 @@ class ChatUI {
             html += `</div>`;
         });
 
-        console.log('[DEBUG] renderTicketMessages setting innerHTML, length:', html.length);
         container.innerHTML = html;
-        console.log('[DEBUG] renderTicketMessages innerHTML set');
 
         // Auto-scroll if user was near bottom, this is initial load, or forceScroll is true
         if (wasNearBottom || !this._hasLoadedMessages || forceScroll) {
