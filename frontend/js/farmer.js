@@ -655,6 +655,14 @@ class FarmerDashboard {
         await this.loadCategories();
         await this.loadProductCatalogNames();
 
+        // Enable product name field after loading catalog
+        const productNameInput = document.getElementById('product-name');
+        if (productNameInput) {
+            productNameInput.readOnly = false;
+            productNameInput.disabled = false;
+            productNameInput.placeholder = 'Select a product';
+        }
+
         // Load feature flags and update button text
         await this.loadFeatureFlags();
         const requireApproval = this.featureFlags.require_product_approval === true;
@@ -3918,11 +3926,13 @@ class FarmerDashboard {
             const addNameEl = document.getElementById('product-name');
             if (addNameEl) {
                 addNameEl.disabled = true;
+                addNameEl.readOnly = true;
                 addNameEl.placeholder = 'Loading products...';
             }
             await this.loadProductCatalogNames(addCategory.dataset.value || addCategory.value || null);
             if (addNameEl) {
                 addNameEl.disabled = false;
+                addNameEl.readOnly = false;
                 addNameEl.placeholder = 'Select a product';
             }
             this.updatePriceSuggestion('add');
