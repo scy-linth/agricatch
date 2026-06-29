@@ -5570,8 +5570,11 @@ class AgricultureMarket {
                 if (reservationsDisabled) {
                     dateDisplay += `<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle"></i> Reservations Temporarily Unavailable</div>`;
                 }
-            } else if (section === 'available' && !isPreorder && product.expiry_date) {
-                dateDisplay = `<div class="text-muted small mb-2"><i class="bi bi-hourglass-split me-1"></i>Best Before: ${new Date(product.expiry_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</div>`;
+            } else if (section === 'available' && !isPreorder) {
+                const bestBefore = product.expiry_date
+                    ? new Date(product.expiry_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+                    : 'Not Specified';
+                dateDisplay = `<div class="text-muted small mb-2"><i class="bi bi-hourglass-split me-1"></i>Best Before: ${bestBefore}</div>`;
             }
 
             // Cart button logic - disable if reservations disabled for preorder
