@@ -174,7 +174,7 @@ class ProductPage {
 
     async loadReviews() {
         try {
-            const response = await fetch(`${this.apiBase}/products/${this.productId}/reviews`);
+            const response = await fetch(`${this.apiBase}/reviews/products/${this.productId}/reviews`);
             if (response.ok) {
                 const data = await response.json();
                 this.renderReviews(data.reviews || []);
@@ -249,7 +249,7 @@ class ProductPage {
         }
 
         try {
-            const response = await fetch(`${this.apiBase}/products/${this.productId}/reviews`, {
+            const response = await fetch(`${this.apiBase}/reviews/products/${this.productId}/reviews`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

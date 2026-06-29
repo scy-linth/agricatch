@@ -1392,6 +1392,28 @@ router.post('/', multer().none(), async (req, res) => {
     // Ensure linked_product_id column exists
     await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS linked_product_id INTEGER REFERENCES products(id) ON DELETE SET NULL');
 
+    // CHECK FOR REJECTED PRODUCTS: Suggest editing instead of creating duplicate
+    const rejectedCheck = await pool.query(
+      `SELECT id, name, status, rejection_reason FROM products 
+       WHERE farmer_id = $1 
+         AND LOWER(name) = LOWER($2)
+         AND category_id = $3
+         AND status = 'rejected'
+       LIMIT 1`,
+      [decoded.id, name, category_id]
+    );
+
+    if (rejectedCheck.rows.length > 0) {
+      const rejected = rejectedCheck.rows[0];
+      return res.status(409).json({ 
+        message: `You have a rejected product named "${rejected.name}" in this category. Would you like to edit and resubmit it instead?`,
+        suggestion: 'edit_rejected',
+        existing_product_id: rejected.id,
+        existing_product_name: rejected.name,
+        rejection_reason: rejected.rejection_reason
+      });
+    }
+
     // DUPLICATE PREVENTION: Prevent Available+Available and Pre-order+Pre-order for same farmer and product catalog item
     const duplicateCheck = await pool.query(
       `SELECT id, is_preorder FROM products 

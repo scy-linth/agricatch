@@ -262,11 +262,17 @@
                 <h2 class="section-title">🔥 Best Selling This Week</h2>
             </div>
             <div class="featured-carousel-wrapper" id="featured-carousel-wrapper">
+                <button type="button" class="carousel-nav carousel-nav-prev" id="featured-prev" aria-label="Previous featured products">
+                    <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                </button>
                 <div class="featured-carousel-viewport">
                     <div class="featured-carousel-track" id="featured-grid">
                         <!-- Featured cards injected by loadFeaturedProducts() -->
                     </div>
                 </div>
+                <button type="button" class="carousel-nav carousel-nav-next" id="featured-next" aria-label="Next featured products">
+                    <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                </button>
             </div>
             <div class="carousel-dots" id="featured-dots"></div>
         </div>
@@ -303,13 +309,11 @@
         <div class="container">
             <div class="products-header">
                 <h2 class="section-title">🌾 Fresh Products Ready for Delivery</h2>
-                <button id="refresh-available-btn" class="btn btn-sm section-refresh-btn" type="button" aria-label="Refresh available products">
-                    <i class="bi bi-arrow-clockwise"></i>
-                </button>
             </div>
             <div id="available-grid" class="products-grid">
                 <!-- Available products will be loaded here -->
             </div>
+            <div id="available-pagination" class="pagination-container"></div>
         </div>
     </section>
 
@@ -319,13 +323,11 @@
             <div class="products-header">
                 <h2 class="section-title preorder-section-title">📅 Reserve Before Harvest</h2>
                 <p class="preorder-subtitle">Secure products before they are harvested.</p>
-                <button id="refresh-preorder-btn" class="btn btn-sm section-refresh-btn" type="button" aria-label="Refresh preorder products">
-                    <i class="bi bi-arrow-clockwise"></i>
-                </button>
             </div>
             <div id="preorder-grid" class="products-grid">
                 <!-- Preorder products will be loaded here -->
             </div>
+            <div id="preorder-pagination" class="pagination-container"></div>
         </div>
     </section>
 

@@ -7,6 +7,10 @@ class ChatUI {
             host.includes('agricatch.store') ||
             host === 'agricatch.page.dev';
         this.apiBase = window.API_BASE || (isCustomFrontendHost ? 'https://agricatch.onrender.com/api' : '/api');
+        if (host === 'localhost' || host === '127.0.0.1') {
+            // Use local backend when testing on localhost
+            this.apiBase = 'http://localhost:3000/api';
+        }
         this.token = this.normalizeAuthToken(localStorage.getItem('token'));
         this.currentConversation = null;
         this.pollInterval = null;
@@ -14,6 +18,7 @@ class ChatUI {
         this.currentUserId = this.getUserId();
         this._lastMarkReadAt = 0;
         this.MAX_MESSAGE_LENGTH = 500;
+        this.currentProductId = null; // Store product context from URL
         window.chatUI = this;
 
         // Support Center filter state
@@ -71,6 +76,11 @@ class ChatUI {
         } else {
             backBtn.setAttribute('href', '/#products');
         }
+        
+        // Add click handler to ensure scroll position is preserved
+        backBtn.addEventListener('click', (e) => {
+            // Let the default navigation happen, the scroll restoration is handled by app.js
+        });
     }
 
     configureCustomerBackButton() {
@@ -1248,9 +1258,17 @@ class ChatUI {
                 const senderName = msgIsSent ? 'You' : otherName;
                 const exactTime = this.formatExactTimestamp(msg.created_at);
 
+                // Add product context if available
+                let productContext = '';
+                if (msg.product_id && !msgIsSent) {
+                    // Only show product context for received messages (farmer seeing customer's message)
+                    productContext = `<div class="chat-product-context" style="font-size: 0.75rem; color: #6b7280; margin-bottom: 4px;"><i class="fas fa-box"></i> Product ID: ${msg.product_id}</div>`;
+                }
+
                 html += `
                     <div class="chat-msg ${msgIsSent ? 'sent' : 'received'}" title="${exactTime}">
                         <div class="chat-msg-bubble">
+                            ${productContext}
                             <p class="chat-msg-text">${this.escapeHtml(msg.message).replace(/\n/g, '<br>')}</p>
                         </div>
                     </div>
@@ -1315,7 +1333,8 @@ class ChatUI {
                 },
                 body: JSON.stringify({
                     receiver_id: parseInt(meta.otherId, 10),
-                    message: messageText
+                    message: messageText,
+                    product_id: this.currentProductId || null
                 })
             });
 
@@ -1323,6 +1342,9 @@ class ChatUI {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.message || 'Failed to send message');
             }
+
+            // Clear product context after first message
+            this.currentProductId = null;
 
             // Reload messages immediately
             await this.loadMessages(this.currentConversation);
@@ -1379,8 +1401,14 @@ class ChatUI {
         const farmerNameParam = params.get('farmerName');
         const customerIdParam = params.get('customerId');
         const orderIdParam = params.get('orderId');
+        const productIdParam = params.get('productId');
         const productNameParam = params.get('productName');
         const quantityParam = Number(params.get('quantity') || 0);
+
+        // Store product context for first message
+        if (productIdParam) {
+            this.currentProductId = Number(productIdParam);
+        }
 
         const subtitleParts = [];
         if (orderIdParam) subtitleParts.push(`Pre-order #${orderIdParam}`);
@@ -1433,11 +1461,12 @@ class ChatUI {
 
             if (response.ok) {
                 // Conversation exists, no need to create
-                return;
+                return true;
             }
 
-            // Conversation doesn't exist, create it with an initial message
-            const initialMessage = contextText ? `I'm interested in: ${contextText}` : 'Hello, I would like to inquire about your products.';
+            // Conversation doesn't exist - create it with a minimal message
+            // This is needed so the conversation exists in the database
+            const initialMessage = contextText ? `I'm interested in: ${contextText}` : 'Hello';
             await fetch(`${this.apiBase}/messages/send`, {
                 method: 'POST',
                 headers: {
@@ -1446,11 +1475,14 @@ class ChatUI {
                 },
                 body: JSON.stringify({
                     receiver_id: farmerId,
-                    message: initialMessage
+                    message: initialMessage,
+                    product_id: this.currentProductId || null
                 })
             });
+            return true;
         } catch (error) {
             console.error('Create conversation error:', error);
+            return false;
         }
     }
 

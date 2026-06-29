@@ -655,13 +655,8 @@ class FarmerDashboard {
         await this.loadCategories();
         await this.loadProductCatalogNames();
 
-        // Enable product name field after loading catalog
-        const productNameInput = document.getElementById('product-name');
-        if (productNameInput) {
-            productNameInput.readOnly = false;
-            productNameInput.disabled = false;
-            productNameInput.placeholder = 'Select a product';
-        }
+        // Sync product name availability based on category selection
+        this.syncProductNameAvailability('add');
 
         // Load feature flags and update button text
         await this.loadFeatureFlags();
@@ -1031,6 +1026,25 @@ class FarmerDashboard {
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
+            
+            // Check if this is a suggestion to edit a rejected product
+            if (response.status === 409 && error.suggestion === 'edit_rejected') {
+                const shouldEdit = confirm(
+                    `${error.message}\n\nRejection reason: ${error.rejection_reason || 'No reason provided'}\n\nClick OK to edit the rejected product, or Cancel to create a new one.`
+                );
+                
+                if (shouldEdit) {
+                    // Close add modal and open edit modal for the rejected product
+                    this.closeAddProductModal(true);
+                    this.openEditProductModal(error.existing_product_id);
+                    throw new Error('Redirecting to edit rejected product');
+                } else {
+                    // User wants to create a new product anyway - let them continue
+                    // The backend will still block it, so we need to tell them to change the name
+                    throw new Error('Please change the product name to create a new product, or edit the existing rejected product.');
+                }
+            }
+            
             throw new Error(error.message || 'Failed to add available product');
         }
 
@@ -1101,6 +1115,25 @@ class FarmerDashboard {
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
+            
+            // Check if this is a suggestion to edit a rejected product
+            if (response.status === 409 && error.suggestion === 'edit_rejected') {
+                const shouldEdit = confirm(
+                    `${error.message}\n\nRejection reason: ${error.rejection_reason || 'No reason provided'}\n\nClick OK to edit the rejected product, or Cancel to create a new one.`
+                );
+                
+                if (shouldEdit) {
+                    // Close add modal and open edit modal for the rejected product
+                    this.closeAddProductModal(true);
+                    this.openEditProductModal(error.existing_product_id);
+                    throw new Error('Redirecting to edit rejected product');
+                } else {
+                    // User wants to create a new product anyway - let them continue
+                    // The backend will still block it, so we need to tell them to change the name
+                    throw new Error('Please change the product name to create a new product, or edit the existing rejected product.');
+                }
+            }
+            
             throw new Error(error.message || 'Failed to add pre-order product');
         }
 
@@ -3837,8 +3870,15 @@ class FarmerDashboard {
 
         const categoryId = String(categoryInput?.dataset.value || categoryInput?.value || '').trim();
         const hasCategory = !!categoryId;
+        
+        // Disable name input until category is selected
         nameInput.disabled = !hasCategory;
-        nameInput.readOnly = true;
+        
+        // Always keep it readOnly when enabled (user selects from dropdown, doesn't type)
+        if (hasCategory) {
+            nameInput.readOnly = true;
+        }
+        
         if (!hasCategory) {
             nameInput.value = '';
             nameInput.placeholder = 'Choose category first';
@@ -10602,10 +10642,11 @@ class FarmerDashboard {
             return;
         }
         const order = this.lastOrdersById?.get(Number(orderId));
+        const productId = order?.product_id || null;
         const productName = order?.product_name || order?.name || '';
         const quantity = Number(order?.quantity || 0) || 1;
         const returnUrl = window.location.pathname + window.location.search + window.location.hash;
-        window.location.href = `/chat.html?customerId=${customerId}&orderId=${orderId}&productName=${encodeURIComponent(productName)}&quantity=${quantity}&returnUrl=${encodeURIComponent(returnUrl)}`;
+        window.location.href = `/chat.html?customerId=${customerId}&orderId=${orderId}&productId=${productId}&productName=${encodeURIComponent(productName)}&quantity=${quantity}&returnUrl=${encodeURIComponent(returnUrl)}`;
     }
 
     viewOrderDetails(orderId) {

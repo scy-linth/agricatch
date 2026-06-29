@@ -5075,12 +5075,14 @@ class AgricultureMarket {
                     title: 'No available products at the moment',
                     description: 'Check back soon for fresh harvests!'
                 });
+                this.renderSectionPagination('available', null);
                 return;
             }
 
             if (data.products && data.products.length > 0) {
                 console.log('Rendering', data.products.length, 'available products');
                 this.renderProducts(data.products, 'available');
+                this.renderSectionPagination('available', data.pagination);
             } else {
                 console.warn('No available products in response:', data);
                 container.innerHTML = (window.renderEmptyState || function() { return ''; })({
@@ -5088,6 +5090,7 @@ class AgricultureMarket {
                     title: 'No available products at the moment',
                     description: 'Check back soon for fresh harvests!'
                 });
+                this.renderSectionPagination('available', null);
             }
         } catch (error) {
             console.error('Error loading available products:', error);
@@ -5158,12 +5161,14 @@ class AgricultureMarket {
                     title: 'No preorder products at the moment',
                     description: 'Check back soon for upcoming harvests!'
                 });
+                this.renderSectionPagination('preorder', null);
                 return;
             }
 
             if (data.products && data.products.length > 0) {
                 console.log('Rendering', data.products.length, 'preorder products');
                 this.renderProducts(data.products, 'preorder');
+                this.renderSectionPagination('preorder', data.pagination);
             } else {
                 console.warn('No preorder products in response:', data);
                 container.innerHTML = (window.renderEmptyState || function() { return ''; })({
@@ -5171,6 +5176,7 @@ class AgricultureMarket {
                     title: 'No preorder products at the moment',
                     description: 'Check back soon for upcoming harvests!'
                 });
+                this.renderSectionPagination('preorder', null);
             }
         } catch (error) {
             console.error('Error loading preorder products:', error);
@@ -5371,8 +5377,7 @@ class AgricultureMarket {
                                             } else {
                                                 const qty = Number(product.stock_quantity ?? product.stock ?? 0);
                                                 const unit = String(product.unit || 'item');
-                                                const stockWord = qty === 1 ? 'stock' : 'stocks';
-                                                return `${qty} ${unit} ${stockWord}`;
+                                                return `<i class="fas fa-weight-hanging" style="color:#f97316;margin-right:4px;"></i><span style="color:#374151;">${qty} ${unit} available</span>`;
                                             }
                                         })()}
                                     </div>
@@ -5386,10 +5391,6 @@ class AgricultureMarket {
                                     <div class="product-sold-left"><span class="sold-count">Sold ${this.fmtNumber(soldCount)}</span></div>
                                 </div>
                                 <div class="featured-card-actions">
-                                    <button type="button" class="btn btn-sm btn-outline-primary view-product-btn"
-                                        onclick="event.stopPropagation(); app.showProductDetails(${product.id})">
-                                        <i class="bi bi-eye me-1"></i>View Product
-                                    </button>
                                     <button type="button" class="add-to-cart-btn ${isPreorder ? 'btn-warning' : ''}"
                                         onclick="event.stopPropagation(); app.addToCart(${product.id})"
                                         ${isPurchasable ? '' : 'disabled'}>
@@ -5420,6 +5421,8 @@ class AgricultureMarket {
         const track = document.getElementById('featured-grid');
         const dotsContainer = document.getElementById('featured-dots');
         const wrapper = document.getElementById('featured-carousel-wrapper');
+        const prevBtn = document.getElementById('featured-prev');
+        const nextBtn = document.getElementById('featured-next');
         if (!track || !dotsContainer) return;
 
         let current = 0;
@@ -5441,6 +5444,9 @@ class AgricultureMarket {
             dotsContainer.querySelectorAll('.carousel-dot').forEach((d, i) => {
                 d.classList.toggle('active', i === current);
             });
+            const hasMultiplePages = pages > 1;
+            if (prevBtn) prevBtn.hidden = !hasMultiplePages;
+            if (nextBtn) nextBtn.hidden = !hasMultiplePages;
         };
 
         const buildDots = () => {
@@ -5460,6 +5466,12 @@ class AgricultureMarket {
         };
 
         buildDots();
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => { goTo(current - 1); resetAuto(); });
+        }
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => { goTo(current + 1); resetAuto(); });
+        }
         goTo(0);
 
         if (wrapper) {
@@ -5604,8 +5616,7 @@ class AgricultureMarket {
                                 } else {
                                     const qty = Number(product.stock_quantity ?? product.stock ?? 0);
                                     const unit = String(product.unit || 'item');
-                                    const stockWord = qty === 1 ? 'stock' : 'stocks';
-                                    return `${qty} ${unit} ${stockWord}`;
+                                    return `<span style="color:#374151;">${qty} ${unit} available</span>`;
                                 }
                             })()}
                         </div>
@@ -5622,7 +5633,7 @@ class AgricultureMarket {
                             <span class="sold-count">Sold ${this.fmtNumber(soldCount)}</span>
                         </div>
                     </div>
-                    <div class="product-actions" style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+                    <div class="product-actions" style="display:flex;gap:8px;align-items:center;">
                         <button type="button" class="add-to-cart-btn ${product.is_preorder ? 'btn-warning' : ''}"
                             ${cartBtnAttr}
                             ${isPurchasable && !reservationsDisabled ? '' : 'disabled'}
@@ -5715,6 +5726,77 @@ class AgricultureMarket {
             const safeY = Math.max(0, Math.min(prevY, maxY));
             
             // Use setTimeout to ensure restore happens after DOM settle
+            setTimeout(() => {
+                window.scrollTo(0, safeY);
+            }, 0);
+        }
+    }
+
+    renderSectionPagination(section, pagination) {
+        const containerId = section === 'available' ? 'available-pagination' : 'preorder-pagination';
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (!pagination || !pagination.totalPages || pagination.totalPages <= 1) return;
+
+        const paginationDiv = document.createElement('div');
+        paginationDiv.className = 'pagination';
+
+        const prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.className = 'btn btn-secondary pagination-btn';
+        prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i> Previous';
+        if (!pagination.hasPrevPage) prevBtn.disabled = true;
+        prevBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (prevBtn.disabled) return;
+            this.changeSectionPage(section, pagination.currentPage - 1);
+        });
+
+        const infoSpan = document.createElement('span');
+        infoSpan.className = 'pagination-info';
+        infoSpan.textContent = `Page ${pagination.currentPage} of ${pagination.totalPages}`;
+
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'btn btn-secondary pagination-btn';
+        nextBtn.innerHTML = 'Next <i class="fas fa-chevron-right"></i>';
+        if (!pagination.hasNextPage) nextBtn.disabled = true;
+        nextBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (nextBtn.disabled) return;
+            this.changeSectionPage(section, pagination.currentPage + 1);
+        });
+
+        paginationDiv.appendChild(prevBtn);
+        paginationDiv.appendChild(infoSpan);
+        paginationDiv.appendChild(nextBtn);
+        container.appendChild(paginationDiv);
+    }
+
+    async changeSectionPage(section, page) {
+        if (!Number.isFinite(page) || page < 1) return;
+
+        const prevY = window.scrollY || window.pageYOffset || 0;
+        if (section === 'available') {
+            this.availableFilters.page = page;
+        } else {
+            this.preorderFilters.page = page;
+        }
+
+        try {
+            if (section === 'available') {
+                await this.loadAvailableProducts();
+            } else {
+                await this.loadPreorderProducts();
+            }
+        } finally {
+            const docEl = document.documentElement;
+            const maxY = Math.max(0, docEl.scrollHeight - window.innerHeight);
+            const safeY = Math.max(0, Math.min(prevY, maxY));
             setTimeout(() => {
                 window.scrollTo(0, safeY);
             }, 0);
@@ -6164,12 +6246,13 @@ class AgricultureMarket {
         }
 
         const productId = Number(product?.id || this.currentProductId || 0);
+        const productName = product?.name || product?.product_name || '';
         const farmerName = product?.farmer_name || 'Farmer';
         const resumeParams = new URLSearchParams();
-        if (productId) resumeParams.set('openProductId', String(productId));
+        // Don't include openProductId to avoid opening modal on return - only restore scroll position
         resumeParams.set('resumeScrollY', String(window.scrollY || 0));
         const returnUrl = `${window.location.pathname}?${resumeParams.toString()}${window.location.hash || '#products'}`;
-        window.location.href = `/chat.html?farmerId=${farmerId}&farmerName=${encodeURIComponent(farmerName)}${productId ? `&productId=${productId}` : ''}&returnUrl=${encodeURIComponent(returnUrl)}`;
+        window.location.href = `/chat.html?farmerId=${farmerId}&farmerName=${encodeURIComponent(farmerName)}${productId ? `&productId=${productId}&productName=${encodeURIComponent(productName)}` : ''}&returnUrl=${encodeURIComponent(returnUrl)}`;
     }
 
     viewFarmerShop(product) {
@@ -7121,26 +7204,19 @@ class AgricultureMarket {
 
         // Optimistic UI update - update immediately before API call
         const inputEl = document.querySelector(`.quantity-value-input[onchange*="${cartId}"]`);
-        const cartTotalEl = document.getElementById('cart-total');
         const oldQuantity = inputEl ? parseInt(inputEl.value) : quantity;
-        const oldTotal = cartTotalEl ? parseFloat(cartTotalEl.textContent.replace(/,/g, '')) : 0;
-
-        // Find the cart item to get its price for optimistic total update
-        const cartItemEl = inputEl ? inputEl.closest('.cart-item') : null;
-        const itemPriceEl = cartItemEl ? cartItemEl.querySelector('.cart-item-price') : null;
-        const itemPrice = itemPriceEl ? parseFloat(itemPriceEl.textContent.replace(/[^\d.]/g, '')) : 0;
 
         // Update input value immediately
         if (inputEl) {
             inputEl.value = quantity;
         }
 
-        // Optimistically update total price
-        if (cartTotalEl && itemPrice) {
-            const quantityDiff = quantity - oldQuantity;
-            const newTotal = oldTotal + (itemPrice * quantityDiff);
-            cartTotalEl.textContent = this.fmtNumber(newTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
+        // Sync in-memory quantity so selection-aware totals are correct
+        const cartItem = this.currentCartItems.find(item => item.id === cartId);
+        if (cartItem) cartItem.quantity = quantity;
+
+        // Update summary values in-place (do NOT replace innerHTML/textContent)
+        this._updateCartSummaryValues();
 
         // Send API request in background without blocking UI
         const requestBody = { quantity };
@@ -7172,18 +7248,15 @@ class AgricultureMarket {
                     cartCountEl.style.display = count > 0 ? 'inline-flex' : 'none';
                 }
                 
-                // Update total with actual server value
-                if (cartTotalEl && data.summary) {
-                    cartTotalEl.textContent = this.fmtNumber(data.summary.subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                }
+                // Update summary values in-place
+                this._updateCartSummaryValues();
             } else {
                 // Revert optimistic update on error
                 if (inputEl) {
                     inputEl.value = oldQuantity;
                 }
-                if (cartTotalEl) {
-                    cartTotalEl.textContent = this.fmtNumber(oldTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                }
+                if (cartItem) cartItem.quantity = oldQuantity;
+                this._updateCartSummaryValues();
                 const data = await response.json();
                 this.showMessage(data.message || 'Failed to update cart', 'error');
             }
@@ -7192,12 +7265,42 @@ class AgricultureMarket {
             if (inputEl) {
                 inputEl.value = oldQuantity;
             }
-            if (cartTotalEl) {
-                cartTotalEl.textContent = this.fmtNumber(oldTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            }
+            if (cartItem) cartItem.quantity = oldQuantity;
+            this._updateCartSummaryValues();
             console.error('Error updating cart item:', error);
             this.showMessage('Failed to update cart item', 'error');
         });
+    }
+
+    _updateCartSummaryValues() {
+        const cartTotal = document.getElementById('cart-total');
+        if (!cartTotal) return;
+
+        const rows = cartTotal.querySelectorAll('.cart-summary-row');
+        if (rows.length === 0) return;
+
+        const selectedSubtotal = this.getSelectedProductSubtotal();
+        const shippingSubtotal = this.getShippingSubtotal();
+        const grandTotal = selectedSubtotal + shippingSubtotal;
+        const selectedCount = this.getSelectedProductCount();
+
+        if (rows.length >= 3) {
+            const subtotalLabel = rows[0].querySelector('span:first-child');
+            const subtotalValue = rows[0].querySelector('span:last-child');
+            if (subtotalLabel) subtotalLabel.textContent = `Subtotal (${selectedCount} item${selectedCount !== 1 ? 's' : ''})`;
+            if (subtotalValue) subtotalValue.textContent = this.fmtCurrency(selectedSubtotal);
+
+            const shippingValue = rows[1].querySelector('span:last-child');
+            if (shippingValue) shippingValue.textContent = this.fmtCurrency(shippingSubtotal);
+
+            const totalValue = rows[2].querySelector('strong:last-child');
+            if (totalValue) totalValue.textContent = this.fmtCurrency(grandTotal);
+        } else if (rows.length === 1) {
+            const totalLabel = rows[0].querySelector('strong:first-child');
+            const totalValue = rows[0].querySelector('strong:last-child');
+            if (totalLabel) totalLabel.textContent = `Total (${selectedCount} item${selectedCount !== 1 ? 's' : ''})`;
+            if (totalValue) totalValue.textContent = this.fmtCurrency(selectedSubtotal);
+        }
     }
 
     // Synchronous cart quantity update for instant UI feedback (like product modal)
@@ -7205,9 +7308,7 @@ class AgricultureMarket {
         if (quantity < 1) return;
 
         const inputEl = document.querySelector(`.quantity-value-input[onchange*="${cartId}"]`);
-        const cartTotalEl = document.getElementById('cart-total');
         const oldQuantity = inputEl ? parseInt(inputEl.value) : quantity;
-        const oldTotal = cartTotalEl ? parseFloat(cartTotalEl.textContent.replace(/,/g, '')) : 0;
 
         // Find the cart item to get its price for local total update
         const cartItemEl = inputEl ? inputEl.closest('.cart-item') : null;
@@ -7221,24 +7322,24 @@ class AgricultureMarket {
             this._updateCartQuantityButtons(cartId);
         }
 
+        // Sync in-memory quantity so selection-aware totals are correct
+        const cartItem = this.currentCartItems.find(item => item.id === cartId);
+        if (cartItem) cartItem.quantity = quantity;
+
         // Update item total immediately
         if (itemTotalEl && itemPrice) {
             const newItemTotal = itemPrice * quantity;
             itemTotalEl.textContent = this.fmtCurrency(newItemTotal);
         }
 
-        // Update total price immediately
-        if (cartTotalEl && itemPrice) {
-            const quantityDiff = quantity - oldQuantity;
-            const newTotal = oldTotal + (itemPrice * quantityDiff);
-            cartTotalEl.textContent = this.fmtNumber(newTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
+        // Update summary values in-place (do NOT replace innerHTML/textContent)
+        this._updateCartSummaryValues();
 
         // Debounce the API call so rapid clicks only send one request
-        this._debounceCartUpdate(cartId, quantity, oldQuantity, oldTotal);
+        this._debounceCartUpdate(cartId, quantity, oldQuantity);
     }
 
-    _debounceCartUpdate(cartId, quantity, oldQuantity, oldTotal) {
+    _debounceCartUpdate(cartId, quantity, oldQuantity) {
         if (!this._cartUpdateTimers) {
             this._cartUpdateTimers = {};
         }
@@ -7246,14 +7347,13 @@ class AgricultureMarket {
             clearTimeout(this._cartUpdateTimers[cartId]);
         }
         this._cartUpdateTimers[cartId] = setTimeout(() => {
-            this._sendCartUpdate(cartId, quantity, oldQuantity, oldTotal);
+            this._sendCartUpdate(cartId, quantity, oldQuantity);
             delete this._cartUpdateTimers[cartId];
         }, 400);
     }
 
-    _sendCartUpdate(cartId, quantity, oldQuantity, oldTotal) {
+    _sendCartUpdate(cartId, quantity, oldQuantity) {
         const inputEl = document.querySelector(`.quantity-value-input[onchange*="${cartId}"]`);
-        const cartTotalEl = document.getElementById('cart-total');
 
         const requestBody = { quantity };
         const headers = {
@@ -7282,10 +7382,8 @@ class AgricultureMarket {
                     cartCountEl.style.display = count > 0 ? 'inline-flex' : 'none';
                 }
 
-                // Update total with actual server value
-                if (cartTotalEl && data.summary) {
-                    cartTotalEl.textContent = this.fmtNumber(data.summary.subtotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                }
+                // Update summary values in-place (do NOT replace innerHTML/textContent)
+                this._updateCartSummaryValues();
 
                 this._updateCartQuantityButtons(cartId);
             } else {
@@ -7294,9 +7392,9 @@ class AgricultureMarket {
                     inputEl.value = oldQuantity;
                     this._updateCartQuantityButtons(cartId);
                 }
-                if (cartTotalEl) {
-                    cartTotalEl.textContent = this.fmtNumber(oldTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                }
+                const cartItem = this.currentCartItems.find(item => item.id === cartId);
+                if (cartItem) cartItem.quantity = oldQuantity;
+                this._updateCartSummaryValues();
                 const data = await response.json();
                 this.showMessage(data.message || 'Failed to update cart', 'error');
             }
@@ -7306,9 +7404,9 @@ class AgricultureMarket {
                 inputEl.value = oldQuantity;
                 this._updateCartQuantityButtons(cartId);
             }
-            if (cartTotalEl) {
-                cartTotalEl.textContent = this.fmtNumber(oldTotal, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            }
+            const cartItem = this.currentCartItems.find(item => item.id === cartId);
+            if (cartItem) cartItem.quantity = oldQuantity;
+            this._updateCartSummaryValues();
             console.error('Error updating cart item:', error);
             this.showMessage('Failed to update cart item', 'error');
         });

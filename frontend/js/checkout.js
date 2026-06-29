@@ -853,21 +853,21 @@ class CheckoutPage {
                 // Clear selected cart items after successful order
                 localStorage.removeItem('selectedCartItems');
 
-                const successMessage = hasPreorder ? 'Pre-order placed successfully! Redirecting…' : 'Order placed successfully! Redirecting…';
+                const successMessage = 'Order placed successfully! Redirecting…';
                 this.showMessage(successMessage, 'success');
                 setTimeout(() => { window.location.href = '/orders.html'; }, 1500);
             } else {
                 const errorData = await response.json();
-                const errorMessage = hasPreorder ? (errorData.message || 'Failed to place pre-order') : (errorData.message || 'Failed to place order');
+                const errorMessage = errorData.message || 'Failed to place order';
                 this.showMessage(errorMessage, 'error');
-                const btnText = hasPreorder ? '<i class="bi bi-bag-check-fill"></i> Place Pre-order' : '<i class="bi bi-bag-check-fill"></i> Place Order';
+                const btnText = '<i class="bi bi-bag-check-fill"></i> Place Order';
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = btnText; }
             }
         } catch (error) {
             console.error('Error placing order:', error);
-            const errorMessage = hasPreorder ? 'Error placing pre-order' : 'Error placing order';
+            const errorMessage = 'Error placing order';
             this.showMessage(errorMessage, 'error');
-            const btnText = hasPreorder ? '<i class="bi bi-bag-check-fill"></i> Place Pre-order' : '<i class="bi bi-bag-check-fill"></i> Place Order';
+            const btnText = '<i class="bi bi-bag-check-fill"></i> Place Order';
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = btnText; }
         }
     }

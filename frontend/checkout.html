@@ -124,6 +124,27 @@
 .co-card-body {
   padding: 1.5rem 1.5rem 1.5rem 1.5rem;
 }
+.co-card.co-card-flex {
+  display: flex;
+  flex-direction: column;
+}
+.co-card.co-card-flex .co-card-body {
+  flex: 1 1 auto;
+}
+.co-card-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--ac-border, #e2e8e4);
+  background: #f8fafc;
+  display: flex;
+  gap: .75rem;
+}
+.co-card-footer .btn-co-primary,
+.co-card-footer .btn-co-blue {
+  flex: 1;
+}
+@media (max-width: 575px) {
+  .co-card-footer { flex-direction: column; gap: .5rem; }
+}
 
 /* Order item row */
 .co-item {
@@ -604,10 +625,10 @@
             <div class="row g-3">
 
                 <!-- Left: Delivery + Payment -->
-                <div class="col-lg-8" style="flex: 0 0 70%; max-width: 70%;">
+                <div class="col-lg-8 d-flex flex-column" style="flex: 0 0 70%; max-width: 70%;">
 
                     <!-- Delivery Information -->
-                    <div class="co-card">
+                    <div class="co-card co-card-flex flex-grow-1">
                         <div class="co-card-header">
                             <i class="fas fa-truck"></i>
                             <h5>Delivery Information</h5>
@@ -687,8 +708,8 @@
                 </div>
 
                 <!-- Right: Order summary -->
-                <div class="col-lg-4" style="flex: 0 0 30%; max-width: 30%;">
-                    <div class="co-card">
+                <div class="col-lg-4 d-flex flex-column" style="flex: 0 0 30%; max-width: 30%;">
+                    <div class="co-card co-card-flex flex-grow-1">
                         <div class="co-card-header">
                             <i class="fas fa-shopping-bag"></i>
                             <h5>Order Summary</h5>
@@ -713,16 +734,14 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Action buttons -->
-                    <div class="d-flex gap-3 mt-4">
-                        <button type="button" class="btn-co-blue flex-grow-1" id="shop-more-btn">
-                            <i class="bi bi-shop"></i> Shop More
-                        </button>
-                        <button type="submit" class="btn-co-primary flex-grow-1" id="place-order-btn">
-                            <i class="bi bi-bag-check-fill"></i> Place Pre-order
-                        </button>
+                        <div class="co-card-footer">
+                            <button type="button" class="btn-co-blue" id="shop-more-btn">
+                                <i class="bi bi-shop"></i> Shop More
+                            </button>
+                            <button type="submit" class="btn-co-primary" id="place-order-btn">
+                                <i class="bi bi-bag-check-fill"></i> Place Order
+                            </button>
+                        </div>
                     </div>
                 </div>
 

@@ -10,6 +10,9 @@ class OrdersPage {
             const host = String(window.location.hostname || '').toLowerCase();
             if (host === 'agricatch.store' || host === 'www.agricatch.store') {
                 this.apiBase = this.apiFallbackBase;
+            } else if (host === 'localhost' || host === '127.0.0.1') {
+                // Use local backend when testing on localhost
+                this.apiBase = 'http://localhost:3000/api';
             }
         }
         this.token = this.normalizeAuthToken(localStorage.getItem('token'));
@@ -118,9 +121,22 @@ class OrdersPage {
             return;
         }
         localStorage.setItem('ordersReturnTo', this.returnTo);
+        
         this.setupEventListeners();
         this.configureBackButton();
-        this.loadOrders();
+        
+        // Restore tab from URL parameter
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get('tab');
+        const restoredTab = (tabParam && ['all', 'active', 'delivered', 'cancelled'].includes(tabParam)) ? tabParam : 'all';
+        
+        // Set current tab before loading
+        this.currentTab = restoredTab;
+        
+        this.loadOrders().then(() => {
+            // Ensure correct tab is shown after orders are loaded
+            this.switchOrderTab(restoredTab);
+        });
         this.setupRealtime();
     }
 
@@ -363,6 +379,26 @@ class OrdersPage {
     applyHighlightFromQuery() {
         if (!this.highlightOrderId || Number.isNaN(this.highlightOrderId)) return;
 
+        // Check if tab parameter is present - if so, don't auto-switch for highlight
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get('tab');
+        if (tabParam && ['all', 'active', 'delivered', 'cancelled'].includes(tabParam)) {
+            // Just highlight without switching tab
+            setTimeout(() => {
+                const target = document.querySelector(`.order-card[data-order-id="${this.highlightOrderId}"]`);
+                if (target) {
+                    target.classList.add('order-card-highlight');
+                    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    setTimeout(() => target.classList.remove('order-card-highlight'), 2200);
+                }
+            }, 120);
+            params.delete('highlightOrderId');
+            const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}${window.location.hash || ''}`;
+            window.history.replaceState({}, '', next);
+            this.highlightOrderId = 0;
+            return;
+        }
+
         let foundStatus = null;
         for (const [status, orders] of Object.entries(this.ordersByStatus)) {
             if ((orders || []).some((order) => Number(order.id) === this.highlightOrderId)) {
@@ -383,7 +419,6 @@ class OrdersPage {
             }
         }, 120);
 
-        const params = new URLSearchParams(window.location.search);
         params.delete('highlightOrderId');
         const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}${window.location.hash || ''}`;
         window.history.replaceState({}, '', next);
@@ -393,7 +428,6 @@ class OrdersPage {
     groupOrdersByStatus(orders) {
         // Reset all status arrays
         this.ordersByStatus = { pending: [], preorder_reserved: [], confirmed: [], preparing: [], scheduled: [], out_for_delivery: [], delivered: [], cancelled: [] };
-        this.currentTab = 'all';
         
         // Group orders by status
         orders.forEach(order => {
@@ -418,13 +452,14 @@ class OrdersPage {
             'cancelled': ['cancelled']
         };
 
+        const savedTab = this.currentTab;
         Object.keys(tabStatusMap).forEach(tab => {
             this.currentTab = tab;
             this.renderOrdersByStatus(tabStatusMap[tab]);
         });
 
-        // Reset to all tab
-        this.currentTab = 'all';
+        // Restore saved tab instead of resetting to all
+        this.currentTab = savedTab;
 
         // Update tab counters after rendering
         this.updateTabCounts();
@@ -594,8 +629,8 @@ class OrdersPage {
                         <span class="order-total">${this.fmtCurrency(order.total_amount)}</span>
                         <div class="order-actions">
                             ${item.farmer_id ? `
-                                <button class="btn btn-small btn-primary" onclick="ordersPage.openChat(${order.id}, ${item.farmer_id}, '${encodedProductName}', ${quantity})">
-                                    <i class="fas fa-comments"></i> Chat Vendor
+                                <button class="btn btn-small btn-primary" onclick="ordersPage.openChat(${order.id}, ${item.farmer_id}, '${encodeURIComponent(item.farmer_name || 'Farmer')}', ${item.product_id}, '${encodedProductName}', ${quantity})">
+                                    <i class="fas fa-comments"></i> Chat Farmer
                                 </button>
                             ` : ''}
                             ${isDelivered ? `
@@ -788,7 +823,7 @@ class OrdersPage {
         }
 
         try {
-            const eligibilityRes = await fetch(`${this.apiBase}/products/${productId}/reviews/eligibility`, {
+            const eligibilityRes = await fetch(`${this.apiBase}/reviews/products/${productId}/reviews/eligibility`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
 
@@ -854,7 +889,7 @@ class OrdersPage {
                     body: JSON.stringify({ rating, comment })
                 });
             } else {
-                response = await fetch(`${this.apiBase}/products/${productId}/reviews`, {
+                response = await fetch(`${this.apiBase}/reviews/products/${productId}/reviews`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -928,17 +963,18 @@ class OrdersPage {
     }
 
 
-    async openChat(orderId, farmerId, encodedProductName = '', quantity = 1) {
+    async openChat(orderId, farmerId, encodedFarmerName = '', productId, encodedProductName = '', quantity = 1) {
         if (!farmerId) {
             showToast('Farmer information not available.', 'error');
             return;
         }
         const params = new URLSearchParams(window.location.search);
         const returnTo = this.normalizeReturnTo(params.get('returnTo') || this.returnTo);
-        const returnUrl = `${window.location.pathname}?highlightOrderId=${orderId}&returnTo=${encodeURIComponent(returnTo)}`;
+        const returnUrl = `${window.location.pathname}?highlightOrderId=${orderId}&tab=${this.currentTab}&returnTo=${encodeURIComponent(returnTo)}`;
+        const farmerName = decodeURIComponent(String(encodedFarmerName || 'Farmer'));
         const productName = decodeURIComponent(String(encodedProductName || 'Product'));
         const safeQty = Number(quantity || 1) || 1;
-        window.location.href = `/chat.html?farmerId=${farmerId}&orderId=${orderId}&productName=${encodeURIComponent(productName)}&quantity=${safeQty}&returnUrl=${encodeURIComponent(returnUrl)}`;
+        window.location.href = `/chat.html?farmerId=${farmerId}&farmerName=${encodeURIComponent(farmerName)}&orderId=${orderId}&productId=${productId}&productName=${encodeURIComponent(productName)}&quantity=${safeQty}&returnUrl=${encodeURIComponent(returnUrl)}`;
     }
 
     async viewProduct(productId) {
