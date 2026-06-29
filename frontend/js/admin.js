@@ -2912,6 +2912,12 @@ class AdminDashboard {
             products = products.filter(p => !p.is_preorder && p.stock_quantity > 0 && !p.is_admin_disabled && !p.farmer_is_disabled && p.is_available);
         } else if (status === 'preorder') {
             products = products.filter(p => p.is_preorder && !p.is_admin_disabled && !p.farmer_is_disabled && p.is_available);
+        } else if (status === 'available') {
+            products = products.filter(p => !p.is_admin_disabled && !p.farmer_is_disabled && p.is_available);
+        } else if (status === 'disabled') {
+            products = products.filter(p => p.is_admin_disabled || p.farmer_is_disabled);
+        } else if (status === 'no_stock') {
+            products = products.filter(p => p.stock_quantity <= 0 && !p.is_admin_disabled && !p.farmer_is_disabled && p.is_available);
         }
 
         this.renderProducts(products);
@@ -3726,7 +3732,7 @@ class AdminDashboard {
                     <div class="mb-3">
                         <label for="setting-delivery_fee" class="form-label fw-semibold">Delivery Fee (₱)</label>
                         <input type="number" id="setting-delivery_fee" class="form-control platform-setting-input"
-                               data-key="${key}" min="0" step="1" value="${this.escapeHtml(deliveryFeeValue)}">
+                               data-key="${key}" min="0" max="99999" step="1" value="${this.escapeHtml(deliveryFeeValue)}">
                         <div class="form-text text-muted" style="font-size: 0.85rem; font-weight: 500;">
                             Current value: <span class="badge bg-primary" id="value-delivery_fee" style="font-size: 0.9rem;">₱${this.escapeHtml(deliveryFeeValue)}</span>
                         </div>
@@ -5613,8 +5619,8 @@ class AdminDashboard {
                 this.lastProducts = data.products || [];
                 this.allProducts = data.products || [];
                 pg.total = Number(data.total || 0);
-                // Apply client-side filtering for available_now and preorder
-                if (effectiveStatus === 'available_now' || effectiveStatus === 'preorder') {
+                // Apply client-side filtering for available_now, preorder, available, disabled, no_stock
+                if (effectiveStatus === 'available_now' || effectiveStatus === 'preorder' || effectiveStatus === 'available' || effectiveStatus === 'disabled' || effectiveStatus === 'no_stock') {
                     this.applyProductsFilter();
                 } else {
                     this.renderProducts(this.lastProducts);
@@ -9915,12 +9921,12 @@ class AdminDashboard {
                 <div class="form-group">
                     <label class="form-label" for="edit-product-price">Price (₱)</label>
                     <input type="number" id="edit-product-price"
-                           class="form-control" min="0" step="0.01" value="${product.price || ''}">
+                           class="form-control" min="0" max="99999" step="0.01" value="${product.price || ''}">
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="edit-product-stock">Stock</label>
                     <input type="number" id="edit-product-stock"
-                           class="form-control" min="0" value="${product.stock_quantity || ''}">
+                           class="form-control" min="0" max="99999" value="${product.stock_quantity || ''}">
                 </div>
             </div>
 
@@ -11008,7 +11014,7 @@ class AdminDashboard {
                 <div class="form-group mt-3">
                     <label class="form-label fw-semibold">Suggested Average Price (₱)</label>
                     <input type="number" id="catalog-edit-suggested-price"
-                           class="form-control" placeholder="e.g. 75" min="0" step="0.01"
+                           class="form-control" placeholder="e.g. 75" min="0" max="99999" step="0.01"
                            value="${item.admin_set_average_price !== null && Number.isFinite(Number(item.admin_set_average_price)) ? item.admin_set_average_price : ''}">
                     <small class="text-muted">Leave empty to use calculated price from real sales data</small>
                 </div>

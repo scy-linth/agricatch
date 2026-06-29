@@ -2942,7 +2942,7 @@
                         <div class="product-name-field">
                             <div class="product-name-input-wrap">
                                 <input type="text" id="product-name" class="form-control form-control-sm"
-                                       placeholder="Choose a category first" autocomplete="off" disabled required>
+                                       placeholder="Choose a category first" autocomplete="off" disabled required maxlength="30">
                                 <i class="bi bi-chevron-down pn-chevron" aria-hidden="true"></i>
                             </div>
                             <div id="product-name-suggestions" class="product-name-dropdown" role="listbox" aria-label="Product suggestions"></div>
@@ -2956,7 +2956,7 @@
                     </div>
                     <div class="form-group" style="flex:1;">
                         <label for="product-price">Price (&#8369;) <span class="text-danger">*</span></label>
-                        <input type="number" id="product-price" class="form-control form-control-sm" step="0.01" min="0" inputmode="decimal" required>
+                        <input type="number" id="product-price" class="form-control form-control-sm" step="0.01" min="0" max="99999" inputmode="decimal" required>
                         <small id="product-price-suggestion" class="field-hint">Suggested price: --</small>
                     </div>
                 </div>
@@ -2988,7 +2988,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="available-stock">Current Stock <span class="text-danger">*</span></label>
-                                <input type="number" id="available-stock" class="form-control form-control-sm" name="stock_quantity" min="0">
+                                <input type="number" id="available-stock" class="form-control form-control-sm" name="stock_quantity" min="0" max="99999">
                                 <small class="field-hint">Current available inventory (0 = Out of Stock)</small>
                                 <small id="available-stock-unit-display" class="field-hint text-muted" style="display:none;"></small>
                             </div>
@@ -3025,7 +3025,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="preorder-max-quantity">Reservation Capacity <span class="text-danger">*</span></label>
-                                <input type="number" id="preorder-max-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1">
+                                <input type="number" id="preorder-max-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1" max="99999">
                                 <small class="field-hint">Maximum number of reservations allowed (in units)</small>
                                 <small id="preorder-max-quantity-unit-display" class="field-hint text-muted" style="display:none;"></small>
                             </div>
@@ -3141,7 +3141,7 @@
                             <label for="edit-product-name" class="form-label small fw-semibold">Product Name <span class="text-danger">*</span></label>
                             <div class="product-name-field">
                                 <div class="product-name-input-wrap">
-                                    <input type="text" id="edit-product-name" class="form-control form-control-sm" placeholder="Product name" autocomplete="off" readonly required>
+                                    <input type="text" id="edit-product-name" class="form-control form-control-sm" placeholder="Product name" autocomplete="off" readonly required maxlength="30">
                                     <i class="bi bi-chevron-down pn-chevron" style="display:none;" aria-hidden="true"></i>
                                 </div>
                                 <div id="edit-product-name-suggestions" class="product-name-dropdown" style="display:none;" role="listbox" aria-label="Product suggestions"></div>
@@ -3153,7 +3153,7 @@
                         </div>
                         <div class="form-group" style="flex:1;">
                             <label for="edit-price" class="form-label small fw-semibold">Price (?) <span class="text-danger">*</span></label>
-                            <input type="number" id="edit-price" class="form-control form-control-sm" name="price" min="0" step="0.01" required>
+                            <input type="number" id="edit-price" class="form-control form-control-sm" name="price" min="0" max="99999" step="0.01" required>
                         </div>
                     </div>
                 </div>
@@ -3168,7 +3168,7 @@
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label for="edit-stock-quantity" class="form-label small fw-semibold">Stock Quantity <span class="text-danger">*</span></label>
-                            <input type="number" id="edit-stock-quantity" class="form-control form-control-sm" name="stock_quantity" min="0">
+                            <input type="number" id="edit-stock-quantity" class="form-control form-control-sm" name="stock_quantity" min="0" max="99999">
                             <small class="text-muted" style="font-size:0.7rem;">Current available inventory (0 = Out of Stock)</small>
                         </div>
                         <div class="col-md-6">
@@ -3193,7 +3193,7 @@
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label for="edit-max-preorder-quantity" class="form-label small fw-semibold">Max Reservation Quantity <span class="text-danger">*</span></label>
-                            <input type="number" id="edit-max-preorder-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1">
+                            <input type="number" id="edit-max-preorder-quantity" class="form-control form-control-sm" name="max_preorder_quantity" min="1" max="99999">
                             <small class="text-muted" style="font-size:0.7rem;">Maximum reservations allowed (in units)</small>
                         </div>
                         <div class="col-md-6">
@@ -3267,7 +3267,7 @@
         <div class="modal-body" style="padding:1.5rem;">
             <div class="form-group mb-3">
                 <label for="harvest-lifecycle-quantity" class="fw-semibold">How many kilograms did you harvest? <span class="text-danger">*</span></label>
-                <input type="number" id="harvest-lifecycle-quantity" class="form-control form-control-sm" min="1" placeholder="Enter harvested quantity">
+                <input type="number" id="harvest-lifecycle-quantity" class="form-control form-control-sm" min="1" max="99999" placeholder="Enter harvested quantity">
             </div>
 
             <div class="alert alert-info mb-3" style="font-size:0.9rem;padding:0.85rem;">
@@ -3297,7 +3297,7 @@
         <div class="modal-body" style="padding:1.5rem;">
             <div class="form-group mb-3">
                 <label for="harvest-fulfill-quantity" class="fw-semibold">How many kilograms did you harvest today? <span class="text-danger">*</span></label>
-                <input type="number" id="harvest-fulfill-quantity" class="form-control form-control-sm" min="1" placeholder="Enter harvested quantity">
+                <input type="number" id="harvest-fulfill-quantity" class="form-control form-control-sm" min="1" max="99999" placeholder="Enter harvested quantity">
             </div>
 
             <div id="harvest-fulfill-summary" class="alert alert-info small mb-0" style="display:none;font-size:0.85rem;padding:0.75rem;">
@@ -3470,7 +3470,7 @@
                 <div class="form-group">
                     <label for="request-product-name">Product Name <span class="text-danger">*</span></label>
                     <input type="text" id="request-product-name" class="form-control form-control-sm"
-                           placeholder="Enter the product name you want to request" required>
+                           placeholder="Enter the product name you want to request" required maxlength="30">
                 </div>
                 <div class="form-group">
                     <label for="request-product-notes">Notes for Admin <span class="text-muted">(optional)</span></label>
