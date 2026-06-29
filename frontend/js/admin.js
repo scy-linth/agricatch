@@ -86,6 +86,8 @@ class AdminDashboard {
                 this.openAdminDetailModal(Number(btn.dataset.userId));
             } else if (btn.matches('.all-users-view-btn')) {
                 this.openAllUsersDetailModal(Number(btn.dataset.userId));
+            } else if (btn.matches('.suspicious-view-btn')) {
+                this.openCustomerDetailModal(Number(btn.dataset.userId));
             } else if (btn.matches('.toggle-modal-password-btn')) {
                 this.toggleModalPasswordVisibility();
             } else if (btn.matches('.category-requests-view-btn')) {
@@ -853,6 +855,8 @@ class AdminDashboard {
             this.loadCategoryRequests();
         } else if (sectionId === 'product-approvals') {
             this.loadProductApprovals();
+        } else if (sectionId === 'broadcast') {
+            this.loadAnnouncements();
         } else if (sectionId === 'profile') {
             this.loadProfileSection();
         }
@@ -918,6 +922,7 @@ class AdminDashboard {
                 'feature-flags': 'Feature Flags',
                 'database-backup': 'Database Data Backup',
                 'image-manager': 'Image Manager',
+                'bulk-select': 'Bulk Select',
             };
             pageTitle.textContent = titles[sectionId] || 'Dashboard';
         }
@@ -2344,6 +2349,7 @@ class AdminDashboard {
             'catalog_name.disable': 'Disabled catalog name', 'catalog_name.enable': 'Enabled catalog name',
             'category.request.review': 'Reviewed name request',
             'announcement.broadcast': 'Broadcast announcement',
+            'announcement.delete': 'Deleted announcement',
             'settings.update': 'Updated settings',
             'feature_flag.update': 'Updated feature flag',
         };
@@ -3424,7 +3430,7 @@ class AdminDashboard {
                         <td class="fw-semibold">${this.escapeHtml(p.username || '—')}</td>
                         <td>${this.escapeHtml(p.email || '—')}</td>
                         <td class="text-muted">${p.order_count}</td>
-                        <td class="text-muted">${p.avg_rating ? p.avg_rating.toFixed(1) : '—'}</td>
+                        <td class="text-muted">${p.avg_rating ? Number(p.avg_rating).toFixed(1) : '—'}</td>
                         <td class="text-muted">${p.review_count || 0}</td>
                         <td>${this.escapeHtml(p.farmer_username || '—')}</td>
                         <td>
@@ -5305,7 +5311,50 @@ class AdminDashboard {
         return timeline;
     }
 
+    initializeDateRangeConstraints() {
+        const dateFrom = document.getElementById('am-date-from');
+        const dateTo = document.getElementById('am-date-to');
+
+        if (!dateFrom || !dateTo) return;
+
+        // Set max to today's date for both inputs
+        const today = new Date().toISOString().split('T')[0];
+        dateFrom.max = today;
+        dateTo.max = today;
+
+        // When "from" date changes, update "to" date's min to the next day
+        dateFrom.addEventListener('change', () => {
+            if (dateFrom.value) {
+                const fromDate = new Date(dateFrom.value);
+                fromDate.setDate(fromDate.getDate() + 1);
+                const nextDay = fromDate.toISOString().split('T')[0];
+                dateTo.min = nextDay;
+                // If "to" date is now before or equal to "from" date, clear it
+                if (dateTo.value && dateTo.value <= dateFrom.value) {
+                    dateTo.value = '';
+                }
+            }
+        });
+
+        // When "to" date changes, update "from" date's max to the previous day
+        dateTo.addEventListener('change', () => {
+            if (dateTo.value) {
+                const toDate = new Date(dateTo.value);
+                toDate.setDate(toDate.getDate() - 1);
+                const previousDay = toDate.toISOString().split('T')[0];
+                dateFrom.max = previousDay;
+                // If "from" date is now after or equal to "to" date, clear it
+                if (dateFrom.value && dateFrom.value >= dateTo.value) {
+                    dateFrom.value = '';
+                }
+            }
+        });
+    }
+
     setupActivityMonitorEventListeners() {
+        // Initialize date range constraints
+        this.initializeDateRangeConstraints();
+
         // Quick filter buttons
         document.querySelectorAll('.am-quick-filter').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -6173,6 +6222,63 @@ class AdminDashboard {
     // ────────────────────────────────────────────────────────────
     //  Admin detail modal
     // ────────────────────────────────────────────────────────────
+    async loadUserActivity(userId, containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = `<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> Loading activity...</div>`;
+        try {
+            const params = new URLSearchParams({ user_id: String(userId), page: '1', limit: '10' });
+            const res = await fetch(`${this.apiBase}/activity-monitor/activities?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!res.ok) {
+                container.innerHTML = `<div class="text-center text-danger py-3 small">Failed to load activity logs.</div>`;
+                return;
+            }
+            const data = await res.json();
+            const activities = (data.activities || []).map(a => ({
+                id: a.id,
+                actionLabel: this.getActionLabel(a.action),
+                actionIcon: this.getActionIcon(a.action),
+                description: a.description || '',
+                status: a.status,
+                timestamp: a.created_at,
+                currentPage: a.current_page || 'N/A'
+            }));
+            if (!activities.length) {
+                container.innerHTML = `<div class="text-center text-muted py-3 small">No recent activity</div>`;
+                return;
+            }
+            container.innerHTML = `
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="font-size:.75rem">When</th>
+                                <th style="font-size:.75rem">Action</th>
+                                <th style="font-size:.75rem">Page</th>
+                                <th style="font-size:.75rem">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${activities.map(a => `
+                                <tr>
+                                    <td class="small text-muted">${new Date(a.timestamp).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</td>
+                                    <td class="small"><span class="me-1">${a.actionIcon}</span>${this.escapeHtml(a.actionLabel)}</td>
+                                    <td class="small font-monospace text-muted">${this.escapeHtml(a.currentPage)}</td>
+                                    <td>${this.getStatusBadge(a.status)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } catch (err) {
+            console.error('loadUserActivity error:', err);
+            container.innerHTML = `<div class="text-center text-danger py-3 small">Failed to load activity logs.</div>`;
+        }
+    }
+
     async openAdminDetailModal(userId) {
         try {
             const user = (this.lastAdmin || []).find(u => u.id === Number(userId));
@@ -6197,8 +6303,7 @@ class AdminDashboard {
                 </div>
             `;
 
-            const activityEl = document.getElementById('sdt-activity-content');
-            if (activityEl) activityEl.innerHTML = `<div class="text-muted small py-3 text-center">Activity log not implemented</div>`;
+            this.loadUserActivity(userId, 'sdt-activity-content');
 
             const isDisabled = !!user.is_disabled;
             const canToggle = this.currentUserRole === 'super_admin' && user.id !== this.currentUserId;
@@ -6492,6 +6597,8 @@ class AdminDashboard {
                 await this.loadVerificationRequests(1, 'all');
             } else if (safeSection === 'subscription-requests') {
                 await this.loadSubscriptionRequests('all');
+            } else if (safeSection === 'broadcast') {
+                await this.loadAnnouncements();
             } else if (safeSection === 'profile') {
                 await this.loadProfileSection();
             }
@@ -6744,7 +6851,7 @@ class AdminDashboard {
             dropdownList.innerHTML = `<li class="text-center py-2 small text-muted">No notifications</li>`;
             return;
         }
-        const iconMap = { order: 'bi-bag-check text-success', product: 'bi-box-seam text-primary', user: 'bi-person text-info', system: 'bi-gear text-secondary', harvest: 'bi-calendar-check text-success', harvest_reminder: 'bi-calendar-event text-warning', harvest_adjusted: 'bi-calendar-x text-danger', harvest_completed: 'bi-check-circle text-success' };
+        const iconMap = { order: 'bi-bag-check text-success', product: 'bi-box-seam text-primary', user: 'bi-person text-info', system: 'bi-gear text-secondary', harvest: 'bi-calendar-check text-success', harvest_reminder: 'bi-calendar-event text-warning', harvest_adjusted: 'bi-calendar-x text-danger', harvest_completed: 'bi-check-circle text-success', announcement: 'bi-megaphone-fill text-primary' };
         dropdownList.innerHTML = recent.map(n => {
             const ic = iconMap[n.type] || 'bi-bell text-muted';
             const relTime = this._relativeTime(new Date(n.created_at));
@@ -6756,7 +6863,7 @@ class AdminDashboard {
                             <i class="bi ${ic}"></i>
                         </div>
                         <div style="flex:1;min-width:0;">
-                            <div class="small" style="font-weight:${n.is_read ? '500' : '600'};color:${n.is_read ? '#111827' : '#065f46'};line-height:1.4;">${this.escapeHtml(n.title || 'Notification')}</div>
+                            <div class="small" style="font-weight:${n.is_read ? '500' : '600'};color:${n.is_read ? '#111827' : '#065f46'};line-height:1.4;">${n.type === 'announcement' ? 'Announcement: ' : ''}${this.escapeHtml(n.title || 'Notification')}</div>
                             <div style="font-size:0.75rem;color:#9ca3af;">${relTime}</div>
                         </div>
                         ${!n.is_read ? '<div style="width:6px;height:6px;border-radius:50%;background:#10b981;flex-shrink:0;"></div>' : ''}
@@ -6870,7 +6977,7 @@ class AdminDashboard {
                     <i class="bi ${iconClass}"></i>
                 </div>
                 <div class="notification-content">
-                    <div class="notification-title">${this.escapeHtml(n.title || 'Notification')}</div>
+                    <div class="notification-title">${n.type === 'announcement' ? 'Announcement: ' : ''}${this.escapeHtml(n.title || 'Notification')}</div>
                     <div class="notification-message">${this.escapeHtml(n.message || '')}</div>
                     <div class="notification-meta">
                         <span>${relTime}</span>
@@ -7372,9 +7479,100 @@ class AdminDashboard {
             if (audienceFarmer) audienceFarmer.checked = false;
             if (audienceCustomer) audienceCustomer.checked = false;
             if (audienceAdmin) audienceAdmin.checked = false;
+            this.loadAnnouncements();
         } catch (err) {
             console.error('Send announcement error:', err);
             this.showMessage('Failed to send announcement', 'error');
+        }
+    }
+
+    async loadAnnouncements() {
+        const loadingEl = document.getElementById('announcements-loading');
+        const tableEl = document.getElementById('announcements-table');
+        const emptyEl = document.getElementById('announcements-empty');
+        const tbody = document.getElementById('announcements-tbody');
+        if (!tbody) return;
+
+        if (loadingEl) loadingEl.style.display = '';
+        if (tableEl) tableEl.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = 'none';
+
+        try {
+            const res = await fetch(`${this.apiBase}/superadmin/announcements/all`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                if (loadingEl) loadingEl.textContent = data.message || 'Failed to load announcements';
+                return;
+            }
+
+            const items = data.announcements || [];
+            if (loadingEl) loadingEl.style.display = 'none';
+
+            if (!items.length) {
+                if (emptyEl) emptyEl.style.display = '';
+                return;
+            }
+
+            if (tableEl) tableEl.style.display = '';
+            const audienceLabels = { all: 'All Users', farmer: 'Farmers', customer: 'Customers', admin: 'Admins' };
+            tbody.innerHTML = items.map(a => {
+                const created = a.created_at ? new Date(a.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '';
+                const isActive = a.is_active && (!a.expires_at || new Date(a.expires_at) > new Date());
+                const statusBadge = isActive
+                    ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>'
+                    : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Inactive</span>';
+                const audienceLabel = audienceLabels[a.audience] || this.escapeHtml(a.audience || '');
+                return `<tr>
+                    <td class="text-muted small">${a.id}</td>
+                    <td>
+                        <div class="fw-semibold">${this.escapeHtml(a.title || '')}</div>
+                        <div class="small text-muted" style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(a.message || '')}</div>
+                    </td>
+                    <td><span class="badge bg-light text-dark border">${audienceLabel}</span></td>
+                    <td class="small text-muted">${created}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-danger border-0 delete-announcement-btn" data-id="${a.id}" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            tbody.querySelectorAll('.delete-announcement-btn').forEach(btn => {
+                btn.addEventListener('click', () => this.deleteAnnouncement(parseInt(btn.dataset.id, 10)));
+            });
+        } catch (err) {
+            console.error('Load announcements error:', err);
+            if (loadingEl) loadingEl.textContent = 'Failed to load announcements';
+        }
+    }
+
+    async deleteAnnouncement(id) {
+        if (!Number.isInteger(id) || id <= 0) return;
+        const confirmed = await this.adminConfirm(
+            'This will permanently delete the announcement and remove it from all users.',
+            { title: 'Delete Announcement', danger: true, okLabel: 'Delete' }
+        );
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`${this.apiBase}/superadmin/announcements/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                this.showMessage(data.message || 'Failed to delete announcement', 'error');
+                return;
+            }
+            this.showMessage('Announcement deleted', 'success');
+            this.loadAnnouncements();
+        } catch (err) {
+            console.error('Delete announcement error:', err);
+            this.showMessage('Failed to delete announcement', 'error');
         }
     }
 

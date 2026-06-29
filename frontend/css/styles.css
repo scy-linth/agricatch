@@ -4658,10 +4658,33 @@ iframe[src*="recaptcha/api2/bframe"] {
     overflow-y: auto;
 }
 
+.header-actions .user-menu .btn-primary {
+    background: transparent;
+    color: var(--white);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+}
+
+.header-actions .user-menu .btn-primary:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.9);
+}
+
 .header-actions .user-menu .btn-secondary {
     background: transparent;
     color: var(--white);
     border: 1px solid rgba(255, 255, 255, 0.65);
+}
+
+#register-btn {
+    background: var(--primary-color) !important;
+    color: var(--white) !important;
+    border: none !important;
+}
+
+#register-btn:hover {
+    background: var(--primary-dark) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
 }
 
 .header-actions .user-menu .btn-secondary:hover {

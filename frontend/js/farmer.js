@@ -5434,7 +5434,7 @@ class FarmerDashboard {
             dropdownList.innerHTML = `<li class="text-center py-2 small text-muted">No notifications</li>`;
             return;
         }
-        const iconMap = { order: 'bi-bag-check text-success', product: 'bi-box-seam text-primary', user: 'bi-person text-info', system: 'bi-gear text-secondary' };
+        const iconMap = { order: 'bi-bag-check text-success', product: 'bi-box-seam text-primary', user: 'bi-person text-info', system: 'bi-gear text-secondary', announcement: 'bi-megaphone-fill text-primary' };
         dropdownList.innerHTML = recent.map(n => {
             const ic = iconMap[n.type] || 'bi-bell text-muted';
             const relTime = this._relativeTime(new Date(n.created_at));
@@ -5446,7 +5446,7 @@ class FarmerDashboard {
                             <i class="bi ${ic}"></i>
                         </div>
                         <div style="flex:1;min-width:0;">
-                            <div class="small" style="font-weight:${n.is_read ? '500' : '600'};color:${n.is_read ? '#111827' : '#065f46'};line-height:1.4;">${this.escapeHtml(n.title || 'Notification')}</div>
+                            <div class="small" style="font-weight:${n.is_read ? '500' : '600'};color:${n.is_read ? '#111827' : '#065f46'};line-height:1.4;">${n.type === 'announcement' ? 'Announcement: ' : ''}${this.escapeHtml(n.title || 'Notification')}</div>
                             <div style="font-size:0.75rem;color:#9ca3af;">${relTime}</div>
                         </div>
                         ${!n.is_read ? '<div style="width:6px;height:6px;border-radius:50%;background:#10b981;flex-shrink:0;"></div>' : ''}
@@ -5820,7 +5820,7 @@ class FarmerDashboard {
                     <i class="bi ${iconClass}"></i>
                 </div>
                 <div class="notification-content">
-                    <div class="notification-title">${this.escapeHtml(n.title || 'Notification')}</div>
+                    <div class="notification-title">${n.type === 'announcement' ? 'Announcement: ' : ''}${this.escapeHtml(n.title || 'Notification')}</div>
                     <div class="notification-message">${this.escapeHtml(n.message || '')}</div>
                     <div class="notification-meta">
                         <span>${relTime}</span>
@@ -6271,7 +6271,7 @@ class FarmerDashboard {
             if (countEl) countEl.textContent = `${items.length} item${items.length > 1 ? 's' : ''}`;
             el.innerHTML = items.map(n => `
                 <div style="padding:8px 0;border-bottom:1px solid var(--border,#e5e7eb);">
-                    <div style="font-size:0.88rem;font-weight:600;color:var(--text,#111827);">${esc(n.title || n.message || '')}</div>
+                    <div style="font-size:0.88rem;font-weight:600;color:var(--text,#111827);">Announcement: ${esc(n.title || n.message || '')}</div>
                     ${n.body || n.content ? `<div style="font-size:0.8rem;color:#4b5563;margin-top:2px;">${esc(n.body || n.content)}</div>` : ''}
                     <div style="font-size:0.75rem;color:#9ca3af;margin-top:3px;">${n.created_at ? new Date(n.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : ''}</div>
                 </div>

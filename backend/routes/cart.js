@@ -1,8 +1,15 @@
 ﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
+const activityLogger = require('../services/activityLogger');
 
 const router = express.Router();
+
+function getClientIp(req) {
+  const xf = req.headers['x-forwarded-for'];
+  if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
+  return req.ip || req.connection?.remoteAddress || 'unknown';
+}
 
 // Get cart items
 router.get('/', async (req, res) => {
@@ -438,6 +445,20 @@ router.post('/', async (req, res) => {
     const subtotal = availableItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const unavailableCount = cartItems.filter(item => !item.is_available_for_checkout).length;
 
+    // Log to activity logger (async, non-blocking) - only for logged in users
+    if (userId) {
+      activityLogger.logAddCart(
+        userId,
+        decoded?.role || 'customer',
+        req.sessionID,
+        productId,
+        product.name,
+        quantity,
+        {},
+        getClientIp(req)
+      );
+    }
+
     res.json({
       message: 'Item added to cart successfully',
       cartItems,
@@ -651,7 +672,27 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Cart item not found' });
     }
 
+    // Get product info for logging before deletion
+    const productInfoResult = await pool.query(
+      'SELECT c.product_id, p.name, c.quantity FROM cart c JOIN products p ON c.product_id = p.id WHERE c.id = $1',
+      [id]
+    );
+    const productInfo = productInfoResult.rows[0];
+
     await pool.query('DELETE FROM cart WHERE id = $1', [id]);
+
+    // Log to activity logger (async, non-blocking) - only for logged in users
+    if (userId && productInfo) {
+      activityLogger.logRemoveCart(
+        userId,
+        decoded?.role || 'customer',
+        req.sessionID,
+        productInfo.product_id,
+        productInfo.name,
+        { quantity: productInfo.quantity },
+        getClientIp(req)
+      );
+    }
 
     // Fetch updated cart data to return to client
     let getQuery, getParams;

@@ -236,13 +236,11 @@ class AgricultureMarket {
                 <div class="announcement-banner" data-id="${ann.id}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; margin: 0; position: relative;">
                     <div class="container" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
                         <div style="flex: 1;">
-                            <strong style="display: block; margin-bottom: 0.25rem;">${this.escapeHtml(ann.title)}</strong>
+                            <strong style="display: block; margin-bottom: 0.25rem;">Announcement: ${this.escapeHtml(ann.title)}</strong>
                             <span style="opacity: 0.9;">${this.escapeHtml(ann.message)}</span>
                         </div>
                         ${ann.is_dismissible ? `
-                            <button class="announcement-dismiss-btn" data-id="${ann.id}" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; white-space: nowrap;">
-                                <i class="fas fa-times"></i> Dismiss
-                            </button>
+                            <button class="announcement-dismiss-btn" data-id="${ann.id}" style="background: transparent; border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 18px; font-weight: bold; flex-shrink: 0;">✕</button>
                         ` : ''}
                     </div>
                 </div>
@@ -2588,7 +2586,8 @@ class AgricultureMarket {
             harvest: 'bi-calendar-check',
             harvest_reminder: 'bi-calendar-event',
             harvest_adjusted: 'bi-calendar-x',
-            harvest_completed: 'bi-check-circle'
+            harvest_completed: 'bi-check-circle',
+            announcement: 'bi-megaphone-fill'
         };
 
         const recent = notifications.slice(0, 5);
@@ -2607,7 +2606,7 @@ class AgricultureMarket {
                             <i class="bi ${ic}"></i>
                         </div>
                         <div style="flex:1;min-width:0;">
-                            <div class="small" style="font-weight:${note.is_read ? '500' : '600'};color:#111827;line-height:1.4;">${this.escapeHtml(note.title || 'Notification')}</div>
+                            <div class="small" style="font-weight:${note.is_read ? '500' : '600'};color:#111827;line-height:1.4;">${note.type === 'announcement' ? 'Announcement: ' : ''}${this.escapeHtml(note.title || 'Notification')}</div>
                             <div style="font-size:0.75rem;color:#9ca3af;">${dateLabel}</div>
                         </div>
                         ${!note.is_read ? '<div style="width:6px;height:6px;border-radius:50%;background:#10b981;flex-shrink:0;"></div>' : ''}
@@ -2702,7 +2701,8 @@ class AgricultureMarket {
             product: 'bi-box-seam text-primary',
             system: 'bi-gear text-secondary',
             payment: 'bi-credit-card text-warning',
-            account: 'bi-person text-info'
+            account: 'bi-person text-info',
+            announcement: 'bi-megaphone-fill text-primary'
         };
 
         list.innerHTML = notifications.map(n => {
@@ -2716,7 +2716,7 @@ class AgricultureMarket {
                     <i class="bi ${iconClass}"></i>
                 </div>
                 <div class="notification-content">
-                    <div class="notification-title">${this.escapeHtml(n.title || 'Notification')}</div>
+                    <div class="notification-title">${n.type === 'announcement' ? 'Announcement: ' : ''}${this.escapeHtml(n.title || 'Notification')}</div>
                     <div class="notification-message">${this.escapeHtml(n.message || '')}</div>
                     <div class="notification-meta">
                         <span>${relTime}</span>
@@ -6998,7 +6998,7 @@ class AgricultureMarket {
             if (selectAllToggle) selectAllToggle.style.display = 'none';
             checkoutBtn.disabled = true;
             checkoutBtn.style.opacity = '0.6';
-            checkoutBtn.textContent = 'Proceed to Checkout';
+            checkoutBtn.textContent = 'Checkout';
             return;
         }
 

@@ -3730,6 +3730,7 @@ router.get('/dashboard/recent-activity', requireAdmin, async (req, res) => {
         'catalog_name.disable': 'Disabled catalog name', 'catalog_name.enable': 'Enabled catalog name',
         'category.request.review': 'Reviewed name request',
         'announcement.broadcast': 'Broadcast announcement',
+        'announcement.delete': 'Deleted announcement',
         'settings.update': 'Updated settings',
         'feature_flag.update': 'Updated feature flag',
       };

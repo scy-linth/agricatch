@@ -341,6 +341,57 @@ router.get('/announcements', async (req, res) => {
   }
 });
 
+// ── GET /api/superadmin/announcements/all — list all announcements (admin) ───
+router.get('/announcements/all', requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, message, audience, is_active, is_dismissible, created_at, expires_at
+       FROM announcements
+       ORDER BY created_at DESC`
+    );
+    res.json({ announcements: result.rows });
+  } catch (err) {
+    console.error('List all announcements error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── DELETE /api/superadmin/announcements/:id — delete an announcement ────────
+router.delete('/announcements/:id', requireSuperAdmin, async (req, res) => {
+  try {
+    const announcementId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(announcementId) || announcementId <= 0) {
+      return res.status(400).json({ message: 'Invalid announcement ID' });
+    }
+
+    const existing = await pool.query(
+      'SELECT id, title, audience FROM announcements WHERE id = $1',
+      [announcementId]
+    );
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+
+    await pool.query('DELETE FROM announcements WHERE id = $1', [announcementId]);
+
+    await writeAdminAuditLog(pool, {
+      actor_admin_id: req.user.id,
+      action: 'announcement.delete',
+      entity: 'announcements',
+      entity_id: announcementId,
+      before: existing.rows[0],
+      after: null,
+      req
+    });
+    broadcastEvent('admin.audit', { action: 'announcement.delete', entity: 'announcements', actor_admin_id: req.user.id });
+
+    res.json({ message: 'Announcement deleted' });
+  } catch (err) {
+    console.error('Delete announcement error:', err);
+    res.status(500).json({ message: 'Server error deleting announcement' });
+  }
+});
+
 // ── POST /api/superadmin/users — create any account ───────────────────────────
 router.post('/users', requireSuperAdmin, async (req, res) => {
   try {

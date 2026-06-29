@@ -480,7 +480,11 @@ router.get('/', async (req, res) => {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN users u ON p.farmer_id = u.id
-      LEFT JOIN farmer_subscriptions fs ON fs.farmer_id = u.id AND fs.status = 'active' AND fs.expires_at > CURRENT_TIMESTAMP
+      LEFT JOIN LATERAL (
+        SELECT tier, status FROM farmer_subscriptions
+        WHERE farmer_id = u.id AND status = 'active' AND expires_at > CURRENT_TIMESTAMP
+        ORDER BY expires_at DESC LIMIT 1
+      ) fs ON true
       LEFT JOIN (
         SELECT product_id, COALESCE(SUM(quantity), 0)::int AS sold_qty
         FROM orders
@@ -843,7 +847,11 @@ router.get('/featured', async (req, res) => {
        FROM featured_products fp
        JOIN products p ON fp.product_id = p.id
        JOIN users u ON u.id = p.farmer_id
-       LEFT JOIN farmer_subscriptions fs ON fs.farmer_id = u.id AND fs.status = 'active' AND fs.expires_at > CURRENT_TIMESTAMP
+       LEFT JOIN LATERAL (
+         SELECT tier, status FROM farmer_subscriptions
+         WHERE farmer_id = u.id AND status = 'active' AND expires_at > CURRENT_TIMESTAMP
+         ORDER BY expires_at DESC LIMIT 1
+       ) fs ON true
        LEFT JOIN categories c ON c.id = p.category_id
        WHERE fp.is_active = true
          AND (fp.expires_at IS NULL OR fp.expires_at > CURRENT_TIMESTAMP)
@@ -906,7 +914,11 @@ router.get('/featured', async (req, res) => {
                NULL as position
         FROM products p
         LEFT JOIN users u ON u.id = p.farmer_id
-        LEFT JOIN farmer_subscriptions fs ON fs.farmer_id = u.id AND fs.status = 'active' AND fs.expires_at > CURRENT_TIMESTAMP
+        LEFT JOIN LATERAL (
+          SELECT tier, status FROM farmer_subscriptions
+          WHERE farmer_id = u.id AND status = 'active' AND expires_at > CURRENT_TIMESTAMP
+          ORDER BY expires_at DESC LIMIT 1
+        ) fs ON true
         LEFT JOIN categories c ON c.id = p.category_id
         LEFT JOIN (
           SELECT product_id, COALESCE(SUM(quantity), 0)::int AS sold_qty

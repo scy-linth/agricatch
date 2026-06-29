@@ -19,8 +19,7 @@ try {
   logoAttachmentResend = {
     filename: "resendlogo.png",
     content: logoBase64,
-    content_id: "logo@agricatch",
-    content_type: "image/png",
+    contentId: "logo@agricatch",
   };
 } catch (err) {
   console.warn("⚠️ Email logo not found at", logoPath, "— emails will not include logo");

@@ -311,7 +311,7 @@
                         <i class="bi bi-circle"></i><span>Farmers</span>
                     </a>
                 </li>
-                <li>
+                <li data-roles="super_admin">
                     <a href="#admin" class="sidebar-link" data-section="admin">
                         <i class="bi bi-circle"></i><span>Admin</span>
                     </a>
@@ -393,6 +393,10 @@
                 <span>Broadcast</span>
             </a>
         </li>
+
+        <!-- ── Extra Features ───────────────────────────────── -->
+        <li class="nav-heading" data-roles="super_admin">Extra Features</li>
+
         <li class="nav-item" data-roles="super_admin">
             <a class="nav-link collapsed sidebar-link" href="#database-backup" data-section="database-backup">
                 <i class="bi bi-database"></i>
@@ -403,6 +407,12 @@
             <a class="nav-link collapsed sidebar-link" href="#image-manager" data-section="image-manager">
                 <i class="bi bi-images"></i>
                 <span>Image Manager</span>
+            </a>
+        </li>
+        <li class="nav-item" data-roles="super_admin">
+            <a class="nav-link collapsed sidebar-link" href="#bulk-select" data-section="bulk-select">
+                <i class="bi bi-check2-square"></i>
+                <span>Bulk Select</span>
             </a>
         </li>
 
@@ -508,10 +518,10 @@
 
         </div><!-- /KPI row 1 -->
 
-        <!-- KPI Cards Row 2: Revenue, Customers, Farmers -->
+        <!-- KPI Cards Row 2: Total Sales, Customers, Farmers -->
         <div class="row g-3 mb-4">
 
-            <!-- Revenue KPI -->
+            <!-- Total Sales KPI -->
             <div class="col-xxl-4 col-md-6">
                 <div class="card info-card revenue-card">
                     <div class="filter">
@@ -528,7 +538,7 @@
                         </ul>
                     </div>
                     <div class="card-body">
-                        <h5 class="card-title">Revenue <span id="kpi-revenue-period">| Today</span></h5>
+                        <h5 class="card-title">Total Sales <span id="kpi-revenue-period">| Today</span></h5>
                         <div class="d-flex align-items-center">
                             <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                                 <i class="bi bi-currency-exchange" style="color:#2eca6a"></i>
@@ -722,7 +732,7 @@
                                     <th scope="col">Product</th>
                                     <th scope="col">Price</th>
                                     <th scope="col">Sold</th>
-                                    <th scope="col">Revenue</th>
+                                    <th scope="col">Sales</th>
                                     <th scope="col">Status</th>
                                 </tr>
                             </thead>
@@ -768,7 +778,7 @@
                             <thead>
                                 <tr>
                                     <th scope="col" class="text-center">Farmer</th>
-                                    <th scope="col">Revenue</th>
+                                    <th scope="col">Sales</th>
                                 </tr>
                             </thead>
                             <tbody id="top-farmers-tbody">
@@ -819,7 +829,7 @@
                                     <th scope="col">Product</th>
                                     <th scope="col">Price</th>
                                     <th scope="col">Sold</th>
-                                    <th scope="col">Revenue</th>
+                                    <th scope="col">Sales</th>
                                 </tr>
                             </thead>
                             <tbody id="top-products-tbody">
@@ -1998,8 +2008,8 @@
                     <div class="ac-filter-group">
                         <label class="ac-filter-label">Date Range</label>
                         <div class="d-flex gap-2">
-                            <input type="date" id="am-date-from" class="form-control form-control-sm ac-filter-date" placeholder="From">
-                            <input type="date" id="am-date-to" class="form-control form-control-sm ac-filter-date" placeholder="To">
+                            <input type="date" id="am-date-from" class="form-control form-control-sm ac-filter-date" placeholder="From" min="2026-01-01">
+                            <input type="date" id="am-date-to" class="form-control form-control-sm ac-filter-date" placeholder="To" min="2026-01-01">
                         </div>
                     </div>
                     <div class="ac-filter-group">
@@ -2835,6 +2845,42 @@
 
         </div>
 
+        <!-- Announcements Management Table -->
+        <div class="mt-4">
+            <div class="card ac-data-card">
+                <div class="ac-data-card__header">
+                    <div class="ac-data-card__header-left">
+                        <span class="ac-data-card__icon ac-data-card__icon--primary">
+                            <i class="bi bi-table"></i>
+                        </span>
+                        <div>
+                            <h6 class="ac-data-card__title">Sent Announcements</h6>
+                            <p class="ac-data-card__subtitle">View and delete existing announcements</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="px-3 pb-3">
+                    <div id="announcements-table-wrap" style="min-height:120px;">
+                        <div class="text-center py-4 text-muted small" id="announcements-loading">Loading announcements…</div>
+                        <table class="table table-hover align-middle mb-0" id="announcements-table" style="display:none;">
+                            <thead>
+                                <tr>
+                                    <th style="width:60px;">#</th>
+                                    <th>Title</th>
+                                    <th style="width:120px;">Audience</th>
+                                    <th style="width:140px;">Created</th>
+                                    <th style="width:100px;">Status</th>
+                                    <th style="width:80px;text-align:center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="announcements-tbody"></tbody>
+                        </table>
+                        <div class="text-center py-4 text-muted small" id="announcements-empty" style="display:none;">No announcements yet.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </section><!-- /broadcast -->
 
 
@@ -2935,6 +2981,40 @@
         </div>
 
     </section><!-- /image-manager -->
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         § 15b — BULK SELECT SECTION
+         (Future Development — for bulk selection operations)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <section id="bulk-select" class="admin-section-card" data-roles="super_admin">
+
+        <div class="ac-section-hero ac-section-hero--primary mb-4">
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-check2-square"></i>
+            </div>
+            <div class="ac-section-hero__body">
+                <h4 class="ac-section-hero__title">Bulk Select</h4>
+                <p class="ac-section-hero__sub">Perform bulk operations on products, orders, and users.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Bulk Select is currently under development. This section will include:
+                    <ul class="mb-0 mt-2">
+                        <li>Bulk select products for approval/rejection</li>
+                        <li>Bulk order status updates</li>
+                        <li>Bulk user enable/disable</li>
+                        <li>Bulk category assignment</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </section><!-- /bulk-select -->
 
 
     <!-- ════════════════════════════════════════════════════════════════

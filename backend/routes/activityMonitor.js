@@ -52,7 +52,8 @@ router.get('/activities', requireRole('admin', 'super_admin'), async (req, res) 
             status = '',
             dateFrom = '',
             dateTo = '',
-            session = ''
+            session = '',
+            user_id = ''
         } = req.query;
 
         const offset = (page - 1) * limit;
@@ -105,6 +106,12 @@ router.get('/activities', requireRole('admin', 'super_admin'), async (req, res) 
             conditions.push(`al.created_at >= NOW() - INTERVAL '30 minutes'`);
         } else if (session === 'inactive') {
             conditions.push(`al.created_at < NOW() - INTERVAL '30 minutes'`);
+        }
+
+        if (user_id) {
+            conditions.push(`al.user_id = $${paramIndex}`);
+            params.push(user_id);
+            paramIndex++;
         }
 
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

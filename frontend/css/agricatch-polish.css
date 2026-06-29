@@ -2280,7 +2280,9 @@ a:not([aria-label]):not([aria-labelledby]):empty {
 
 :where(#featured, #available-now, #preorder) .harvest-date-display {
     color: #6b7280 !important;
-    margin: 0;
+    margin: 0 0 0 -320px;
+    white-space: nowrap;
+    font-size: 0.7rem;
 }
 
 :where(#featured, #available-now, #preorder) .harvest-date-display i {
@@ -2321,6 +2323,7 @@ a:not([aria-label]):not([aria-labelledby]):empty {
 :where(#featured, #available-now, #preorder) .harvest-date-display .text-warning {
     color: #6b7280 !important;
     font-weight: 750;
+    font-size: 0.75rem;
 }
 
 :where(#featured, #available-now, #preorder) .product-card-summary span[style*="9333ea"] {
@@ -2493,7 +2496,7 @@ a:not([aria-label]):not([aria-labelledby]):empty {
 
 #cart-sidebar .cart-header {
     padding: 0.85rem 1.1rem;
-    background: linear-gradient(135deg, #16a34a, #0ea5e9);
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     color: #ffffff;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
 }
@@ -2626,7 +2629,7 @@ a:not([aria-label]):not([aria-labelledby]):empty {
     column-gap: 0.5rem;
     row-gap: 0.2rem;
     min-width: 0;
-    align-items: start;
+    align-items: center;
     text-align: left;
 }
 

@@ -1,8 +1,15 @@
 ﻿const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../utils/db');
+const activityLogger = require('../services/activityLogger');
 
 const router = express.Router();
+
+function getClientIp(req) {
+  const xf = req.headers['x-forwarded-for'];
+  if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
+  return req.ip || req.connection?.remoteAddress || 'unknown';
+}
 
 const getUserFromToken = (req) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -62,6 +69,21 @@ router.post('/', async (req, res) => {
       VALUES ($1, $2)
     `, [user.id, productId]);
 
+    // Get product name for logging
+    const productResult = await pool.query('SELECT name FROM products WHERE id = $1', [productId]);
+    const productName = productResult.rows[0]?.name || 'Unknown Product';
+
+    // Log to activity logger (async, non-blocking)
+    activityLogger.logAddWishlist(
+      user.id,
+      user.role,
+      req.sessionID,
+      productId,
+      productName,
+      {},
+      getClientIp(req)
+    );
+
     res.status(201).json({ message: 'Added to wishlist' });
   } catch (error) {
     if (error.code === '23505') {
@@ -81,7 +103,24 @@ router.delete('/:productId', async (req, res) => {
     }
 
     const { productId } = req.params;
+    
+    // Get product name for logging before deletion
+    const productResult = await pool.query('SELECT name FROM products WHERE id = $1', [productId]);
+    const productName = productResult.rows[0]?.name || 'Unknown Product';
+    
     await pool.query('DELETE FROM wishlist WHERE user_id = $1 AND product_id = $2', [user.id, productId]);
+    
+    // Log to activity logger (async, non-blocking)
+    activityLogger.logRemoveWishlist(
+      user.id,
+      user.role,
+      req.sessionID,
+      productId,
+      productName,
+      {},
+      getClientIp(req)
+    );
+    
     res.json({ message: 'Removed from wishlist' });
   } catch (error) {
     console.error('Remove wishlist error:', error);
