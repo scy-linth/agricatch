@@ -430,12 +430,6 @@ class AgricultureMarket {
             // Check debug mode
             this.checkDebugMode();
 
-            // Fetch OTP mode from backend
-            this.fetchOtpMode();
-
-            // Fetch announcements for dismissible banners
-            this.fetchAnnouncements();
-
             // Disable browser's default scroll restoration to control it manually
             if ('scrollRestoration' in history) {
                 history.scrollRestoration = 'manual';
@@ -490,14 +484,12 @@ class AgricultureMarket {
                 console.error('Error waking up server:', error);
             }
 
+            // --- Critical path: UI setup, auth, products, hero video ---
             this.setupEventListeners();
             this.setupRealtime();
             this.checkAuthStatus();
             this.loadProductCategories();
-            
-            // Fetch delivery fee on app load
-            this.fetchDeliveryFee();
-            
+
             // Load products for both sections - must be independent of registration state
             try {
                 this.loadAvailableProducts();
@@ -510,29 +502,42 @@ class AgricultureMarket {
             } catch (error) {
                 console.error('Error loading featured products in init:', error);
             }
-            
-            this.updateCartCount();
-            this.loadCartData();
-            this.loadNotifications();
-            this.loadCustomerMessagesBadge();
-            this.startMessagesPolling();
-            if (this.token) {
-                this.updateOrdersCount();
-            }
 
             // Ensure active nav link is calculated after layout and media load.
-            // Some elements (hero video/image) can change section heights after initial JS runs,
-            // so re-run active link detection after a short delay and on window load/resize.
             setTimeout(() => this.updateActiveNavLink(), 300);
             requestAnimationFrame(() => this.updateActiveNavLink());
             window.addEventListener('load', () => this.updateActiveNavLink());
             window.addEventListener('resize', () => {
-                // Debounce resize
                 clearTimeout(this._resizeNavTimeout);
                 this._resizeNavTimeout = setTimeout(() => this.updateActiveNavLink(), 150);
             });
-            // Update when hash changes (clicking footer links or manual hash changes)
             window.addEventListener('hashchange', () => this.updateActiveNavLink());
+
+            // Initialize hero video with blur-up placeholder
+            this.initHeroVideo();
+
+            // --- Deferred non-critical calls: cart, notifications, messages, announcements ---
+            // Use requestIdleCallback with setTimeout fallback so these don't block first paint
+            const deferredInit = () => {
+                this.fetchOtpMode();
+                this.fetchAnnouncements();
+                this.fetchDeliveryFee();
+                this.updateCartCount();
+                this.loadCartData();
+                this.loadNotifications();
+                this.loadCustomerMessagesBadge();
+                this.startMessagesPolling();
+                if (this.token) {
+                    this.updateOrdersCount();
+                }
+                this.renderRecaptchaWidgets('login');
+            };
+
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(deferredInit, { timeout: 2000 });
+            } else {
+                setTimeout(deferredInit, 100);
+            }
 
             // Cross-tab sync for messages badge
             window.addEventListener('storage', (e) => {
@@ -560,11 +565,6 @@ class AgricultureMarket {
                 this.stopMessagesPolling();
                 this.showMessage('You are offline. Some features may be limited.', 'warning');
             });
-
-            this.renderRecaptchaWidgets('login');
-            
-            // Initialize hero video with blur-up placeholder
-            this.initHeroVideo();
         } catch (error) {
             console.error('Error during app initialization:', error);
             // Try to at least load products even if other things fail
@@ -1774,7 +1774,7 @@ class AgricultureMarket {
                     activeBtn.classList.add('active');
                 }
                 this.loadProducts();
-                this.scrollToSection('#products');
+                this.scrollToSection('#available-now');
             });
         });
 
@@ -2535,7 +2535,7 @@ class AgricultureMarket {
         if (this.messagesPollInterval) clearInterval(this.messagesPollInterval);
         this.messagesPollInterval = setInterval(() => {
             this.loadCustomerMessagesBadge();
-        }, 10000); // Poll every 10 seconds for real-time updates
+        }, 30000); // Poll every 30 seconds as fallback (SSE handles real-time updates)
     }
 
     stopMessagesPolling() {
@@ -5714,8 +5714,6 @@ class AgricultureMarket {
     async changePage(page) {
         if (!Number.isFinite(page) || page < 1) return;
 
-        // Save scroll position before loading new page content
-        const prevY = window.scrollY || window.pageYOffset || 0;
         this.availableFilters.page = page;
         this.preorderFilters.page = page;
 
@@ -5723,14 +5721,8 @@ class AgricultureMarket {
             await this.loadAvailableProducts();
             await this.loadPreorderProducts();
         } finally {
-            // Restore scroll position after load, clamped to valid document height
-            const docEl = document.documentElement;
-            const maxY = Math.max(0, docEl.scrollHeight - window.innerHeight);
-            const safeY = Math.max(0, Math.min(prevY, maxY));
-            
-            // Use setTimeout to ensure restore happens after DOM settle
             setTimeout(() => {
-                window.scrollTo(0, safeY);
+                this.scrollToSection('#available-now');
             }, 0);
         }
     }
@@ -5783,7 +5775,6 @@ class AgricultureMarket {
     async changeSectionPage(section, page) {
         if (!Number.isFinite(page) || page < 1) return;
 
-        const prevY = window.scrollY || window.pageYOffset || 0;
         if (section === 'available') {
             this.availableFilters.page = page;
         } else {
@@ -5797,11 +5788,9 @@ class AgricultureMarket {
                 await this.loadPreorderProducts();
             }
         } finally {
-            const docEl = document.documentElement;
-            const maxY = Math.max(0, docEl.scrollHeight - window.innerHeight);
-            const safeY = Math.max(0, Math.min(prevY, maxY));
+            const sectionId = section === 'available' ? '#available-now' : '#preorder';
             setTimeout(() => {
-                window.scrollTo(0, safeY);
+                this.scrollToSection(sectionId);
             }, 0);
         }
     }
@@ -6254,7 +6243,7 @@ class AgricultureMarket {
         const resumeParams = new URLSearchParams();
         // Don't include openProductId to avoid opening modal on return - only restore scroll position
         resumeParams.set('resumeScrollY', String(window.scrollY || 0));
-        const returnUrl = `${window.location.pathname}?${resumeParams.toString()}${window.location.hash || '#products'}`;
+        const returnUrl = `${window.location.pathname}?${resumeParams.toString()}${window.location.hash || '#available-now'}`;
         window.location.href = `/chat.html?farmerId=${farmerId}&farmerName=${encodeURIComponent(farmerName)}${productId ? `&productId=${productId}&productName=${encodeURIComponent(productName)}` : ''}&returnUrl=${encodeURIComponent(returnUrl)}`;
     }
 
@@ -6564,7 +6553,7 @@ class AgricultureMarket {
                     checkoutBtn.style.opacity = (data.summary.itemCount || 0) > 0 ? '1' : '0.6';
                 }
 
-                this.showMessage('Item added to cart!', 'success', { position: 'center' });
+                this.showMessage('Item added to cart!', 'success');
 
                 // Auto-select the newly added product
                 // Find the cart item that matches the product we just added
@@ -6994,7 +6983,7 @@ class AgricultureMarket {
                     <i class="fas fa-shopping-cart"></i>
                     <p>Your cart is empty</p>
                     <p style="font-size: 0.9rem; color: var(--gray); margin-top: -1rem;">Start adding products to your cart!</p>
-                    <button class="btn btn-primary" onclick="app.closeCart(); app.scrollToSection('#products');">
+                    <button class="btn btn-primary" onclick="app.closeCart(); app.scrollToSection('#available-now');">
                         <i class="fas fa-store"></i> Shop Now
                     </button>
                 </div>
@@ -9053,61 +9042,33 @@ class AgricultureMarket {
         const loader = document.getElementById('hero-video-loader');
         
         if (!video || !placeholder) return;
-        
-        // Create a canvas to capture the first frame
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Set canvas to a small size for performance (we'll blur it anyway)
-        canvas.width = 320;
-        canvas.height = 180;
-        
-        // When video has enough data, capture the first frame
-        const captureFrame = () => {
-            try {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                placeholder.src = dataUrl;
-                console.log('Hero video placeholder generated');
-            } catch (e) {
-                console.error('Error capturing video frame:', e);
-                // Fallback to gradient if capture fails
-                placeholder.style.display = 'none';
-            }
-        };
-        
-        // Listen for video to have enough data
-        video.addEventListener('loadeddata', () => {
-            captureFrame();
-        });
-        
-        // Also try on canplay (earlier event)
-        video.addEventListener('canplay', () => {
-            if (!placeholder.src || placeholder.src === window.location.href) {
-                captureFrame();
-            }
-        });
-        
-        // Handle video ready state
-        video.addEventListener('canplaythrough', () => {
+
+        // Handle video ready state — use canplay (fires earlier than canplaythrough)
+        const onVideoReady = () => {
             video.classList.add('ready');
             if (loader) loader.classList.add('hidden');
             if (placeholder) placeholder.classList.add('loaded');
-        });
-        
+        };
+        video.addEventListener('canplay', onVideoReady);
+        video.addEventListener('canplaythrough', onVideoReady);
+
         // Handle video error
         video.addEventListener('error', () => {
             console.error('Hero video failed to load');
             if (loader) loader.classList.add('hidden');
             if (placeholder) placeholder.style.display = 'none';
         });
-        
+
+        // Fallback: hide spinner after 8 seconds even if video hasn't loaded
+        setTimeout(() => {
+            if (loader && !loader.classList.contains('hidden')) {
+                loader.classList.add('hidden');
+            }
+        }, 8000);
+
         // If video is already loaded
         if (video.readyState >= 2) {
-            captureFrame();
-            video.classList.add('ready');
-            if (loader) loader.classList.add('hidden');
-            if (placeholder) placeholder.classList.add('loaded');
+            onVideoReady();
         }
     }
 
@@ -9146,7 +9107,7 @@ class AgricultureMarket {
             return;
         }
 
-        const sections = ['home', 'featured', 'products', 'about', 'contact'];
+        const sections = ['home', 'featured', 'available-now', 'preorder', 'about', 'contact'];
         const headerEl = document.querySelector('.header');
         const headerOffset = headerEl ? headerEl.offsetHeight : 100;
         const scrollY = window.scrollY || window.pageYOffset;
@@ -9169,6 +9130,9 @@ class AgricultureMarket {
             });
         }
 
+        // Map preorder to available-now so both sections highlight the Products nav link
+        const navSection = activeSection === 'preorder' ? 'available-now' : activeSection;
+
         // Update nav links (normalize hrefs so /#products and #products both match)
         const normalizeHash = (href) => {
             if (!href) return null;
@@ -9179,23 +9143,23 @@ class AgricultureMarket {
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
             const href = normalizeHash(link.getAttribute('href'));
-            if (href === `#${activeSection}`) {
+            if (href === `#${navSection}`) {
                 link.classList.add('active');
             }
         });
     }
 
     getCurrentSectionHash() {
-        const fallback = '#products';
+        const fallback = '#available-now';
         const activeLink = document.querySelector('.nav-link.active');
         const href = activeLink?.getAttribute('href') || '';
         const hashIndex = href.indexOf('#');
         const hashFromActive = hashIndex >= 0 ? href.slice(hashIndex) : '';
-        if (['#home', '#featured', '#products', '#about', '#contact'].includes(hashFromActive)) {
+        if (['#home', '#featured', '#available-now', '#preorder', '#about', '#contact'].includes(hashFromActive)) {
             return hashFromActive;
         }
         const fromLocation = String(window.location.hash || '').trim();
-        if (['#home', '#featured', '#products', '#about', '#contact'].includes(fromLocation)) {
+        if (['#home', '#featured', '#available-now', '#preorder', '#about', '#contact'].includes(fromLocation)) {
             return fromLocation;
         }
         return fallback;
@@ -9288,8 +9252,9 @@ class AgricultureMarket {
 
             // Listen for product updates (e.g., name changes from admin edit) - for all users
             es.addEventListener('product.updated', () => {
-                // Refresh product grid to show updated product names
-                this.loadProducts();
+                // Refresh product grids to show updated product names
+                this.loadAvailableProducts();
+                this.loadPreorderProducts();
             });
 
             // Handle connection errors
