@@ -1934,7 +1934,7 @@ a:not([aria-label]):not([aria-labelledby]):empty {
    ============================================================ */
 
 #home.hero {
-    margin-top: 0;
+    margin-top: 80px;
     min-height: calc(100vh - 80px);
 }
 
