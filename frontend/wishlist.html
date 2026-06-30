@@ -16,18 +16,16 @@
     <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css" rel="stylesheet">
 
-    <!-- NiceAdmin base -->
-    <link rel="stylesheet" href="/css/nicemain.css">
-    <!-- AgriCatch SaaS overrides -->
+    <!-- Landing page CSS (same as index.html) -->
+    <link rel="stylesheet" href="/css/styles.css?v=8">
+    <link rel="stylesheet" href="/css/agricatch-polish.css?v=3">
+    <!-- Admin CSS for ac-section-hero and pagetitle breadcrumb -->
     <link rel="stylesheet" href="/css/agricatch-admin.css">
-    <link rel="stylesheet" href="/css/agricatch-polish.css?v=2">
-    <!-- Legacy styles for product card rendering -->
-    <link rel="stylesheet" href="/css/styles.css">
 
 <style>
-/* ── Wishlist page — standalone customer view ─────────────── */
+/* ── Wishlist page — uses landing page product card design ─────────── */
 
-/* Topbar — gradient matching landing page header */
+/* Topbar — gradient matching customer-account.html */
 .wishlist-topbar {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -53,7 +51,7 @@
   margin: 0;
   line-height: 1;
 }
-.wishlist-topbar .back-btn {
+.wishlist-topbar .wishlist-back-btn {
   background: rgba(255,255,255,.35);
   color: #fff;
   border: 1px solid rgba(255,255,255,.5);
@@ -67,101 +65,482 @@
   text-decoration: none;
   transition: background .15s;
   flex-shrink: 0;
-  position: static;
-  left: auto;
+  margin-left: auto;
 }
-.wishlist-topbar .back-btn:hover {
+.wishlist-topbar .wishlist-back-btn:hover {
   background: rgba(255,255,255,.5);
   color: #fff;
   text-decoration: none;
 }
-
-/* Main area */
-#wishlist-main {
-  margin-top: 60px;
-  padding: 1.5rem 1.75rem 3rem;
-  min-height: calc(100vh - 60px);
-  background: var(--ac-bg, #f5f7f5);
-}
 @media (max-width: 767px) {
-  #wishlist-main { padding: 1rem .75rem 2.5rem; }
   .wishlist-topbar { padding: 0 .75rem; }
 }
 
-/* Wishlist filters */
-.wishlist-filters {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
-  margin-bottom: 16px;
-}
-.wishlist-filters label {
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-.wishlist-filters select {
-  padding: 6px 10px;
-  border: 1px solid var(--ac-border, #e2e8e4);
-  border-radius: 8px;
-  font-size: 0.9rem;
-  background: #fff;
-  outline: none;
-  transition: border-color .15s;
-}
-.wishlist-filters select:focus {
-  border-color: var(--ac-primary, #2d7a3a);
-  box-shadow: 0 0 0 3px rgba(45,122,58,.12);
+/* Body background matching landing page */
+body {
+    background: #ffffff;
 }
 
-/* Empty state */
-.empty-state {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: var(--ac-text-muted, #6b7e72);
-  font-size: .9rem;
-}
-.empty-state i {
-  font-size: 2.5rem;
-  display: block;
-  margin-bottom: .75rem;
-  color: var(--ac-primary-muted, #c8e6c9);
+/* Main content area */
+#wishlist-main {
+    padding: 2rem 0 4rem;
+    min-height: calc(100vh - 60px);
+    margin-top: 60px;
 }
 
-/* btn-small — alias for Bootstrap btn-sm */
-.btn.btn-small {
-  padding: .25rem .6rem;
-  font-size: .78rem;
-  border-radius: .4rem;
-  font-weight: 600;
+/* Override .products class excessive padding */
+#wishlist.products {
+    padding: 0;
 }
 
-/* Unavailable product card — greyed out */
+/* Override .section-title — later rule in styles.css sets 1.1rem, too small */
+#wishlist-main .section-title {
+    font-size: 2rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--primary-color, #4ade80);
+}
+
+/* ── Section Filter Bar (copied from admin.html design) ────────────── */
+.section-filter-bar {
+    padding: 8px 10px;
+    background: #f5f7f5;
+    border: 1px solid #e2e8e4;
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+
+/* ── Product card polish — same as landing page (agricatch-polish.css) ── */
+#wishlist .product-card {
+    overflow: visible;
+    border: 1px solid rgba(213, 226, 217, 0.96);
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 10px 24px rgba(23, 37, 27, 0.07);
+    transition:
+        transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+        border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#wishlist .product-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(19, 154, 79, 0.36);
+    box-shadow: 0 18px 38px rgba(23, 37, 27, 0.12);
+}
+
+#wishlist .product-card::before {
+    display: none;
+}
+
+/* Image is direct child of .product-card (same as landing page) */
+#wishlist .product-card > .product-image {
+    height: 205px;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: 16px 16px 0 0;
+    background: #eef3ef;
+    transition: transform 0.28s ease, filter 0.28s ease;
+}
+
+#wishlist .product-card:hover > .product-image {
+    filter: saturate(1.04) contrast(1.02);
+}
+
+#wishlist .product-info {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.42rem;
+    padding: 1rem 1.05rem 1.1rem;
+}
+
+#wishlist .product-card .badge {
+    align-self: flex-start;
+    min-height: 22px;
+    padding: 0.28rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.64rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    box-shadow: 0 7px 14px rgba(23, 37, 27, 0.12);
+}
+
+#wishlist .product-card .badge.bg-success {
+    background: linear-gradient(135deg, #16a34a, #0f8f45) !important;
+    color: #ffffff;
+}
+
+#wishlist .product-card .harvest-soon-badge {
+    background: linear-gradient(135deg, #fb923c, #f97316) !important;
+    color: #ffffff;
+}
+
+#wishlist .product-name {
+    margin: 0.05rem 0 0;
+    color: #15251a;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+#wishlist .product-price {
+    margin: 0;
+    color: #07833e;
+    font-size: 1.08rem;
+    font-weight: 900;
+    line-height: 1.25;
+}
+
+#wishlist .product-farmer,
+#wishlist .product-stock,
+#wishlist .product-details,
+#wishlist .product-rating-wrap,
+#wishlist .product-stats-lines,
+#wishlist .product-card-summary {
+    color: #596a60;
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+#wishlist .product-card-summary {
+    gap: 0.36rem;
+    margin-top: 0.1rem;
+}
+
+/* Summary items — same as agricatch-polish.css */
+#wishlist .product-card-summary > *,
+#wishlist .product-ship-from,
+#wishlist .product-sold-left,
+#wishlist .product-stock,
+#wishlist .product-rating-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.38rem;
+    min-height: 18px;
+    color: #6b7280 !important;
+    font-size: 0.8rem;
+    font-weight: 650;
+    line-height: 1.25;
+}
+
+#wishlist .product-card-summary strong,
+#wishlist .product-card-summary span,
+#wishlist .product-card-summary .text-primary,
+#wishlist .product-card-summary .text-success,
+#wishlist .product-card-summary .text-warning {
+    color: inherit !important;
+    font-weight: 750;
+}
+
+/* Stock emoji */
+#wishlist .product-stock::before {
+    content: "🔥";
+    color: #f97316;
+    font-size: 0.88rem;
+    line-height: 1;
+}
+
+#wishlist .product-stock,
+#wishlist .product-stock span {
+    color: #f97316 !important;
+}
+
+/* Sold count icon */
+#wishlist .product-sold-left {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#wishlist .product-sold-left::before {
+    content: "\f007";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+/* Ship from emoji */
+#wishlist .product-ship-from::before {
+    content: "📍";
+    font-size: 0.88rem;
+    line-height: 1;
+    filter: grayscale(100%);
+    opacity: 0.5;
+}
+
+/* Preorder add-to-cart button — same as #preorder .add-to-cart-btn in styles.css */
+#wishlist .add-to-cart-btn.btn-warning {
+    background: #F59E0B;
+    border-color: #F59E0B;
+    color: white;
+}
+
+#wishlist .add-to-cart-btn.btn-warning:hover:not(:disabled) {
+    background: #D97706;
+    border-color: #D97706;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+/* Badge absolute positioning — same as landing page (agricatch-polish.css line 2003) */
+#wishlist .product-card .badge {
+    position: absolute;
+    left: 12px;
+    top: 171px;
+    z-index: 3;
+    margin: 0 !important;
+    max-width: calc(100% - 68px);
+}
+
+/* Product info padding-top — same as landing page */
+#wishlist .product-info {
+    padding-top: 1rem;
+}
+
+#wishlist .wishlist-toggle-btn {
+    position: absolute !important;
+    top: 12px;
+    right: 12px;
+    z-index: 4;
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+    padding: 0 !important;
+    border: 1px solid rgba(226, 232, 240, 0.92) !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    color: #ef4444 !important;
+    box-shadow: 0 9px 20px rgba(15, 23, 42, 0.16);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    transition:
+        transform 0.18s ease,
+        box-shadow 0.18s ease,
+        background 0.18s ease,
+        border-color 0.18s ease !important;
+}
+
+#wishlist .wishlist-toggle-btn:hover {
+    transform: translateY(-1px) scale(1.05);
+    background: #ffffff !important;
+    border-color: rgba(248, 113, 113, 0.42) !important;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.2);
+}
+
+#wishlist .wishlist-toggle-btn i {
+    font-size: 1rem !important;
+    line-height: 1;
+    pointer-events: none;
+}
+
+/* 576px responsive — same as landing page (agricatch-polish.css) */
+@media (max-width: 576px) {
+    #wishlist .product-card {
+        border-radius: 13px;
+    }
+
+    #wishlist .product-card > .product-image {
+        height: 142px;
+    }
+
+    #wishlist .product-info {
+        gap: 0.32rem;
+        padding: 0.78rem;
+    }
+
+    #wishlist .product-card .badge {
+        min-height: 20px;
+        padding: 0.24rem 0.52rem;
+        font-size: 0.58rem;
+        left: 9px;
+        top: 113px;
+        max-width: calc(100% - 52px);
+    }
+
+    #wishlist .product-name {
+        font-size: 0.9rem;
+    }
+
+    #wishlist .product-price {
+        font-size: 0.98rem;
+    }
+
+    #wishlist .wishlist-toggle-btn {
+        top: 9px;
+        right: 9px;
+        width: 34px;
+        height: 34px;
+        min-height: 34px;
+    }
+
+    #wishlist .product-card-summary > *,
+    #wishlist .product-ship-from,
+    #wishlist .product-sold-left,
+    #wishlist .product-stock,
+    #wishlist .product-rating-wrap {
+        font-size: 0.74rem;
+    }
+}
+
+/* Unavailable product card */
 .product-card-unavailable {
-  opacity: 0.75;
-  filter: grayscale(0.3);
-  pointer-events: none;
+    opacity: 0.75;
+    filter: grayscale(0.3);
+    pointer-events: none;
 }
 .product-card-unavailable .product-actions,
 .product-card-unavailable .wishlist-toggle-btn {
-  pointer-events: auto;
+    pointer-events: auto;
 }
 
-/* Bootstrap button overrides (brand colours) */
-.btn-ac-green {
-  background: var(--ac-primary, #2d7a3a);
-  color: #fff;
-  border-color: var(--ac-primary, #2d7a3a);
+/* 4-column grid for wishlist products */
+.wishlist-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    align-items: start;
 }
-.btn-ac-green:hover {
-  background: var(--ac-primary-dark, #1e5429);
+
+/* Modal (same pattern as orders.html) */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1070;
+  background: rgba(15,23,42,.55);
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+}
+.modal.open { display: flex; }
+.modal .modal-content {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.18);
+  width: 100%;
+  max-width: 440px;
+  margin: auto;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.modal .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .875rem 1.25rem;
+  border-bottom: 1px solid var(--ac-border, #e2e8e4);
+  background: #dc2626;
+}
+.modal .modal-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
   color: #fff;
-  border-color: var(--ac-primary-dark, #1e5429);
+}
+.modal .close-btn {
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.25);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+  line-height: 1;
+}
+.modal .close-btn:hover { background: rgba(255,255,255,.3); }
+.modal .modal-body {
+  padding: 1.25rem;
+  font-size: .9rem;
+  color: var(--ac-text, #1a2e1e);
+  line-height: 1.5;
+}
+.modal .modal-body p { margin: 0; }
+.modal .modal-body .product-name-preview {
+  font-weight: 700;
+  color: var(--ac-heading, #111d14);
+}
+.modal .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .5rem;
+  padding: .85rem 1.25rem;
+  border-top: 1px solid var(--ac-border-light, #eef2ef);
+  background: var(--ac-bg, #f5f7f5);
+}
+
+@media (max-width: 1200px) {
+    .wishlist-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .wishlist-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    #wishlist .product-card {
+        border-radius: 13px;
+    }
+
+    #wishlist .product-card > .product-image {
+        height: 142px;
+    }
+
+    #wishlist .product-info {
+        gap: 0.32rem;
+        padding: 0.78rem;
+    }
+
+    #wishlist .product-card .badge {
+        min-height: 20px;
+        padding: 0.24rem 0.52rem;
+        font-size: 0.58rem;
+    }
+
+    #wishlist .product-name {
+        font-size: 0.9rem;
+    }
+
+    #wishlist .product-price {
+        font-size: 0.98rem;
+    }
+
+    #wishlist .wishlist-toggle-btn {
+        top: 9px;
+        right: 9px;
+        width: 34px;
+        height: 34px;
+        min-height: 34px;
+    }
+
+    .wishlist-grid {
+        gap: 0.7rem;
+    }
 }
 </style>
 </head>
 
-<body class="loading" style="background:var(--ac-bg,#f5f7f5);">
+<body class="loading">
 
 <!-- Loading Screen -->
 <div id="loading-screen" class="loading-screen">
@@ -182,9 +561,9 @@
     </div>
 </div>
 
-<!-- ── Top bar ───────────────────────────────────────────────────────── -->
+<!-- ── Topbar (same design as customer-account.html) ──────────────── -->
 <header class="wishlist-topbar">
-    <a href="/index.html" class="d-flex align-items-center gap-2" style="text-decoration:none;">
+    <a href="/index.html" class="d-flex align-items-center gap-2" style="text-decoration:none; flex-shrink:0;">
         <img src="/images/logo.png" alt="AgriCatch" height="34" style="flex-shrink:0;">
         <div>
             <div class="brand-name">AgriCatch</div>
@@ -192,62 +571,100 @@
         </div>
     </a>
 
-    <a href="/index.html" id="back-to-origin-btn" class="back-btn ms-auto" style="margin-left:auto;flex-shrink:0;" onclick="restoreLandingPagePosition(event)">
+    <a href="/index.html" class="wishlist-back-btn" onclick="restoreLandingPagePosition(event)">
         <i class="bi bi-arrow-left"></i>
         <span>Back</span>
     </a>
 </header>
 
-<!-- ── Main content ──────────────────────────────────────────────────── -->
+<!-- ── Breadcrumb + Hero (same pattern as notifications.html) ──────── -->
 <main id="wishlist-main">
+    <div class="container">
+        <!-- Breadcrumb -->
+        <div class="pagetitle">
+            <nav>
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/index.html">Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">My Wishlist</li>
+                </ol>
+            </nav>
+        </div>
 
-    <!-- Breadcrumb -->
-    <div class="pagetitle">
-        <nav>
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item">Home</li>
-                <li class="breadcrumb-item active">My Wishlist</li>
-            </ol>
-        </nav>
-    </div>
-
-    <!-- Wishlist section -->
-    <section id="wishlist" class="admin-section-card active">
+        <!-- Hero -->
         <div class="ac-section-hero ac-section-hero--primary mb-4">
-            <div class="ac-section-hero__icon"><i class="bi bi-heart"></i></div>
+            <div class="ac-section-hero__icon">
+                <i class="bi bi-heart"></i>
+            </div>
             <div class="ac-section-hero__body">
-                <h4 class="ac-section-hero__title">My Wishlist <span id="wishlist-count-badge" style="font-size:0.85rem;font-weight:500;color:var(--ac-text-muted,#6b7e72);"></span></h4>
-                <p class="ac-section-hero__sub">Save items you want to buy later.</p>
+                <h4 class="ac-section-hero__title">My Wishlist <span id="wishlist-count-badge" class="badge bg-light text-dark ms-2"></span></h4>
+                <p class="ac-section-hero__sub">Products you've saved for later. We'll let you know when they become available. Tap a card to view it on the store.</p>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-body px-3 pt-3 pb-2">
-
-            <!-- Filters -->
-            <div class="wishlist-filters">
-                <label for="wishlist-sort">Sort by:</label>
-                <select id="wishlist-sort">
+        <!-- Filter Bar (design from admin.html listings) -->
+        <div class="section-filter-bar row g-2 mb-3 align-items-end">
+            <div class="col-md-2 col-sm-6">
+                <label class="form-label small fw-semibold mb-1">Sort by</label>
+                <select id="wishlist-sort" class="form-select form-select-sm">
                     <option value="date_desc">Newest First</option>
                     <option value="date_asc">Oldest First</option>
                     <option value="price_asc">Price: Low to High</option>
                     <option value="price_desc">Price: High to Low</option>
                 </select>
-                <select id="wishlist-filter-category">
-                    <option value="">All Categories</option>
+            </div>
+            <div class="col-md-2 col-sm-6">
+                <label class="form-label small fw-semibold mb-1">Category</label>
+                <select id="wishlist-filter-category" class="form-select form-select-sm">
+                    <option value="">All categories</option>
                 </select>
             </div>
+            <div class="col-md-2 col-sm-6">
+                <label class="form-label small fw-semibold mb-1">Filter</label>
+                <select id="wishlist-filter-type" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    <option value="available_now">Available Now</option>
+                    <option value="preorder">Pre-order</option>
+                </select>
+            </div>
+            <div class="col-md-4 col-sm-6 ms-md-auto">
+                <label class="form-label small fw-semibold mb-1">Search</label>
+                <div class="d-flex gap-2">
+                    <div class="input-group input-group-sm flex-grow-1">
+                        <input type="text" id="wishlist-search-input" class="form-control me-2" placeholder="Product name…">
+                        <button id="wishlist-search-btn" class="btn btn-primary" type="button" style="min-width: 80px; background: #41bf5b; border: none; color: white; border-radius: 8px;"><i class="bi bi-search me-1"></i>Search</button>
+                    </div>
+                    <button id="wishlist-refresh-btn" class="btn btn-sm" type="button" aria-label="Refresh wishlist" style="background: #41bf5b; border: none; color: white; border-radius: 8px; min-width: 42px;"><i class="bi bi-arrow-clockwise"></i></button>
+                </div>
+            </div>
+        </div>
 
-            <!-- Wishlist grid -->
-            <div id="wishlist-grid" class="products-grid">
+        <!-- Wishlist grid -->
+        <section id="wishlist" class="products">
+            <div id="wishlist-grid">
                 <!-- Wishlist items will be rendered here -->
             </div>
+        </section>
 
+    </div>
+</main>
+
+<!-- ── Remove from Wishlist Confirmation Modal ─────────────────────── -->
+<div id="wishlist-remove-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-heart-broken me-1"></i> Remove from Wishlist</h3>
+            <button type="button" class="close-btn" id="close-wishlist-remove-modal" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to remove <span class="product-name-preview" id="wishlist-remove-product-name"></span> from your wishlist?</p>
+            <p style="margin-top:.5rem;color:var(--ac-text-muted,#6b7e72);font-size:.8rem;">You can always add it back by tapping the heart icon on the product card.</p>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="cancel-wishlist-remove-btn">Cancel</button>
+            <button type="button" class="btn btn-sm btn-danger" id="confirm-wishlist-remove-btn"><i class="fas fa-trash me-1"></i>Remove</button>
         </div>
     </div>
-    </section>
-
-</main>
+</div>
 
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

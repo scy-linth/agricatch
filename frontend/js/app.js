@@ -627,9 +627,18 @@ class AgricultureMarket {
             }, 60);
         }
         if (resumeProductId > 0) {
+            // Scroll to the section hash first (browser may not auto-scroll
+            // because scrollRestoration is set to 'manual')
+            const sectionHash = window.location.hash || '#available-now';
+            if (sectionHash && sectionHash !== '#home') {
+                setTimeout(() => {
+                    this.scrollToSection(sectionHash);
+                }, 60);
+            }
+            // Open product details modal after scroll has started
             setTimeout(() => {
                 this.showProductDetails(resumeProductId);
-            }, 220);
+            }, 400);
         }
         if (hasResumeParams) {
             urlParams.delete('openProductId');
@@ -6840,8 +6849,9 @@ class AgricultureMarket {
             this.selectedFarmerNames.clear();
             this.allSelected = false;
         } else {
-            // Select all
+            // Select all (skip unavailable items)
             this.currentCartItems.forEach(item => {
+                if (item.is_available_for_checkout === false) return;
                 this.selectedProductIds.add(item.id);
                 if (item.farmer_name) {
                     this.selectedFarmerNames.add(item.farmer_name);
@@ -6869,12 +6879,14 @@ class AgricultureMarket {
             // Select all products for this farmer (transition from indeterminate to selected)
             this.selectedFarmerNames.add(farmerName);
             this.currentCartItems.filter(item => item.farmer_name === farmerName).forEach(item => {
+                if (item.is_available_for_checkout === false) return;
                 this.selectedProductIds.add(item.id);
             });
         } else {
             // Select farmer and all its products (unselected state)
             this.selectedFarmerNames.add(farmerName);
             this.currentCartItems.filter(item => item.farmer_name === farmerName).forEach(item => {
+                if (item.is_available_for_checkout === false) return;
                 this.selectedProductIds.add(item.id);
             });
         }
@@ -7173,7 +7185,9 @@ class AgricultureMarket {
 
         // Update footer with selection-aware totals
         const selectedCount = this.getSelectedProductCount();
-        const hasUnavailable = !!data.summary?.has_unavailable_items;
+        const hasUnavailable = this.currentCartItems.some(item =>
+            this.selectedProductIds.has(item.id) && item.is_available_for_checkout === false
+        );
         const hasSelected = selectedCount > 0;
 
         // Update cart total display

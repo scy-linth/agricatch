@@ -1109,7 +1109,7 @@ router.get('/:id/current-active', async (req, res) => {
 
     if (isOriginalActive) {
       // Case 1: Original product is still active
-      return res.json({ currentProductId: original.id, isOriginal: true });
+      return res.json({ currentProductId: original.id, isOriginal: true, isPreorder: original.is_preorder === true });
     }
 
     // Case 2: Check for linked active product
@@ -1129,7 +1129,7 @@ router.get('/:id/current-active', async (req, res) => {
 
         if (isLinkedActive) {
           // Case 2: Linked product is active
-          return res.json({ currentProductId: linked.id, isOriginal: false });
+          return res.json({ currentProductId: linked.id, isOriginal: false, isPreorder: linked.is_preorder === true });
         }
       }
     }

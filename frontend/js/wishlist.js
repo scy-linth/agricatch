@@ -82,7 +82,32 @@ class WishlistPage {
     setupListeners() {
         document.getElementById('wishlist-sort')?.addEventListener('change', () => this.renderWishlist(this._items));
         document.getElementById('wishlist-filter-category')?.addEventListener('change', () => this.renderWishlist(this._items));
-        document.getElementById('wishlist-add-all-btn')?.addEventListener('click', () => this.addAllToCart());
+        document.getElementById('wishlist-filter-type')?.addEventListener('change', () => this.renderWishlist(this._items));
+        document.getElementById('wishlist-search-btn')?.addEventListener('click', () => this.renderWishlist(this._items));
+        document.getElementById('wishlist-search-input')?.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') this.renderWishlist(this._items);
+        });
+        document.getElementById('wishlist-refresh-btn')?.addEventListener('click', () => this.loadWishlist());
+
+        // Remove confirmation modal
+        const removeModal = document.getElementById('wishlist-remove-modal');
+        document.getElementById('close-wishlist-remove-modal')?.addEventListener('click', () => {
+            removeModal.classList.remove('open');
+            this._pendingRemoveProductId = null;
+        });
+        document.getElementById('cancel-wishlist-remove-btn')?.addEventListener('click', () => {
+            removeModal.classList.remove('open');
+            this._pendingRemoveProductId = null;
+        });
+        document.getElementById('confirm-wishlist-remove-btn')?.addEventListener('click', () => {
+            this._confirmRemoveFromWishlist();
+        });
+        removeModal?.addEventListener('click', (e) => {
+            if (e.target === removeModal) {
+                removeModal.classList.remove('open');
+                this._pendingRemoveProductId = null;
+            }
+        });
     }
 
     async loadWishlist() {
@@ -108,7 +133,7 @@ class WishlistPage {
         if (!select) return;
         const categories = [...new Set(items.map((i) => i.category_name || '').filter(Boolean))];
         const current = select.value;
-        select.innerHTML = '<option value="">All Categories</option>' +
+        select.innerHTML = '<option value="">All categories</option>' +
             categories.map((c) => `<option value="${this.escapeHtml(c)}">${this.escapeHtml(c)}</option>`).join('');
         select.value = current;
     }
@@ -116,7 +141,30 @@ class WishlistPage {
     _getSortedFiltered(items) {
         const sortVal = document.getElementById('wishlist-sort')?.value || 'date_desc';
         const catFilter = document.getElementById('wishlist-filter-category')?.value || '';
-        let list = catFilter ? items.filter((i) => (i.category_name || '') === catFilter) : [...items];
+        const typeFilter = document.getElementById('wishlist-filter-type')?.value || '';
+        const searchQuery = (document.getElementById('wishlist-search-input')?.value || '').toLowerCase().trim();
+
+        let list = [...items];
+
+        // Category filter
+        if (catFilter) list = list.filter((i) => (i.category_name || '') === catFilter);
+
+        // Type filter (available_now / preorder)
+        if (typeFilter === 'available_now') {
+            list = list.filter((i) => !(i.is_preorder === true || i.listing_type === 'preorder'));
+        } else if (typeFilter === 'preorder') {
+            list = list.filter((i) => i.is_preorder === true || i.listing_type === 'preorder');
+        }
+
+        // Search filter
+        if (searchQuery) {
+            list = list.filter((i) =>
+                String(i.name || '').toLowerCase().includes(searchQuery) ||
+                String(i.farmer_name || '').toLowerCase().includes(searchQuery)
+            );
+        }
+
+        // Sort
         if (sortVal === 'date_asc') list.sort((a, b) => new Date(a.added_at || 0) - new Date(b.added_at || 0));
         else if (sortVal === 'date_desc') list.sort((a, b) => new Date(b.added_at || 0) - new Date(a.added_at || 0));
         else if (sortVal === 'price_asc') list.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
@@ -126,14 +174,12 @@ class WishlistPage {
 
     renderWishlist(items) {
         const grid = document.getElementById('wishlist-grid');
-        const addAllBtn = document.getElementById('wishlist-add-all-btn');
         const countBadge = document.getElementById('wishlist-count-badge');
         if (!grid) return;
 
         const list = this._getSortedFiltered(items);
 
-        if (countBadge) countBadge.textContent = items.length > 0 ? `(${items.length} item${items.length !== 1 ? 's' : ''})` : '';
-        if (addAllBtn) addAllBtn.style.display = list.length > 0 ? 'inline-flex' : 'none';
+        if (countBadge) countBadge.textContent = items.length > 0 ? `${items.length} item${items.length !== 1 ? 's' : ''}` : '';
 
         if (!list.length) {
             grid.innerHTML = (window.renderEmptyState || function() { return ''; })({
@@ -141,24 +187,21 @@ class WishlistPage {
                 title: 'Your wishlist is empty',
                 description: 'Save products you love by tapping the heart icon.',
                 actionText: 'Browse Products',
-                actionHref: '/#products'
+                actionHref: '/index.html#available-now'
             });
+            const browseBtn = grid.querySelector('.empty-state .btn-primary');
+            if (browseBtn) {
+                browseBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    sessionStorage.setItem('scrollToSection', '#available-now');
+                    window.location.href = '/index.html#available-now';
+                });
+            }
             return;
         }
 
-        // Group items by farmer (like Cart)
-        const groupedByFarmer = list.reduce((acc, item) => {
-            const farmerName = item.farmer_name || 'Unknown Farmer';
-            if (!acc[farmerName]) {
-                acc[farmerName] = [];
-            }
-            acc[farmerName].push(item);
-            return acc;
-        }, {});
-
-        // Render grouped items
-        grid.innerHTML = Object.entries(groupedByFarmer).map(([farmerName, farmerItems]) => {
-            const farmerSection = farmerItems.map(item => {
+        // Render flat list — card structure matches landing page app.js renderProducts()
+        grid.innerHTML = `<div class="wishlist-grid">` + list.map(item => {
                 const savedPrice = this._savedPrices[item.id];
                 const currentPrice = Number(item.price || 0);
                 const priceDrop = savedPrice && currentPrice < savedPrice;
@@ -216,7 +259,7 @@ class WishlistPage {
                 // Card classes & click — same as landing page, with unavailable override
                 const cardClass = isAvailable ? 'product-card' : 'product-card product-card-unavailable';
                 const cardClick = isAvailable
-                    ? `onclick="wishlistPage.openProduct(${item.id})"`
+                    ? `onclick="wishlistPage.openProduct(${item.id}, ${isPreorder})"`
                     : '';
                 const cardStyle = isAvailable ? 'cursor: pointer;' : 'cursor: default; opacity: 0.7;';
                 const imgStyle = isAvailable ? '' : 'opacity:0.45;filter:grayscale(1);';
@@ -232,20 +275,18 @@ class WishlistPage {
 
                 // Unavailable overlay badge
                 const unavailableOverlay = !isAvailable
-                    ? `<div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:#fff;font-size:0.7rem;font-weight:600;padding:3px 8px;border-radius:6px;z-index:1;">Unavailable</div>`
+                    ? `<div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:#fff;font-size:0.7rem;font-weight:600;padding:3px 8px;border-radius:6px;z-index:1;">Unavailable</div>`
                     : '';
 
                 return `
                 <div class="${cardClass}" ${cardClick} style="${cardStyle}" data-product-id="${item.id}">
-                    <div style="position:relative;">
-                        ${unavailableOverlay}
-                        <img src="${this.escapeHtml(productImageUrl)}"
-                             alt="${this.escapeHtml(item.name)}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__" draggable="false" ondragstart="event.preventDefault()" style="${imgStyle}">
-                    </div>
+                    ${unavailableOverlay}
+                    <img src="${this.escapeHtml(productImageUrl)}"
+                         alt="${this.escapeHtml(item.name)}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__" draggable="false" ondragstart="event.preventDefault()" style="${imgStyle}">
                     <div class="product-info">
                         ${preorderBadge}
-                        <h3 class="product-name" style="${!isAvailable ? 'color:#9ca3af;' : ''}">${this.escapeHtml(item.name)}</h3>
-                        <div class="product-price" style="${!isAvailable ? 'color:#9ca3af;' : ''}">${this.fmtCurrency(item.price)} per ${this.escapeHtml(unit)}</div>
+                        <h3 class="product-name"${!isAvailable ? ' style="color:#9ca3af;"' : ''}>${this.escapeHtml(item.name)}</h3>
+                        <div class="product-price"${!isAvailable ? ' style="color:#9ca3af;"' : ''}>${this.fmtCurrency(item.price)} per ${this.escapeHtml(unit)}</div>
                         ${priceDropBadge ? `<div style="margin:4px 0;">${priceDropBadge}</div>` : ''}
                         <div class="product-meta product-card-summary">
                             <div class="product-stock" aria-label="${isPreorder ? 'Preorder capacity' : 'Stock available'}">
@@ -267,35 +308,19 @@ class WishlistPage {
                         <div class="product-actions" style="display:flex;gap:8px;align-items:center;">
                             <button type="button" class="add-to-cart-btn ${isPreorder && isAvailable ? 'btn-warning' : ''}"
                                 ${cartBtnAttr}
-                                ${!isAvailable ? 'disabled' : ''}
                                 title="${cartBtnTitle}">
                                 ${cartBtnText}
                             </button>
                             <button type="button" class="wishlist-toggle-btn"
                                 onclick="event.stopPropagation(); wishlistPage.removeFromWishlist(${item.id})"
                                 title="Remove from wishlist"
-                                aria-label="Remove from wishlist"
-                                style="background:none;border:none;padding:8px;cursor:pointer;color:#ef4444;transition:color 0.2s;">
+                                aria-label="Remove from wishlist">
                                 <i class="fas fa-heart" style="font-size:1.2rem;" aria-hidden="true"></i>
                             </button>
                         </div>
                     </div>
                 </div>`;
-            }).join('');
-
-            return `
-                <div class="farmer-group-section" style="margin-bottom: 32px;">
-                    <div class="farmer-group-header" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #e5e7eb;">
-                        <i class="fas fa-store" style="color:#0d6efd;font-size:1.2rem;"></i>
-                        <h3 style="margin:0;font-size:1.25rem;font-weight:600;color:#1f2937;">${this.escapeHtml(farmerName)}</h3>
-                        <span style="background:#e5e7eb;color:#4b5563;font-size:0.75rem;padding:2px 8px;border-radius:12px;font-weight:500;">${farmerItems.length} item${farmerItems.length !== 1 ? 's' : ''}</span>
-                    </div>
-                    <div class="products-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;">
-                        ${farmerSection}
-                    </div>
-                </div>
-            `;
-        }).join('');
+        }).join('') + `</div>`;
     }
 
     async addToCart(productId) {
@@ -344,35 +369,56 @@ class WishlistPage {
         showToast(`${successCount} item${successCount !== 1 ? 's' : ''} added to cart.`, successCount > 0 ? 'success' : 'warning');
     }
 
-    async removeFromWishlist(productId) {
+    _pendingRemoveProductId = null;
+
+    removeFromWishlist(productId) {
+        const item = this._items.find((i) => i.id === productId);
+        const nameEl = document.getElementById('wishlist-remove-product-name');
+        if (nameEl && item) {
+            nameEl.textContent = item.name || 'this product';
+        }
+        this._pendingRemoveProductId = productId;
+        document.getElementById('wishlist-remove-modal').classList.add('open');
+    }
+
+    async _confirmRemoveFromWishlist() {
+        const productId = this._pendingRemoveProductId;
+        if (!productId) return;
+        this._pendingRemoveProductId = null;
+        document.getElementById('wishlist-remove-modal').classList.remove('open');
+
         try {
             const response = await fetch(`${this.apiBase}/wishlist/${productId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (response.ok) {
+                const item = this._items.find((i) => i.id === productId);
                 this._items = this._items.filter((i) => i.id !== productId);
                 this.renderWishlist(this._items);
+                showToast(`${item?.name || 'Item'} removed from wishlist.`, 'success');
             }
         } catch (error) {
             console.error('Error removing wishlist item:', error);
+            showToast('Unable to remove item right now.', 'error');
         }
     }
 
-    async openProduct(productId) {
+    async openProduct(productId, isPreorder = false) {
         try {
-            // Use current-active endpoint to get the active product ID
+            // Check if product has an active listing
             const response = await fetch(`${this.apiBase}/products/${productId}/current-active`);
             const data = await response.json();
 
             if (response.ok && data.currentProductId) {
-                // Active listing exists - open product details
-                if (window.app && typeof window.app.showProductDetails === 'function') {
-                    window.app.showProductDetails(data.currentProductId);
-                } else {
-                    // Fallback: navigate to product page
-                    window.location.href = `/product.html?id=${data.currentProductId}`;
-                }
+                // Use isPreorder from API response (accurate) over wishlist item flag (stale)
+                const actualPreorder = data.isPreorder === true;
+                const activeId = data.currentProductId;
+                const sectionHash = actualPreorder ? '#preorder' : '#available-now';
+                const scrollY = window.scrollY || 0;
+                sessionStorage.setItem('wishlistScrollY', String(scrollY));
+                sessionStorage.setItem('scrollToSection', sectionHash);
+                window.location.href = `/index.html?openProductId=${activeId}${sectionHash}`;
             } else {
                 // No active listing - show friendly dialog
                 this.showUnavailableDialog();
