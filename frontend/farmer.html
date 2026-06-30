@@ -544,30 +544,15 @@
 /* Order Grid */
 .orders-grid {
   display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: .75rem;
-}
-@media (min-width: 576px) {
-  .orders-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (min-width: 768px) {
-  .orders-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-@media (min-width: 1200px) {
-  .orders-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
 }
 /* Order Card */
 .order-card {
   background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: .75rem;
+  padding: .5rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   transition: all 0.2s ease;
 }
@@ -580,8 +565,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
   border-bottom: 1px solid #f1f5f9;
 }
 .order-card-id {
@@ -606,11 +591,11 @@
 }
 .order-card-product-img {
   width: 100%;
-  height: 110px;
+  height: 80px;
   object-fit: cover;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 .order-card-product-name {
   font-weight: 600;
@@ -643,8 +628,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
-  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.35rem;
   background: #f8fafc;
   border-radius: 8px;
 }
@@ -1275,10 +1260,10 @@
     <section id="overview" class="admin-section-card">
         <!-- Verification Banner -->
         <div id="verification-banner" class="alert alert-warning alert-dismissible" style="display:none;">
-            <i class="bi bi-info-circle"></i>
+            <span class="badge bg-warning text-dark me-2">Info</span>
             <span id="verification-banner-message"></span>
             <button type="button" class="btn btn-sm btn-primary ms-2" id="open-chat-btn">Open Chat</button>
-            <button type="button" class="btn-close" onclick="dismissVerificationBanner()" aria-label="Close"></button>
+            <button type="button" class="btn-close ms-auto" onclick="dismissVerificationBanner()" aria-label="Close"></button>
         </div>
 
         <!-- KPI Cards Row 1: Harvest Reminders and My Products -->

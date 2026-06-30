@@ -444,19 +444,6 @@ class AgricultureMarket {
                 history.scrollRestoration = 'manual';
             }
 
-            // Check if we need to scroll to a specific section (from orders.html nav links)
-            const scrollToSection = sessionStorage.getItem('scrollToSection');
-            if (scrollToSection) {
-                sessionStorage.removeItem('scrollToSection');
-                // Scroll to the section immediately with minimal delay
-                setTimeout(() => {
-                    console.log('Scrolling to section:', scrollToSection);
-                    this.scrollToSection(scrollToSection);
-                    // Update the hash in URL
-                    window.location.hash = scrollToSection;
-                }, 50);
-            }
-
             // Restore scroll position from orders.html back button
             const restoreScrollY = sessionStorage.getItem('restoreScrollY');
             const restoreHash = sessionStorage.getItem('restoreHash');
@@ -510,6 +497,20 @@ class AgricultureMarket {
                 this.loadFeaturedProducts();
             } catch (error) {
                 console.error('Error loading featured products in init:', error);
+            }
+
+            // Check if we need to scroll to a specific section (from wishlist/orders nav)
+            const scrollToSection = sessionStorage.getItem('scrollToSection');
+            if (scrollToSection) {
+                sessionStorage.removeItem('scrollToSection');
+                this._pendingScrollTarget = scrollToSection;
+                this._pendingOpenProductId = null;
+                // Fallback: if the section's load already completed, scroll after a delay
+                setTimeout(() => {
+                    if (this._pendingScrollTarget === scrollToSection) {
+                        this._executePendingScroll();
+                    }
+                }, 3000);
             }
 
             // Ensure active nav link is calculated after layout and media load.
@@ -627,18 +628,16 @@ class AgricultureMarket {
             }, 60);
         }
         if (resumeProductId > 0) {
-            // Scroll to the section hash first (browser may not auto-scroll
-            // because scrollRestoration is set to 'manual')
             const sectionHash = window.location.hash || '#available-now';
-            if (sectionHash && sectionHash !== '#home') {
-                setTimeout(() => {
-                    this.scrollToSection(sectionHash);
-                }, 60);
-            }
-            // Open product details modal after scroll has started
+            // Store pending scroll — will be executed after products render in loadAvailableProducts/loadPreorderProducts
+            this._pendingScrollTarget = sectionHash;
+            this._pendingOpenProductId = resumeProductId;
+            // Fallback: if the section's load already completed, scroll after a delay
             setTimeout(() => {
-                this.showProductDetails(resumeProductId);
-            }, 400);
+                if (this._pendingScrollTarget === sectionHash) {
+                    this._executePendingScroll();
+                }
+            }, 3000);
         }
         if (hasResumeParams) {
             urlParams.delete('openProductId');
@@ -5145,6 +5144,10 @@ class AgricultureMarket {
         } finally {
             container.style.minHeight = '';
             container.removeAttribute('aria-busy');
+            // If we have a pending scroll to #available-now, execute it now that products are rendered
+            if (this._pendingScrollTarget === '#available-now') {
+                this._executePendingScroll();
+            }
         }
     }
 
@@ -5231,6 +5234,10 @@ class AgricultureMarket {
         } finally {
             container.style.minHeight = '';
             container.removeAttribute('aria-busy');
+            // If we have a pending scroll to #preorder, execute it now that products are rendered
+            if (this._pendingScrollTarget === '#preorder') {
+                this._executePendingScroll();
+            }
         }
     }
 
@@ -6952,8 +6959,12 @@ class AgricultureMarket {
     }
 
     updateAllSelectionState() {
-        const allSelected = this.currentCartItems.every(item => this.selectedProductIds.has(item.id));
-        this.allSelected = allSelected;
+        const selectableItems = this.currentCartItems.filter(item => item.is_available_for_checkout !== false);
+        if (selectableItems.length === 0) {
+            this.allSelected = false;
+        } else {
+            this.allSelected = selectableItems.every(item => this.selectedProductIds.has(item.id));
+        }
     }
 
     getFarmerSelectionState(farmerName) {
@@ -9159,6 +9170,29 @@ class AgricultureMarket {
         } else {
             console.error('Section not found:', sectionId);
         }
+    }
+
+    _executePendingScroll() {
+        const target = this._pendingScrollTarget;
+        const productId = this._pendingOpenProductId;
+        if (!target) return;
+        this._pendingScrollTarget = null;
+        this._pendingOpenProductId = null;
+
+        // Double rAF ensures the browser has finished layout/paint after DOM updates
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (target && target !== '#home') {
+                    this.scrollToSection(target);
+                    window.location.hash = target;
+                }
+                if (productId) {
+                    setTimeout(() => {
+                        this.showProductDetails(productId);
+                    }, 400);
+                }
+            });
+        });
     }
 
     updateActiveNavLink() {
