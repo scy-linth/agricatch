@@ -16,6 +16,23 @@ const { getValidStatuses } = require('../utils/orderTransitions');
 
 const router = express.Router();
 
+const MAX_NUMERIC_VALUE = 99999;
+
+function validateBoundedNumber(value, fieldName, { min = 0, max = MAX_NUMERIC_VALUE } = {}) {
+  if (typeof value === 'undefined' || value === null || String(value).trim() === '') return undefined;
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return { error: `${fieldName} must be a valid number` };
+  }
+  if (num < min) {
+    return { error: `${fieldName} must be ${min} or higher` };
+  }
+  if (num > max) {
+    return { error: `${fieldName} must not exceed ${max}` };
+  }
+  return undefined;
+}
+
 const extractCloudinaryPublicId = (url) => {
   if (!url) return null;
   const value = String(url).trim();
@@ -1822,6 +1839,8 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
       paramIndex++;
     }
     if (price !== undefined && price !== null && price !== "") {
+      const priceCheck = validateBoundedNumber(price, 'price', { min: 0 });
+      if (priceCheck?.error) return res.status(400).json({ message: priceCheck.error });
       updates.push(`price = $${paramIndex}`);
       values.push(Number(price));
       paramIndex++;
@@ -1832,6 +1851,8 @@ router.put('/products/:id', requireAdmin, productUpload.single('image'), async (
       paramIndex++;
     }
     if (stock_quantity !== undefined && stock_quantity !== null && stock_quantity !== "") {
+      const stockCheck = validateBoundedNumber(stock_quantity, 'stock_quantity', { min: 0 });
+      if (stockCheck?.error) return res.status(400).json({ message: stockCheck.error });
       updates.push(`stock_quantity = $${paramIndex}`);
       values.push(Number(stock_quantity));
       paramIndex++;
@@ -2066,6 +2087,17 @@ router.put('/orders/:id/status', requireAdmin, async (req, res) => {
           cancelled_by = CASE WHEN $1::varchar = 'cancelled'::varchar THEN 'admin'::varchar ELSE cancelled_by END
       WHERE id = $2
     `, [status, id]);
+
+    // Log status history for timeline tracking
+    try {
+      await client.query(
+        `INSERT INTO order_status_history (order_id, status, changed_by, changed_by_role)
+         VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+        [parseInt(id, 10), status, req.user.id, req.user.role]
+      );
+    } catch (e) {
+      console.error('Failed to log order status history:', e.message);
+    }
 
     // Apply business logic based on status change
     if (status === 'cancelled' && currentStatus !== 'cancelled') {

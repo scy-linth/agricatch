@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS products (
     farmer_id INTEGER REFERENCES users(id),
     stock_quantity INTEGER DEFAULT 0,
     unit VARCHAR(20) DEFAULT 'kg', -- kg, pieces, boxes, etc.
+    minimum_order_quantity INTEGER CHECK (minimum_order_quantity IS NULL OR minimum_order_quantity > 0),
     image_url VARCHAR(255),
     sales_count INTEGER DEFAULT 0,
     is_available BOOLEAN DEFAULT true,

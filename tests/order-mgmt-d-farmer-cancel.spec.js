@@ -211,24 +211,32 @@ test.describe('Group D — Farmer Cancellation', () => {
     const orderId = orderResult.body.orderIds[0];
     expect((await dbGetOrder(orderId)).status).toBe('preorder_reserved');
 
-    // Convert pre-order via harvest lifecycle
-    const { apiHarvestLifecycle } = require('./helpers/order-test-helper');
-    const harvestResult = await apiHarvestLifecycle(farmerToken, product.id, 1, true);
-    test.skip(harvestResult.status !== 200, `Harvest failed: ${harvestResult.body?.message}`);
+    // Convert pre-order via convert-preorders endpoint
+    const { apiConvertPreorders } = require('./helpers/order-test-helper');
+    const convertResult = await apiConvertPreorders(farmerToken, product.id, 1);
+    test.skip(convertResult.status !== 200, `Pre-order conversion failed: ${convertResult.body?.message}`);
+
+    // Convert-preorders uses FIFO allocation, so it converts the oldest order first
+    const affectedOrders = convertResult.body.affected_orders || [];
+    const convertedOrderId = affectedOrders[0];
+    test.skip(!convertedOrderId, 'No orders were converted');
 
     // Verify order is now confirmed (converted)
-    const convertedOrder = await dbGetOrder(orderId);
+    const convertedOrder = await dbGetOrder(convertedOrderId);
     expect(convertedOrder.status).toBe('confirmed');
     expect(convertedOrder.preorder_converted_at).not.toBeNull();
     expect(Number(convertedOrder.preorder_fulfilled_quantity)).toBeGreaterThanOrEqual(1);
 
     const stockAfterHarvest = await dbGetProductStock(product.id);
 
+    // Use the converted order ID for remaining test steps
+    const orderToCancel = convertedOrderId;
+
     // Farmer cancels the converted pre-order
-    const cancelResult = await apiCancelOrderFarmer(farmerToken, orderId, 'Cancelled after conversion');
+    const cancelResult = await apiCancelOrderFarmer(farmerToken, orderToCancel, 'Cancelled after conversion');
     expect(cancelResult.status).toBe(200);
 
-    const cancelledOrder = await dbGetOrder(orderId);
+    const cancelledOrder = await dbGetOrder(orderToCancel);
     expect(cancelledOrder.status).toBe('cancelled');
     expect(cancelledOrder.cancelled_by).toBe('farmer');
 
@@ -237,12 +245,12 @@ test.describe('Group D — Farmer Cancellation', () => {
     expect(stockAfterCancel).toBe(stockAfterHarvest + Number(convertedOrder.preorder_fulfilled_quantity));
 
     // Verify preorder_fulfilled_quantity reset to 0
-    const finalOrder = await dbGetOrder(orderId);
+    const finalOrder = await dbGetOrder(orderToCancel);
     expect(Number(finalOrder.preorder_fulfilled_quantity)).toBe(0);
 
     // Cleanup
     const { dbRestoreOrder } = require('./helpers/order-test-helper');
-    await dbRestoreOrder(orderId, 'pending', product.id, originalStock, originalReserved);
+    await dbRestoreOrder(orderToCancel, 'pending', product.id, originalStock, originalReserved);
   });
 
   // -------------------------------------------------------------------------

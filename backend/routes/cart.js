@@ -5,6 +5,60 @@ const activityLogger = require('../services/activityLogger');
 
 const router = express.Router();
 
+function getMinimumOrderQuantity(product) {
+  const minimum = Number.parseInt(product?.minimum_order_quantity, 10);
+  return Number.isInteger(minimum) && minimum > 0 ? minimum : 1;
+}
+
+function formatMinimumOrderMessage(product) {
+  return `Minimum order is ${getMinimumOrderQuantity(product)} ${product?.unit || 'unit'}.`;
+}
+
+function getAvailableCapacity(product) {
+  if (product?.is_preorder) {
+    const max = Number(product.max_preorder_quantity || 0);
+    if (max <= 0) return Infinity;
+    return Math.max(0, max - Number(product.reserved_quantity || 0));
+  }
+  return Number(product?.stock_quantity || 0);
+}
+
+function validateCartQuantity(product, quantity) {
+  const parsedQuantity = Number.parseInt(quantity, 10);
+  if (!Number.isInteger(parsedQuantity) || parsedQuantity < 1) {
+    return 'Valid quantity is required';
+  }
+  const minimumOrderQuantity = getMinimumOrderQuantity(product);
+  if (parsedQuantity < minimumOrderQuantity) {
+    return formatMinimumOrderMessage(product);
+  }
+  const availableCapacity = getAvailableCapacity(product);
+  if (parsedQuantity > availableCapacity) {
+    return product?.is_preorder
+      ? `Not enough preorder capacity available. Maximum: ${product.max_preorder_quantity || 'unlimited'}`
+      : 'Not enough stock available';
+  }
+  return null;
+}
+
+function normalizeQuantity(value) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function getCartSelectFields() {
+  return `p.id as product_id, p.name, p.price, p.unit, p.minimum_order_quantity, p.image_url, p.stock_quantity,
+               p.is_preorder, p.max_preorder_quantity, p.reserved_quantity`;
+}
+
+function getCartSelectFieldsWithoutPreorder() {
+  return `p.id as product_id, p.name, p.price, p.unit, p.minimum_order_quantity, p.image_url, p.stock_quantity`;
+}
+
+function getMinimumOrderColumnForLegacy() {
+  return 'p.minimum_order_quantity';
+}
+
 function getClientIp(req) {
   const xf = req.headers['x-forwarded-for'];
   if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
@@ -32,7 +86,7 @@ router.get('/', async (req, res) => {
       // Logged in user
       query = `
         SELECT c.id, c.quantity, c.added_at,
-               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.id as product_id, p.name, p.price, p.unit, p.minimum_order_quantity, p.image_url, p.stock_quantity,
                p.is_preorder, p.max_preorder_quantity, p.reserved_quantity,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
@@ -63,7 +117,7 @@ router.get('/', async (req, res) => {
       // Guest user
       query = `
         SELECT c.id, c.quantity, c.added_at,
-               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.id as product_id, p.name, p.price, p.unit, p.minimum_order_quantity, p.image_url, p.stock_quantity,
                p.is_preorder, p.max_preorder_quantity, p.reserved_quantity,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
@@ -133,7 +187,7 @@ router.post('/', async (req, res) => {
     let { productId, quantity = 1 } = req.body;
     console.log('[BUG2 TRACE] Raw productId:', productId, 'quantity:', quantity);
     productId = parseInt(productId, 10);
-    quantity = parseInt(quantity, 10) || 1;
+    quantity = normalizeQuantity(quantity);
     console.log('[BUG2 TRACE] Parsed productId:', productId, 'quantity:', quantity);
     const token = req.headers.authorization?.split(' ')[1];
     const sessionId = req.body.sessionId;
@@ -144,9 +198,10 @@ router.post('/', async (req, res) => {
     }
 
     // Prevent superadmin from adding to cart
+    let decoded = null;
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
         console.log('[BUG2 TRACE] User from token:', { id: decoded.id, username: decoded.username, role: decoded.role });
         if (decoded.role === 'super_admin') {
           console.log('[BUG2 TRACE] Superadmin attempted to add to cart, returning 403');
@@ -161,7 +216,7 @@ router.post('/', async (req, res) => {
     // Check if product exists and is available
     console.log('[BUG2 TRACE] Looking up product with ID:', productId);
     const productResult = await pool.query(
-      `SELECT p.id, p.stock_quantity, p.is_available, p.expiry_date, p.is_preorder,
+      `SELECT p.id, p.stock_quantity, p.unit, p.minimum_order_quantity, p.is_available, p.expiry_date, p.is_preorder,
               p.reserved_quantity, p.max_preorder_quantity,
               COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
               COALESCE(u.is_disabled, false) as farmer_is_disabled,
@@ -209,28 +264,9 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Product is already expired' });
     }
 
-    // Validate stock/reservation based on product type
-    if (product.is_preorder) {
-      console.log('[BUG2 TRACE] Product is preorder, checking capacity');
-      // Preorder: check capacity
-      const availableCapacity = product.max_preorder_quantity 
-        ? product.max_preorder_quantity - product.reserved_quantity 
-        : Infinity;
-      console.log('[BUG2 TRACE] Available capacity:', availableCapacity, 'requested:', quantity);
-      if (quantity > availableCapacity) {
-        console.log('[BUG2 TRACE] Not enough preorder capacity, returning 400');
-        return res.status(400).json({ 
-          message: `Not enough preorder capacity available. Maximum: ${product.max_preorder_quantity || 'unlimited'}` 
-        });
-      }
-    } else {
-      console.log('[BUG2 TRACE] Product is regular, checking stock');
-      // Regular product: check stock
-      console.log('[BUG2 TRACE] Stock quantity:', product.stock_quantity, 'requested:', quantity);
-      if (quantity > product.stock_quantity) {
-        console.log('[BUG2 TRACE] Not enough stock, returning 400');
-        return res.status(400).json({ message: 'Not enough stock available' });
-      }
+    const quantityError = validateCartQuantity(product, quantity);
+    if (quantityError) {
+      return res.status(400).json({ message: quantityError });
     }
 
     // Mixed cart prevention removed - regular and pre-order products can now be mixed
@@ -256,19 +292,9 @@ router.post('/', async (req, res) => {
       if (existingItem.rows.length > 0) {
         // Update quantity
         const newQuantity = existingItem.rows[0].quantity + quantity;
-        if (product.is_preorder) {
-          const availableCapacity = product.max_preorder_quantity 
-            ? product.max_preorder_quantity - product.reserved_quantity 
-            : Infinity;
-          if (newQuantity > availableCapacity) {
-            return res.status(400).json({ 
-              message: `Not enough preorder capacity available. Maximum: ${product.max_preorder_quantity || 'unlimited'}` 
-            });
-          }
-        } else {
-          if (newQuantity > product.stock_quantity) {
-            return res.status(400).json({ message: 'Not enough stock available' });
-          }
+        const newQuantityError = validateCartQuantity(product, newQuantity);
+        if (newQuantityError) {
+          return res.status(400).json({ message: newQuantityError });
         }
 
         await pool.query(
@@ -319,19 +345,9 @@ router.post('/', async (req, res) => {
       if (existingItem.rows.length > 0) {
         // Update quantity
         const newQuantity = existingItem.rows[0].quantity + quantity;
-        if (product.is_preorder) {
-          const availableCapacity = product.max_preorder_quantity 
-            ? product.max_preorder_quantity - product.reserved_quantity 
-            : Infinity;
-          if (newQuantity > availableCapacity) {
-            return res.status(400).json({ 
-              message: `Not enough preorder capacity available. Maximum: ${product.max_preorder_quantity || 'unlimited'}` 
-            });
-          }
-        } else {
-          if (newQuantity > product.stock_quantity) {
-            return res.status(400).json({ message: 'Not enough stock available' });
-          }
+        const newQuantityError = validateCartQuantity(product, newQuantity);
+        if (newQuantityError) {
+          return res.status(400).json({ message: newQuantityError });
         }
 
         await pool.query(
@@ -380,7 +396,7 @@ router.post('/', async (req, res) => {
     if (userId) {
       getQuery = `
         SELECT c.id, c.quantity, c.added_at,
-               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.id as product_id, p.name, p.price, p.unit, p.minimum_order_quantity, p.image_url, p.stock_quantity,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
                COALESCE(f.is_disabled, false) as farmer_is_disabled,
@@ -409,7 +425,7 @@ router.post('/', async (req, res) => {
     } else if (sessionId) {
       getQuery = `
         SELECT c.id, c.quantity, c.added_at,
-               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.id as product_id, p.name, p.price, p.unit, p.minimum_order_quantity, p.image_url, p.stock_quantity,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
                COALESCE(f.is_disabled, false) as farmer_is_disabled,
@@ -487,7 +503,8 @@ router.put('/:id', async (req, res) => {
     const { quantity } = req.body;
     const token = req.headers.authorization?.split(' ')[1];
 
-    if (!quantity || quantity < 1) {
+    const requestedQuantity = Number.parseInt(quantity, 10);
+    if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1) {
       return res.status(400).json({ message: 'Valid quantity is required' });
     }
 
@@ -506,7 +523,7 @@ router.put('/:id', async (req, res) => {
     const sessionId = req.body.sessionId;
 
     if (userId) {
-      cartQuery = `SELECT c.*, p.stock_quantity, p.is_available, p.expiry_date,
+      cartQuery = `SELECT c.*, p.stock_quantity, p.minimum_order_quantity, p.is_preorder, p.max_preorder_quantity, p.reserved_quantity, p.is_available, p.expiry_date,
              COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
              COALESCE(u.is_disabled, false) as farmer_is_disabled
            FROM cart c
@@ -515,7 +532,7 @@ router.put('/:id', async (req, res) => {
            WHERE c.id = $1 AND c.user_id = $2`;
       cartParams = [id, userId];
     } else if (sessionId) {
-      cartQuery = `SELECT c.*, p.stock_quantity, p.is_available, p.expiry_date,
+      cartQuery = `SELECT c.*, p.stock_quantity, p.minimum_order_quantity, p.is_preorder, p.max_preorder_quantity, p.reserved_quantity, p.is_available, p.expiry_date,
              COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
              COALESCE(u.is_disabled, false) as farmer_is_disabled
            FROM cart c
@@ -542,18 +559,19 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ message: 'Product is already expired' });
     }
 
-    if (quantity > cartItem.stock_quantity) {
-      return res.status(400).json({ message: 'Not enough stock available' });
+    const updateQuantityError = validateCartQuantity(cartItem, requestedQuantity);
+    if (updateQuantityError) {
+      return res.status(400).json({ message: updateQuantityError });
     }
 
-    await pool.query('UPDATE cart SET quantity = $1 WHERE id = $2', [quantity, id]);
+    await pool.query('UPDATE cart SET quantity = $1 WHERE id = $2', [requestedQuantity, id]);
 
     // Fetch updated cart data to return to client
     let getQuery, getParams;
     if (userId) {
       getQuery = `
         SELECT c.id, c.quantity, c.added_at,
-               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.id as product_id, p.name, p.price, p.unit, p.minimum_order_quantity, p.image_url, p.stock_quantity,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
                COALESCE(f.is_disabled, false) as farmer_is_disabled,
@@ -582,7 +600,7 @@ router.put('/:id', async (req, res) => {
     } else if (sessionId) {
       getQuery = `
         SELECT c.id, c.quantity, c.added_at,
-               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.id as product_id, p.name, p.price, p.unit, p.minimum_order_quantity, p.image_url, p.stock_quantity,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
                COALESCE(f.is_disabled, false) as farmer_is_disabled,
@@ -699,7 +717,7 @@ router.delete('/:id', async (req, res) => {
     if (userId) {
       getQuery = `
         SELECT c.id, c.quantity, c.added_at,
-               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.id as product_id, p.name, p.price, p.unit, p.minimum_order_quantity, p.image_url, p.stock_quantity,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
                COALESCE(f.is_disabled, false) as farmer_is_disabled,
@@ -728,7 +746,7 @@ router.delete('/:id', async (req, res) => {
     } else if (sessionId) {
       getQuery = `
         SELECT c.id, c.quantity, c.added_at,
-               p.id as product_id, p.name, p.price, p.unit, p.image_url, p.stock_quantity,
+               p.id as product_id, p.name, p.price, p.unit, p.minimum_order_quantity, p.image_url, p.stock_quantity,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date,
                COALESCE(f.is_disabled, false) as farmer_is_disabled,

@@ -61,6 +61,25 @@ function normalizeDescription(value) {
   return cleaned;
 }
 
+function validationError(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
+
+function parseOptionalPositiveInteger(value, fieldName) {
+  if (typeof value === 'undefined' || value === null || String(value).trim() === '') return null;
+  const raw = String(value).trim();
+  if (!/^[1-9]\d*$/.test(raw)) {
+    throw validationError(`${fieldName} must be a positive whole number`);
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (parsed > MAX_NUMERIC_VALUE) {
+    throw validationError(`${fieldName} must not exceed ${MAX_NUMERIC_VALUE}`);
+  }
+  return parsed;
+}
+
 const extractCloudinaryPublicId = (url) => {
   if (!url) return null;
   const value = String(url).trim();
@@ -135,6 +154,22 @@ const rehomeProductImageToCategorizedId = async ({
 
 const NON_EXPIRED_PRODUCT_SQL = `(p.expiry_date IS NULL OR p.expiry_date >= CURRENT_DATE)`;
 const PRODUCT_DESCRIPTION_MAX_LENGTH = 500;
+const MAX_NUMERIC_VALUE = 99999;
+
+function validateBoundedNumber(value, fieldName, { min = 0, max = MAX_NUMERIC_VALUE } = {}) {
+  if (typeof value === 'undefined' || value === null || String(value).trim() === '') return undefined;
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    throw validationError(`${fieldName} must be a valid number`);
+  }
+  if (num < min) {
+    throw validationError(`${fieldName} must be ${min} or higher`);
+  }
+  if (num > max) {
+    throw validationError(`${fieldName} must not exceed ${max}`);
+  }
+  return num;
+}
 const FEATURED_CATEGORY_GROUPS = [
   'Vegetables',
   'Fruits',
@@ -463,15 +498,16 @@ router.get('/', async (req, res) => {
     const userId = user?.id;
 
     const normalizedSort = String(sort || 'latest').trim().toLowerCase();
+    const inStockExpr = "CASE WHEN p.is_preorder = true THEN (COALESCE(p.max_preorder_quantity, 0) - COALESCE(p.reserved_quantity, 0)) > 0 ELSE COALESCE(p.stock_quantity, 0) > 0 END DESC, ";
     const orderByMap = {
-      latest: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.created_at DESC',
-      harvest_date: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.harvest_date DESC NULLS LAST, p.created_at DESC',
-      expiry_date: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.expiry_date ASC NULLS LAST, p.created_at DESC',
-      expiration_date: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.expiry_date ASC NULLS LAST, p.created_at DESC',
-      ratings: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, average_rating DESC, total_reviews DESC, p.created_at DESC',
-      top_sales: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.sales_count DESC, p.created_at DESC',
-      price_low_high: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.price ASC, p.created_at DESC',
-      price_high_low: 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.price DESC, p.created_at DESC'
+      latest: inStockExpr + 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.created_at DESC',
+      harvest_date: inStockExpr + 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.harvest_date DESC NULLS LAST, p.created_at DESC',
+      expiry_date: inStockExpr + 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.expiry_date ASC NULLS LAST, p.created_at DESC',
+      expiration_date: inStockExpr + 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.expiry_date ASC NULLS LAST, p.created_at DESC',
+      ratings: inStockExpr + 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, average_rating DESC, total_reviews DESC, p.created_at DESC',
+      top_sales: inStockExpr + 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.sales_count DESC, p.created_at DESC',
+      price_low_high: inStockExpr + 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.price ASC, p.created_at DESC',
+      price_high_low: inStockExpr + 'COALESCE(fs.tier = \'premium\' AND fs.status = \'active\', false) DESC, COALESCE(u.is_verified, false) DESC, p.price DESC, p.created_at DESC'
     };
     const orderByClause = orderByMap[normalizedSort] || orderByMap.latest;
 
@@ -1334,13 +1370,25 @@ router.post('/', multer().none(), async (req, res) => {
       expiry_date,
       is_preorder,
       preorder_availability_date,
-      max_preorder_quantity
+      max_preorder_quantity,
+      minimum_order_quantity
     } = req.body;
 
     // Normalize boolean values from FormData strings
     const isPreorderValue = is_preorder === true || is_preorder === 'true' || is_preorder === '1';
 
     const normalizedDescription = normalizeDescription(description);
+    const minimumOrderQuantityValue = parseOptionalPositiveInteger(minimum_order_quantity, 'minimum_order_quantity');
+
+    // Validate numeric fields against upper bound
+    try {
+      validateBoundedNumber(price, 'price', { min: 0 });
+      validateBoundedNumber(stock_quantity, 'stock_quantity', { min: 0 });
+      validateBoundedNumber(max_preorder_quantity, 'max_preorder_quantity', { min: 1 });
+    } catch (e) {
+      if (e.statusCode === 400) return res.status(400).json({ message: e.message });
+      throw e;
+    }
 
     if (normalizedDescription && normalizedDescription.length > PRODUCT_DESCRIPTION_MAX_LENGTH) {
       return res.status(400).json({ message: `Description must be ${PRODUCT_DESCRIPTION_MAX_LENGTH} characters or less.` });
@@ -1367,6 +1415,7 @@ router.post('/', multer().none(), async (req, res) => {
 
     await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS cloudinary_public_id VARCHAR(255)');
     await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT \'approved\'');
+    await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS minimum_order_quantity INTEGER');
 
     // Determine image URL/public id: prefer explicit image_url, but any uploaded file is always sent to Cloudinary.
     let imageUrl = null;
@@ -1477,15 +1526,15 @@ router.post('/', multer().none(), async (req, res) => {
 
     const result = await pool.query(`
       INSERT INTO products (name, description, price, category_id, farmer_id, stock_quantity,
-                           unit, image_url, location, city, province, harvest_date, expiry_date, cloudinary_public_id, is_available, status,
+                           unit, minimum_order_quantity, image_url, location, city, province, harvest_date, expiry_date, cloudinary_public_id, is_available, status,
                            is_preorder, preorder_availability_date, reserved_quantity, max_preorder_quantity, linked_product_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
       RETURNING *
     `, [name, normalizedDescription, price, category_id, decoded.id, stock_quantity,
-         unit || 'kg', imageUrl, productLocation, cityValue, provinceValue, harvestDateValue, expiryDateValue, imagePublicId, initialIsAvailable, initialStatus,
+         unit || 'kg', minimumOrderQuantityValue, imageUrl, productLocation, cityValue, provinceValue, harvestDateValue, expiryDateValue, imagePublicId, initialIsAvailable, initialStatus,
          isPreorderValue || false,
          preorderAvailabilityDateValue || null,
-         0, // reserved_quantity always starts at 0
+         0,
          max_preorder_quantity || null,
          linkedProductId]);
 
@@ -1537,6 +1586,7 @@ router.post('/', multer().none(), async (req, res) => {
 
   } catch (error) {
     console.error('Add product error:', error);
+    if (error.statusCode) return res.status(error.statusCode).json({ message: error.message });
     res.status(500).json({ message: 'Server error adding product' });
   }
 });
@@ -1735,7 +1785,8 @@ router.put('/:id', multer().none(), async (req, res) => {
       is_available,
       is_preorder,
       preorder_availability_date,
-      max_preorder_quantity
+      max_preorder_quantity,
+      minimum_order_quantity
     } = req.body;
 
     const nextName = typeof name === 'undefined' ? current.name : name;
@@ -1754,6 +1805,19 @@ router.put('/:id', multer().none(), async (req, res) => {
     const nextIsPreorder = typeof is_preorder === 'undefined' ? current.is_preorder : (is_preorder === true || is_preorder === 'true' || is_preorder === '1');
     const nextPreorderAvailabilityDate = (typeof preorder_availability_date === 'undefined') ? current.preorder_availability_date : (String(preorder_availability_date).trim() === '' ? null : preorder_availability_date);
     const nextMaxPreorderQuantity = typeof max_preorder_quantity === 'undefined' ? current.max_preorder_quantity : max_preorder_quantity;
+    const nextMinimumOrderQuantity = typeof minimum_order_quantity === 'undefined'
+      ? current.minimum_order_quantity
+      : parseOptionalPositiveInteger(minimum_order_quantity, 'minimum_order_quantity');
+
+    // Validate numeric fields against upper bound
+    try {
+      validateBoundedNumber(nextPrice, 'price', { min: 0 });
+      validateBoundedNumber(nextStockQuantity, 'stock_quantity', { min: 0 });
+      validateBoundedNumber(nextMaxPreorderQuantity, 'max_preorder_quantity', { min: 1 });
+    } catch (e) {
+      if (e.statusCode === 400) return res.status(400).json({ message: e.message });
+      throw e;
+    }
 
     if (nextDescription && String(nextDescription).length > PRODUCT_DESCRIPTION_MAX_LENGTH) {
       return res.status(400).json({ message: `Description must be ${PRODUCT_DESCRIPTION_MAX_LENGTH} characters or less.` });
@@ -1844,17 +1908,19 @@ router.put('/:id', multer().none(), async (req, res) => {
     // Note: is_available is already set in the main query, so we don't include it here
     const statusReset = current.status === 'rejected' ? ', status = \'pending\', is_admin_disabled = false, rejection_reason = NULL' : '';
 
+    await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS minimum_order_quantity INTEGER');
+
     await pool.query(`
       UPDATE products SET
         name = $1, description = $2, price = $3, category_id = $4,
-        stock_quantity = $5, unit = $6, image_url = $7, location = $8,
-        city = $9, province = $10,
-        harvest_date = $11, expiry_date = $12, is_available = $13,
-        cloudinary_public_id = $14, is_preorder = $15, preorder_availability_date = $16, max_preorder_quantity = $17${statusReset},
+        stock_quantity = $5, unit = $6, minimum_order_quantity = $7, image_url = $8, location = $9,
+        city = $10, province = $11,
+        harvest_date = $12, expiry_date = $13, is_available = $14,
+        cloudinary_public_id = $15, is_preorder = $16, preorder_availability_date = $17, max_preorder_quantity = $18${statusReset},
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $18
+      WHERE id = $19
     `, [nextName, nextDescription, nextPrice, nextCategoryId, nextStockQuantity, nextUnit,
-         imageUrl, nextLocation, nextCity, nextProvince, nextHarvestDate, nextExpiryDate, nextIsAvailable, imagePublicId,
+         nextMinimumOrderQuantity, imageUrl, nextLocation, nextCity, nextProvince, nextHarvestDate, nextExpiryDate, nextIsAvailable, imagePublicId,
          nextIsPreorder, nextPreorderAvailabilityDate, nextMaxPreorderQuantity, id]);
 
     // Check if product went from out of stock to in stock and notify wishlist customers
@@ -1927,6 +1993,7 @@ router.put('/:id', multer().none(), async (req, res) => {
 
   } catch (error) {
     console.error('Update product error:', error);
+    if (error.statusCode) return res.status(error.statusCode).json({ message: error.message });
     res.status(500).json({ message: 'Server error updating product' });
   }
 });

@@ -53,6 +53,22 @@ class AdminDashboard {
             return;
         }
 
+        // Check if JWT token is expired before loading dashboard
+        try {
+            const payload = JSON.parse(atob(this.token.split('.')[1]));
+            if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('userId');
+                window.location.href = '/?login=1&reason=expired_token';
+                return;
+            }
+        } catch (_) {
+            // Malformed token — treat as invalid
+            localStorage.removeItem('token');
+            window.location.href = '/?login=1&reason=invalid_token';
+            return;
+        }
+
         this.init();
 
         // Setup chat scroll observer after initialization
@@ -651,6 +667,17 @@ class AdminDashboard {
                     }
                 }
             });
+            es.addEventListener('announcement.created', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    const role = this.currentUserRole || 'admin';
+                    if (data.audience === 'all' || String(data.audience).includes('admin') || String(data.audience).includes(role)) {
+                        this.fetchAnnouncementBanner();
+                    }
+                } catch (e) {
+                    this.fetchAnnouncementBanner();
+                }
+            });
         } catch (e) {
             // ignore
         }
@@ -1088,6 +1115,7 @@ class AdminDashboard {
                 }
                 this.currentUserRole = data.user.role;
                 this.currentUserId = data.user.id;
+                this.fetchAnnouncementBanner();
                 const fullName = data.user.full_name || data.user.username || 'Admin';
                 // Extract first name and format as Title Case (capitalize each word)
                 const firstName = fullName.split(' ')[0];
@@ -7480,6 +7508,7 @@ class AdminDashboard {
             if (audienceCustomer) audienceCustomer.checked = false;
             if (audienceAdmin) audienceAdmin.checked = false;
             this.loadAnnouncements();
+            this.fetchAnnouncementBanner();
         } catch (err) {
             console.error('Send announcement error:', err);
             this.showMessage('Failed to send announcement', 'error');
@@ -7517,13 +7546,22 @@ class AdminDashboard {
 
             if (tableEl) tableEl.style.display = '';
             const audienceLabels = { all: 'All Users', farmer: 'Farmers', customer: 'Customers', admin: 'Admins' };
+            const formatAudience = (aud) => {
+                if (!aud) return '';
+                const parts = String(aud).split(',').map(s => s.trim()).filter(Boolean);
+                if (parts.length === 0) return '';
+                return parts.map(p => audienceLabels[p] || this.escapeHtml(p)).join(', ');
+            };
             tbody.innerHTML = items.map(a => {
                 const created = a.created_at ? new Date(a.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '';
                 const isActive = a.is_active && (!a.expires_at || new Date(a.expires_at) > new Date());
                 const statusBadge = isActive
                     ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>'
-                    : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Inactive</span>';
-                const audienceLabel = audienceLabels[a.audience] || this.escapeHtml(a.audience || '');
+                    : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Disabled</span>';
+                const audienceLabel = formatAudience(a.audience);
+                const toggleBtnClass = isActive ? 'btn-outline-warning' : 'btn-outline-success';
+                const toggleIcon = isActive ? 'bi-pause-circle' : 'bi-play-circle';
+                const toggleTitle = isActive ? 'Disable' : 'Enable';
                 return `<tr>
                     <td class="text-muted small">${a.id}</td>
                     <td>
@@ -7534,15 +7572,15 @@ class AdminDashboard {
                     <td class="small text-muted">${created}</td>
                     <td>${statusBadge}</td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-outline-danger border-0 delete-announcement-btn" data-id="${a.id}" title="Delete">
-                            <i class="bi bi-trash"></i>
+                        <button class="btn btn-sm ${toggleBtnClass} border-0 toggle-announcement-btn" data-id="${a.id}" title="${toggleTitle}">
+                            <i class="bi ${toggleIcon}"></i>
                         </button>
                     </td>
                 </tr>`;
             }).join('');
 
-            tbody.querySelectorAll('.delete-announcement-btn').forEach(btn => {
-                btn.addEventListener('click', () => this.deleteAnnouncement(parseInt(btn.dataset.id, 10)));
+            tbody.querySelectorAll('.toggle-announcement-btn').forEach(btn => {
+                btn.addEventListener('click', () => this.toggleAnnouncement(parseInt(btn.dataset.id, 10)));
             });
         } catch (err) {
             console.error('Load announcements error:', err);
@@ -7550,30 +7588,90 @@ class AdminDashboard {
         }
     }
 
-    async deleteAnnouncement(id) {
+    async toggleAnnouncement(id) {
         if (!Number.isInteger(id) || id <= 0) return;
-        const confirmed = await this.adminConfirm(
-            'This will permanently delete the announcement and remove it from all users.',
-            { title: 'Delete Announcement', danger: true, okLabel: 'Delete' }
-        );
-        if (!confirmed) return;
 
         try {
-            const res = await fetch(`${this.apiBase}/superadmin/announcements/${id}`, {
-                method: 'DELETE',
+            const res = await fetch(`${this.apiBase}/superadmin/announcements/${id}/toggle`, {
+                method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                this.showMessage(data.message || 'Failed to delete announcement', 'error');
+                this.showMessage(data.message || 'Failed to toggle announcement', 'error');
                 return;
             }
-            this.showMessage('Announcement deleted', 'success');
+            this.showMessage(data.message || 'Announcement updated', 'success');
             this.loadAnnouncements();
+            this.fetchAnnouncementBanner();
         } catch (err) {
-            console.error('Delete announcement error:', err);
-            this.showMessage('Failed to delete announcement', 'error');
+            console.error('Toggle announcement error:', err);
+            this.showMessage('Failed to toggle announcement', 'error');
         }
+    }
+
+    async fetchAnnouncementBanner() {
+        try {
+            const role = this.currentUserRole || 'admin';
+            const response = await fetch(`${this.apiBase}/superadmin/announcements?role=${role}`);
+            if (response.ok) {
+                const data = await response.json();
+                this.displayAnnouncementBanner(data.announcements || []);
+            }
+        } catch (error) {
+            console.error('Error fetching announcement banner:', error);
+        }
+    }
+
+    displayAnnouncementBanner(announcements) {
+        const container = document.getElementById('announcement-banner-container');
+        if (!container) return;
+
+        const dismissed = JSON.parse(localStorage.getItem('dismissed_announcements') || '[]');
+
+        container.innerHTML = announcements
+            .filter(ann => !dismissed.includes(ann.id))
+            .map(ann => `
+                <style>
+                    @keyframes announce-slide-${ann.id} {
+                        0% { transform: translateX(100%); }
+                        100% { transform: translateX(-100%); }
+                    }
+                    .announce-marquee-${ann.id} {
+                        display: inline-block;
+                        white-space: nowrap;
+                        animation: announce-slide-${ann.id} 18s linear infinite;
+                    }
+                </style>
+                <div class="announcement-banner" data-id="${ann.id}" style="background: linear-gradient(90deg, #e0f2fe 0%, #bae6fd 100%); color: #0369a1; padding: 0.5rem 1rem; margin: 0; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; box-shadow: 0 2px 6px rgba(0,0,0,0.12); overflow: hidden; display: flex; align-items: center; gap: 0.75rem; min-height: 40px;">
+                    <span style="flex-shrink: 0; font-size: 0.85rem; font-weight: 700; color: #0284c7;"><i class="bi bi-megaphone" style="margin-right:4px;"></i>Announcement</span>
+                    <div style="flex: 1; overflow: hidden; position: relative;">
+                        <span class="announce-marquee-${ann.id}" style="font-size: 0.85rem; font-weight: 500; color: #0369a1;">
+                            <strong>${this.escapeHtml(ann.title)}</strong> &mdash; ${this.escapeHtml(ann.message)}
+                        </span>
+                    </div>
+                    ${ann.is_dismissible ? `
+                        <button class="announcement-dismiss-btn" data-id="${ann.id}" style="background: rgba(2,132,199,0.15); border: none; color: #0284c7; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; flex-shrink: 0; line-height: 1;">&#10005;</button>
+                    ` : ''}
+                </div>
+            `).join('');
+
+        container.querySelectorAll('.announcement-dismiss-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const announcementId = parseInt(e.target.closest('.announcement-dismiss-btn').dataset.id);
+                this.dismissAnnouncementBanner(announcementId);
+            });
+        });
+    }
+
+    dismissAnnouncementBanner(announcementId) {
+        const dismissed = JSON.parse(localStorage.getItem('dismissed_announcements') || '[]');
+        if (!dismissed.includes(announcementId)) {
+            dismissed.push(announcementId);
+            localStorage.setItem('dismissed_announcements', JSON.stringify(dismissed));
+        }
+        const banner = document.querySelector(`.announcement-banner[data-id="${announcementId}"]`);
+        if (banner) banner.remove();
     }
 
     setupAudienceCheckboxes() {
@@ -10312,6 +10410,16 @@ class AdminDashboard {
         const location = document.getElementById('edit-product-location').value;
         const description = document.getElementById('edit-product-description').value;
         const imageInput = document.getElementById('edit-product-image');
+
+        if (price && Number(price) > 99999) {
+            this.showMessage('Price must not exceed 99,999', 'error');
+            return;
+        }
+        if (stock_quantity && Number(stock_quantity) > 99999) {
+            this.showMessage('Stock must not exceed 99,999', 'error');
+            return;
+        }
+
         const formData = new FormData();
         formData.append('name', productName);
         formData.append('price', price);

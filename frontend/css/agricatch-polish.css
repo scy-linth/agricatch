@@ -712,6 +712,23 @@ button:not(:disabled):not(.disabled):hover {
     color: #fff;
 }
 
+/* Header login/register buttons stay transparent on hover */
+.header-actions .user-menu .btn-primary,
+.header-actions .user-menu .btn-primary:hover,
+.header-actions .user-menu .btn-primary:focus {
+    background: transparent !important;
+    background-color: transparent !important;
+    border-color: rgba(255, 255, 255, 0.65) !important;
+    color: var(--white, #fff) !important;
+}
+
+.header-actions .user-menu .btn-primary:hover,
+.header-actions .user-menu .btn-primary:focus {
+    background: rgba(255, 255, 255, 0.15) !important;
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    border-color: rgba(255, 255, 255, 0.9) !important;
+}
+
 /* Secondary button — unified */
 .btn-secondary {
     background-color: #f3f4f6;
@@ -1344,9 +1361,9 @@ a:not([aria-label]):not([aria-labelledby]):empty {
 }
 
 #home.hero .hero-buttons .btn-hero-primary {
-    background: linear-gradient(135deg, #24bf63, #119c50);
+    background: var(--primary-color);
     border: 1px solid rgba(255, 255, 255, 0.16);
-    box-shadow: 0 14px 30px rgba(13, 101, 52, 0.34);
+    box-shadow: 0 14px 30px rgba(74, 222, 128, 0.34);
 }
 
 #home.hero .hero-buttons .btn-hero-outline {
@@ -1356,7 +1373,11 @@ a:not([aria-label]):not([aria-labelledby]):empty {
     backdrop-filter: blur(8px);
 }
 
-#home.hero .hero-buttons .btn-hero-primary:hover,
+#home.hero .hero-buttons .btn-hero-primary:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+}
+
 #home.hero .hero-buttons .btn-hero-outline:hover {
     transform: translateY(-2px);
 }

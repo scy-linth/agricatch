@@ -170,26 +170,113 @@ class WishlistPage {
                     : '';
 
                 const isAvailable = item.status !== 'disabled' && Number(item.stock_quantity ?? 0) > 0;
+                const isPreorder = item.is_preorder === true || item.listing_type === 'preorder';
+                const qty = Number(item.stock_quantity ?? 0);
+                const unit = String(item.unit || 'item');
+
+                // Badge — same as landing page
+                const preorderBadge = isPreorder
+                    ? '<span class="badge harvest-soon-badge mb-2">HARVEST SOON</span>'
+                    : '<span class="badge bg-success mb-2">Available Now</span>';
+
+                // Image URL — same logic as app.js
+                let productImageUrl = item.image_url || '';
+                if (productImageUrl && !productImageUrl.startsWith('http') && !productImageUrl.startsWith('/')) {
+                    productImageUrl = '/' + productImageUrl;
+                }
+                if (!productImageUrl || productImageUrl === 'null' || productImageUrl === 'undefined') {
+                    productImageUrl = window.__PLACEHOLDER_IMAGE__;
+                }
+
+                // Rating — same as landing page
+                const totalReviews = Number(item.total_reviews ?? item.review_count ?? 0);
+                const averageRatingValue = Number(item.average_rating || 0);
+                const averageRating = this.fmtNumber(averageRatingValue, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+                // Ship from — same as landing page
+                const shipFrom = item.province
+                    ? (item.city ? `${item.city}, ${item.province}` : item.province)
+                    : 'your local area';
+
+                // Sold count — same as landing page
+                const soldCount = Number(item.sold_qty ?? item.sales_count ?? 0) || 0;
+
+                // Stock display — same as landing page
+                const stockDisplay = isPreorder
+                    ? (() => {
+                        const reserved = Number(item.reserved_quantity ?? 0);
+                        const max = Number(item.max_preorder_quantity ?? 0);
+                        const remaining = max > 0 ? max - reserved : 'Unlimited';
+                        return `<span style="color: #9333ea;">${remaining} ${unit} remaining</span>`;
+                    })()
+                    : isAvailable
+                    ? `<span style="color:#374151;">${qty} ${unit} available</span>`
+                    : `<span style="color:#9ca3af;">Out of stock</span>`;
+
+                // Card classes & click — same as landing page, with unavailable override
+                const cardClass = isAvailable ? 'product-card' : 'product-card product-card-unavailable';
+                const cardClick = isAvailable
+                    ? `onclick="wishlistPage.openProduct(${item.id})"`
+                    : '';
+                const cardStyle = isAvailable ? 'cursor: pointer;' : 'cursor: default; opacity: 0.7;';
+                const imgStyle = isAvailable ? '' : 'opacity:0.45;filter:grayscale(1);';
+
+                // Cart button — same logic as landing page
+                const cartBtnAttr = isAvailable
+                    ? `onclick="event.stopPropagation(); wishlistPage.addToCart(${item.id})"`
+                    : 'disabled style="opacity: 0.5; cursor: not-allowed;"';
+                const cartBtnText = isAvailable
+                    ? (isPreorder ? 'Reserve' : 'Add to Cart')
+                    : 'Unavailable';
+                const cartBtnTitle = isAvailable ? '' : 'Product unavailable';
+
+                // Unavailable overlay badge
+                const unavailableOverlay = !isAvailable
+                    ? `<div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:#fff;font-size:0.7rem;font-weight:600;padding:3px 8px;border-radius:6px;z-index:1;">Unavailable</div>`
+                    : '';
 
                 return `
-                <div class="product-card" style="cursor:pointer;" onclick="wishlistPage.openProduct(${item.id})">
-                    <img src="${this.escapeHtml(item.image_url || window.__PLACEHOLDER_IMAGE__)}"
-                         alt="${this.escapeHtml(item.name)}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__">
+                <div class="${cardClass}" ${cardClick} style="${cardStyle}" data-product-id="${item.id}">
+                    <div style="position:relative;">
+                        ${unavailableOverlay}
+                        <img src="${this.escapeHtml(productImageUrl)}"
+                             alt="${this.escapeHtml(item.name)}" class="product-image" onerror="this.src=window.__PLACEHOLDER_IMAGE__" draggable="false" ondragstart="event.preventDefault()" style="${imgStyle}">
+                    </div>
                     <div class="product-info">
-                        <h3 class="product-name">${this.escapeHtml(item.name)}</h3>
-                        <div class="product-price">${this.fmtCurrency(item.price)} per ${this.escapeHtml(item.unit || '')}</div>
+                        ${preorderBadge}
+                        <h3 class="product-name" style="${!isAvailable ? 'color:#9ca3af;' : ''}">${this.escapeHtml(item.name)}</h3>
+                        <div class="product-price" style="${!isAvailable ? 'color:#9ca3af;' : ''}">${this.fmtCurrency(item.price)} per ${this.escapeHtml(unit)}</div>
                         ${priceDropBadge ? `<div style="margin:4px 0;">${priceDropBadge}</div>` : ''}
-                        <div class="product-details">${item.description ? this.escapeHtml(item.description.substring(0, 100)) + '...' : ''}</div>
-                        <div class="product-meta">
-                            <span>Stock: ${this.fmtNumber(item.stock_quantity ?? 0)}</span>
-                            ${item.category_name ? `<span>${this.escapeHtml(item.category_name)}</span>` : ''}
+                        <div class="product-meta product-card-summary">
+                            <div class="product-stock" aria-label="${isPreorder ? 'Preorder capacity' : 'Stock available'}">
+                                ${stockDisplay}
+                            </div>
+                            <div class="product-rating-wrap" aria-hidden="false">
+                                <div class="product-rating-text" aria-label="${totalReviews} reviews, average ${averageRating} out of 5">
+                                    <i class="fas fa-star product-rating-icon" aria-hidden="true"></i>
+                                    <span class="product-rating-value">${averageRating}</span>
+                                </div>
+                            </div>
+                            <div class="product-ship-from" aria-label="Shipping origin">
+                                Ships from ${this.escapeHtml(shipFrom)}
+                            </div>
+                            <div class="product-sold-left">
+                                <span class="sold-count">Sold ${this.fmtNumber(soldCount)}</span>
+                            </div>
                         </div>
-                        <div class="wishlist-actions" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-                            <button class="btn btn-primary btn-small" onclick="event.stopPropagation(); wishlistPage.addToCart(${item.id})" ${!isAvailable ? 'disabled title="Out of stock"' : ''}>
-                                <i class="fas fa-cart-plus"></i> Add to Cart
+                        <div class="product-actions" style="display:flex;gap:8px;align-items:center;">
+                            <button type="button" class="add-to-cart-btn ${isPreorder && isAvailable ? 'btn-warning' : ''}"
+                                ${cartBtnAttr}
+                                ${!isAvailable ? 'disabled' : ''}
+                                title="${cartBtnTitle}">
+                                ${cartBtnText}
                             </button>
-                            <button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); wishlistPage.removeFromWishlist(${item.id})">
-                                <i class="fas fa-heart-broken"></i> Remove
+                            <button type="button" class="wishlist-toggle-btn"
+                                onclick="event.stopPropagation(); wishlistPage.removeFromWishlist(${item.id})"
+                                title="Remove from wishlist"
+                                aria-label="Remove from wishlist"
+                                style="background:none;border:none;padding:8px;cursor:pointer;color:#ef4444;transition:color 0.2s;">
+                                <i class="fas fa-heart" style="font-size:1.2rem;" aria-hidden="true"></i>
                             </button>
                         </div>
                     </div>

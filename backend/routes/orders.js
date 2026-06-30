@@ -6,6 +6,19 @@ const activityLogger = require('../services/activityLogger');
 const { restoreInventoryOnCancel, updateStatisticsOnDeliver, getOrderForBusinessLogic } = require('../utils/orderBusinessLogic');
 const { validateTransition, getValidStatuses } = require('../utils/orderTransitions');
 
+async function logOrderStatusHistory(client, orderId, status, changedBy = null, changedByRole = null) {
+  try {
+    await client.query(
+      `INSERT INTO order_status_history (order_id, status, changed_by, changed_by_role)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT DO NOTHING`,
+      [orderId, status, changedBy, changedByRole]
+    );
+  } catch (e) {
+    console.error('Failed to log order status history:', e.message);
+  }
+}
+
 function getClientIp(req) {
   const xf = req.headers['x-forwarded-for'];
   if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
@@ -60,6 +73,24 @@ router.get('/', async (req, res) => {
 
     console.log(`[Get Orders] User ${decoded.id}: Found ${result.rows.length} orders`);
 
+    // Fetch status history for all orders in one query
+    const orderIds = result.rows.map(r => r.id);
+    let statusHistoryMap = {};
+    if (orderIds.length > 0) {
+      try {
+        const historyResult = await pool.query(
+          `SELECT order_id, status, created_at FROM order_status_history WHERE order_id = ANY($1) ORDER BY order_id, created_at`,
+          [orderIds]
+        );
+        for (const h of historyResult.rows) {
+          if (!statusHistoryMap[h.order_id]) statusHistoryMap[h.order_id] = [];
+          statusHistoryMap[h.order_id].push({ status: h.status, timestamp: h.created_at });
+        }
+      } catch (e) {
+        console.error('Failed to fetch order status history:', e.message);
+      }
+    }
+
     // Format orders to match frontend expectations (each order is already one item)
     const orders = result.rows.map(row => ({
       id: row.id,
@@ -74,6 +105,7 @@ router.get('/', async (req, res) => {
       delivery_address: row.delivery_address,
       delivery_date: row.delivery_date,
       special_instructions: row.special_instructions,
+      status_history: statusHistoryMap[row.id] || [],
       created_at: row.created_at,
       updated_at: row.updated_at,
       items: [{
@@ -305,6 +337,9 @@ router.put('/:orderId/items/:orderItemId/status', async (req, res) => {
         WHERE id = $2
       `, [status, actualOrderId]);
 
+      // Log status history for timeline tracking
+      await logOrderStatusHistory(client, actualOrderId, status, decoded.id, role);
+
       if (status === 'delivered' && order.status !== 'delivered') {
         // Update statistics using shared business logic
         await updateStatisticsOnDeliver(client, order);
@@ -481,7 +516,8 @@ router.post('/', async (req, res) => {
         SELECT c.id as cart_id, c.quantity, p.id as product_id, p.price, p.stock_quantity, p.name,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date, COALESCE(u.is_disabled, false) as farmer_is_disabled,
-               p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity
+               p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity,
+               p.minimum_order_quantity
         FROM cart c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN users u ON p.farmer_id = u.id
@@ -491,7 +527,8 @@ router.post('/', async (req, res) => {
         SELECT c.id as cart_id, c.quantity, p.id as product_id, p.price, p.stock_quantity, p.name,
                p.is_available, COALESCE(p.is_admin_disabled, false) as is_admin_disabled,
                p.expiry_date, COALESCE(u.is_disabled, false) as farmer_is_disabled,
-               p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity
+               p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity,
+               p.minimum_order_quantity
         FROM cart c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN users u ON p.farmer_id = u.id
@@ -537,6 +574,15 @@ router.post('/', async (req, res) => {
           await client.query('ROLLBACK');
           return res.status(400).json({
             message: 'Invalid cart item. Please refresh your cart and try again.'
+          });
+        }
+
+        // Validate minimum order quantity
+        const minimumOrderQuantity = Number.parseInt(item.minimum_order_quantity, 10);
+        if (Number.isInteger(minimumOrderQuantity) && minimumOrderQuantity > 0 && item.quantity < minimumOrderQuantity) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            message: `Minimum order quantity for ${item.name} is ${minimumOrderQuantity}. Please update your cart.`
           });
         }
       }
@@ -884,6 +930,9 @@ router.put('/:id/status', async (req, res) => {
             cancelled_by = CASE WHEN $1::varchar = 'cancelled'::varchar THEN 'farmer'::varchar ELSE cancelled_by END
         WHERE id = $2
       `, [status, orderId]);
+
+      // Log status history for timeline tracking
+      await logOrderStatusHistory(client, orderId, status, decoded.id, userResult.rows[0].role);
 
       // Apply business logic based on status change
       if (status === 'cancelled' && currentStatus !== 'cancelled') {

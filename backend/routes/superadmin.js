@@ -282,6 +282,11 @@ router.post('/announcements', requireSuperAdmin, requireAnnouncementsEnabled, as
       [title, message, roles]
     );
 
+    // Disable all other active announcements so only one is active at a time
+    await pool.query(
+      `UPDATE announcements SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE is_active = true`
+    );
+
     // Create announcement record for dismissible banner
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // Default 7 days
@@ -329,7 +334,11 @@ router.get('/announcements', async (req, res) => {
        FROM announcements 
        WHERE is_active = true 
          AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
-         AND (audience = 'all' OR audience = $1)
+         AND (
+           audience = 'all' 
+           OR $1 = ANY(string_to_array(audience, ','))
+           OR ($1 = 'super_admin' AND 'admin' = ANY(string_to_array(audience, ',')))
+         )
        ORDER BY created_at DESC`,
       [userRole]
     );
@@ -356,8 +365,8 @@ router.get('/announcements/all', requireSuperAdmin, async (req, res) => {
   }
 });
 
-// ── DELETE /api/superadmin/announcements/:id — delete an announcement ────────
-router.delete('/announcements/:id', requireSuperAdmin, async (req, res) => {
+// ── PATCH /api/superadmin/announcements/:id/toggle — enable/disable announcement ─
+router.patch('/announcements/:id/toggle', requireSuperAdmin, async (req, res) => {
   try {
     const announcementId = parseInt(req.params.id, 10);
     if (!Number.isInteger(announcementId) || announcementId <= 0) {
@@ -365,30 +374,39 @@ router.delete('/announcements/:id', requireSuperAdmin, async (req, res) => {
     }
 
     const existing = await pool.query(
-      'SELECT id, title, audience FROM announcements WHERE id = $1',
+      'SELECT id, title, audience, is_active FROM announcements WHERE id = $1',
       [announcementId]
     );
     if (existing.rows.length === 0) {
       return res.status(404).json({ message: 'Announcement not found' });
     }
 
-    await pool.query('DELETE FROM announcements WHERE id = $1', [announcementId]);
+    const newActive = !existing.rows[0].is_active;
+
+    // When enabling, disable all other active announcements so only one is active at a time
+    if (newActive) {
+      await pool.query('UPDATE announcements SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE is_active = true AND id != $1', [announcementId]);
+    }
+
+    await pool.query('UPDATE announcements SET is_active = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [announcementId, newActive]);
+
+    const afterRes = await pool.query('SELECT id, title, audience, is_active FROM announcements WHERE id = $1', [announcementId]);
 
     await writeAdminAuditLog(pool, {
       actor_admin_id: req.user.id,
-      action: 'announcement.delete',
+      action: newActive ? 'announcement.enable' : 'announcement.disable',
       entity: 'announcements',
       entity_id: announcementId,
       before: existing.rows[0],
-      after: null,
+      after: afterRes.rows[0],
       req
     });
-    broadcastEvent('admin.audit', { action: 'announcement.delete', entity: 'announcements', actor_admin_id: req.user.id });
+    broadcastEvent('admin.audit', { action: newActive ? 'announcement.enable' : 'announcement.disable', entity: 'announcements', actor_admin_id: req.user.id });
 
-    res.json({ message: 'Announcement deleted' });
+    res.json({ message: newActive ? 'Announcement enabled' : 'Announcement disabled', is_active: newActive });
   } catch (err) {
-    console.error('Delete announcement error:', err);
-    res.status(500).json({ message: 'Server error deleting announcement' });
+    console.error('Toggle announcement error:', err);
+    res.status(500).json({ message: 'Server error toggling announcement' });
   }
 });
 

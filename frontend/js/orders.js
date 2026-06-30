@@ -28,7 +28,7 @@ class OrdersPage {
             NaN
         );
         this.ordersByStatus = { pending: [], preorder_reserved: [], confirmed: [], preparing: [], scheduled: [], out_for_delivery: [], delivered: [], cancelled: [] };
-        this.currentTab = 'all';
+        this.currentTab = 'active';
         this.ratingDraft = {
             productId: null,
             reviewId: null,
@@ -125,10 +125,15 @@ class OrdersPage {
         this.setupEventListeners();
         this.configureBackButton();
         
-        // Restore tab from URL parameter
+        // Restore tab from URL parameter, then sessionStorage fallback
         const params = new URLSearchParams(window.location.search);
         const tabParam = params.get('tab');
-        const restoredTab = (tabParam && ['all', 'active', 'delivered', 'cancelled'].includes(tabParam)) ? tabParam : 'all';
+        const sessionTab = sessionStorage.getItem('ordersActiveTab');
+        const restoredTab = (tabParam && ['active', 'delivered', 'cancelled'].includes(tabParam))
+            ? tabParam
+            : (sessionTab && ['active', 'delivered', 'cancelled'].includes(sessionTab))
+                ? sessionTab
+                : 'active';
         
         // Set current tab before loading
         this.currentTab = restoredTab;
@@ -174,8 +179,7 @@ class OrdersPage {
     }
 
     setupEventListeners() {
-        // Setup tab click handlers - simplified tabs: All, Active, Delivered, Cancelled
-        document.getElementById('all-orders-tab')?.addEventListener('click', () => this.switchOrderTab('all'));
+        // Setup tab click handlers - simplified tabs: Active, Delivered, Cancelled
         document.getElementById('active-orders-tab')?.addEventListener('click', () => this.switchOrderTab('active'));
         document.getElementById('delivered-orders-tab')?.addEventListener('click', () => this.switchOrderTab('delivered'));
         document.getElementById('cancelled-orders-tab')?.addEventListener('click', () => this.switchOrderTab('cancelled'));
@@ -263,27 +267,35 @@ class OrdersPage {
 
     switchOrderTab(tab) {
         this.currentTab = tab;
-        
+
+        // Persist tab in URL and sessionStorage so refresh stays on same tab
+        if (['active', 'delivered', 'cancelled'].includes(tab)) {
+            sessionStorage.setItem('ordersActiveTab', tab);
+            const params = new URLSearchParams(window.location.search);
+            params.set('tab', tab);
+            const newUrl = `${window.location.pathname}?${params.toString()}${window.location.hash || ''}`;
+            window.history.replaceState({}, '', newUrl);
+        }
+
         // Hide all tabs and sections
         document.querySelectorAll('.order-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        
+
         // Show selected tab and section
         const tabBtn = document.getElementById(`${tab}-orders-tab`);
         const section = document.getElementById(`${tab}-orders-section`);
-        
+
         if (tabBtn) tabBtn.classList.add('active');
         if (section) section.classList.add('active');
-        
+
         // Map simplified tabs to actual order statuses
         const statusMap = {
-            'all': ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery', 'delivered', 'cancelled'],
             'active': ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery'],
             'delivered': ['delivered'],
             'cancelled': ['cancelled']
         };
-        
-        const statuses = statusMap[tab] || statusMap['all'];
+
+        const statuses = statusMap[tab] || statusMap['active'];
         this.renderOrdersByStatus(statuses);
     }
 
@@ -382,7 +394,7 @@ class OrdersPage {
         // Check if tab parameter is present - if so, don't auto-switch for highlight
         const params = new URLSearchParams(window.location.search);
         const tabParam = params.get('tab');
-        if (tabParam && ['all', 'active', 'delivered', 'cancelled'].includes(tabParam)) {
+        if (tabParam && ['active', 'delivered', 'cancelled'].includes(tabParam)) {
             // Just highlight without switching tab
             setTimeout(() => {
                 const target = document.querySelector(`.order-card[data-order-id="${this.highlightOrderId}"]`);
@@ -444,9 +456,8 @@ class OrdersPage {
     }
 
     renderAllOrders() {
-        // Render orders for simplified tabs only (all, active, delivered, cancelled)
+        // Render orders for simplified tabs only (active, delivered, cancelled)
         const tabStatusMap = {
-            'all': ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery', 'delivered', 'cancelled'],
             'active': ['pending', 'preorder_reserved', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery'],
             'delivered': ['delivered'],
             'cancelled': ['cancelled']
@@ -469,7 +480,6 @@ class OrdersPage {
         try {
             // Map simplified tabs to status counts
             const tabCounts = {
-                'all': 0,
                 'active': 0,
                 'delivered': 0,
                 'cancelled': 0
@@ -485,7 +495,6 @@ class OrdersPage {
                 } else if (status === 'cancelled') {
                     tabCounts.cancelled += count;
                 }
-                tabCounts.all += count;
             });
 
             // Update tab labels with counts
@@ -567,22 +576,57 @@ class OrdersPage {
             const steps = ['pending', 'confirmed', 'preparing', 'scheduled', 'out_for_delivery', 'delivered'];
             const currentStepIdx = steps.indexOf(currentStatus);
             const isCancelled = currentStatus === 'cancelled';
+
+            // Build per-step timestamps from status_history (from API) with fallbacks
+            const stepTimestamps = {};
+            if (Array.isArray(order.status_history)) {
+                for (const h of order.status_history) {
+                    if (h.status && h.timestamp) {
+                        stepTimestamps[h.status] = new Date(h.timestamp);
+                    }
+                }
+            }
+            // Fallbacks if status_history is empty
+            if (!stepTimestamps['pending'] && order.created_at) stepTimestamps['pending'] = new Date(order.created_at);
+            if (!stepTimestamps['delivered'] && (order.delivered_at || item.delivered_at)) stepTimestamps['delivered'] = new Date(order.delivered_at || item.delivered_at);
+            if (!stepTimestamps[currentStatus] && order.updated_at && currentStatus !== 'delivered') stepTimestamps[currentStatus] = new Date(order.updated_at);
+
+            // For delivered orders, backfill missing intermediate timestamps using updated_at
+            // This handles older orders where status_history wasn't populated for every transition
+            if (isDelivered && order.updated_at) {
+                for (const s of ['confirmed', 'preparing', 'scheduled', 'out_for_delivery']) {
+                    if (!stepTimestamps[s]) {
+                        stepTimestamps[s] = new Date(order.updated_at);
+                    }
+                }
+            }
+
+            const fmtTimelineDate = (dt) => {
+                if (!dt || Number.isNaN(dt.getTime())) return '';
+                const d = dt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' });
+                const t = dt.toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' });
+                return `${d}, ${t}`;
+            };
+
             const timelineHtml = !isCancelled ? `
-                <div class="order-timeline" style="display:flex;align-items:center;gap:0;margin:12px 0 4px;overflow-x:auto;padding-bottom:2px;">
+                <div class="order-timeline" style="display:flex;align-items:flex-start;gap:0;margin:12px 0 4px;overflow-x:auto;padding-bottom:2px;">
                     ${steps.map((step, i) => {
                         const done = i <= currentStepIdx;
                         const active = i === currentStepIdx;
                         const labels = { pending: 'Pending', confirmed: 'Confirmed', preparing: 'Preparing', scheduled: 'Scheduled', out_for_delivery: 'On the Way', delivered: 'Delivered' };
                         const color = done ? '#10b981' : '#d1d5db';
                         const textColor = active ? '#059669' : done ? '#10b981' : '#9ca3af';
+                        const ts = stepTimestamps[step];
+                        const tsLabel = ts ? fmtTimelineDate(ts) : '';
                         return `
                             <div style="display:flex;flex-direction:column;align-items:center;min-width:72px;">
                                 <div style="width:24px;height:24px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;${active ? 'box-shadow:0 0 0 3px #d1fae5;' : ''}">
                                     ${done ? '<i class="fas fa-check" style="color:#fff;font-size:11px;"></i>' : `<span style="width:8px;height:8px;border-radius:50%;background:#fff;display:block;"></span>`}
                                 </div>
                                 <span style="font-size:10px;color:${textColor};margin-top:3px;text-align:center;font-weight:${active ? '600' : '400'};white-space:nowrap;">${labels[step]}</span>
+                                ${tsLabel ? `<span style="font-size:9px;color:#9ca3af;margin-top:1px;text-align:center;white-space:nowrap;">${tsLabel}</span>` : ''}
                             </div>
-                            ${i < steps.length - 1 ? `<div style="flex:1;height:2px;background:${i < currentStepIdx ? '#10b981' : '#e5e7eb'};min-width:20px;margin-bottom:18px;"></div>` : ''}
+                            ${i < steps.length - 1 ? `<div style="flex:1;height:2px;background:${i < currentStepIdx ? '#10b981' : '#e5e7eb'};min-width:20px;margin-top:11px;"></div>` : ''}
                         `;
                     }).join('')}
                 </div>` : '';
@@ -614,8 +658,11 @@ class OrdersPage {
                         ${isPreorder && item.harvest_adjustment_count ? `<div class="order-item-meta"><strong>Adjustments:</strong> ${item.harvest_adjustment_count}</div>` : ''}
                         ${isPreorder && item.previous_harvest_date ? `<div class="order-item-meta"><strong>Previous Harvest Date:</strong> ${new Date(item.previous_harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
                         ${isPreorder && item.harvest_adjustment_reason ? `<div class="order-item-meta"><strong>Adjustment Reason:</strong> ${this.escapeHtml(item.harvest_adjustment_reason)}</div>` : ''}
-                        ${isPreorder && item.preorder_availability_date ? `<div class="order-item-meta"><strong>Available:</strong> ${new Date(item.preorder_availability_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
-                        ${order.delivery_date ? `<div class="order-item-meta"><strong>Delivery Date:</strong> ${new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
+                        ${isPreorder && item.preorder_availability_date ? `<div class="order-item-meta"><strong>Harvest Date:</strong> ${new Date(item.preorder_availability_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
+                        ${item.farm_location ? `<div class="order-item-meta"><strong>Farm Location:</strong> ${this.escapeHtml(item.farm_location)}</div>` : ''}
+                        ${order.delivery_address ? `<div class="order-item-meta"><strong>Delivery Address:</strong> ${this.escapeHtml(order.delivery_address)}</div>` : ''}
+                        ${order.special_instructions ? `<div class="order-item-meta"><strong>Special Instructions:</strong> ${this.escapeHtml(order.special_instructions)}</div>` : ''}
+                        ${order.delivery_date ? `<div class="order-item-meta"><strong>Delivery Date Announced:</strong> ${new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
                         ${order.reschedule_reason ? `<div class="order-item-meta"><strong>Reason for Rescheduling:</strong> ${this.escapeHtml(order.reschedule_reason)}</div>` : ''}
                         ${(currentStatus === 'cancelled') ? `
                             <div class="order-item-meta">
@@ -921,7 +968,7 @@ class OrdersPage {
 
     clearOrders() {
         // Clear all order containers using simplified tab structure
-        const tabs = ['all', 'active', 'delivered', 'cancelled'];
+        const tabs = ['active', 'delivered', 'cancelled'];
         tabs.forEach(tab => {
             const container = document.getElementById(`${tab}-orders-list`);
             if (container) {
@@ -934,7 +981,7 @@ class OrdersPage {
         });
         // Reset orders by status
         this.ordersByStatus = { pending: [], preorder_reserved: [], confirmed: [], preparing: [], scheduled: [], out_for_delivery: [], delivered: [], cancelled: [] };
-        this.currentTab = 'all';
+        this.currentTab = 'active';
         // Force reload from server
         this.loadOrders();
     }
@@ -1054,7 +1101,6 @@ class OrdersPage {
 
     formatTabLabel(tab) {
         const labels = {
-            'all': 'All',
             'active': 'Active',
             'delivered': 'Delivered',
             'cancelled': 'Cancelled'

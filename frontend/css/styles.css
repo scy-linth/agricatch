@@ -64,6 +64,7 @@ body {
     min-height: 100%;
     position: relative;
     overflow-x: hidden;
+    cursor: default;
 }
 
 body.loading {
@@ -5419,6 +5420,18 @@ iframe[src*="recaptcha/api2/bframe"] {
     color: #fff !important;
 }
 
+#auth-submit-btn {
+    background: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: var(--white) !important;
+}
+
+#auth-submit-btn:hover:not(:disabled) {
+    background: var(--primary-dark) !important;
+    border-color: var(--primary-dark) !important;
+    color: var(--white) !important;
+}
+
 #auth-submit-btn:disabled {
     background: var(--primary-color) !important;
     color: #fff !important;
@@ -5585,6 +5598,17 @@ textarea {
     font-size: 1rem;
     transition: var(--transition);
     font-family: inherit;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+textarea {
+    cursor: text;
 }
 
 input:focus,

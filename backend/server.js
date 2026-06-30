@@ -316,6 +316,7 @@ app.use(checkMaintenanceMode);
             farmer_id INTEGER REFERENCES users(id),
             stock_quantity INTEGER DEFAULT 0,
             unit VARCHAR(20) DEFAULT 'kg',
+            minimum_order_quantity INTEGER CHECK (minimum_order_quantity IS NULL OR minimum_order_quantity > 0),
             image_url VARCHAR(255),
             sales_count INTEGER DEFAULT 0,
             is_available BOOLEAN DEFAULT true,
@@ -356,6 +357,9 @@ app.use(checkMaintenanceMode);
       await safeQuery('products.image_url column', 'ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url VARCHAR(255)');
       await safeQuery("products.unit column", "ALTER TABLE products ADD COLUMN IF NOT EXISTS unit VARCHAR(20) DEFAULT 'kg'");
       await safeQuery('products.stock_quantity column', 'ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 0');
+      await safeQuery('products.minimum_order_quantity column', 'ALTER TABLE products ADD COLUMN IF NOT EXISTS minimum_order_quantity INTEGER');
+      await safeQuery('products.minimum_order_quantity constraint', 'ALTER TABLE products DROP CONSTRAINT IF EXISTS products_minimum_order_quantity_positive');
+      await safeQuery('products.minimum_order_quantity positive constraint', 'ALTER TABLE products ADD CONSTRAINT products_minimum_order_quantity_positive CHECK (minimum_order_quantity IS NULL OR minimum_order_quantity > 0)');
       await safeQuery('products.sales_count column', 'ALTER TABLE products ADD COLUMN IF NOT EXISTS sales_count INTEGER DEFAULT 0');
       await safeQuery('products.is_available column', 'ALTER TABLE products ADD COLUMN IF NOT EXISTS is_available BOOLEAN DEFAULT true');
       await safeQuery('products.created_at column', 'ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');

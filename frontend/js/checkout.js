@@ -654,7 +654,9 @@ class CheckoutPage {
             } else {
                 maxStock = Number(item.stock_quantity) || 0;
             }
-            maxStock = Math.max(1, maxStock);
+            const minimumOrderQuantity = Number.parseInt(item.minimum_order_quantity, 10);
+            const moq = Number.isInteger(minimumOrderQuantity) && minimumOrderQuantity > 0 ? minimumOrderQuantity : 1;
+            maxStock = Math.max(moq, maxStock);
             const badge = isUnavailable
                 ? `<span class="status-pill pending ms-1">Unavailable</span>`
                 : '';
@@ -666,6 +668,8 @@ class CheckoutPage {
                     return `Reservation: ${this.fmtNumber(remaining)} ${item.unit || 'unit'} remaining`;
                 })()
                 : `Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}`;
+            const moqDisplay = moq > 1 ? `<div class="co-item-meta co-item-moq" style="font-size:0.75rem;color:#6b7280;">Min. order: ${moq} ${item.unit || 'unit'}</div>` : '';
+            const minusDisabled = item.quantity <= moq || isUnavailable;
             return `
             <div class="co-item" data-product-id="${item.product_id}">
                 <img src="${imageUrl}" alt="${item.name}" onerror="this.src='/images/logo.png'">
@@ -674,12 +678,13 @@ class CheckoutPage {
                     <div class="co-item-meta">${this.fmtCurrency(item.price)} per ${item.unit || 'item'}</div>
                     ${item.farmer_name ? `<div class="co-item-meta co-item-farmer">From ${item.farmer_name}</div>` : ''}
                     <div class="co-item-meta co-item-stock">${stockDisplay}</div>
+                    ${moqDisplay}
                     <div class="co-qty">
-                        <button type="button" class="co-qty-btn" onclick="checkoutPage.handleCheckoutQuantityButton(${item.id}, -1, ${maxStock})" ${(item.quantity <= 1 || isUnavailable) ? 'disabled' : ''}><i class="fas fa-minus"></i></button>
-                        <input type="number" class="co-qty-input" value="${item.quantity}" min="1" max="${maxStock}" inputmode="numeric"
-                            onchange="checkoutPage.handleCheckoutQuantityInput(${item.id}, this.value, ${maxStock}, this)"
+                        <button type="button" class="co-qty-btn" onclick="checkoutPage.handleCheckoutQuantityButton(${item.id}, -1, ${maxStock}, ${moq})" ${minusDisabled ? 'disabled' : ''}><i class="fas fa-minus"></i></button>
+                        <input type="number" class="co-qty-input" value="${item.quantity}" min="${moq}" max="${maxStock}" inputmode="numeric"
+                            onchange="checkoutPage.handleCheckoutQuantityInput(${item.id}, this.value, ${maxStock}, ${moq}, this)"
                             onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" ${disabledAttr}>
-                        <button type="button" class="co-qty-btn" onclick="checkoutPage.handleCheckoutQuantityButton(${item.id}, 1, ${maxStock})" ${disabledAttr}><i class="fas fa-plus"></i></button>
+                        <button type="button" class="co-qty-btn" onclick="checkoutPage.handleCheckoutQuantityButton(${item.id}, 1, ${maxStock}, ${moq})" ${disabledAttr}><i class="fas fa-plus"></i></button>
                         <button type="button" class="co-remove-btn-qty" onclick="checkoutPage.removeCheckoutItem(${item.id})">
                             <i class="fas fa-trash-alt"></i>
                         </button>
@@ -872,7 +877,7 @@ class CheckoutPage {
         }
     }
 
-    async handleCheckoutQuantityButton(cartId, change, maxStock) {
+    async handleCheckoutQuantityButton(cartId, change, maxStock, moq) {
         const inputEl = document.querySelector(`.co-qty-input[onchange*="${cartId}"]`);
         if (!inputEl) return;
 
@@ -890,18 +895,20 @@ class CheckoutPage {
             }
         }
 
-        const currentQty = parseInt(inputEl.value, 10) || 1;
+        const safeMoq = Number.isFinite(Number(moq)) && Number(moq) > 0 ? Number(moq) : 1;
+        const currentQty = parseInt(inputEl.value, 10) || safeMoq;
         const newQty = currentQty + change;
 
-        if (newQty < 1 || newQty > currentStock) return;
+        if (newQty < safeMoq || newQty > currentStock) return;
 
-        // Update max attribute on input
+        // Update max and min attributes on input
         inputEl.max = currentStock;
+        inputEl.min = safeMoq;
         
         await this.updateCartQuantity(cartId, newQty, inputEl);
     }
 
-    async handleCheckoutQuantityInput(cartId, rawValue, maxStock, inputEl) {
+    async handleCheckoutQuantityInput(cartId, rawValue, maxStock, moq, inputEl) {
         const itemEl = inputEl ? inputEl.closest('.co-item') : null;
         const productId = itemEl ? itemEl.getAttribute('data-product-id') : null;
         
@@ -918,10 +925,12 @@ class CheckoutPage {
         
         const parsed = Number.parseInt(String(rawValue || '').trim(), 10);
         const safeMax = Number.isFinite(Number(currentStock)) && Number(currentStock) > 0 ? Number(currentStock) : 1;
-        const nextQuantity = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), safeMax) : 1;
+        const safeMoq = Number.isFinite(Number(moq)) && Number(moq) > 0 ? Number(moq) : 1;
+        const nextQuantity = Number.isFinite(parsed) ? Math.min(Math.max(parsed, safeMoq), safeMax) : safeMoq;
         if (inputEl) {
             inputEl.value = String(nextQuantity);
             inputEl.max = safeMax;
+            inputEl.min = safeMoq;
         }
         await this.updateCartQuantity(cartId, nextQuantity, inputEl);
     }

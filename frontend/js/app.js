@@ -233,16 +233,27 @@ class AgricultureMarket {
         container.innerHTML = announcements
             .filter(ann => !dismissed.includes(ann.id))
             .map(ann => `
-                <div class="announcement-banner" data-id="${ann.id}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; margin: 0; position: relative;">
-                    <div class="container" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
-                        <div style="flex: 1;">
-                            <strong style="display: block; margin-bottom: 0.25rem;">Announcement: ${this.escapeHtml(ann.title)}</strong>
-                            <span style="opacity: 0.9;">${this.escapeHtml(ann.message)}</span>
-                        </div>
-                        ${ann.is_dismissible ? `
-                            <button class="announcement-dismiss-btn" data-id="${ann.id}" style="background: transparent; border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 18px; font-weight: bold; flex-shrink: 0;">✕</button>
-                        ` : ''}
+                <style>
+                    @keyframes announce-slide-${ann.id} {
+                        0% { transform: translateX(100%); }
+                        100% { transform: translateX(-100%); }
+                    }
+                    .announce-marquee-${ann.id} {
+                        display: inline-block;
+                        white-space: nowrap;
+                        animation: announce-slide-${ann.id} 18s linear infinite;
+                    }
+                </style>
+                <div class="announcement-banner" data-id="${ann.id}" style="background: linear-gradient(90deg, #e0f2fe 0%, #bae6fd 100%); color: #0369a1; padding: 0.5rem 1rem; margin: 0; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; box-shadow: 0 2px 6px rgba(0,0,0,0.12); overflow: hidden; display: flex; align-items: center; gap: 0.75rem; min-height: 40px;">
+                    <span style="flex-shrink: 0; font-size: 0.85rem; font-weight: 700; color: #0284c7;"><i class="bi bi-megaphone" style="margin-right:4px;"></i>Announcement</span>
+                    <div style="flex: 1; overflow: hidden; position: relative;">
+                        <span class="announce-marquee-${ann.id}" style="font-size: 0.85rem; font-weight: 500; color: #0369a1;">
+                            <strong>${this.escapeHtml(ann.title)}</strong> &mdash; ${this.escapeHtml(ann.message)}
+                        </span>
                     </div>
+                    ${ann.is_dismissible ? `
+                        <button class="announcement-dismiss-btn" data-id="${ann.id}" style="background: rgba(2,132,199,0.15); border: none; color: #0284c7; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; flex-shrink: 0; line-height: 1;">&#10005;</button>
+                    ` : ''}
                 </div>
             `).join('');
 
@@ -2219,12 +2230,26 @@ class AgricultureMarket {
     }
 
     // Authentication
+    isTokenExpired(token) {
+        const payload = this.decodeJwtPayload(token || this.token);
+        if (!payload || !payload.exp) return false; // no exp = treat as valid
+        const nowSec = Math.floor(Date.now() / 1000);
+        return payload.exp < nowSec;
+    }
+
     checkAuthStatus() {
-        if (this.token) {
+        if (this.token && !this.isTokenExpired(this.token)) {
             this.redirectAuthenticatedLandingByToken();
             this.showUserMenu();
             this.migrateGuestCart();
         } else {
+            if (this.token) {
+                // Token exists but is expired — clear it
+                this.token = null;
+                this.userId = null;
+                localStorage.removeItem('token');
+                localStorage.removeItem('userId');
+            }
             this.showGuestMenu();
         }
     }
@@ -2912,6 +2937,17 @@ class AgricultureMarket {
                     'Authorization': `Bearer ${this.token}`
                 }
             });
+
+            if (response.status === 401 || response.status === 403) {
+                // Token expired or invalid — clear auth state and show guest UI
+                this.token = null;
+                this.userId = null;
+                localStorage.removeItem('token');
+                localStorage.removeItem('userId');
+                this.showGuestMenu();
+                this.updateCartCount();
+                return;
+            }
 
             if (response.ok) {
                 const data = await response.json();
@@ -6091,18 +6127,21 @@ class AgricultureMarket {
             }
             if (priceEl) {
                 const unit = product.unit || 'unit';
-                priceEl.textContent = `${this.fmtCurrency(product.price || 0)} per ${unit}`;
+                priceEl.innerHTML = `${this.fmtCurrency(product.price || 0)} per ${unit} <span style="font-size:0.7em;color:#6b7280;font-weight:400;margin-left:6px;">(Price Varies)</span>`;
             }
             if (quantityEl) {
-                quantityEl.value = 1;
+                const minimumOrderQuantity = Number.parseInt(product.minimum_order_quantity, 10);
+                const moq = Number.isInteger(minimumOrderQuantity) && minimumOrderQuantity > 0 ? minimumOrderQuantity : 1;
+                quantityEl.value = moq;
+                quantityEl.min = moq;
                 const isPreorder = product.is_preorder === true;
                 if (isPreorder) {
                     const reserved = Number(product.reserved_quantity ?? 0);
                     const max = Number(product.max_preorder_quantity ?? 0);
                     const remaining = max > 0 ? max - reserved : 0;
-                    quantityEl.max = remaining || 1;
+                    quantityEl.max = Math.max(remaining || 1, moq);
                 } else {
-                    quantityEl.max = product.stock_quantity || 1;
+                    quantityEl.max = Math.max(product.stock_quantity || 1, moq);
                 }
             }
 
@@ -6477,9 +6516,11 @@ class AgricultureMarket {
         if (!quantityEl || !this.currentProductDetails) return;
 
         const maxStock = this.getMaxAddableQuantity();
+        const minimumOrderQuantity = Number.parseInt(this.currentProductDetails.minimum_order_quantity, 10);
+        const moq = Number.isInteger(minimumOrderQuantity) && minimumOrderQuantity > 0 ? minimumOrderQuantity : 1;
         const parsed = Number.parseInt(String(quantityEl.value || '').replace(/[^0-9]/g, ''), 10);
-        const value = Number.isFinite(parsed) ? parsed : 1;
-        const normalized = maxStock <= 0 ? 1 : Math.min(Math.max(value, 1), maxStock);
+        const value = Number.isFinite(parsed) ? parsed : moq;
+        const normalized = maxStock <= 0 ? moq : Math.min(Math.max(value, moq), maxStock);
 
         quantityEl.value = normalized;
         quantityEl.max = maxStock;
@@ -7044,6 +7085,8 @@ class AgricultureMarket {
                     ? `<span class="status-pill pending" style="margin-left:6px;">Unavailable</span>`
                     : (isPreorder ? `<span class="badge bg-warning text-dark" style="margin-left:6px;">Pre-order</span>` : '');
                 const disabledAttr = isUnavailable ? 'disabled' : '';
+                const minimumOrderQuantity = Number.parseInt(item.minimum_order_quantity, 10);
+                const moq = Number.isInteger(minimumOrderQuantity) && minimumOrderQuantity > 0 ? minimumOrderQuantity : 1;
                 let maxStock;
                 if (isPreorder) {
                     const reserved = Number(item.reserved_quantity ?? 0);
@@ -7052,16 +7095,17 @@ class AgricultureMarket {
                 } else {
                     maxStock = Number(item.stock_quantity) || 0;
                 }
-                maxStock = Math.max(1, maxStock);
-                const minusDisabled = isUnavailable || item.quantity <= 1;
+                maxStock = Math.max(moq, maxStock);
+                const minusDisabled = isUnavailable || item.quantity <= moq;
                 const plusDisabled = isUnavailable || item.quantity >= maxStock;
                 const itemTotal = (Number(item.price) || 0) * (Number(item.quantity) || 0);
                 const productCircle = isSelected ? '●' : '○';
                 const productClass = isSelected ? 'selected' : '';
+                const moqDisplay = moq > 1 ? `<div class="cart-item-moq" style="font-size:0.75rem;color:#6b7280;">Min. order: ${moq} ${item.unit || 'unit'}</div>` : '';
 
                 html += `
                     <div class="cart-item" data-product-id="${item.product_id}" data-cart-id="${item.id}">
-                        <button class="cart-selection-circle ${productClass}" 
+                        <button class="cart-selection-circle ${productClass}"
                                 onclick="app.toggleProductSelection(${item.id}, '${group.farmerName}')"
                                 aria-label="Select ${item.name}">
                             ${productCircle}
@@ -7081,20 +7125,21 @@ class AgricultureMarket {
                                 })()
                                 : `<div class="cart-item-stock">Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}</div>`
                             }
+                            ${moqDisplay}
                             <div class="cart-item-quantity">
                                 <div class="quantity-controls">
-                                    <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, -1, ${maxStock})" title="Decrease quantity" ${minusDisabled ? 'disabled' : ''}>−</button>
+                                    <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, -1, ${maxStock}, ${moq})" title="Decrease quantity" ${minusDisabled ? 'disabled' : ''}>−</button>
                                     <input
                                         type="number"
                                         class="quantity-value-input"
                                         value="${item.quantity}"
-                                        min="1"
+                                        min="${moq}"
                                         max="${maxStock}"
                                         inputmode="numeric"
                                         aria-label="Cart quantity"
-                                        onchange="app.handleCartQuantityInput(${item.id}, this.value, ${maxStock}, this)"
+                                        onchange="app.handleCartQuantityInput(${item.id}, this.value, ${maxStock}, ${moq}, this)"
                                         onkeydown="if(event.key === 'Enter'){event.preventDefault(); this.blur();}" ${disabledAttr}>
-                                    <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, 1, ${maxStock})" title="Increase quantity" ${plusDisabled ? 'disabled' : ''}>+</button>
+                                    <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, 1, ${maxStock}, ${moq})" title="Increase quantity" ${plusDisabled ? 'disabled' : ''}>+</button>
                                 </div>
                                 <button class="remove-item" onclick="app.removeCartItem(${item.id})" title="Remove item">
                                     <i class="fas fa-trash-alt"></i>
@@ -7404,7 +7449,7 @@ class AgricultureMarket {
         });
     }
     
-    async handleCartQuantityInput(cartId, rawValue, maxStock, inputEl) {
+    async handleCartQuantityInput(cartId, rawValue, maxStock, moq, inputEl) {
         const cartItemEl = inputEl ? inputEl.closest('.cart-item') : null;
         const productId = cartItemEl ? cartItemEl.getAttribute('data-product-id') : null;
         
@@ -7421,15 +7466,17 @@ class AgricultureMarket {
         
         const parsed = Number.parseInt(String(rawValue || '').trim(), 10);
         const safeMax = Number.isFinite(Number(currentStock)) && Number(currentStock) > 0 ? Number(currentStock) : 1;
-        const nextQuantity = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), safeMax) : 1;
+        const safeMoq = Number.isFinite(Number(moq)) && Number(moq) > 0 ? Number(moq) : 1;
+        const nextQuantity = Number.isFinite(parsed) ? Math.min(Math.max(parsed, safeMoq), safeMax) : safeMoq;
         if (inputEl) {
             inputEl.value = String(nextQuantity);
             inputEl.max = safeMax;
+            inputEl.min = safeMoq;
         }
         this.updateCartItemSync(cartId, nextQuantity);
     }
 
-    async handleCartQuantityButton(cartId, delta, maxStock) {
+    async handleCartQuantityButton(cartId, delta, maxStock, moq) {
         const inputEl = document.querySelector(`.quantity-value-input[onchange*="${cartId}"]`);
         const cartItemEl = inputEl ? inputEl.closest('.cart-item') : null;
         const productId = cartItemEl ? cartItemEl.getAttribute('data-product-id') : null;
@@ -7446,12 +7493,14 @@ class AgricultureMarket {
         }
         
         const safeMax = Number.isFinite(Number(currentStock)) && Number(currentStock) > 0 ? Number(currentStock) : 1;
-        const current = inputEl ? parseInt(inputEl.value, 10) : 1;
-        const nextQuantity = Math.min(Math.max(current + delta, 1), safeMax);
+        const safeMoq = Number.isFinite(Number(moq)) && Number(moq) > 0 ? Number(moq) : 1;
+        const current = inputEl ? parseInt(inputEl.value, 10) : safeMoq;
+        const nextQuantity = Math.min(Math.max(current + delta, safeMoq), safeMax);
         
-        // Update max attribute on input
+        // Update max and min attributes on input
         if (inputEl) {
             inputEl.max = safeMax;
+            inputEl.min = safeMoq;
         }
         
         this.updateCartItemSync(cartId, nextQuantity);

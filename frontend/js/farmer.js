@@ -81,6 +81,22 @@ class FarmerDashboard {
             return;
         }
 
+        // Check if JWT token is expired before loading dashboard
+        try {
+            const payload = JSON.parse(atob(this.token.split('.')[1]));
+            if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('userId');
+                window.location.href = '/?login=1&reason=expired_token';
+                return;
+            }
+        } catch (_) {
+            // Malformed token — treat as invalid
+            localStorage.removeItem('token');
+            window.location.href = '/?login=1&reason=invalid_token';
+            return;
+        }
+
         this.init();
 
         // Setup chat scroll observer after initialization
@@ -792,7 +808,7 @@ class FarmerDashboard {
         const emptyState = document.getElementById('selling-mode-empty');
         const availableDetails = document.getElementById('available-details');
         const preorderDetails = document.getElementById('preorder-details');
-        const locationSection = document.getElementById('location-section');
+        const locationSection = document.getElementById('add-product-location-section');
         const submitBtn = document.getElementById('add-product-submit-btn');
         const modalFooter = document.getElementById('add-product-modal-footer');
 
@@ -834,10 +850,15 @@ class FarmerDashboard {
         if (preorderCol) preorderCol.classList.toggle('col-md-6', !preorderEnabled || availableEnabled);
 
         // Show/hide sections based on selection
+        const imageSection = document.getElementById('add-product-image-section');
+        const availableImageGroup = document.getElementById('add-available-image-group');
+        const preorderImageGroup = document.getElementById('add-preorder-image-group');
         if (!availableEnabled && !preorderEnabled) {
             // No mode selected - hide everything
             if (productInfoSection) productInfoSection.style.display = 'none';
             if (sellingDetailsSection) sellingDetailsSection.style.display = 'none';
+            if (locationSection) locationSection.style.display = 'none';
+            if (imageSection) imageSection.style.display = 'none';
             if (submitBtn) submitBtn.disabled = true;
             if (modalFooter) modalFooter.style.display = 'none';
         } else {
@@ -847,7 +868,10 @@ class FarmerDashboard {
             if (emptyState) emptyState.style.display = 'none';
             if (availableDetails) availableDetails.style.display = availableEnabled ? 'block' : 'none';
             if (preorderDetails) preorderDetails.style.display = preorderEnabled ? 'block' : 'none';
-            if (locationSection) locationSection.style.display = (availableEnabled || preorderEnabled) ? 'block' : 'none';
+            if (locationSection) locationSection.style.display = 'block';
+            if (imageSection) imageSection.style.display = 'block';
+            if (availableImageGroup) availableImageGroup.style.display = availableEnabled ? 'block' : 'none';
+            if (preorderImageGroup) preorderImageGroup.style.display = preorderEnabled ? 'block' : 'none';
             if (submitBtn) submitBtn.disabled = false;
             if (modalFooter) modalFooter.style.display = 'flex';
         }
@@ -994,6 +1018,7 @@ class FarmerDashboard {
     async submitAvailableProduct(name, description, category_id, category_name, unit, location, price) {
         const stock_quantity = document.getElementById('available-stock').value;
         const expiryDate = document.getElementById('available-expiry').value || '';
+        const minimumOrderQuantity = document.getElementById('product-moq').value || '';
 
         if (Number(stock_quantity) < 0) {
             throw new Error('Stock quantity must be zero or higher.');
@@ -1008,6 +1033,7 @@ class FarmerDashboard {
         formData.append('location', location);
         formData.append('stock_quantity', stock_quantity);
         if (expiryDate) formData.append('expiry_date', expiryDate);
+        if (minimumOrderQuantity) formData.append('minimum_order_quantity', minimumOrderQuantity);
         formData.append('is_preorder', 'false');
         formData.append('is_available', 'true');
 
@@ -1083,6 +1109,7 @@ class FarmerDashboard {
     async submitPreorderProduct(name, description, category_id, category_name, unit, location, price) {
         const maxQuantity = document.getElementById('preorder-max-quantity').value;
         const harvestDate = document.getElementById('preorder-harvest-date').value;
+        const minimumOrderQuantity = document.getElementById('product-moq').value || '';
 
         if (Number(maxQuantity) < 1) {
             throw new Error('Reservation capacity must be at least 1.');
@@ -1097,6 +1124,7 @@ class FarmerDashboard {
         formData.append('location', location);
         formData.append('max_preorder_quantity', maxQuantity);
         formData.append('preorder_availability_date', harvestDate);
+        if (minimumOrderQuantity) formData.append('minimum_order_quantity', minimumOrderQuantity);
         formData.append('is_preorder', 'true');
         formData.append('is_available', 'false');
 
@@ -1175,6 +1203,7 @@ class FarmerDashboard {
         const expiryDate = document.getElementById('available-expiry').value || '';
         const maxQuantity = document.getElementById('preorder-max-quantity').value;
         const harvestDate = document.getElementById('preorder-harvest-date').value;
+        const minimumOrderQuantity = document.getElementById('product-moq').value || '';
 
         if (Number(stock_quantity) < 0) {
             throw new Error('Stock quantity must be zero or higher.');
@@ -1192,6 +1221,7 @@ class FarmerDashboard {
         formData.append('location', location);
         formData.append('stock_quantity', stock_quantity);
         if (expiryDate) formData.append('expiry_date', expiryDate);
+        if (minimumOrderQuantity) formData.append('minimum_order_quantity', minimumOrderQuantity);
         formData.append('max_preorder_quantity', maxQuantity);
         formData.append('preorder_availability_date', harvestDate);
         formData.append('is_available', 'true');
@@ -1289,6 +1319,9 @@ class FarmerDashboard {
         if (!price || !price.value || price.value.trim() === '' || Number(price.value) < 0) {
             if (price) price.classList.add('is-invalid');
             errors.push('Price is required and must be zero or higher');
+        } else if (Number(price.value) > 99999) {
+            if (price) price.classList.add('is-invalid');
+            errors.push('Price must not exceed 99,999');
         } else {
             if (price) price.classList.remove('is-invalid');
         }
@@ -1308,6 +1341,9 @@ class FarmerDashboard {
             if (!stock || !stock.value || stock.value.trim() === '' || Number(stock.value) < 0) {
                 if (stock) stock.classList.add('is-invalid');
                 errors.push('Current Stock is required and must be zero or higher');
+            } else if (Number(stock.value) > 99999) {
+                if (stock) stock.classList.add('is-invalid');
+                errors.push('Current Stock must not exceed 99,999');
             } else {
                 if (stock) stock.classList.remove('is-invalid');
             }
@@ -1330,6 +1366,9 @@ class FarmerDashboard {
             if (!maxQuantity || !maxQuantity.value || maxQuantity.value.trim() === '' || Number(maxQuantity.value) < 1) {
                 if (maxQuantity) maxQuantity.classList.add('is-invalid');
                 errors.push('Reservation Capacity is required and must be at least 1');
+            } else if (Number(maxQuantity.value) > 99999) {
+                if (maxQuantity) maxQuantity.classList.add('is-invalid');
+                errors.push('Reservation Capacity must not exceed 99,999');
             } else {
                 if (maxQuantity) maxQuantity.classList.remove('is-invalid');
             }
@@ -1837,6 +1876,18 @@ class FarmerDashboard {
                 }
             });
 
+            es.addEventListener('announcement.created', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    const userRole = 'farmer';
+                    if (data.audience === 'all' || String(data.audience).includes('farmer')) {
+                        this.fetchAnnouncementBanner();
+                    }
+                } catch (e) {
+                    this.fetchAnnouncementBanner();
+                }
+            });
+
             es.addEventListener('error', async () => {
                 const switched = await this.resolveWorkingApiBase();
                 if (switched) {
@@ -1997,6 +2048,7 @@ class FarmerDashboard {
                 await this.loadSubscription();
                 this.loadOverviewMetrics({ force: true });
                 this.loadAnnouncements();
+                this.fetchAnnouncementBanner();
                 this.loadSupportTicketsBadge();
             } else {
                 // Never bounce farmer users to home on transient backend errors (causes redirect loop).
@@ -2872,13 +2924,6 @@ class FarmerDashboard {
         }
         if (cancelAddProductModalBtn) {
             cancelAddProductModalBtn.addEventListener('click', () => this.closeAddProductModal());
-        }
-        if (addProductModal) {
-            addProductModal.addEventListener('click', (e) => {
-                if (e.target === addProductModal) {
-                    this.closeAddProductModal();
-                }
-            });
         }
 
         // Selling mode card click handlers
@@ -6281,6 +6326,69 @@ class FarmerDashboard {
         }
     }
 
+    async fetchAnnouncementBanner() {
+        try {
+            const response = await fetch(`${this.apiBase}/superadmin/announcements?role=farmer`);
+            if (response.ok) {
+                const data = await response.json();
+                this.displayAnnouncementBanner(data.announcements || []);
+            }
+        } catch (error) {
+            console.error('Error fetching announcement banner:', error);
+        }
+    }
+
+    displayAnnouncementBanner(announcements) {
+        const container = document.getElementById('announcement-banner-container');
+        if (!container) return;
+
+        const dismissed = JSON.parse(localStorage.getItem('dismissed_announcements') || '[]');
+
+        container.innerHTML = announcements
+            .filter(ann => !dismissed.includes(ann.id))
+            .map(ann => `
+                <style>
+                    @keyframes announce-slide-${ann.id} {
+                        0% { transform: translateX(100%); }
+                        100% { transform: translateX(-100%); }
+                    }
+                    .announce-marquee-${ann.id} {
+                        display: inline-block;
+                        white-space: nowrap;
+                        animation: announce-slide-${ann.id} 18s linear infinite;
+                    }
+                </style>
+                <div class="announcement-banner" data-id="${ann.id}" style="background: linear-gradient(90deg, #e0f2fe 0%, #bae6fd 100%); color: #0369a1; padding: 0.5rem 1rem; margin: 0; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; box-shadow: 0 2px 6px rgba(0,0,0,0.12); overflow: hidden; display: flex; align-items: center; gap: 0.75rem; min-height: 40px;">
+                    <span style="flex-shrink: 0; font-size: 0.85rem; font-weight: 700; color: #0284c7;"><i class="bi bi-megaphone" style="margin-right:4px;"></i>Announcement</span>
+                    <div style="flex: 1; overflow: hidden; position: relative;">
+                        <span class="announce-marquee-${ann.id}" style="font-size: 0.85rem; font-weight: 500; color: #0369a1;">
+                            <strong>${this.escapeHtml(ann.title)}</strong> &mdash; ${this.escapeHtml(ann.message)}
+                        </span>
+                    </div>
+                    ${ann.is_dismissible ? `
+                        <button class="announcement-dismiss-btn" data-id="${ann.id}" style="background: rgba(2,132,199,0.15); border: none; color: #0284c7; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; flex-shrink: 0; line-height: 1;">&#10005;</button>
+                    ` : ''}
+                </div>
+            `).join('');
+
+        container.querySelectorAll('.announcement-dismiss-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const announcementId = parseInt(e.target.closest('.announcement-dismiss-btn').dataset.id);
+                this.dismissAnnouncementBanner(announcementId);
+            });
+        });
+    }
+
+    dismissAnnouncementBanner(announcementId) {
+        const dismissed = JSON.parse(localStorage.getItem('dismissed_announcements') || '[]');
+        if (!dismissed.includes(announcementId)) {
+            dismissed.push(announcementId);
+            localStorage.setItem('dismissed_announcements', JSON.stringify(dismissed));
+        }
+        const banner = document.querySelector(`.announcement-banner[data-id="${announcementId}"]`);
+        if (banner) banner.remove();
+    }
+
     async loadOverviewMetrics({ force = false } = {}) {
         try {
             if (!this.token) return;
@@ -8059,6 +8167,9 @@ class FarmerDashboard {
         if (!price || !price.value || price.value.trim() === '' || Number(price.value) < 0) {
             if (price) price.classList.add('is-invalid');
             errors.push('Price is required and must be zero or higher');
+        } else if (Number(price.value) > 99999) {
+            if (price) price.classList.add('is-invalid');
+            errors.push('Price must not exceed 99,999');
         }
         if (!location || !location.value || location.value.trim() === '') {
             if (location) location.classList.add('is-invalid');
@@ -8082,11 +8193,17 @@ class FarmerDashboard {
             if (!maxQuantity || !maxQuantity.value || maxQuantity.value.trim() === '' || Number(maxQuantity.value) < 1) {
                 if (maxQuantity) maxQuantity.classList.add('is-invalid');
                 errors.push('Maximum Reservation Quantity is required and must be at least 1');
+            } else if (Number(maxQuantity.value) > 99999) {
+                if (maxQuantity) maxQuantity.classList.add('is-invalid');
+                errors.push('Maximum Reservation Quantity must not exceed 99,999');
             }
         } else {
             if (!stockQuantity || !stockQuantity.value || stockQuantity.value.trim() === '' || Number(stockQuantity.value) < 0) {
                 if (stockQuantity) stockQuantity.classList.add('is-invalid');
                 errors.push('Stock Quantity is required and must be zero or higher');
+            } else if (Number(stockQuantity.value) > 99999) {
+                if (stockQuantity) stockQuantity.classList.add('is-invalid');
+                errors.push('Stock Quantity must not exceed 99,999');
             }
         }
 
@@ -8222,6 +8339,9 @@ class FarmerDashboard {
                 if (hasPreorder && !preorderAvailabilityDate) {
                     throw new Error('Expected harvest date is required for pre-orders.');
                 }
+
+                const minimumOrderQuantity = document.getElementById('edit-moq')?.value || '';
+                if (minimumOrderQuantity) formData.append('minimum_order_quantity', minimumOrderQuantity);
 
                 formData.append('harvest_date', harvestDate);
                 formData.append('expiry_date', expiryDate);
@@ -8757,6 +8877,10 @@ class FarmerDashboard {
                 document.getElementById('edit-product-id').value = product.id;
                 document.getElementById('edit-product-name').value = product.name;
                 document.getElementById('edit-price').value = product.price;
+                const moqInput = document.getElementById('edit-moq');
+                if (moqInput) {
+                    moqInput.value = product.minimum_order_quantity || '';
+                }
                 
                 // Set toggle status button based on product availability and admin disabled status
                 const toggleStatusBtn = document.getElementById('edit-toggle-status-btn');
@@ -9134,6 +9258,11 @@ class FarmerDashboard {
         let filtered = this.myProductsCache.filter(p => !p.is_preorder);
 
         filtered = filtered.filter(product => {
+            // Only show approved products in Available Now tab
+            if (product.status !== 'approved') {
+                return false;
+            }
+            
             // Search filter
             const nameMatch = !searchTerm || String(product.name || '').toLowerCase().includes(searchTerm);
             
@@ -9184,6 +9313,11 @@ class FarmerDashboard {
         let filtered = this.myProductsCache.filter(p => p.is_preorder);
 
         filtered = filtered.filter(product => {
+            // Only show approved products in Pre-orders tab
+            if (product.status !== 'approved') {
+                return false;
+            }
+            
             // Search filter
             const nameMatch = !searchTerm || String(product.name || '').toLowerCase().includes(searchTerm);
             
