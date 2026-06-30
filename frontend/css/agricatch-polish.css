@@ -1308,7 +1308,6 @@ a:not([aria-label]):not([aria-labelledby]):empty {
 #home.hero {
     min-height: 620px;
     height: calc(100vh - 80px);
-    max-height: 760px;
     padding: 7rem 0 5rem;
     margin-top: 80px;
     box-shadow: none;
