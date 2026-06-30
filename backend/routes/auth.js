@@ -457,7 +457,7 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, full_name: user.full_name, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     );
 
     // Send welcome email (non-blocking)
@@ -643,7 +643,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, full_name: user.full_name, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     );
 
     // Remove password from response
