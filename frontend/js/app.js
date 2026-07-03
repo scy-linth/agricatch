@@ -850,7 +850,7 @@ class AgricultureMarket {
         // Ping the API server to wake it up immediately when user lands on the site
         // This prevents the "cold start" delay on Render's free tier
         
-        const apiUrl = `${this.apiBase}/test-db`;
+        return;
         
         // Fire and forget - don't block UI, handle errors silently
         fetch(apiUrl, {
@@ -5098,9 +5098,6 @@ class AgricultureMarket {
                 }, 25000);
             } catch (firstErr) {
                 console.warn('Available products request timed out, attempting wake-up retry...', firstErr?.message || firstErr);
-                try {
-                    await this.fetchJsonWithTimeout(`${this.apiBase}/test-db`, { cache: 'no-cache' }, 15000);
-                } catch (_) {}
                 response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
                     headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
                 }, 25000);
@@ -5188,9 +5185,6 @@ class AgricultureMarket {
                 }, 25000);
             } catch (firstErr) {
                 console.warn('Preorder products request timed out, attempting wake-up retry...', firstErr?.message || firstErr);
-                try {
-                    await this.fetchJsonWithTimeout(`${this.apiBase}/test-db`, { cache: 'no-cache' }, 15000);
-                } catch (_) {}
                 response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
                     headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
                 }, 25000);
@@ -5285,11 +5279,6 @@ class AgricultureMarket {
             } catch (firstErr) {
                 // Render cold starts can be slow; wake server and retry once with a longer timeout.
                 console.warn('Products request timed out, attempting wake-up retry...', firstErr?.message || firstErr);
-                try {
-                    await this.fetchJsonWithTimeout(`${this.apiBase}/test-db`, { cache: 'no-cache' }, 15000);
-                } catch (_) {
-                    // best effort warmup
-                }
                 response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
                     headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
                 }, 70000);

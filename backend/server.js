@@ -999,38 +999,6 @@ try {
   console.error('❌ Support tickets route failed to load:', error);
 }
 
-// Test database connection route
-app.get('/api/test-db', async (req, res) => {
-  try {
-    const now = await pool.query('SELECT NOW() as now');
-    const usersTable = await pool.query("SELECT to_regclass('public.users') as users_table");
-
-    let userCount = null;
-    let sampleUsers = [];
-
-    if (usersTable.rows?.[0]?.users_table) {
-      const result = await pool.query('SELECT COUNT(*)::int as user_count FROM users');
-      userCount = result.rows[0].user_count;
-      const users = await pool.query('SELECT * FROM users LIMIT 3');
-      sampleUsers = users.rows;
-    }
-
-    res.json({
-      status: 'âœ… Database Connected Successfully!',
-      now: now.rows[0].now,
-      user_count: userCount,
-      sample_users: sampleUsers,
-      message: 'Backend can reach PostgreSQL.'
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'âŒ Database Connection Failed',
-      error: error.message,
-      message: 'Check your PostgreSQL connection and .env file'
-    });
-  }
-});
-
 // Server-Sent Events (SSE) endpoint for real-time updates
 // Note: EventSource cannot send Authorization headers reliably, so we accept token via query param.
 // For public users (landing page), token is optional - they only receive product updates.
@@ -1233,10 +1201,10 @@ if (process.env.RENDER === 'true' || process.env.RENDER_EXTERNAL_URL) {
     const max = Math.max(min, maxMinutes) * 60 * 1000;
     const interval = Math.floor(Math.random() * (max - min + 1)) + min;
 
-    console.log(`[Self-ping] Scheduling next ping in ${(interval/1000/60).toFixed(2)} minutes to ${url}/api/test-db`);
+    console.log(`[Self-ping] Scheduling next ping in ${(interval/1000/60).toFixed(2)} minutes to ${url}/_health`);
 
     setTimeout(() => {
-      https.get(url + '/api/test-db', (res) => {
+      https.get(url + '/_health', (res) => {
         console.log(`[Self-ping] Status: ${res.statusCode}`);
       }).on('error', (err) => {
         console.error('[Self-ping] Error:', err.message);

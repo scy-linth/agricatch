@@ -68,7 +68,7 @@ test.describe('Cart quantity performance', () => {
       if (pathname === '/api/settings/delivery-fee') {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ delivery_fee: 35 }) });
       }
-      if (pathname === '/api/test-db') {
+      if (pathname === '/_health') {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
       }
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) });
