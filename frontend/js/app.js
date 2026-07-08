@@ -1391,6 +1391,13 @@ class AgricultureMarket {
             });
         }
 
+        // Password validation for register
+        if (passwordRegister) {
+            passwordRegister.addEventListener('input', () => {
+                this.validatePassword(passwordRegister.value);
+            });
+        }
+
         // Password strength indicator removed
 
         // Dynamic name hint based on role
@@ -3862,6 +3869,68 @@ class AgricultureMarket {
         }
     }
 
+    validatePassword(password) {
+        // Trim leading and trailing spaces
+        const trimmedPassword = password.trim();
+
+        // Get requirement elements
+        const reqLength = document.getElementById('req-length');
+        const reqUppercase = document.getElementById('req-uppercase');
+        const reqLowercase = document.getElementById('req-lowercase');
+        const reqNumber = document.getElementById('req-number');
+        const reqSpecial = document.getElementById('req-special');
+        const reqNospace = document.getElementById('req-nospace');
+
+        if (!reqLength || !reqUppercase || !reqLowercase || !reqNumber || !reqSpecial || !reqNospace) return;
+
+        // Check length (8-64 characters)
+        const lengthValid = trimmedPassword.length >= 8 && trimmedPassword.length <= 64;
+        this.updateRequirementStatus(reqLength, lengthValid);
+
+        // Check uppercase
+        const uppercaseValid = /[A-Z]/.test(trimmedPassword);
+        this.updateRequirementStatus(reqUppercase, uppercaseValid);
+
+        // Check lowercase
+        const lowercaseValid = /[a-z]/.test(trimmedPassword);
+        this.updateRequirementStatus(reqLowercase, lowercaseValid);
+
+        // Check number
+        const numberValid = /[0-9]/.test(trimmedPassword);
+        this.updateRequirementStatus(reqNumber, numberValid);
+
+        // Check special character
+        const specialValid = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(trimmedPassword);
+        this.updateRequirementStatus(reqSpecial, specialValid);
+
+        // Check no spaces
+        const nospaceValid = !/\s/.test(trimmedPassword);
+        this.updateRequirementStatus(reqNospace, nospaceValid);
+
+        // Update password input value with trimmed version
+        const passwordInput = document.getElementById('auth-password-register');
+        if (passwordInput && password !== trimmedPassword) {
+            passwordInput.value = trimmedPassword;
+        }
+    }
+
+    updateRequirementStatus(element, isValid) {
+        const icon = element.querySelector('.requirement-icon');
+        if (isValid) {
+            element.classList.add('valid');
+            if (icon) {
+                icon.classList.remove('fa-circle');
+                icon.classList.add('fa-check-circle');
+            }
+        } else {
+            element.classList.remove('valid');
+            if (icon) {
+                icon.classList.remove('fa-check-circle');
+                icon.classList.add('fa-circle');
+            }
+        }
+    }
+
     async handleRegistrationStep(step, direction) {
         if (this.isLoading) return; // Prevent multiple clicks during loading
         
@@ -4066,11 +4135,40 @@ class AgricultureMarket {
                     document.getElementById('auth-password-register').focus();
                     return false;
                 }
-                if (password.length < 6) {
-                    this.showMessage('Password must be at least 6 characters long', 'error');
+
+                // Validate password meets all requirements
+                const trimmedPassword = password.trim();
+                if (trimmedPassword.length < 8 || trimmedPassword.length > 64) {
+                    this.showMessage('Password must be between 8 and 64 characters', 'error');
                     document.getElementById('auth-password-register').focus();
                     return false;
                 }
+                if (!/[A-Z]/.test(trimmedPassword)) {
+                    this.showMessage('Password must contain at least one uppercase letter', 'error');
+                    document.getElementById('auth-password-register').focus();
+                    return false;
+                }
+                if (!/[a-z]/.test(trimmedPassword)) {
+                    this.showMessage('Password must contain at least one lowercase letter', 'error');
+                    document.getElementById('auth-password-register').focus();
+                    return false;
+                }
+                if (!/[0-9]/.test(trimmedPassword)) {
+                    this.showMessage('Password must contain at least one number', 'error');
+                    document.getElementById('auth-password-register').focus();
+                    return false;
+                }
+                if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(trimmedPassword)) {
+                    this.showMessage('Password must contain at least one special character', 'error');
+                    document.getElementById('auth-password-register').focus();
+                    return false;
+                }
+                if (/\s/.test(trimmedPassword)) {
+                    this.showMessage('Password must not contain spaces', 'error');
+                    document.getElementById('auth-password-register').focus();
+                    return false;
+                }
+
                 if (!confirmPassword) {
                     this.showMessage('Please confirm your password', 'error');
                     document.getElementById('auth-password-confirm').focus();
@@ -8075,7 +8173,7 @@ class AgricultureMarket {
 
         // Update title
         if (authTitle) {
-            authTitle.textContent = mode === 'login' ? 'Login' : 'Register';
+            authTitle.textContent = mode === 'login' ? 'Welcome Back' : 'Create Account';
         }
 
         if (mode === 'login') {

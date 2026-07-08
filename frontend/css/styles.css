@@ -3513,6 +3513,10 @@ body.modal-open {
     color: var(--white);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     border-bottom: 2px solid var(--light-gray);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    justify-content: center;
 }
 
 #auth-modal .modal-header h3 {
@@ -3520,17 +3524,47 @@ body.modal-open {
     margin: 0;
 }
 
+#auth-modal .modal-header .auth-modal-header-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    text-align: center;
+}
+
 #auth-modal .close-btn,
 #auth-modal .modal-header .close-btn {
     background: rgba(255, 255, 255, 0.2);
     color: var(--white);
     border: none;
+    position: absolute;
+    right: 1.5rem;
+    top: 1.5rem;
 }
 
 #auth-modal .close-btn:hover,
 #auth-modal .modal-header .close-btn:hover {
     background: rgba(255, 255, 255, 0.3);
     transform: rotate(90deg);
+}
+
+/* Auth modal header logo - centered */
+.modal-header-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+}
+
+.auth-modal-logo {
+    max-width: 84px;
+    max-height: 84px;
+    object-fit: contain;
+}
+
+#auth-modal .modal-header h3 {
+    text-align: center;
 }
 
 /* Keep white close button for cart header */
@@ -4642,9 +4676,6 @@ iframe[src*="recaptcha/api2/bframe"] {
 }
 
 #auth-modal .modal-header {
-    position: sticky;
-    top: 0;
-    z-index: 5;
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     color: var(--white);
 }

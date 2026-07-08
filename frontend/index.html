@@ -150,8 +150,7 @@
                         </li><!-- End Notifications Nav -->
                     </ul>
                     <div id="user-menu" class="user-menu">
-                        <button id="login-btn" class="btn btn-primary" type="button">Login</button>
-                        <button id="register-btn" class="btn btn-primary" type="button">Register</button>
+                        <button id="login-btn" class="btn btn-primary" type="button" style="background-color: #4ade80 !important; border-color: #4ade80 !important; color: #fff !important;">Login</button>
                     </div>
                     <div id="user-profile" class="user-profile dropdown hidden">
                         <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" id="user-account-btn" data-bs-toggle="dropdown" aria-expanded="false">
@@ -480,7 +479,12 @@
     <div id="auth-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="auth-modal-title">Login</h3>
+                <div class="auth-modal-header-content">
+                    <div class="modal-header-logo">
+                        <img src="/images/resendlogo.png" alt="AgriCatch Logo" class="auth-modal-logo">
+                    </div>
+                    <h3 id="auth-modal-title">Welcome back</h3>
+                </div>
                 <button class="close-btn" id="auth-close-btn" aria-label="Close login dialog"><i class="fas fa-times" aria-hidden="true"></i></button>
             </div>
             <form id="auth-form" class="auth-form">
@@ -605,13 +609,38 @@
                                 <span class="required-indicator">*</span>
                             </label>
                             <div class="password-input-wrapper">
-                                <input type="password" id="auth-password-register" placeholder="Create a strong password" minlength="6" required>
+                                <input type="password" id="auth-password-register" placeholder="Create a strong password" minlength="8" maxlength="64" required>
                                 <button type="button" class="password-toggle" id="toggle-register-password" aria-label="Show password">
                                     <i class="fas fa-eye-slash"></i>
                                 </button>
                             </div>
-                            <!-- Password strength UI removed -->
-                            <small class="field-hint">At least 6 characters recommended</small>
+                            <small class="field-hint">Password must meet the following requirements:</small>
+                            <div class="password-requirements" id="password-requirements">
+                                <div class="requirement-item" id="req-length">
+                                    <i class="fas fa-circle requirement-icon"></i>
+                                    <span>At least 8 characters (max 64)</span>
+                                </div>
+                                <div class="requirement-item" id="req-uppercase">
+                                    <i class="fas fa-circle requirement-icon"></i>
+                                    <span>Contains uppercase letter</span>
+                                </div>
+                                <div class="requirement-item" id="req-lowercase">
+                                    <i class="fas fa-circle requirement-icon"></i>
+                                    <span>Contains lowercase letter</span>
+                                </div>
+                                <div class="requirement-item" id="req-number">
+                                    <i class="fas fa-circle requirement-icon"></i>
+                                    <span>Contains a number</span>
+                                </div>
+                                <div class="requirement-item" id="req-special">
+                                    <i class="fas fa-circle requirement-icon"></i>
+                                    <span>Contains special character</span>
+                                </div>
+                                <div class="requirement-item" id="req-nospace">
+                                    <i class="fas fa-circle requirement-icon"></i>
+                                    <span>No spaces allowed</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="auth-password-confirm">
@@ -619,7 +648,7 @@
                                 <span class="required-indicator">*</span>
                             </label>
                             <div class="password-input-wrapper">
-                                <input type="password" id="auth-password-confirm" placeholder="Re-enter your password" minlength="6" required>
+                                <input type="password" id="auth-password-confirm" placeholder="Re-enter your password" minlength="8" maxlength="64" required>
                                 <button type="button" class="password-toggle" id="toggle-confirm-password" aria-label="Show password">
                                     <i class="fas fa-eye-slash"></i>
                                 </button>
