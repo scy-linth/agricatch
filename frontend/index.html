@@ -48,9 +48,6 @@
         </div>
     </div>
     
-    <!-- Announcement Banner Container -->
-    <div id="announcement-banner-container"></div>
-    
     <!-- Header -->
     <header class="header">
         <div class="container">
@@ -225,6 +222,9 @@
             </div>
         </div>
     </header>
+
+    <!-- Announcement Banner Container -->
+    <div id="announcement-banner-container"></div>
 
     <!-- Hero Section -->
     <section id="home" class="hero">
@@ -483,7 +483,7 @@
                     <div class="modal-header-logo">
                         <img src="/images/resendlogo.png" alt="AgriCatch Logo" class="auth-modal-logo">
                     </div>
-                    <h3 id="auth-modal-title">Welcome back</h3>
+                    <h3 id="auth-modal-title" class="fw-bold">Welcome back</h3>
                 </div>
                 <button class="close-btn" id="auth-close-btn" aria-label="Close login dialog"><i class="fas fa-times" aria-hidden="true"></i></button>
             </div>
@@ -493,7 +493,7 @@
                 <div id="auth-login-fields" class="auth-mode-fields">
                     <div class="form-group">
                         <label for="auth-email">Email or Username</label>
-                        <input type="text" id="auth-email" placeholder="Username or Email" required>
+                        <input type="text" id="auth-email" placeholder="Username or Email" maxlength="256" pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}|[a-zA-Z0-9_]{3,20}" required>
                     </div>
                     <div class="form-group">
                         <label for="auth-password">Password</label>
@@ -546,7 +546,7 @@
                                 Email Address
                                 <span class="required-indicator">*</span>
                             </label>
-                            <input type="email" id="auth-email-register" placeholder="your.email@example.com" required>
+                            <input type="email" id="auth-email-register" placeholder="your.email@example.com" maxlength="128" pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}" required>
                             <small class="field-hint">We'll send a verification code to this email</small>
                         </div>
                         
@@ -578,7 +578,7 @@
                         </div>
 
                         <div class="step-actions">
-                            <button type="button" class="btn btn-primary btn-full" id="register-next-1">
+                            <button type="button" class="btn btn-primary btn-full" id="register-next-1" style="background-color: #4ade80 !important; border-color: #4ade80 !important;">
                                 <span class="btn-text" id="register-next-1-text">Send Verification Code</span>
                                 <span class="btn-loader" style="display: none;">
                                     <i class="fas fa-spinner fa-spin"></i> Sending...
@@ -657,7 +657,7 @@
                         </div>
                         <div class="step-actions">
                             <button type="button" class="btn btn-outline" id="register-back-2">Back</button>
-                            <button type="button" class="btn btn-primary" id="register-next-2">
+                            <button type="button" class="btn btn-primary" id="register-next-2" style="background-color: #4ade80 !important; border-color: #4ade80 !important;">
                                 <span class="btn-text">Next</span>
                                 <span class="btn-loader" style="display: none;">
                                     <i class="fas fa-spinner fa-spin"></i> Loading...
@@ -674,21 +674,23 @@
                                 First Name
                                 <span class="required-indicator">*</span>
                             </label>
-                            <input type="text" id="auth-firstname" placeholder="Enter your first name" pattern="[A-Za-z\s]+" title="Letters only" maxlength="40" required>
+                            <input type="text" id="auth-firstname" placeholder="Enter your first name" pattern="[A-Za-z\s]+" title="Up to 40 characters. Letters and spaces only." maxlength="40" required>
+                            <small class="field-hint">Max 40 characters. Letters and spaces only.</small>
                         </div>
                         <div class="form-group">
                             <label for="auth-middlename">
                                 Middle Name (Optional)
                             </label>
-                            <input type="text" id="auth-middlename" placeholder="Enter your middle name" pattern="[A-Za-z\s]+" title="Letters only" maxlength="40">
+                            <input type="text" id="auth-middlename" placeholder="Enter your middle name" pattern="[A-Za-z\s]+" title="Up to 40 characters. Letters and spaces only." maxlength="40">
+                            <small class="field-hint">Max 40 characters. Letters and spaces only.</small>
                         </div>
                         <div class="form-group">
                             <label for="auth-lastname">
                                 Last Name
                                 <span class="required-indicator">*</span>
                             </label>
-                            <input type="text" id="auth-lastname" placeholder="Enter your last name" pattern="[A-Za-z\s]+" title="Letters only" maxlength="40" required>
-                            <small class="field-hint" id="fullname-hint">For farmers, enter your shop/farm name in First Name.</small>
+                            <input type="text" id="auth-lastname" placeholder="Enter your last name" pattern="[A-Za-z\s]+" title="Up to 40 characters. Letters and spaces only." maxlength="40" required>
+                            <small class="field-hint">Max 40 characters. Letters and spaces only.</small>
                         </div>
                         <div class="form-group">
                             <label for="auth-phone">
@@ -718,13 +720,13 @@
                             <select id="auth-barangay" class="form-select" disabled required style="margin-top:6px">
                                 <option value="">Select Barangay</option>
                             </select>
-                            <input type="text" id="auth-street" class="form-input" placeholder="House no., building, street" required style="margin-top:6px">
+                            <input type="text" id="auth-street" class="form-input" placeholder="House no., building, street" maxlength="100" pattern="[a-zA-Z0-9\s,.#/-()]+" required style="margin-top:6px">
+                            <small class="field-hint">Street/house no. + Barangay, City/Municipality, Province. (Max 100 Characters)</small>
                             <textarea id="auth-address" class="form-textarea readonly-display" rows="3" placeholder="Selected address will appear here" readonly required style="margin-top:6px"></textarea>
-                            <small class="field-hint">Street/house no. + Barangay, City/Municipality, Province</small>
                         </div>
                         <div class="step-actions">
                             <button type="button" class="btn btn-outline" id="register-back-3">Back</button>
-                            <button type="button" class="btn btn-primary" id="register-next-3">
+                            <button type="button" class="btn btn-primary" id="register-next-3" style="background-color: #4ade80 !important; border-color: #4ade80 !important;">
                                 <span class="btn-text">Next</span>
                                 <span class="btn-loader" style="display: none;">
                                     <i class="fas fa-spinner fa-spin"></i> Loading...
@@ -766,14 +768,22 @@
                                     </div>
                                 </button>
                             </div>
-                            <small class="field-hint">Select your account type. You can change this later in settings.</small>
                         </div>
 
                         <!-- Terms and Conditions -->
                         <div class="form-group">
                             <label class="checkbox-label-enhanced terms-checkbox-inline" id="terms-trigger">
                                 <input type="checkbox" id="auth-terms-checkbox" required>
-                                <span>I have read and agree to the <strong>Terms and Conditions</strong> and <strong>Privacy Policy</strong></span>
+                                <span>I have read and agree to the <strong>Terms and Conditions</strong></span>
+                                <span class="required-indicator">*</span>
+                            </label>
+                        </div>
+
+                        <!-- Data Privacy Policy -->
+                        <div class="form-group">
+                            <label class="checkbox-label-enhanced terms-checkbox-inline" id="privacy-trigger">
+                                <input type="checkbox" id="auth-privacy-checkbox" required>
+                                <span>I have read and agree to the <strong>Data Privacy Policy</strong></span>
                                 <span class="required-indicator">*</span>
                             </label>
                         </div>
@@ -791,7 +801,7 @@
 
                 </div>
                 
-                <button type="submit" class="btn btn-primary btn-full" id="auth-submit-btn">
+                <button type="submit" class="btn btn-primary btn-full" id="auth-submit-btn" style="background-color: #4ade80 !important; border-color: #4ade80 !important;">
                     <span class="btn-text">Login</span>
                     <span class="btn-loader" style="display: none;">
                         <i class="fas fa-spinner fa-spin"></i> Logging in...
@@ -823,7 +833,7 @@
                 <p>By creating an account or using AgriCatch, you agree to these Terms and our Privacy Policy. If you do not agree, do not use the platform.</p>
 
                 <h6>2. Eligibility</h6>
-                <p>You must be at least 18 years old or have legal capacity to enter into a binding agreement to use AgriCatch.</p>
+                <p>By creating an account, you represent that you have the legal capacity to use AgriCatch and to comply with these Terms and applicable laws.</p>
 
                 <h6>3. Account Registration and Security</h6>
                 <p>You are responsible for keeping your login credentials secure and for all activity on your account. Notify us immediately of any unauthorized use.</p>
@@ -858,15 +868,89 @@
                 <h6>13. Indemnity</h6>
                 <p>You agree to indemnify and hold AgriCatch harmless from claims arising out of your use of the platform or violation of these Terms.</p>
 
-                <h6>14. Changes to Terms</h6>
+                <h6>14. Account Suspension and Termination</h6>
+                <p>AgriCatch reserves the right to suspend or terminate any account that violates these Terms, engages in fraudulent or illegal activities, provides false information, or compromises the security or integrity of the platform.</p>
+
+                <h6>15. Intellectual Property</h6>
+                <p>All platform content, including the AgriCatch name, logo, software, design, text, and other materials, are owned by or licensed to AgriCatch. Users may not copy, reproduce, distribute, or modify any part of the platform without prior authorization.</p>
+
+                <h6>16. Force Majeure</h6>
+                <p>AgriCatch shall not be liable for delays or failures in providing services caused by events beyond reasonable control, including natural disasters, power outages, internet service interruptions, government actions, or other force majeure events.</p>
+
+                <h6>17. Governing Law</h6>
+                <p>These Terms shall be governed by and interpreted in accordance with the laws of the Republic of the Philippines.</p>
+
+                <h6>18. Contact</h6>
+                <p>For questions regarding these Terms and Conditions, users may contact the AgriCatch administrators through the contact information available within the platform.</p>
+
+                <h6>19. Changes to Terms</h6>
                 <p>We may update these Terms from time to time. Continued use of AgriCatch after changes means you accept the updated Terms.</p>
                 <div class="terms-modal-actions">
                     <label class="checkbox-label-enhanced terms-modal-checkbox">
                         <input type="checkbox" id="terms-modal-checkbox">
-                        <span>I have read and agree to the <strong>Terms and Conditions</strong> and <strong>Privacy Policy</strong></span>
+                        <span>I have read and agree to the <strong>Terms and Conditions</strong></span>
                     </label>
                     <div class="terms-modal-footer">
                         <button type="button" class="btn btn-primary" id="terms-modal-done" disabled>
+                            Done
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="privacy-modal" class="modal">
+        <div class="modal-content modal-medium terms-modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-shield-alt"></i> Data Privacy Policy</h3>
+                <button class="close-btn" id="close-privacy-modal">&times;</button>
+            </div>
+            <div class="modal-body terms-modal-body">
+                <p><strong>Last Updated:</strong> May 2026</p>
+
+                <h6>1. Information We Collect</h6>
+                <p>We collect account details, contact information, delivery details, order history, messages, reviews, and other information you provide when using AgriCatch.</p>
+
+                <h6>2. How We Use Your Information</h6>
+                <p>We use personal data to create and manage accounts, process orders, support deliveries, verify users, improve the platform, and comply with legal obligations.</p>
+
+                <h6>3. Sharing of Information</h6>
+                <p>We may share information with sellers, delivery partners, service providers, and authorities when required by law or when needed to operate the marketplace.</p>
+
+                <h6>4. Data Protection</h6>
+                <p>We apply reasonable administrative, technical, and physical safeguards to protect personal data from unauthorized access, misuse, or disclosure.</p>
+
+                <h6>5. Your Rights</h6>
+                <p>You may request access to, correction of, or deletion of your personal data, subject to applicable legal and operational limitations.</p>
+
+                <h6>6. Retention</h6>
+                <p>We keep personal data only for as long as necessary to fulfill the purposes described in this policy, unless a longer retention period is required by law.</p>
+
+                <h6>7. Cookies and Authentication</h6>
+                <p>AgriCatch may use cookies, authentication tokens, or similar technologies to maintain secure user sessions, improve platform functionality, and enhance the user experience.</p>
+
+                <h6>8. Legal Basis for Processing</h6>
+                <p>Personal data is processed based on user consent, contractual necessity, compliance with legal obligations, and other lawful bases permitted under the Data Privacy Act of 2012 (Republic Act No. 10173).</p>
+
+                <h6>9. Children's Privacy</h6>
+                <p>AgriCatch is not intended for individuals who do not have the legal capacity to use the platform. We do not knowingly collect personal information from users who are not legally permitted to register.</p>
+
+                <h6>10. Security Disclaimer</h6>
+                <p>While AgriCatch implements reasonable administrative, technical, and physical safeguards, no method of electronic transmission or storage is completely secure. Absolute security of personal data cannot be guaranteed.</p>
+
+                <h6>11. Privacy Contact</h6>
+                <p>Users may contact the AgriCatch administrators regarding privacy concerns, requests for access, correction, or deletion of personal data through the contact information available within the platform.</p>
+
+                <h6>12. Policy Updates</h6>
+                <p>We may update this policy from time to time. Continued use of AgriCatch after changes means you accept the updated policy.</p>
+                <div class="terms-modal-actions">
+                    <label class="checkbox-label-enhanced terms-modal-checkbox">
+                        <input type="checkbox" id="privacy-modal-checkbox">
+                        <span>I have read and agree to the <strong>Data Privacy Policy</strong></span>
+                    </label>
+                    <div class="terms-modal-footer">
+                        <button type="button" class="btn btn-primary" id="privacy-modal-done" disabled>
                             Done
                         </button>
                     </div>
@@ -888,7 +972,7 @@
                 <div id="forgot-step-email">
                     <div class="form-group">
                         <label for="forgot-email">Email Address</label>
-                        <input type="email" id="forgot-email" placeholder="your.email@example.com" autocomplete="email">
+                        <input type="email" id="forgot-email" placeholder="your.email@example.com" maxlength="256" pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}" autocomplete="email">
                         <small class="field-hint">We’ll send a 6-digit verification code to your email.</small>
                     </div>
                     <div class="form-group">
