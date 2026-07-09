@@ -15,7 +15,7 @@ const activityLogger = require('../services/activityLogger');
 const { restoreInventoryOnCancel, updateStatisticsOnDeliver, getOrderForBusinessLogic } = require('../utils/orderBusinessLogic');
 const { getValidStatuses } = require('../utils/orderTransitions');
 const { getPeriodFilter } = require('../services/dashboardService');
-const { getAdminOrders, buildAdminOrdersExcel } = require('../services/orderExportService');
+const { getAdminOrders, buildAdminOrdersExcel, getAdminUsers, buildAdminUsersExcel } = require('../services/orderExportService');
 
 const router = express.Router();
 
@@ -675,6 +675,32 @@ router.get('/users', requireAdmin, async (req, res) => {
     res.json({ users, total: totalRes.rows[0]?.count || 0, page, limit });
   } catch (error) {
     console.error('Get users error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Admin: export users as Excel
+// GET /api/admin/users/export.xlsx?search=&role=&status=&verification=
+router.get('/users/export.xlsx', requireAdmin, async (req, res) => {
+  try {
+    const search = req.query.search ? String(req.query.search).trim() : null;
+    const role = req.query.role ? String(req.query.role).trim() : null;
+    const status = req.query.status ? String(req.query.status).trim() : null;
+    const verification = req.query.verification ? String(req.query.verification).trim() : null;
+
+    // Use shared user export service
+    const { buffer, filename } = await buildAdminUsersExcel(pool, {
+      search,
+      role,
+      status,
+      verification
+    }, req.user);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(buffer);
+  } catch (error) {
+    console.error('Export admin users Excel error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
