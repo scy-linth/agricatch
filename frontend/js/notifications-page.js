@@ -154,7 +154,7 @@ class NotificationsPage {
 
         container.innerHTML = notifications.map((n) => {
             const isRead = Boolean(n.is_read);
-            const date = n.created_at ? new Date(n.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+            const date = n.created_at ? FormatUtil.formatDate(n.created_at, {"month":"short","day":"numeric"}) : '—';
             const icon = this._getIcon(n.type);
             const bg = isRead ? '#fff' : '#eff6ff';
             const borderColor = isRead ? '#e5e7eb' : '#bfdbfe';

@@ -565,8 +565,8 @@ class OrdersPage {
 
             const currentStatus = item.status || order.status || 'pending';
             const createdAt = new Date(order.created_at);
-            const displayDate = Number.isNaN(createdAt.getTime()) ? '—' : createdAt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' });
-            const displayTime = Number.isNaN(createdAt.getTime()) ? '' : createdAt.toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' });
+            const displayDate = Number.isNaN(createdAt.getTime()) ? '—' : FormatUtil.formatDate(createdAt);
+            const displayTime = '';
             const cancellationReason = item.cancellation_reason || order.cancellation_reason || 'No reason provided.';
             const encodedReason = encodeURIComponent(cancellationReason);
             const encodedProductName = encodeURIComponent(item.product_name || 'Product');
@@ -603,9 +603,7 @@ class OrdersPage {
 
             const fmtTimelineDate = (dt) => {
                 if (!dt || Number.isNaN(dt.getTime())) return '';
-                const d = dt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' });
-                const t = dt.toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' });
-                return `${d}, ${t}`;
+                return FormatUtil.formatDate(dt, {"month":"short","day":"numeric","year":undefined});
             };
 
             const timelineHtml = !isCancelled ? `
@@ -653,16 +651,16 @@ class OrdersPage {
                         <div class="order-item-name">${item.product_name || 'Product'}</div>
                         <div class="order-item-meta">${this.fmtNumber(quantity)} x ${this.fmtCurrency(item.price || order.price || 0)} ${item.unit || ''}</div>
                         <div class="order-item-meta"><strong>From:</strong> ${item.farmer_name || 'Local Farmer'}${item.farmer_verified ? ' <i class="fas fa-check-circle" style="color: #0d6efd; margin-left: 4px;" title="Verified Farmer"></i>' : ''}</div>
-                        ${isPreorder && item.harvest_date ? `<div class="order-item-meta"><strong>Expected Harvest:</strong> ${new Date(item.harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
-                        ${isPreorder && item.harvest_date_updated_at ? `<div class="order-item-meta"><strong>Last Updated:</strong> ${new Date(item.harvest_date_updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
+                        ${isPreorder && item.harvest_date ? `<div class="order-item-meta"><strong>Expected Harvest:</strong> ${FormatUtil.formatDateOnly(item.harvest_date, {"month":"short","day":"numeric"})}</div>` : ''}
+                        ${isPreorder && item.harvest_date_updated_at ? `<div class="order-item-meta"><strong>Last Updated:</strong> ${FormatUtil.formatDateOnly(item.harvest_date_updated_at, {"month":"short","day":"numeric"})}</div>` : ''}
                         ${isPreorder && item.harvest_adjustment_count ? `<div class="order-item-meta"><strong>Adjustments:</strong> ${item.harvest_adjustment_count}</div>` : ''}
-                        ${isPreorder && item.previous_harvest_date ? `<div class="order-item-meta"><strong>Previous Harvest Date:</strong> ${new Date(item.previous_harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
+                        ${isPreorder && item.previous_harvest_date ? `<div class="order-item-meta"><strong>Previous Harvest Date:</strong> ${FormatUtil.formatDateOnly(item.previous_harvest_date, {"month":"short","day":"numeric"})}</div>` : ''}
                         ${isPreorder && item.harvest_adjustment_reason ? `<div class="order-item-meta"><strong>Adjustment Reason:</strong> ${this.escapeHtml(item.harvest_adjustment_reason)}</div>` : ''}
-                        ${isPreorder && item.preorder_availability_date ? `<div class="order-item-meta"><strong>Harvest Date:</strong> ${new Date(item.preorder_availability_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
+                        ${isPreorder && item.preorder_availability_date ? `<div class="order-item-meta"><strong>Harvest Date:</strong> ${FormatUtil.formatDateOnly(item.preorder_availability_date, {"month":"short","day":"numeric"})}</div>` : ''}
                         ${item.farm_location ? `<div class="order-item-meta"><strong>Farm Location:</strong> ${this.escapeHtml(item.farm_location)}</div>` : ''}
                         ${order.delivery_address ? `<div class="order-item-meta"><strong>Delivery Address:</strong> ${this.escapeHtml(order.delivery_address)}</div>` : ''}
                         ${order.special_instructions ? `<div class="order-item-meta"><strong>Special Instructions:</strong> ${this.escapeHtml(order.special_instructions)}</div>` : ''}
-                        ${order.delivery_date ? `<div class="order-item-meta"><strong>Delivery Date Announced:</strong> ${new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}
+                        ${order.delivery_date ? `<div class="order-item-meta"><strong>Delivery Date Announced:</strong> ${FormatUtil.formatDateOnly(order.delivery_date, {"month":"short","day":"numeric"})}</div>` : ''}
                         ${order.reschedule_reason ? `<div class="order-item-meta"><strong>Reason for Rescheduling:</strong> ${this.escapeHtml(order.reschedule_reason)}</div>` : ''}
                         ${(currentStatus === 'cancelled') ? `
                             <div class="order-item-meta">

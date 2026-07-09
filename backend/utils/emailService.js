@@ -6,20 +6,18 @@ require("dotenv").config();
 // Inline logo attachment for email clients (fixes broken image in Gmail)
 const logoPath = path.join(__dirname, "..", "..", "frontend", "images", "resendlogo.png");
 let logoBase64 = "";
+let logoDataUri = "";
 let logoAttachmentNodemailer = null;
-let logoAttachmentResend = null;
 try {
   const logoBuffer = fs.readFileSync(logoPath);
   logoBase64 = logoBuffer.toString("base64");
+  // Create data URI for Resend (more reliable than cid: for Resend API)
+  const ext = path.extname(logoPath).slice(1);
+  logoDataUri = `data:image/${ext};base64,${logoBase64}`;
   logoAttachmentNodemailer = {
     filename: "resendlogo.png",
     path: logoPath,
     cid: "logo@agricatch",
-  };
-  logoAttachmentResend = {
-    filename: "resendlogo.png",
-    content: logoBase64,
-    contentId: "logo@agricatch",
   };
 } catch (err) {
   console.warn("⚠️ Email logo not found at", logoPath, "— emails will not include logo");
@@ -87,6 +85,14 @@ if (!useResend) {
 }
 
 /**
+ * Helper function to get logo src based on email service
+ * @returns {string} Logo src (data URI for Resend, cid: for SMTP)
+ */
+function getLogoSrc() {
+  return useResend ? logoDataUri : "cid:logo@agricatch";
+}
+
+/**
  * Send OTP email
  * @param {string} to - Recipient email address
  * @param {string} otp - OTP code
@@ -108,6 +114,7 @@ async function sendOtpEmail(to, otp, purpose = "login", firstName = null) {
   }[purpose] || "Verification";
 
   const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+  const logoSrc = getLogoSrc();
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -128,7 +135,7 @@ async function sendOtpEmail(to, otp, purpose = "login", firstName = null) {
     <body>
       <div class="container">
         <div class="header">
-          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
+          <img src="${logoSrc}" alt="AgriCatch Logo" class="logo-img" />
           <h1>AgriCatch</h1>
           <p>${purposeText} Verification</p>
         </div>
@@ -178,7 +185,6 @@ async function sendOtpEmail(to, otp, purpose = "login", firstName = null) {
         subject: `Your ${purposeText} OTP Code`,
         html: htmlContent,
         text: textContent,
-        attachments: logoAttachmentResend ? [logoAttachmentResend] : undefined,
       });
 
       if (error) {
@@ -248,6 +254,7 @@ async function sendOtpEmail(to, otp, purpose = "login", firstName = null) {
  */
 async function sendWelcomeEmail(to, firstName, role = "customer") {
   const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+  const logoSrc = getLogoSrc();
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -269,7 +276,7 @@ async function sendWelcomeEmail(to, firstName, role = "customer") {
     <body>
       <div class="container">
         <div class="header">
-          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
+          <img src="${logoSrc}" alt="AgriCatch Logo" class="logo-img" />
           <h1>AgriCatch</h1>
           <p>Welcome</p>
         </div>
@@ -340,6 +347,7 @@ async function sendWelcomeEmail(to, firstName, role = "customer") {
  */
 async function sendVerificationEmail(to, firstName) {
   const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+  const logoSrc = getLogoSrc();
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -361,7 +369,7 @@ async function sendVerificationEmail(to, firstName) {
     <body>
       <div class="container">
         <div class="header">
-          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
+          <img src="${logoSrc}" alt="AgriCatch Logo" class="logo-img" />
           <h1>AgriCatch</h1>
           <p>Account Verification</p>
         </div>
@@ -430,6 +438,7 @@ async function sendVerificationEmail(to, firstName) {
  */
 async function sendUnverificationEmail(to, firstName, reason) {
   const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+  const logoSrc = getLogoSrc();
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -448,7 +457,7 @@ async function sendUnverificationEmail(to, firstName, reason) {
     <body>
       <div class="container">
         <div class="header">
-          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
+          <img src="${logoSrc}" alt="AgriCatch Logo" class="logo-img" />
           <h1>AgriCatch</h1>
           <p>Account Status Update</p>
         </div>
@@ -493,6 +502,7 @@ async function sendUnverificationEmail(to, firstName, reason) {
  */
 async function sendPremiumUpgradeEmail(to, firstName) {
   const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+  const logoSrc = getLogoSrc();
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -514,7 +524,7 @@ async function sendPremiumUpgradeEmail(to, firstName) {
     <body>
       <div class="container">
         <div class="header">
-          <img src="cid:logo@agricatch" alt="AgriCatch Logo" class="logo-img" />
+          <img src="${logoSrc}" alt="AgriCatch Logo" class="logo-img" />
           <h1>AgriCatch</h1>
           <p>Premium Upgrade</p>
         </div>
@@ -672,7 +682,6 @@ async function sendEmail(to, subject, html, text) {
         subject: subject,
         html: html,
         text: text,
-        attachments: logoAttachmentResend ? [logoAttachmentResend] : undefined,
       });
 
       if (error) {

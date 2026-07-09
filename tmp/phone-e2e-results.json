@@ -1,0 +1,115 @@
+[
+  {
+    "page": "Customer Edit Profile",
+    "scenario": "phone field checks for #edit-phone",
+    "pass": true,
+    "details": {
+      "visible": true,
+      "placeholder": "9XX XXX XXXX",
+      "maxLength": "12",
+      "type": "tel",
+      "prefixText": "+63",
+      "valueAfterGarbage": "123 630 91",
+      "checks": [
+        [
+          "input visible",
+          true
+        ],
+        [
+          "placeholder set",
+          true
+        ],
+        [
+          "maxlength 12",
+          true
+        ],
+        [
+          "+63 prefix displayed",
+          true
+        ],
+        [
+          "only digits/spaces retained",
+          true
+        ]
+      ]
+    },
+    "evidence": {},
+    "time": "2026-07-08T20:16:33.070Z"
+  },
+  {
+    "page": "Customer Edit Profile",
+    "scenario": "overall",
+    "pass": false,
+    "details": {
+      "error": "page.waitForResponse: Timeout 30000ms exceeded while waiting for event \"response\"",
+      "logs": [
+        {
+          "method": "GET",
+          "url": "http://localhost:3000/api/auth/profile",
+          "requestBody": null,
+          "status": 200,
+          "responseBody": "{\"user\":{\"id\":103,\"username\":\"testcustomer\",\"email\":\"testcustomer@test.com\",\"full_name\":\"Test Customer\",\"role\":\"customer\",\"created_at\":\"2026-06-26T14:32:53.686Z\",\"first_name\":null,\"middle_name\":null,\"last_name\":null,\"shop_name\":null,\"phone\":null,\"address\":null,\"shop_description\":null,\"shop_banner_url\":null,\"shop_avatar_url\":null,\"is_verified\":false,\"is_disabled\":false,\"disabled_reason\":null}}"
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:3000/api/support-tickets/my?limit=100",
+          "requestBody": null,
+          "status": 200,
+          "responseBody": "{\"tickets\":[],\"total\":0,\"page\":1,\"limit\":100}"
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:3000/api/support-tickets/my?limit=100",
+          "requestBody": null,
+          "status": 200,
+          "responseBody": "{\"tickets\":[],\"total\":0,\"page\":1,\"limit\":100}"
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:3000/api/farmers/me/verification-request",
+          "requestBody": null,
+          "status": 200,
+          "responseBody": "{\"request\":null,\"history\":[]}"
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:3000/api/support-tickets/my?page=1&limit=10",
+          "requestBody": null,
+          "status": 200,
+          "responseBody": "{\"tickets\":[],\"total\":0,\"page\":1,\"limit\":10}"
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:3000/api/messages/conversations",
+          "requestBody": null,
+          "status": 200,
+          "responseBody": "{\"conversations\":[{\"id\":8,\"conversation_id\":\"42_103\",\"farmer_id\":42,\"customer_id\":103,\"last_message_at\":\"2026-06-28T15:56:15.280Z\",\"created_at\":\"2026-06-28T15:56:15.280Z\",\"other_shop_name\":\"Test Farmer\",\"other_full_name\":\"Test Farmer\",\"other_username\":\"testfarmer\",\"unread_count\":0,\"last_message\":\"Hello, I would like to inquire about your products.\"},{\"id\":5,\"conversation_id\":\"8_103\",\"farmer_id\":8,\"customer_id\":103,\"last_message_at\":\"2026-06-28T15:55:58.254Z\",\"created_at\":\"2026-06-28T05:53:04.675Z\",\"other_shop_name\":\"asdasd\",\"other_full_name\":\"asdasd\",\"other_username\":\"titefarm\",\"unread_count\":0,\"last_message\":\"asdasd\"},{\"id\":6,\"conversation_id\":\"97_103\",\"farmer_id\":97,\"customer_id\":103,\"last_message_at\":\"2026-06-28T05:53:40.836Z\",\"created_at\":\"2026-06-28T05:53:29.635Z\",\"other_shop_name\":\"Saja Jasa\",\"other_full_name\":\"Ian amata\",\"other_username\":\"farmeraccount\",\"unread_count\":0,\"last_message\":\"uiouio\"}]}"
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:3000/api/messages/conversations",
+          "requestBody": null,
+          "status": 200,
+          "responseBody": "{\"conversations\":[{\"id\":8,\"conversation_id\":\"42_103\",\"farmer_id\":42,\"customer_id\":103,\"last_message_at\":\"2026-06-28T15:56:15.280Z\",\"created_at\":\"2026-06-28T15:56:15.280Z\",\"other_shop_name\":\"Test Farmer\",\"other_full_name\":\"Test Farmer\",\"other_username\":\"testfarmer\",\"unread_count\":0,\"last_message\":\"Hello, I would like to inquire about your products.\"},{\"id\":5,\"conversation_id\":\"8_103\",\"farmer_id\":8,\"customer_id\":103,\"last_message_at\":\"2026-06-28T15:55:58.254Z\",\"created_at\":\"2026-06-28T05:53:04.675Z\",\"other_shop_name\":\"asdasd\",\"other_full_name\":\"asdasd\",\"other_username\":\"titefarm\",\"unread_count\":0,\"last_message\":\"asdasd\"},{\"id\":6,\"conversation_id\":\"97_103\",\"farmer_id\":97,\"customer_id\":103,\"last_message_at\":\"2026-06-28T05:53:40.836Z\",\"created_at\":\"2026-06-28T05:53:29.635Z\",\"other_shop_name\":\"Saja Jasa\",\"other_full_name\":\"Ian amata\",\"other_username\":\"farmeraccount\",\"unread_count\":0,\"last_message\":\"uiouio\"}]}"
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:3000/api/messages/conversations",
+          "requestBody": null,
+          "status": 200,
+          "responseBody": "{\"conversations\":[{\"id\":8,\"conversation_id\":\"42_103\",\"farmer_id\":42,\"customer_id\":103,\"last_message_at\":\"2026-06-28T15:56:15.280Z\",\"created_at\":\"2026-06-28T15:56:15.280Z\",\"other_shop_name\":\"Test Farmer\",\"other_full_name\":\"Test Farmer\",\"other_username\":\"testfarmer\",\"unread_count\":0,\"last_message\":\"Hello, I would like to inquire about your products.\"},{\"id\":5,\"conversation_id\":\"8_103\",\"farmer_id\":8,\"customer_id\":103,\"last_message_at\":\"2026-06-28T15:55:58.254Z\",\"created_at\":\"2026-06-28T05:53:04.675Z\",\"other_shop_name\":\"asdasd\",\"other_full_name\":\"asdasd\",\"other_username\":\"titefarm\",\"unread_count\":0,\"last_message\":\"asdasd\"},{\"id\":6,\"conversation_id\":\"97_103\",\"farmer_id\":97,\"customer_id\":103,\"last_message_at\":\"2026-06-28T05:53:40.836Z\",\"created_at\":\"2026-06-28T05:53:29.635Z\",\"other_shop_name\":\"Saja Jasa\",\"other_full_name\":\"Ian amata\",\"other_username\":\"farmeraccount\",\"unread_count\":0,\"last_message\":\"uiouio\"}]}"
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:3000/api/messages/conversations",
+          "requestBody": null,
+          "status": 200,
+          "responseBody": "{\"conversations\":[{\"id\":8,\"conversation_id\":\"42_103\",\"farmer_id\":42,\"customer_id\":103,\"last_message_at\":\"2026-06-28T15:56:15.280Z\",\"created_at\":\"2026-06-28T15:56:15.280Z\",\"other_shop_name\":\"Test Farmer\",\"other_full_name\":\"Test Farmer\",\"other_username\":\"testfarmer\",\"unread_count\":0,\"last_message\":\"Hello, I would like to inquire about your products.\"},{\"id\":5,\"conversation_id\":\"8_103\",\"farmer_id\":8,\"customer_id\":103,\"last_message_at\":\"2026-06-28T15:55:58.254Z\",\"created_at\":\"2026-06-28T05:53:04.675Z\",\"other_shop_name\":\"asdasd\",\"other_full_name\":\"asdasd\",\"other_username\":\"titefarm\",\"unread_count\":0,\"last_message\":\"asdasd\"},{\"id\":6,\"conversation_id\":\"97_103\",\"farmer_id\":97,\"customer_id\":103,\"last_message_at\":\"2026-06-28T05:53:40.836Z\",\"created_at\":\"2026-06-28T05:53:29.635Z\",\"other_shop_name\":\"Saja Jasa\",\"other_full_name\":\"Ian amata\",\"other_username\":\"farmeraccount\",\"unread_count\":0,\"last_message\":\"uiouio\"}]}"
+        }
+      ],
+      "screenshot": "D:\\Codings\\AgriCatch\\tmp\\phone-e2e-screenshots\\customer-edit-error.png"
+    },
+    "evidence": {},
+    "time": "2026-07-08T20:17:03.405Z"
+  }
+]

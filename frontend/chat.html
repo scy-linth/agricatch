@@ -255,6 +255,15 @@
 
                     <div id="chat-messages" class="chat-messages-feed"></div>
 
+                    <div id="chat-faq-section" class="chat-faq-section" style="display:none;">
+                        <div class="chat-faq-label">Frequently Asked Questions</div>
+                        <div class="chat-faq-buttons">
+                            <button type="button" class="chat-faq-btn" data-question="available" aria-label="Is this still available?">📦 Is this still available?</button>
+                            <button type="button" class="chat-faq-btn" data-question="delivery" aria-label="When can this product be delivered?">🚚 When can this product be delivered?</button>
+                            <button type="button" class="chat-faq-btn" data-question="fresh" aria-label="Is this product freshly harvested?">🌱 Is this product freshly harvested?</button>
+                        </div>
+                    </div>
+
                     <form id="chat-form" class="chat-compose-bar">
                         <div class="chat-input-wrap" style="flex:1;position:relative;">
                             <input id="chat-input"
@@ -296,5 +305,6 @@
             }
         });
     </script>
+  <script src="/js/validation-standardizer.js"></script>
 </body>
 </html>

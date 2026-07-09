@@ -46,6 +46,69 @@
   };
 })();
 
+// Shared safe date parser used by all date formatters
+const _parseDateInput = (dateInput) => {
+  if (dateInput === null || dateInput === undefined || dateInput === '') return null;
+  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+// Standard AgriCatch date + time display.
+// Example: July 9, 2026, 8:45 PM
+window.FormatUtil.formatDate = function(dateInput, options = {}) {
+  const date = _parseDateInput(dateInput);
+  if (!date) return options.invalid || '—';
+  const dateOpts = {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    ...options
+  };
+  const timeOpts = {
+    timeZone: 'Asia/Manila',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    ...options
+  };
+  // Do not pass date-related keys to the time formatter
+  const { year, month, day, weekday, era, ...safeTimeOpts } = timeOpts;
+  const datePart = date.toLocaleDateString('en-PH', dateOpts);
+  const timePart = date.toLocaleTimeString('en-PH', safeTimeOpts);
+  return `${datePart}, ${timePart}`;
+};
+
+// Standard AgriCatch date-only display.
+// Example: July 9, 2026
+window.FormatUtil.formatDateOnly = function(dateInput, options = {}) {
+  const date = _parseDateInput(dateInput);
+  if (!date) return options.invalid || '—';
+  const dateOpts = {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    ...options
+  };
+  return date.toLocaleDateString('en-PH', dateOpts);
+};
+
+// Standard AgriCatch time-only display.
+// Example: 8:45 PM
+window.FormatUtil.formatTimeOnly = function(dateInput, options = {}) {
+  const date = _parseDateInput(dateInput);
+  if (!date) return options.invalid || '—';
+  const timeOpts = {
+    timeZone: 'Asia/Manila',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    ...options
+  };
+  return date.toLocaleTimeString('en-PH', timeOpts);
+};
+
 // Server time utility - fetches and caches server time for accurate display
 window.ServerTime = (function () {
   let cachedServerTime = null;
@@ -77,45 +140,20 @@ window.ServerTime = (function () {
 
   // Format a date string/timestamp using server time context
   async function formatDate(dateInput, options = {}) {
-    const serverNow = await getServerTime();
-    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
-    
-    if (isNaN(date.getTime())) return '—';
-    
-    const defaultOptions = {
-      timeZone: 'Asia/Manila',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      ...options
-    };
-    
-    return date.toLocaleString('en-PH', defaultOptions);
+    await getServerTime(); // Keeps cache warm / maintains original async shape
+    return window.FormatUtil.formatDate(dateInput, options);
   }
 
   // Format date only (no time)
   async function formatDateOnly(dateInput, options = {}) {
-    const defaultOptions = {
-      timeZone: 'Asia/Manila',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      ...options
-    };
-    return formatDate(dateInput, defaultOptions);
+    await getServerTime();
+    return window.FormatUtil.formatDateOnly(dateInput, options);
   }
 
   // Format time only (no date)
   async function formatTimeOnly(dateInput, options = {}) {
-    const defaultOptions = {
-      timeZone: 'Asia/Manila',
-      hour: '2-digit',
-      minute: '2-digit',
-      ...options
-    };
-    return formatDate(dateInput, defaultOptions);
+    await getServerTime();
+    return window.FormatUtil.formatTimeOnly(dateInput, options);
   }
 
   // Get current server time as Date object

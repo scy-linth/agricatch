@@ -567,20 +567,48 @@ class SupportTicketChat {
         }) + ` at ${timeStr}`;
     }
 
-    formatConversationPreviewTime(dateStr) {
-        if (!dateStr) return '';
-        const date = new Date(dateStr);
+    formatConversationPreviewTime(date) {
+        if (!date) return '';
+        const d = new Date(date);
+        
+        // Check for invalid date
+        if (isNaN(d.getTime())) return '';
+        
         const now = new Date();
-        const diffMs = now - date;
+        const diffMs = now - d;
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffMs / 86400000);
 
         if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffMins < 60) return `${diffMins}min ago`;
+        
+        if (diffHours < 24) return `${diffHours}hr ago`;
+        
+        // Check if yesterday (exactly 1 day ago and different calendar day)
+        // Only show "Yesterday" when it's actually yesterday AND at least 24 hours ago
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (d.toDateString() === yesterday.toDateString() && diffDays === 1) return 'Yesterday';
+        
+        // Days ago (2-6 days)
         if (diffDays < 7) return `${diffDays}d ago`;
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        // Weeks ago (7-27 days)
+        const diffWeeks = Math.floor(diffDays / 7);
+        if (diffWeeks < 4) return `${diffWeeks}w ago`;
+        
+        // Months ago (28-364 days)
+        const diffMonths = Math.floor(diffDays / 30);
+        if (diffDays < 365) {
+            // Ensure at least 1 month for 28+ days
+            return `${Math.max(1, diffMonths)}mo ago`;
+        }
+        
+        // Years ago (365+ days)
+        const diffYears = Math.floor(diffDays / 365);
+        // Ensure at least 1 year for 365+ days
+        return `${Math.max(1, diffYears)}y ago`;
     }
 
     isNearBottom(container) {

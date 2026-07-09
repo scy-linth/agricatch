@@ -2147,6 +2147,50 @@ body.sidebar-collapsed #main.main {
 }
 .chat-send-btn:hover { background: var(--ac-primary-dark); border-color: var(--ac-primary-dark); }
 
+/* ─── 23b. Chat FAQ Quick Replies ───────────────────────────────────── */
+.chat-faq-section {
+  padding: 12px 16px;
+  border-top: 1px solid var(--ac-border-light);
+  background: #fff;
+  flex-shrink: 0;
+}
+.chat-faq-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ac-text-muted);
+  margin-bottom: 8px;
+}
+.chat-faq-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chat-faq-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--ac-border);
+  border-radius: 9999px;
+  background: #fff;
+  color: var(--ac-text);
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: all .15s ease;
+  white-space: nowrap;
+}
+.chat-faq-btn:hover:not(:disabled) {
+  background: var(--ac-primary-light);
+  border-color: var(--ac-primary);
+  color: var(--ac-primary);
+}
+.chat-faq-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 /* ─── 24. Notifications Empty State (full section) ──────────────────── */
 .empty-state-page {
   display: flex;

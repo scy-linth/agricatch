@@ -295,7 +295,7 @@ class CustomerAccount {
         const phone = profile.phone || '—';
         const address = profile.address || '—';
         const role = this.formatRole(profile.role);
-        const joined = profile.created_at ? new Date(profile.created_at).toLocaleDateString() : '—';
+        const joined = profile.created_at ? FormatUtil.formatDateOnly(profile.created_at) : '—';
         const verificationStatus = this.formatVerificationStatus(profile);
 
         const setText = (id, text) => {
@@ -543,6 +543,22 @@ class CustomerAccount {
             return;
         }
 
+        // Check phone uniqueness before submission
+        try {
+            const phoneCheckResponse = await fetch('/api/auth/check-phone', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phoneDigits, userId: this.user?.id })
+            });
+            if (phoneCheckResponse.status === 409) {
+                this.showToast('This phone number is already registered.', 'error');
+                return;
+            }
+        } catch (phoneCheckError) {
+            // If phone check fails, continue with profile update (backend will validate)
+            console.warn('Phone uniqueness check failed, continuing with profile update');
+        }
+
         let address = null;
         const anyAddress = province || city || barangay || street;
         if (anyAddress) {
@@ -560,7 +576,7 @@ class CustomerAccount {
             first_name: firstName,
             middle_name: middleName || null,
             last_name: lastName,
-            phone: `+63${phoneDigits}`
+            phone: phoneDigits
         };
         if (address !== null) payload.address = address;
 
@@ -781,7 +797,7 @@ class CustomerAccount {
         const displayNotesWrap = document.getElementById('display-admin-notes-wrap');
         const displayNotes = document.getElementById('display-admin-notes');
         if (displayStatus) displayStatus.innerHTML = `<span class="status-badge status-${request.status}">${this.formatRole(request.status)}</span>`;
-        if (displaySubmitted) displaySubmitted.textContent = request.created_at ? new Date(request.created_at).toLocaleString() : '—';
+        if (displaySubmitted) displaySubmitted.textContent = request.created_at ? FormatUtil.formatDate(request.created_at) : '—';
         if (displayEstimated) displayEstimated.textContent = 'Within 1-3 business days';
         if (displayNotesWrap && displayNotes) {
             if (request.rejection_reason) {
@@ -892,7 +908,7 @@ class CustomerAccount {
                     <td>${this.escapeHtml(ticket.subject)}</td>
                     <td class="text-center">#${ticket.id}</td>
                     <td class="text-center"><span style="background:${style.bg};color:${style.color};font-size:0.75rem;font-weight:600;padding:4px 10px;border-radius:9999px;text-transform:uppercase;">${style.label}</span></td>
-                    <td>${new Date(ticket.created_at).toLocaleDateString('en-PH')}</td>
+                    <td>${FormatUtil.formatDate(ticket.created_at)}</td>
                     <td>
                         <button class="btn btn-sm btn-outline-primary view-ticket-btn" data-id="${ticket.id}">Chat</button>
                         ${ticket.unread_count > 0 ? '<i class="bi bi-dot text-danger ms-1"></i>' : ''}
@@ -1229,7 +1245,7 @@ class CustomerAccount {
             const isTruncated = notes.length > 50;
             return `
                 <tr>
-                    <td>${new Date(request.created_at).toLocaleDateString()}</td>
+                    <td>${FormatUtil.formatDate(request.created_at)}</td>
                     <td><span class="badge ${badgeClass}">${request.status.charAt(0).toUpperCase() + request.status.slice(1)}</span></td>
                     <td>
                         <span class="notes-text">${truncatedNotes}</span>
@@ -1555,12 +1571,44 @@ class CustomerAccount {
     }
 
     _relativeTime(date) {
-        const seconds = Math.floor((new Date() - date) / 1000);
-        if (seconds < 60) return 'Just now';
-        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-        if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-        return date.toLocaleDateString();
+        if (!date) return '';
+        const d = new Date(date);
+
+        // Check for invalid date
+        if (isNaN(d.getTime())) return '';
+
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}min ago`;
+
+        if (diffHours < 24) return `${diffHours}hr ago`;
+
+        // Check if yesterday (exactly 1 day ago and different calendar day)
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (d.toDateString() === yesterday.toDateString() && diffDays === 1) return 'Yesterday';
+
+        // Days ago (2-6 days)
+        if (diffDays < 7) return `${diffDays}d ago`;
+
+        // Weeks ago (7-27 days)
+        const diffWeeks = Math.floor(diffDays / 7);
+        if (diffWeeks < 4) return `${diffWeeks}w ago`;
+
+        // Months ago (28-364 days)
+        const diffMonths = Math.floor(diffDays / 30);
+        if (diffDays < 365) {
+            return `${Math.max(1, diffMonths)}mo ago`;
+        }
+
+        // Years ago (365+ days)
+        const diffYears = Math.floor(diffDays / 365);
+        return `${Math.max(1, diffYears)}y ago`;
     }
 
     escapeHtml(text) {

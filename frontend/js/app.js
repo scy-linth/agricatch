@@ -171,11 +171,12 @@ class AgricultureMarket {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
-                const data = await response.json();
-                this.isDebugAccount = !!data.is_debug_account;
-                this.debugUserInfo = data;
+                const responseData = await response.json();
+                const user = responseData.user || responseData;
+                this.isDebugAccount = !!user.is_debug_account;
+                this.debugUserInfo = user;
                 if (this.isDebugAccount) {
-                    console.log('[DEBUG LANDING] Debug mode enabled for user:', data.email);
+                    console.log('[DEBUG LANDING] Debug mode enabled for user:', user.email);
                 }
             }
         } catch (error) {
@@ -244,7 +245,7 @@ class AgricultureMarket {
                         animation: announce-slide-${ann.id} 18s linear infinite;
                     }
                 </style>
-                <div class="announcement-banner" data-id="${ann.id}" style="background: linear-gradient(90deg, #e0f2fe 0%, #bae6fd 100%); color: #0369a1; padding: 0.5rem 1rem; margin: 0; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; box-shadow: 0 2px 6px rgba(0,0,0,0.12); overflow: hidden; display: flex; align-items: center; gap: 0.75rem; min-height: 40px;">
+                <div class="announcement-banner" data-id="${ann.id}" style="background: linear-gradient(90deg, #e0f2fe 0%, #bae6fd 100%); color: #0369a1; padding: 0.5rem 1rem; margin: 0; position: relative; box-shadow: 0 2px 6px rgba(0,0,0,0.12); overflow: hidden; display: flex; align-items: center; gap: 0.75rem; min-height: 40px;">
                     <span style="flex-shrink: 0; font-size: 0.85rem; font-weight: 700; color: #0284c7;"><i class="bi bi-megaphone" style="margin-right:4px;"></i>Announcement</span>
                     <div style="flex: 1; overflow: hidden; position: relative;">
                         <span class="announce-marquee-${ann.id}" style="font-size: 0.85rem; font-weight: 500; color: #0369a1;">
@@ -777,7 +778,7 @@ class AgricultureMarket {
         }
         
         // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         if (!emailRegex.test(email)) {
             this.showMessage('Please enter a valid email address', 'error');
             document.getElementById('contact-email').focus();
@@ -1242,14 +1243,23 @@ class AgricultureMarket {
 
         // Terms modal
         const termsModal = document.getElementById('terms-modal');
+        const privacyModal = document.getElementById('privacy-modal');
         const closeTermsBtn = document.getElementById('close-terms-modal');
+        const closePrivacyBtn = document.getElementById('close-privacy-modal');
         const termsModalCheckbox = document.getElementById('terms-modal-checkbox');
+        const privacyModalCheckbox = document.getElementById('privacy-modal-checkbox');
         const termsModalDone = document.getElementById('terms-modal-done');
+        const privacyModalDone = document.getElementById('privacy-modal-done');
         const mainTermsCheckbox = document.getElementById('auth-terms-checkbox');
+        const mainPrivacyCheckbox = document.getElementById('auth-privacy-checkbox');
         const termsTrigger = document.getElementById('terms-trigger');
+        const privacyTrigger = document.getElementById('privacy-trigger');
 
         const openTermsModal = () => {
             if (!termsModal) return;
+            if (privacyModal) {
+                privacyModal.classList.remove('open');
+            }
             if (termsModalCheckbox && mainTermsCheckbox) {
                 termsModalCheckbox.checked = mainTermsCheckbox.checked;
             }
@@ -1257,6 +1267,21 @@ class AgricultureMarket {
                 termsModalDone.disabled = !termsModalCheckbox?.checked;
             }
             termsModal.classList.add('open');
+            this.setPageScrollLocked(true);
+        };
+
+        const openPrivacyModal = () => {
+            if (!privacyModal) return;
+            if (termsModal) {
+                termsModal.classList.remove('open');
+            }
+            if (privacyModalCheckbox && mainPrivacyCheckbox) {
+                privacyModalCheckbox.checked = mainPrivacyCheckbox.checked;
+            }
+            if (privacyModalDone) {
+                privacyModalDone.disabled = !privacyModalCheckbox?.checked;
+            }
+            privacyModal.classList.add('open');
             this.setPageScrollLocked(true);
         };
 
@@ -1270,9 +1295,25 @@ class AgricultureMarket {
                 openTermsModal();
             });
         }
+        if (privacyTrigger && mainPrivacyCheckbox) {
+            privacyTrigger.addEventListener('click', (event) => {
+                event.preventDefault();
+                openPrivacyModal();
+            });
+            mainPrivacyCheckbox.addEventListener('click', (event) => {
+                event.preventDefault();
+                openPrivacyModal();
+            });
+        }
         if (closeTermsBtn && termsModal) {
             closeTermsBtn.addEventListener('click', () => {
                 termsModal.classList.remove('open');
+                this.setPageScrollLocked(false);
+            });
+        }
+        if (closePrivacyBtn && privacyModal) {
+            closePrivacyBtn.addEventListener('click', () => {
+                privacyModal.classList.remove('open');
                 this.setPageScrollLocked(false);
             });
         }
@@ -1284,9 +1325,22 @@ class AgricultureMarket {
                 }
             });
         }
+        if (privacyModal) {
+            privacyModal.addEventListener('click', (event) => {
+                if (event.target === privacyModal) {
+                    privacyModal.classList.remove('open');
+                    this.setPageScrollLocked(false);
+                }
+            });
+        }
         if (termsModalCheckbox && termsModalDone) {
             termsModalCheckbox.addEventListener('change', () => {
                 termsModalDone.disabled = !termsModalCheckbox.checked;
+            });
+        }
+        if (privacyModalCheckbox && privacyModalDone) {
+            privacyModalCheckbox.addEventListener('change', () => {
+                privacyModalDone.disabled = !privacyModalCheckbox.checked;
             });
         }
         if (termsModalDone && termsModalCheckbox && mainTermsCheckbox) {
@@ -1294,6 +1348,15 @@ class AgricultureMarket {
                 mainTermsCheckbox.checked = termsModalCheckbox.checked;
                 if (termsModal) {
                     termsModal.classList.remove('open');
+                }
+                this.setPageScrollLocked(false);
+            });
+        }
+        if (privacyModalDone && privacyModalCheckbox && mainPrivacyCheckbox) {
+            privacyModalDone.addEventListener('click', () => {
+                mainPrivacyCheckbox.checked = privacyModalCheckbox.checked;
+                if (privacyModal) {
+                    privacyModal.classList.remove('open');
                 }
                 this.setPageScrollLocked(false);
             });
@@ -2024,7 +2087,10 @@ class AgricultureMarket {
         if (!emailInput) return;
 
         const email = (emailInput.value || '').trim();
-        if (!email || !email.includes('@')) {
+        
+        // Validate email format
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!email || !emailRegex.test(email)) {
             this.showMessage('Please enter a valid email address.', 'error');
             emailInput.focus();
             return;
@@ -2545,18 +2611,44 @@ class AgricultureMarket {
     }
 
     _relativeTime(date) {
-        const now = new Date();
-        const diff = now - date;
-        const seconds = Math.floor(diff / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
+        if (!date) return '';
+        const d = new Date(date);
 
-        if (seconds < 60) return 'Just now';
-        if (minutes < 60) return `${minutes}m ago`;
-        if (hours < 24) return `${hours}h ago`;
-        if (days < 7) return `${days}d ago`;
-        return date.toLocaleDateString();
+        // Check for invalid date
+        if (isNaN(d.getTime())) return '';
+
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}min ago`;
+
+        if (diffHours < 24) return `${diffHours}hr ago`;
+
+        // Check if yesterday (exactly 1 day ago and different calendar day)
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (d.toDateString() === yesterday.toDateString() && diffDays === 1) return 'Yesterday';
+
+        // Days ago (2-6 days)
+        if (diffDays < 7) return `${diffDays}d ago`;
+
+        // Weeks ago (7-27 days)
+        const diffWeeks = Math.floor(diffDays / 7);
+        if (diffWeeks < 4) return `${diffWeeks}w ago`;
+
+        // Months ago (28-364 days)
+        const diffMonths = Math.floor(diffDays / 30);
+        if (diffDays < 365) {
+            return `${Math.max(1, diffMonths)}mo ago`;
+        }
+
+        // Years ago (365+ days)
+        const diffYears = Math.floor(diffDays / 365);
+        return `${Math.max(1, diffYears)}y ago`;
     }
 
     escapeHtml(text) {
@@ -2695,12 +2787,44 @@ class AgricultureMarket {
     }
 
     _relativeTime(date) {
-        const seconds = Math.floor((new Date() - date) / 1000);
-        if (seconds < 60) return 'Just now';
-        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-        if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-        return date.toLocaleDateString();
+        if (!date) return '';
+        const d = new Date(date);
+
+        // Check for invalid date
+        if (isNaN(d.getTime())) return '';
+
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}min ago`;
+
+        if (diffHours < 24) return `${diffHours}hr ago`;
+
+        // Check if yesterday (exactly 1 day ago and different calendar day)
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (d.toDateString() === yesterday.toDateString() && diffDays === 1) return 'Yesterday';
+
+        // Days ago (2-6 days)
+        if (diffDays < 7) return `${diffDays}d ago`;
+
+        // Weeks ago (7-27 days)
+        const diffWeeks = Math.floor(diffDays / 7);
+        if (diffWeeks < 4) return `${diffWeeks}w ago`;
+
+        // Months ago (28-364 days)
+        const diffMonths = Math.floor(diffDays / 30);
+        if (diffDays < 365) {
+            return `${Math.max(1, diffMonths)}mo ago`;
+        }
+
+        // Years ago (365+ days)
+        const diffYears = Math.floor(diffDays / 365);
+        return `${Math.max(1, diffYears)}y ago`;
     }
 
     async loadCustomerNotificationsPage() {
@@ -4220,6 +4344,11 @@ class AgricultureMarket {
                     document.getElementById('auth-street')?.focus();
                     return false;
                 }
+                if (street.length > 40) {
+                    this.showMessage('Street/building/house number must be 40 characters or less', 'error');
+                    document.getElementById('auth-street')?.focus();
+                    return false;
+                }
                 if (!province || !city || !barangay) {
                     this.showMessage('Please select your zone, province, city, and barangay from the dropdowns', 'error');
                     document.getElementById('auth-zone')?.focus();
@@ -4240,8 +4369,9 @@ class AgricultureMarket {
                     return false;
                 }
                 const termsChecked = document.getElementById('auth-terms-checkbox').checked;
-                if (!termsChecked) {
-                    this.showMessage('You must agree to the Terms and Conditions to continue', 'error');
+                const privacyChecked = document.getElementById('auth-privacy-checkbox').checked;
+                if (!termsChecked || !privacyChecked) {
+                    this.showMessage('You must agree to the Terms and Conditions and Data Privacy Policy to continue', 'error');
                     return false;
                 }
                 return true;
@@ -4452,7 +4582,7 @@ class AgricultureMarket {
         }
 
         // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         if (!emailRegex.test(email)) {
             this.setButtonLoading('register-next-1', false);
             this.showMessage('Please enter a valid email address', 'error');
@@ -4768,6 +4898,24 @@ class AgricultureMarket {
         
         // Send raw 10-digit phone number (backend expects 10 digits starting with 9)
         phone = phoneDigits;
+
+        // Check phone uniqueness before submission
+        try {
+            const phoneCheckResponse = await fetch('/api/auth/check-phone', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phoneDigits })
+            });
+            if (phoneCheckResponse.status === 409) {
+                this.setButtonLoading('register-submit-btn', false);
+                this.showMessage('This phone number is already registered.', 'error');
+                document.getElementById('auth-phone').focus();
+                return;
+            }
+        } catch (phoneCheckError) {
+            // If phone check fails, continue with registration (backend will validate)
+            console.warn('Phone uniqueness check failed, continuing with registration');
+        }
 
         // Validate required fields with specific messages
         if (!username) {
@@ -5688,7 +5836,7 @@ class AgricultureMarket {
                     harvestStatus = `${diffDays} Days`;
                     harvestStatusClass = 'text-warning';
                 } else if (diffDays > 3) {
-                    const harvestFormatted = new Date(product.harvest_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+                    const harvestFormatted = FormatUtil.formatDateOnly(product.harvest_date, {"month":"short","day":"numeric"});
                     harvestStatus = harvestFormatted;
                     harvestStatusClass = 'text-primary';
                 } else {
@@ -5711,7 +5859,7 @@ class AgricultureMarket {
                 }
             } else if (section === 'available' && !isPreorder) {
                 const bestBefore = product.expiry_date
-                    ? new Date(product.expiry_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+                    ? FormatUtil.formatDateOnly(product.expiry_date, {"month":"short","day":"numeric"})
                     : 'Not Specified';
                 dateDisplay = `<div class="text-muted small mb-2"><i class="bi bi-hourglass-split me-1"></i>Best Before: ${bestBefore}</div>`;
             }
@@ -6043,7 +6191,7 @@ class AgricultureMarket {
                     harvestDate = `${diffDays} Days`;
                     harvestDateClass = 'text-warning';
                 } else if (diffDays > 3) {
-                    harvestDate = harvest.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });
+                    harvestDate = FormatUtil.formatDateOnly(harvest, {"month":"long","day":"numeric"});
                     harvestDateClass = 'text-primary';
                 } else {
                     harvestDate = 'To Be Announced';
@@ -6061,7 +6209,7 @@ class AgricultureMarket {
             if (product.expiry_date) {
                 try {
                     const expiry = new Date(product.expiry_date);
-                    expiryDate = expiry.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });
+                    expiryDate = FormatUtil.formatDateOnly(expiry, {"month":"long","day":"numeric"});
                 } catch (e) {
                     expiryDate = product.expiry_date; // Use raw value if date parsing fails
                 }
@@ -8609,6 +8757,12 @@ class AgricultureMarket {
                 }
                 if (saved.password && document.getElementById('auth-password-register')) {
                     document.getElementById('auth-password-register').value = saved.password;
+                    // Trigger password validation after restoring value
+                    try {
+                        this.validatePassword(saved.password);
+                    } catch (e) {
+                        console.error('Error validating password on restore:', e);
+                    }
                 }
                 if (saved.passwordConfirm && document.getElementById('auth-password-confirm')) {
                     document.getElementById('auth-password-confirm').value = saved.passwordConfirm;

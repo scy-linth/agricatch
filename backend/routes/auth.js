@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { pool } = require('../utils/db');
+const { normalizePhone } = require('../utils/phoneValidation');
 
 const { sendOtpEmail, sendWelcomeEmail } = require('../utils/emailService');
 const { verifyRecaptchaToken } = require('../utils/recaptcha');
@@ -20,6 +21,34 @@ router.get('/otp-mode', async (req, res) => {
     res.json({ otp_mode: otpMode });
   } catch (error) {
     console.error('Error getting OTP mode:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Public endpoint to check phone number uniqueness
+router.post('/check-phone', async (req, res) => {
+  try {
+    const { phone, userId } = req.body;
+    if (!phone) {
+      return res.status(400).json({ message: 'Phone number is required' });
+    }
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) {
+      return res.status(400).json({ message: 'Invalid phone number format' });
+    }
+    let query = 'SELECT id FROM users WHERE phone = $1';
+    const params = [normalizedPhone];
+    if (userId) {
+      query += ' AND id <> $2';
+      params.push(userId);
+    }
+    const phoneExists = await pool.query(query, params);
+    if (phoneExists.rows.length > 0) {
+      return res.status(409).json({ message: 'This phone number is already registered.' });
+    }
+    res.json({ available: true });
+  } catch (error) {
+    console.error('Error checking phone uniqueness:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -341,11 +370,65 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
   try {
   const { username, email, password, full_name, first_name, middle_name, last_name, phone, address, role = 'customer' } = req.body;
 
+    // Validate email (max 128 characters for registration)
+    if (email) {
+      const emailStr = String(email).trim();
+      if (emailStr.length > 128) {
+        return res.status(400).json({ message: 'Email must be 128 characters or less' });
+      }
+    }
+
+    // Validate username (max 20 characters)
+    if (username) {
+      const usernameStr = String(username).trim();
+      if (usernameStr.length > 20) {
+        return res.status(400).json({ message: 'Username must be 20 characters or less' });
+      }
+    }
+
     // Validate phone number format (must start with 9 and be 10 digits)
+    let normalizedPhone = null;
     if (phone) {
-      const phoneDigits = String(phone).replace(/\D/g, '');
-      if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+      normalizedPhone = normalizePhone(phone);
+      if (!normalizedPhone) {
         return res.status(400).json({ message: 'Phone number must be 10 digits starting with 9' });
+      }
+
+      // Check phone number uniqueness
+      const phoneExists = await pool.query(
+        'SELECT id FROM users WHERE phone = $1',
+        [normalizedPhone]
+      );
+      if (phoneExists.rows.length > 0) {
+        return res.status(409).json({ message: 'This phone number is already registered.' });
+      }
+    }
+
+    // Validate address/street field (max 100 characters)
+    if (address) {
+      const addressStr = String(address).trim();
+      if (addressStr.length > 100) {
+        return res.status(400).json({ message: 'Address must be 100 characters or less' });
+      }
+    }
+
+    // Validate password strength (uppercase, lowercase, number, special char, min 8 chars)
+    if (password) {
+      const passwordStr = String(password);
+      if (passwordStr.length < 8) {
+        return res.status(400).json({ message: 'Password must be at least 8 characters' });
+      }
+      if (!/[A-Z]/.test(passwordStr)) {
+        return res.status(400).json({ message: 'Password must contain at least one uppercase letter' });
+      }
+      if (!/[a-z]/.test(passwordStr)) {
+        return res.status(400).json({ message: 'Password must contain at least one lowercase letter' });
+      }
+      if (!/[0-9]/.test(passwordStr)) {
+        return res.status(400).json({ message: 'Password must contain at least one number' });
+      }
+      if (!/[!@#$%^&*(),.?":{}|<>]/.test(passwordStr)) {
+        return res.status(400).json({ message: 'Password must contain at least one special character' });
       }
     }
 
@@ -435,7 +518,7 @@ router.post('/register', requireRegistrationsEnabled, async (req, res) => {
       firstName: first_name,
       middleName: middle_name,
       lastName: last_name,
-      phone,
+      phone: normalizedPhone,
       address,
       role: userRole,
       passwordValue,
@@ -488,6 +571,11 @@ router.post('/login', async (req, res) => {
     const normalizedRequestedRole = String(requestedRole || '').toLowerCase() === 'admin' ? 'admin' : requestedRole;
     const loginIdentifier = String(email || '').trim(); // Can be either username or email
     const loginIdentifierLower = loginIdentifier.toLowerCase();
+
+    // Validate email/username (max 256 characters for login)
+    if (loginIdentifier.length > 256) {
+      return res.status(400).json({ message: 'Email or username must be 256 characters or less' });
+    }
 
     // Note: virtual super-admin bypass removed. Ensure a super-admin user
     // exists in the `users` table (email: scy@linth by default) and log in
@@ -795,7 +883,8 @@ router.get('/profile', async (req, res) => {
       'shop_avatar_url',
       'is_verified',
       'is_disabled',
-      'disabled_reason'
+      'disabled_reason',
+      'is_debug_account'
     ].forEach((field) => {
       if (columns.has(field)) selectFields.push(field);
     });
@@ -845,7 +934,8 @@ router.get('/me', async (req, res) => {
       'shop_avatar_url',
       'is_verified',
       'is_disabled',
-      'disabled_reason'
+      'disabled_reason',
+      'is_debug_account'
     ].forEach((field) => {
       if (columns.has(field)) selectFields.push(field);
     });
@@ -974,13 +1064,23 @@ router.put('/profile', async (req, res) => {
 
     if (typeof phone !== 'undefined' && hasColumn('phone')) {
       const nextPhone = String(phone || '').trim();
+      let normalizedPhone = null;
       if (nextPhone) {
-        const phoneDigits = nextPhone.replace(/\D/g, '');
-        if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+        normalizedPhone = normalizePhone(nextPhone);
+        if (!normalizedPhone) {
           return res.status(400).json({ message: 'Phone number must be 10 digits starting with 9' });
         }
+        // Check phone uniqueness (allow current user to keep their own phone)
+        const phoneExists = await pool.query(
+          'SELECT id FROM users WHERE phone = $1 AND id <> $2',
+          [normalizedPhone, decoded.id]
+        );
+        if (phoneExists.rows.length > 0) {
+          return res.status(409).json({ message: 'This phone number is already registered.' });
+        }
       }
-      push('phone', nextPhone || null);
+      // Store only 10-digit phone number (without +63 prefix)
+      push('phone', normalizedPhone);
     }
     if (typeof address !== 'undefined' && hasColumn('address')) push('address', String(address || '').trim() || null);
 
@@ -1050,6 +1150,12 @@ router.post('/forgot', async (req, res) => {
     await ensurePasswordResetsTable();
 
     const email = normalizeEmail(req.body?.email);
+    
+    // Validate email (max 256 characters for forgot password)
+    if (email && email.length > 256) {
+      return res.status(400).json({ message: 'Email must be 256 characters or less' });
+    }
+    
     const ip = getClientIp(req);
     const limiterKey = `${ip}:${email || 'noemail'}`;
     const rl = checkForgotRateLimit(limiterKey, {
@@ -1151,6 +1257,12 @@ router.post('/forgot/resend', async (req, res) => {
     await ensurePasswordResetsTable();
 
     const email = normalizeEmail(req.body?.email);
+    
+    // Validate email (max 256 characters for forgot password resend)
+    if (email && email.length > 256) {
+      return res.status(400).json({ message: 'Email must be 256 characters or less' });
+    }
+    
     const ip = getClientIp(req);
     const limiterKey = `${ip}:${email || 'noemail'}`;
     const rl = checkForgotRateLimit(limiterKey, {

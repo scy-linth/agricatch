@@ -1,0 +1,308 @@
+{
+  "phoneA": "9230105252",
+  "validity": {
+    "formCheckValidity": false,
+    "fields": {
+      "edit-firstname": {
+        "value": "Test",
+        "validity": {
+          "valid": true,
+          "valueMissing": false,
+          "patternMismatch": false,
+          "tooLong": false,
+          "typeMismatch": false
+        },
+        "validationMessage": null,
+        "required": true,
+        "disabled": false,
+        "checkValidity": true
+      },
+      "edit-middlename": {
+        "value": "",
+        "validity": {
+          "valid": true,
+          "valueMissing": false,
+          "patternMismatch": false,
+          "tooLong": false,
+          "typeMismatch": false
+        },
+        "validationMessage": null,
+        "required": false,
+        "disabled": false,
+        "checkValidity": true
+      },
+      "edit-lastname": {
+        "value": "Customer",
+        "validity": {
+          "valid": true,
+          "valueMissing": false,
+          "patternMismatch": false,
+          "tooLong": false,
+          "typeMismatch": false
+        },
+        "validationMessage": null,
+        "required": true,
+        "disabled": false,
+        "checkValidity": true
+      },
+      "edit-phone": {
+        "value": "923 010 5252",
+        "validity": {
+          "valid": true,
+          "valueMissing": false,
+          "patternMismatch": false,
+          "tooLong": false,
+          "typeMismatch": false
+        },
+        "validationMessage": null,
+        "required": true,
+        "disabled": false,
+        "checkValidity": true
+      },
+      "edit-zone": {
+        "value": "",
+        "validity": {
+          "valid": false,
+          "valueMissing": true,
+          "patternMismatch": false,
+          "tooLong": false,
+          "typeMismatch": false
+        },
+        "validationMessage": "Please select an item in the list.",
+        "required": true,
+        "disabled": false,
+        "checkValidity": false
+      },
+      "edit-province": {
+        "value": "",
+        "validity": {
+          "valid": true,
+          "valueMissing": false,
+          "patternMismatch": false,
+          "tooLong": false,
+          "typeMismatch": false
+        },
+        "validationMessage": null,
+        "required": false,
+        "disabled": true,
+        "checkValidity": true
+      },
+      "edit-city": {
+        "value": "",
+        "validity": {
+          "valid": true,
+          "valueMissing": false,
+          "patternMismatch": false,
+          "tooLong": false,
+          "typeMismatch": false
+        },
+        "validationMessage": null,
+        "required": false,
+        "disabled": true,
+        "checkValidity": true
+      },
+      "edit-barangay": {
+        "value": "",
+        "validity": {
+          "valid": true,
+          "valueMissing": false,
+          "patternMismatch": false,
+          "tooLong": false,
+          "typeMismatch": false
+        },
+        "validationMessage": null,
+        "required": false,
+        "disabled": true,
+        "checkValidity": true
+      },
+      "edit-street": {
+        "value": "",
+        "validity": {
+          "valid": false,
+          "valueMissing": true,
+          "patternMismatch": false,
+          "tooLong": false,
+          "typeMismatch": false
+        },
+        "validationMessage": "Please fill out this field.",
+        "required": true,
+        "disabled": false,
+        "checkValidity": false
+      }
+    },
+    "activeElement": "edit-phone",
+    "saveBtnExists": true,
+    "saveBtnDisabled": false,
+    "saveBtnText": "Save Changes"
+  },
+  "post": {
+    "submitFired": false,
+    "submitDefaultPrevented": false,
+    "saveProfileCalled": false,
+    "saveProfileInputs": null,
+    "saveProfileResult": null,
+    "toastMessage": null,
+    "activeElement": "edit-zone",
+    "phoneValue": "923 010 5252"
+  },
+  "diag": [
+    {
+      "type": "formValidity",
+      "data": {
+        "formCheckValidity": false,
+        "fields": {
+          "edit-firstname": {
+            "value": "Test",
+            "validity": {
+              "valid": true,
+              "valueMissing": false,
+              "patternMismatch": false,
+              "tooLong": false,
+              "typeMismatch": false
+            },
+            "validationMessage": null,
+            "required": true,
+            "disabled": false,
+            "checkValidity": true
+          },
+          "edit-middlename": {
+            "value": "",
+            "validity": {
+              "valid": true,
+              "valueMissing": false,
+              "patternMismatch": false,
+              "tooLong": false,
+              "typeMismatch": false
+            },
+            "validationMessage": null,
+            "required": false,
+            "disabled": false,
+            "checkValidity": true
+          },
+          "edit-lastname": {
+            "value": "Customer",
+            "validity": {
+              "valid": true,
+              "valueMissing": false,
+              "patternMismatch": false,
+              "tooLong": false,
+              "typeMismatch": false
+            },
+            "validationMessage": null,
+            "required": true,
+            "disabled": false,
+            "checkValidity": true
+          },
+          "edit-phone": {
+            "value": "923 010 5252",
+            "validity": {
+              "valid": true,
+              "valueMissing": false,
+              "patternMismatch": false,
+              "tooLong": false,
+              "typeMismatch": false
+            },
+            "validationMessage": null,
+            "required": true,
+            "disabled": false,
+            "checkValidity": true
+          },
+          "edit-zone": {
+            "value": "",
+            "validity": {
+              "valid": false,
+              "valueMissing": true,
+              "patternMismatch": false,
+              "tooLong": false,
+              "typeMismatch": false
+            },
+            "validationMessage": "Please select an item in the list.",
+            "required": true,
+            "disabled": false,
+            "checkValidity": false
+          },
+          "edit-province": {
+            "value": "",
+            "validity": {
+              "valid": true,
+              "valueMissing": false,
+              "patternMismatch": false,
+              "tooLong": false,
+              "typeMismatch": false
+            },
+            "validationMessage": null,
+            "required": false,
+            "disabled": true,
+            "checkValidity": true
+          },
+          "edit-city": {
+            "value": "",
+            "validity": {
+              "valid": true,
+              "valueMissing": false,
+              "patternMismatch": false,
+              "tooLong": false,
+              "typeMismatch": false
+            },
+            "validationMessage": null,
+            "required": false,
+            "disabled": true,
+            "checkValidity": true
+          },
+          "edit-barangay": {
+            "value": "",
+            "validity": {
+              "valid": true,
+              "valueMissing": false,
+              "patternMismatch": false,
+              "tooLong": false,
+              "typeMismatch": false
+            },
+            "validationMessage": null,
+            "required": false,
+            "disabled": true,
+            "checkValidity": true
+          },
+          "edit-street": {
+            "value": "",
+            "validity": {
+              "valid": false,
+              "valueMissing": true,
+              "patternMismatch": false,
+              "tooLong": false,
+              "typeMismatch": false
+            },
+            "validationMessage": "Please fill out this field.",
+            "required": true,
+            "disabled": false,
+            "checkValidity": false
+          }
+        },
+        "activeElement": "edit-phone",
+        "saveBtnExists": true,
+        "saveBtnDisabled": false,
+        "saveBtnText": "Save Changes"
+      }
+    },
+    {
+      "type": "postClickState",
+      "data": {
+        "submitFired": false,
+        "submitDefaultPrevented": false,
+        "saveProfileCalled": false,
+        "saveProfileInputs": null,
+        "saveProfileResult": null,
+        "toastMessage": null,
+        "activeElement": "edit-zone",
+        "phoneValue": "923 010 5252"
+      }
+    },
+    {
+      "type": "dbPhone",
+      "data": {
+        "phone": null
+      }
+    }
+  ],
+  "screenshot": "D:\\Codings\\AgriCatch\\scripts\\phone-e2e-screenshots\\customer-edit-blocker-diag.png"
+}

@@ -67,6 +67,11 @@ async function insertAddress(userId, payload) {
   const city = normalizeText(payload.city);
   const province = normalizeText(payload.province);
 
+  // Validate street field (max 100 characters)
+  if (street && street.length > 100) {
+    throw new Error('Street address must be 100 characters or less');
+  }
+
   pushField('user_id', userId);
   pushField('label', normalizeText(payload.label) || '');
   pushField('full_name', normalizeText(payload.full_name));
@@ -114,6 +119,11 @@ async function updateAddress(userId, id, payload) {
 
   const street = normalizeText(payload.street) || normalizeText(payload.address_line1);
   const barangay = normalizeText(payload.barangay) || normalizeText(payload.address_line2);
+
+  // Validate street field (max 100 characters)
+  if (street && street.length > 100) {
+    throw new Error('Street address must be 100 characters or less');
+  }
 
   setField('label', normalizeText(payload.label) || '');
   setField('full_name', normalizeText(payload.full_name));

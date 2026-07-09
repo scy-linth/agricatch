@@ -102,6 +102,8 @@ class AdminDashboard {
                 this.openAdminDetailModal(Number(btn.dataset.userId));
             } else if (btn.matches('.all-users-view-btn')) {
                 this.openAllUsersDetailModal(Number(btn.dataset.userId));
+            } else if (btn.matches('#export-dashboard-btn')) {
+                this.showExportPeriodModal();
             } else if (btn.matches('.suspicious-view-btn')) {
                 this.openCustomerDetailModal(Number(btn.dataset.userId));
             } else if (btn.matches('.toggle-modal-password-btn')) {
@@ -808,6 +810,12 @@ class AdminDashboard {
             }, 500);
         }
 
+        // Show/hide export dashboard button - only visible in overview section
+        const exportBtn = document.getElementById('export-dashboard-btn');
+        if (exportBtn) {
+            exportBtn.style.display = sectionId === 'overview' ? 'block' : 'none';
+        }
+
         if (sectionId === 'verification-requests') {
             this.loadVerificationRequests();
         }
@@ -1278,6 +1286,26 @@ class AdminDashboard {
         // Stop notification polling when user leaves page
         window.addEventListener('beforeunload', () => {
             this.stopNotifPolling();
+        });
+
+        // Export period modal
+        document.getElementById('close-export-period-modal')?.addEventListener('click', () => {
+            const modal = document.getElementById('export-period-modal');
+            if (modal) modal.classList.remove('open');
+        });
+        document.querySelectorAll('[data-close-modal="export-period-modal"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const modal = document.getElementById('export-period-modal');
+                if (modal) modal.classList.remove('open');
+            });
+        });
+        document.querySelectorAll('.export-period-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const period = e.target.closest('.export-period-btn').dataset.period;
+                const modal = document.getElementById('export-period-modal');
+                if (modal) modal.classList.remove('open');
+                this.exportDashboard(period);
+            });
         });
 
         // Stop polling when tab is hidden, resume when visible
@@ -12382,6 +12410,54 @@ class AdminDashboard {
                 this.showToast(data.message || 'Failed to save', 'error');
             }
         } catch (e) { this.showToast('Error saving pricing', 'error'); }
+    }
+
+    showExportPeriodModal() {
+        const modal = document.getElementById('export-period-modal');
+        if (modal) {
+            modal.classList.add('open');
+        }
+    }
+
+    async exportDashboard(period = 'all') {
+        try {
+            const exportBtn = document.getElementById('export-dashboard-btn');
+            if (exportBtn) {
+                exportBtn.disabled = true;
+                exportBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Generating...';
+            }
+
+            const url = `${this.apiBase}/admin/dashboard/export.xlsx?period=${period}`;
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (!response.ok) {
+                const json = await response.json().catch(() => null);
+                throw new Error(json?.message || 'Export failed');
+            }
+
+            const blob = await response.blob();
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'Admin_Dashboard_Report.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+
+            this.showToast('Dashboard report exported successfully!', 'success');
+        } catch (error) {
+            console.error('Export dashboard error:', error);
+            this.showToast('Failed to export dashboard report. Please try again.', 'error');
+        } finally {
+            const exportBtn = document.getElementById('export-dashboard-btn');
+            if (exportBtn) {
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>Export Dashboard Report';
+            }
+        }
     }
 
 }

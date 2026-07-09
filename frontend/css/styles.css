@@ -1287,15 +1287,15 @@ body.loading {
 .user-menu {
     display: flex;
     gap: 0.75rem;
-    margin-left: -0.4rem;
+    margin-left: -1.5rem;
     min-width: 180px;
 }
 
 .user-menu .btn {
-    padding: 0.6rem 1.1rem;
+    padding: 0.6rem 2rem;
     font-weight: 600;
     letter-spacing: 0.2px;
-    min-width: 92px;
+    min-width: 120px;
 }
 
 /* Buttons */
@@ -4153,17 +4153,6 @@ iframe[src*="recaptcha/api2/bframe"] {
     transform: translate(-50%, -50%) !important;
 }
 
-/* Ensure Terms modal floats above auth/register modal */
-#terms-modal {
-    z-index: 100004 !important;
-    position: fixed !important;
-}
-#terms-modal .modal-content {
-    z-index: 100005 !important;
-    position: relative !important;
-}
-
-/* Add address modal should appear above checkout modal */
 /* Add address modal should appear above checkout modal */
 #add-address-modal {
     z-index: 100007 !important;
@@ -4175,14 +4164,29 @@ iframe[src*="recaptcha/api2/bframe"] {
     z-index: 100008 !important;
 }
 
+/* Ensure Terms modal floats above auth/register modal */
 #terms-modal {
-    z-index: 100060 !important;
+    z-index: 100020 !important;
     position: fixed !important;
 }
 
 #terms-modal .modal-content {
     position: relative !important;
-    z-index: 100061 !important;
+    z-index: 100021 !important;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    overflow: hidden;
+}
+
+#privacy-modal {
+    z-index: 100022 !important;
+    position: fixed !important;
+}
+
+#privacy-modal .modal-content {
+    position: relative !important;
+    z-index: 100023 !important;
     display: flex;
     flex-direction: column;
     max-height: 90vh;
@@ -4215,6 +4219,36 @@ iframe[src*="recaptcha/api2/bframe"] {
 }
 
 #terms-modal .terms-modal-body {
+    overflow-y: auto;
+    flex: 1 1 auto;
+}
+
+#privacy-modal .modal-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
+    color: var(--white);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-bottom: 2px solid var(--light-gray);
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    flex: 0 0 auto;
+}
+
+#privacy-modal .modal-header h3,
+#privacy-modal .modal-header .close-btn {
+    color: var(--white);
+}
+
+#privacy-modal .modal-header .close-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+}
+
+#privacy-modal .modal-header .close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+#privacy-modal .terms-modal-body {
     overflow-y: auto;
     flex: 1 1 auto;
 }
@@ -5723,11 +5757,40 @@ textarea.invalid:focus {
     border: none;
     color: var(--primary-color);
     cursor: pointer;
-    padding: 0.5rem;
+}
+
+/* Password Requirements Indicator */
+.password-requirements {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: #f5f5f5;
+    border-radius: var(--border-radius);
+    font-size: 0.85rem;
+}
+
+.requirement-item {
     display: flex;
     align-items: center;
-    justify-content: center;
-    transition: var(--transition);
+    margin-bottom: 0.4rem;
+    color: #666;
+}
+
+.requirement-item:last-child {
+    margin-bottom: 0;
+}
+
+.requirement-icon {
+    margin-right: 0.5rem;
+    font-size: 0.5rem;
+    color: #ccc;
+}
+
+.requirement-item.valid .requirement-icon {
+    color: #2e7d32;
+}
+
+.requirement-item.valid {
+    color: #2e7d32;
 }
 
 .password-toggle:hover {
@@ -7263,7 +7326,7 @@ textarea.invalid:focus {
 
     .hero {
         padding: 6rem 0 3rem;
-        margin-top: 70px;
+        margin-top: 0;
         min-height: 600px;
         height: 80vh;
     }
@@ -7730,6 +7793,37 @@ textarea.invalid:focus {
     }
 
     #terms-modal .terms-modal-body {
+        overflow: auto;
+        padding: 1rem 1.25rem 1.5rem;
+        flex: 1 1 auto;
+    }
+
+    #privacy-modal .modal-content {
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        width: 90%;
+        max-width: 680px;
+        overflow: hidden;
+    }
+
+    #privacy-modal .modal-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important;
+        color: var(--white);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-bottom: 2px solid var(--light-gray);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        flex: 0 0 auto;
+    }
+
+    #privacy-modal .modal-header h3 {
+        color: var(--white);
+        margin: 0;
+    }
+
+    #privacy-modal .terms-modal-body {
         overflow: auto;
         padding: 1rem 1.25rem 1.5rem;
         flex: 1 1 auto;

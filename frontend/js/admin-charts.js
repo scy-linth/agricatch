@@ -56,7 +56,7 @@
 
     const labels = Object.keys(dailyTotals).map((dayKey) => {
       const date = new Date(`${dayKey}T00:00:00`);
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return FormatUtil.formatDateOnly(date, {"month":"short","day":"numeric", year: undefined });
     });
 
     return {

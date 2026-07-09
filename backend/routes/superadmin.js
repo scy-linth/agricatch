@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { pool, clearSettingsCache } = require('../utils/db');
+const { normalizePhone } = require('../utils/phoneValidation');
 const { writeAdminAuditLog } = require('../utils/auditLog');
 const { broadcastEvent } = require('../utils/realtime');
 const requireRole = require('../middleware/requireRole');
@@ -463,11 +464,28 @@ router.post('/users', requireSuperAdmin, async (req, res) => {
       return res.status(409).json({ message: 'Email or username already exists' });
     }
 
+    // Check phone number uniqueness if provided
+    const phone = String(req.body.phone || '').trim();
+    let phoneDigits = null;
+    if (phone) {
+      phoneDigits = normalizePhone(phone);
+      if (!phoneDigits) {
+        return res.status(400).json({ message: 'Phone number must be 10 digits starting with 9' });
+      }
+      const phoneExists = await pool.query(
+        'SELECT id FROM users WHERE phone = $1',
+        [phoneDigits]
+      );
+      if (phoneExists.rows.length) {
+        return res.status(409).json({ message: 'This phone number is already registered.' });
+      }
+    }
+
     const inserted = await pool.query(
-      `INSERT INTO users (username, email, password, full_name, first_name, middle_name, last_name, role, is_verified, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
-       RETURNING id, username, email, full_name, role, is_verified, created_at`,
-      [cleanUsername, cleanEmail, pwHash, displayName, fn || null, mn || null, ln || null, cleanRole, isVerified]
+      `INSERT INTO users (username, email, password, full_name, first_name, middle_name, last_name, phone, role, is_verified, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+       RETURNING id, username, email, full_name, first_name, middle_name, last_name, phone, role, is_verified, created_at`,
+      [cleanUsername, cleanEmail, pwHash, displayName, fn || null, mn || null, ln || null, phoneDigits, cleanRole, isVerified]
     );
 
     await writeAdminAuditLog(pool, {
@@ -501,7 +519,7 @@ router.put('/users/:id', requireSuperAdmin, async (req, res) => {
     );
     if (!targetRes.rows.length) return res.status(404).json({ message: 'User not found' });
 
-    const { first_name, middle_name, last_name, full_name, email, username, password, role } = req.body || {};
+    const { first_name, middle_name, last_name, full_name, email, username, password, role, phone } = req.body || {};
 
     // Validate name length limits
     if (typeof first_name !== 'undefined' && String(first_name || '').trim().length > 40) {
@@ -546,6 +564,24 @@ router.put('/users/:id', requireSuperAdmin, async (req, res) => {
       const r = String(role).trim().toLowerCase();
       if (!allowedRoles.includes(r)) return res.status(400).json({ message: `Invalid role` });
       push('role', r);
+    }
+    if (typeof phone !== 'undefined') {
+      let phoneDigits = null;
+      if (phone) {
+        phoneDigits = normalizePhone(phone);
+        if (!phoneDigits) {
+          return res.status(400).json({ message: 'Phone number must be 10 digits starting with 9' });
+        }
+        // Check phone uniqueness (allow target user to keep their own phone)
+        const phoneExists = await pool.query(
+          'SELECT id FROM users WHERE phone = $1 AND id <> $2',
+          [phoneDigits, targetId]
+        );
+        if (phoneExists.rows.length > 0) {
+          return res.status(409).json({ message: 'This phone number is already registered.' });
+        }
+      }
+      push('phone', phoneDigits); // Store only 10-digit phone number
     }
 
     if (!updates.length) return res.status(400).json({ message: 'No fields to update' });

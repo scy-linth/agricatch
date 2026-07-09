@@ -1523,7 +1523,7 @@ class FarmerDashboard {
                         const status = String(r.status || 'pending');
                         const statusClass = status === 'approved' ? 'badge bg-success' : status === 'rejected' ? 'badge bg-danger' : 'badge bg-secondary';
                         const cat = this.escapeAttr(r.category_name || r.requested_category_name || 'Uncategorized');
-                        const when = new Date(r.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                        const when = FormatUtil.formatDate(r.created_at, {"month":"short","day":"numeric"});
                         const note = this.escapeAttr(r.notes || '');
                         const review = this.escapeAttr(r.review_notes || '');
                         return `
@@ -1594,7 +1594,7 @@ class FarmerDashboard {
             const status = String(r.status || 'pending');
             const statusClass = status === 'approved' ? 'bg-success' : status === 'rejected' ? 'bg-danger' : 'bg-secondary';
             const cat = this.escapeHtml(r.category_name || 'Uncategorized');
-            const when = new Date(r.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' });
+            const when = FormatUtil.formatDate(r.created_at, {"month":"short","day":"numeric"});
             return `
             <tr>
                 <td class="small text-center">#${r.id}</td>
@@ -1649,7 +1649,7 @@ class FarmerDashboard {
                     const product = data.product;
                     const status = product.status || 'pending';
                     const statusClass = status === 'approved' ? 'bg-success' : status === 'rejected' ? 'bg-danger' : 'bg-secondary';
-                    const when = new Date(product.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    const when = FormatUtil.formatDate(product.created_at, {"month":"short","day":"numeric"});
                     
                     // Show resubmit button for rejected products
                     if (status === 'rejected' && resubmitBtn) {
@@ -1917,11 +1917,12 @@ class FarmerDashboard {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (response.ok) {
-                const data = await response.json();
-                this.isDebugAccount = !!data.is_debug_account;
-                this.debugUserInfo = data;
+                const responseData = await response.json();
+                const user = responseData.user || responseData;
+                this.isDebugAccount = !!user.is_debug_account;
+                this.debugUserInfo = user;
                 if (this.isDebugAccount) {
-                    console.log('[DEBUG FARMER] Debug mode enabled for user:', data.email);
+                    console.log('[DEBUG FARMER] Debug mode enabled for user:', user.email);
                 }
             }
         } catch (error) {
@@ -2134,6 +2135,14 @@ class FarmerDashboard {
     }
 
     setupEventListeners() {
+        // Export Dashboard button (Premium only)
+        const exportBtn = document.getElementById('export-dashboard-btn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                this.showExportPeriodModal();
+            });
+        }
         // Sidebar toggle button (same pattern as admin.js)
         const toggleBtn = document.getElementById('farmer-sidebar-toggle');
         if (toggleBtn) {
@@ -2477,6 +2486,24 @@ class FarmerDashboard {
 
         document.getElementById('btn-submit-support-ticket')?.addEventListener('click', () => {
             this.submitSupportTicket();
+        });
+
+        // Export period modal
+        document.getElementById('close-export-period-modal')?.addEventListener('click', () => {
+            const modal = document.getElementById('export-period-modal');
+            if (modal) modal.classList.remove('open');
+        });
+        document.getElementById('cancel-export-period-modal')?.addEventListener('click', () => {
+            const modal = document.getElementById('export-period-modal');
+            if (modal) modal.classList.remove('open');
+        });
+        document.querySelectorAll('.export-period-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const period = e.target.closest('.export-period-btn').dataset.period;
+                const modal = document.getElementById('export-period-modal');
+                if (modal) modal.classList.remove('open');
+                this.exportDashboard(period);
+            });
         });
 
         document.getElementById('support-ticket-subject')?.addEventListener('input', (e) => {
@@ -3020,6 +3047,44 @@ class FarmerDashboard {
             });
         }
 
+        // Order action confirmation modal event listeners
+        const orderActionModal = document.getElementById('order-action-confirm-modal');
+        const orderActionClose = document.getElementById('close-order-action-modal');
+        const orderActionCancel = document.getElementById('cancel-order-action-btn');
+        const orderActionConfirm = document.getElementById('confirm-order-action-btn');
+
+        if (orderActionClose) {
+            orderActionClose.addEventListener('click', () => {
+                document.getElementById('order-action-confirm-modal').classList.remove('open');
+            });
+        }
+        if (orderActionCancel) {
+            orderActionCancel.addEventListener('click', () => {
+                document.getElementById('order-action-confirm-modal').classList.remove('open');
+            });
+        }
+        if (orderActionConfirm) {
+            orderActionConfirm.addEventListener('click', () => {
+                const orderId = Number(orderActionConfirm.dataset.orderId);
+                const orderItemId = Number(orderActionConfirm.dataset.orderItemId);
+                const status = orderActionConfirm.dataset.status;
+
+                if (orderId && !isNaN(orderId) && status) {
+                    const actualOrderItemId = (orderItemId && !isNaN(orderItemId)) ? orderItemId : orderId;
+                    this.updateOrderItemStatus(orderId, actualOrderItemId, status);
+                }
+
+                document.getElementById('order-action-confirm-modal').classList.remove('open');
+            });
+        }
+        if (orderActionModal) {
+            orderActionModal.addEventListener('click', (e) => {
+                if (e.target === orderActionModal) {
+                    document.getElementById('order-action-confirm-modal').classList.remove('open');
+                }
+            });
+        }
+
         // Rejection reason modal event listeners
         const rejectionReasonClose = document.getElementById('rejection-reason-close');
         const rejectionReasonCloseBtn = document.getElementById('rejection-reason-close-btn');
@@ -3406,9 +3471,37 @@ class FarmerDashboard {
                     this.showMessage('Invalid order information. Please refresh the page.', 'error');
                     return;
                 }
-                // In per-item system, orderItemId should equal orderId, but use orderId if orderItemId is invalid
-                const actualOrderItemId = (orderItemId && !isNaN(orderItemId)) ? orderItemId : orderId;
-                this.updateOrderItemStatus(orderId, actualOrderItemId, status);
+                // Show confirmation modal
+                const modalTitle = document.getElementById('order-action-modal-title');
+                const modalMessage = document.getElementById('order-action-modal-message');
+                const confirmBtn = document.getElementById('confirm-order-action-btn');
+
+                // Set modal content based on action
+                const statusLabels = {
+                    'confirmed': 'Confirm Order',
+                    'cancelled': 'Cancel Order',
+                    'preparing': 'Start Preparing',
+                    'out_for_delivery': 'Mark as Out for Delivery',
+                    'delivered': 'Mark as Delivered'
+                };
+                const statusMessages = {
+                    'confirmed': 'Are you sure you want to confirm this order? This will notify the customer that their order has been accepted.',
+                    'cancelled': 'Are you sure you want to cancel this order? This action cannot be undone and will notify the customer.',
+                    'preparing': 'Are you sure you want to start preparing this order? This will update the order status to "Preparing".',
+                    'out_for_delivery': 'Are you sure you want to mark this order as out for delivery? This will notify the customer that their order is on the way.',
+                    'delivered': 'Are you sure you want to mark this order as delivered? This will complete the order and allow the customer to rate it.'
+                };
+
+                modalTitle.innerHTML = `<i class="bi bi-exclamation-circle me-2 text-warning"></i>${statusLabels[status] || 'Confirm Action'}`;
+                modalMessage.textContent = statusMessages[status] || 'Are you sure you want to perform this action?';
+
+                // Store action details in confirm button
+                confirmBtn.dataset.orderId = orderId;
+                confirmBtn.dataset.orderItemId = orderItemId;
+                confirmBtn.dataset.status = status;
+
+                // Show modal
+                document.getElementById('order-action-confirm-modal').classList.add('open');
             }
 
             if (action === 'schedule-delivery') {
@@ -4364,6 +4457,12 @@ class FarmerDashboard {
             pagetitle.style.display = safeSection === 'support-ticket-chat' ? 'none' : '';
         }
 
+        // Show/hide export dashboard button - only visible in overview section for premium users
+        const exportBtn = document.getElementById('export-dashboard-btn');
+        if (exportBtn) {
+            exportBtn.style.display = (safeSection === 'overview' && this.isPremium()) ? 'block' : 'none';
+        }
+
         // Load notifications when notifications section is opened
         if (safeSection === 'notifications') {
             this.loadNotifications(1).then(() => {
@@ -4761,7 +4860,7 @@ class FarmerDashboard {
                 if (poPhone) poPhone.textContent = user.phone ? `+63${user.phone}` : '—';
                 if (poRole) poRole.textContent = (user.role || '—').toUpperCase();
                 if (poJoined) poJoined.textContent = user.created_at
-                    ? new Date(user.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+                    ? FormatUtil.formatDateOnly(user.created_at, {"month":"short","day":"numeric"})
                     : '—';
 
                 // Pre-populate edit form
@@ -4885,7 +4984,7 @@ class FarmerDashboard {
         html += '<thead><tr><th>Date</th><th>Plan</th><th>Amount</th><th>Status</th><th>Period</th><th>Actions</th></tr></thead><tbody>';
 
         history.forEach(sub => {
-            const date = new Date(sub.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+            const date = FormatUtil.formatDate(sub.created_at, {"month":"short","day":"numeric"});
             const months = sub.plan_duration_months || 1;
             const amount = sub.amount_paid ? `₱${parseFloat(sub.amount_paid).toLocaleString()}` : '—';
             const status = sub.status || 'unknown';
@@ -4894,8 +4993,8 @@ class FarmerDashboard {
 
             let period = '—';
             if (sub.starts_at && sub.expires_at) {
-                const start = new Date(sub.starts_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
-                const end = new Date(sub.expires_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+                const start = FormatUtil.formatDateOnly(sub.starts_at, {"month":"short","day":"numeric", year: undefined });
+                const end = FormatUtil.formatDateOnly(sub.expires_at, {"month":"short","day":"numeric", year: undefined });
                 period = `${start} - ${end}`;
             }
 
@@ -4984,18 +5083,18 @@ class FarmerDashboard {
                     </div>
                     <div class="col-md-6">
                         <label class="small fw-semibold text-muted">Requested Date</label>
-                        <div>${new Date(subscription.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                        <div>${FormatUtil.formatDate(subscription.created_at, {"month":"long","day":"numeric"})}</div>
                     </div>
                     ${subscription.starts_at ? `
                     <div class="col-md-6">
                         <label class="small fw-semibold text-muted">Start Date</label>
-                        <div>${new Date(subscription.starts_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                        <div>${FormatUtil.formatDateOnly(subscription.starts_at, {"month":"long","day":"numeric"})}</div>
                     </div>
                     ` : ''}
                     ${subscription.expires_at ? `
                     <div class="col-md-6">
                         <label class="small fw-semibold text-muted">Expiry Date</label>
-                        <div>${new Date(subscription.expires_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                        <div>${FormatUtil.formatDateOnly(subscription.expires_at, {"month":"long","day":"numeric"})}</div>
                     </div>
                     ` : ''}
                 </div>
@@ -5057,7 +5156,7 @@ class FarmerDashboard {
         else if (d.status === 'active') {
             show('active','Premium','bg-success');
             const expEl = document.getElementById('subscription-expiry-date');
-            if (expEl && d.expires_at) expEl.textContent = new Date(d.expires_at).toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'});
+            if (expEl && d.expires_at) expEl.textContent = FormatUtil.formatDateOnly(d.expires_at, {"month":"long","day":"numeric"});
             // Expiry warning
             const warnEl = document.getElementById('subscription-expiry-warning');
             if (warnEl && d.expires_at) {
@@ -5074,6 +5173,12 @@ class FarmerDashboard {
             }
         } else if (d.status === 'expired') show('expired','Expired','bg-danger');
         else show('free','Free','bg-secondary');
+
+        // Show/hide export button based on premium status
+        const exportContainer = document.getElementById('export-dashboard-container');
+        if (exportContainer) {
+            exportContainer.style.display = this.isPremium() ? 'flex' : 'none';
+        }
     }
 
     updatePremiumBadge() {
@@ -5169,7 +5274,7 @@ class FarmerDashboard {
         if (mode === 'extend' && this.subscriptionData?.expires_at) {
             title.textContent = 'Extend Subscription';
             currentInfo.style.display = 'block';
-            document.getElementById('sub-current-expiry').textContent = new Date(this.subscriptionData.expires_at).toLocaleDateString('en-PH');
+            document.getElementById('sub-current-expiry').textContent = FormatUtil.formatDateOnly(this.subscriptionData.expires_at);
             this.updateNewExpiryPreview();
         } else {
             title.textContent = mode === 'renew' ? 'Renew Premium' : 'Go Premium';
@@ -5193,7 +5298,7 @@ class FarmerDashboard {
         const newExpiry = new Date(currentExpiry);
         newExpiry.setMonth(newExpiry.getMonth() + months);
         const el = document.getElementById('sub-new-expiry');
-        if (el) el.textContent = newExpiry.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+        if (el) el.textContent = FormatUtil.formatDateOnly(newExpiry, {"month":"long","day":"numeric"});
     }
 
     async submitSubscriptionRequest() {
@@ -5273,6 +5378,24 @@ class FarmerDashboard {
         if (phoneDigits && !/^9[0-9]{9}$/.test(phoneDigits)) {
             this.showMessage('Phone must be 10 digits starting with 9 (e.g. 912 345 6789)', 'error');
             return;
+        }
+
+        // Check phone uniqueness before submission
+        if (phoneDigits) {
+            try {
+                const phoneCheckResponse = await fetch('/api/auth/check-phone', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phoneDigits, userId: this.user?.id })
+                });
+                if (phoneCheckResponse.status === 409) {
+                    this.showMessage('This phone number is already registered.', 'error');
+                    return;
+                }
+            } catch (phoneCheckError) {
+                // If phone check fails, continue with profile update (backend will validate)
+                console.warn('Phone uniqueness check failed, continuing with profile update');
+            }
         }
 
         const saveBtn = document.getElementById('profile-save-btn');
@@ -5793,12 +5916,44 @@ class FarmerDashboard {
     }
 
     _relativeTime(date) {
-        const seconds = Math.floor((new Date() - date) / 1000);
-        if (seconds < 60) return 'Just now';
-        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-        if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-        return date.toLocaleDateString();
+        if (!date) return '';
+        const d = new Date(date);
+
+        // Check for invalid date
+        if (isNaN(d.getTime())) return '';
+
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}min ago`;
+
+        if (diffHours < 24) return `${diffHours}hr ago`;
+
+        // Check if yesterday (exactly 1 day ago and different calendar day)
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (d.toDateString() === yesterday.toDateString() && diffDays === 1) return 'Yesterday';
+
+        // Days ago (2-6 days)
+        if (diffDays < 7) return `${diffDays}d ago`;
+
+        // Weeks ago (7-27 days)
+        const diffWeeks = Math.floor(diffDays / 7);
+        if (diffWeeks < 4) return `${diffWeeks}w ago`;
+
+        // Months ago (28-364 days)
+        const diffMonths = Math.floor(diffDays / 30);
+        if (diffDays < 365) {
+            return `${Math.max(1, diffMonths)}mo ago`;
+        }
+
+        // Years ago (365+ days)
+        const diffYears = Math.floor(diffDays / 365);
+        return `${Math.max(1, diffYears)}y ago`;
     }
 
     renderNotifications(items) {
@@ -6267,6 +6422,65 @@ class FarmerDashboard {
         }, 600);
     }
 
+
+    showExportPeriodModal() {
+        const modal = document.getElementById('export-period-modal');
+        if (modal) {
+            modal.classList.add('open');
+        }
+    }
+
+    async exportDashboard(period = 'all') {
+        try {
+            if (!this.isPremium()) {
+                this.showToast('Excel export is a Premium feature. Upgrade to Premium for advanced analytics.', 'warning');
+                return;
+            }
+
+            const exportBtn = document.getElementById('export-dashboard-btn');
+            if (exportBtn) {
+                exportBtn.disabled = true;
+                exportBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Generating...';
+            }
+
+            const rangeDays = this._periodToRangeDays(period);
+            const params = new URLSearchParams();
+            if (rangeDays) {
+                params.set('rangeDays', rangeDays);
+            }
+
+            const url = `${this.apiBase}/farmers/me/metrics/export.xlsx?${params.toString()}`;
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (!response.ok) {
+                const json = await response.json().catch(() => null);
+                throw new Error(json?.message || 'Export failed');
+            }
+
+            const blob = await response.blob();
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'Farmer_Dashboard_Report.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+
+            this.showToast('Dashboard report exported successfully!', 'success');
+        } catch (error) {
+            console.error('Export dashboard error:', error);
+            this.showToast('Failed to export dashboard report. Please try again.', 'error');
+        } finally {
+            const exportBtn = document.getElementById('export-dashboard-btn');
+            if (exportBtn) {
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>Export Dashboard Report';
+            }
+        }
+    }
     formatLocalDateInputValue(dt) {
         try {
             const d = dt instanceof Date ? dt : new Date(dt);
@@ -6318,7 +6532,7 @@ class FarmerDashboard {
                 <div style="padding:8px 0;border-bottom:1px solid var(--border,#e5e7eb);">
                     <div style="font-size:0.88rem;font-weight:600;color:var(--text,#111827);">Announcement: ${esc(n.title || n.message || '')}</div>
                     ${n.body || n.content ? `<div style="font-size:0.8rem;color:#4b5563;margin-top:2px;">${esc(n.body || n.content)}</div>` : ''}
-                    <div style="font-size:0.75rem;color:#9ca3af;margin-top:3px;">${n.created_at ? new Date(n.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : ''}</div>
+                    <div style="font-size:0.75rem;color:#9ca3af;margin-top:3px;">${n.created_at ? FormatUtil.formatDate(n.created_at, {"month":"short","day":"numeric"}) : ''}</div>
                 </div>
             `).join('');
         } catch (err) {
@@ -6506,7 +6720,7 @@ class FarmerDashboard {
         if (lastUpdatedEl) {
             const ts = new Date();
             const periodLabel = this._periodLabel(this._reportPeriod);
-            lastUpdatedEl.textContent = `${periodLabel} • Updated: ${ts.toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+            lastUpdatedEl.textContent = `${periodLabel} • Updated: ${FormatUtil.formatDate(ts, {"month":"short","day":"numeric"})}`;
         }
 
         // Update period labels on all widgets (synced via _syncAllPeriods, but also update here for initial load)
@@ -6552,7 +6766,7 @@ class FarmerDashboard {
         const lastUpdatedEl = document.getElementById('overview-last-updated');
         if (lastUpdatedEl) {
             const ts = new Date();
-            lastUpdatedEl.textContent = `Basic View • Updated: ${ts.toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+            lastUpdatedEl.textContent = `Basic View • Updated: ${FormatUtil.formatDate(ts, {"month":"short","day":"numeric"})}`;
         }
 
         // Hide advanced charts - available for premium users only
@@ -6881,8 +7095,8 @@ class FarmerDashboard {
                 const labels = data.map(d => {
                     const dt = new Date(d.label);
                     if (period === 'today') return dt.getHours() + ':00';
-                    if (period === 'year' || period === 'all') return dt.toLocaleString('default', { month: 'short' });
-                    return dt.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+                    if (period === 'year' || period === 'all') return FormatUtil.formatDateOnly(dt, {"month":"short", year: undefined });
+                    return FormatUtil.formatDateOnly(dt, {"month":"short","day":"numeric", year: undefined });
                 });
 
                 this.overviewCharts.reports = new ApexCharts(el, {
@@ -7340,7 +7554,7 @@ class FarmerDashboard {
             const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
             const categoryName = String(product.category_name || '').trim();
             const createdAt = product.created_at ? new Date(product.created_at) : null;
-            const createdLabel = createdAt ? createdAt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+            const createdLabel = createdAt ? FormatUtil.formatDate(createdAt, {"month":"short","day":"numeric"}) : '—';
             const createdOrder = createdAt ? createdAt.getTime() : 0;
 
             // Normalize image URL
@@ -7570,7 +7784,7 @@ class FarmerDashboard {
                         ${reservationIndicator}
                     </td>
                     <td class="small">${this.escapeHtml(product.category_name || 'N/A')}</td>
-                    <td class="small">${product.harvest_date ? new Date(product.harvest_date).toLocaleDateString() : 'N/A'}</td>
+                    <td class="small">${product.harvest_date ? FormatUtil.formatDateOnly(product.harvest_date) : 'N/A'}</td>
                     <td>
                         ${progressPercent >= 100
                             ? `<div class="small fw-bold text-success"><i class="bi bi-check-circle-fill me-1"></i>Reserved Full</div>`
@@ -7911,6 +8125,7 @@ class FarmerDashboard {
                 return;
             }
             const data = await res.json();
+            this._reviewsData = data;
             this._renderReviews(data, listEl, paginationEl);
         } catch (e) {
             console.error('Load reviews error:', e);
@@ -7920,6 +8135,39 @@ class FarmerDashboard {
                 description: 'Please try again later.'
             });
         }
+    }
+
+    _applyReviewsFiltersAndSort(reviews) {
+        const ratingFilter = document.getElementById('reviews-filter-rating');
+        const sortSelect = document.getElementById('reviews-sort');
+        
+        let filtered = [...reviews];
+        
+        // Apply rating filter
+        if (ratingFilter && ratingFilter.value) {
+            const filterRating = Number(ratingFilter.value);
+            filtered = filtered.filter(r => Number(r.rating) === filterRating);
+        }
+        
+        // Apply sorting
+        if (sortSelect) {
+            switch (sortSelect.value) {
+                case 'newest':
+                    filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    break;
+                case 'oldest':
+                    filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    break;
+                case 'highest':
+                    filtered.sort((a, b) => Number(b.rating) - Number(a.rating));
+                    break;
+                case 'lowest':
+                    filtered.sort((a, b) => Number(a.rating) - Number(b.rating));
+                    break;
+            }
+        }
+        
+        return filtered;
     }
 
     _renderReviews(data, listEl, paginationEl) {
@@ -7939,11 +8187,15 @@ class FarmerDashboard {
 
         if (!listEl) return;
         const reviews = Array.isArray(data.reviews) ? data.reviews : [];
-        if (!reviews.length) {
+        
+        // Apply filters and sorting
+        const filteredReviews = this._applyReviewsFiltersAndSort(reviews);
+        
+        if (!filteredReviews.length) {
             listEl.innerHTML = (window.renderEmptyState || function() { return ''; })({
                 icon: 'fas fa-star',
-                title: 'No reviews yet',
-                description: 'Customer reviews will appear here.'
+                title: 'No reviews match your filters',
+                description: 'Try adjusting your filter or sort options.'
             });
             if (paginationEl) paginationEl.innerHTML = '';
             return;
@@ -7962,14 +8214,14 @@ class FarmerDashboard {
                         </tr>
                     </thead>
                     <tbody>
-                        ${reviews.map(r => {
+                        ${filteredReviews.map(r => {
                             const filledR = Number(r.rating || 0);
                             const starsHtml = `<span style="color:#f59e0b;">${'★'.repeat(filledR)}</span><span style="color:#cbd5e1;">${'☆'.repeat(Math.max(0, 5 - filledR))}</span>`;
                             const customerName = r.first_name
                                 ? `${r.first_name} ${r.last_name || ''}`.trim()
                                 : (r.customer_name || 'Anonymous');
                             const customerVerified = r.customer_is_verified === true;
-                            const date = r.created_at ? new Date(r.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+                            const date = r.created_at ? FormatUtil.formatDate(r.created_at, {"month":"short","day":"numeric"}) : '—';
                             return `
                                 <tr>
                                     <td>${this.escapeHtml(customerName)}${customerVerified ? ' <i class="bi bi-check-circle-fill text-primary" style="font-size:0.75rem;margin-left:4px;" title="Verified Customer"></i>' : ''}</td>
@@ -8043,8 +8295,8 @@ class FarmerDashboard {
         const status = isAvailable ? 'Available' : 'Disabled';
         const toggleLabel = isAvailable ? 'Disable' : 'Enable';
         const toggleArg = !isAvailable;
-        const harvestDate = product.harvest_date ? new Date(product.harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : 'Not specified';
-        const expiryDate = product.expiry_date ? new Date(product.expiry_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : 'Not specified';
+        const harvestDate = product.harvest_date ? FormatUtil.formatDateOnly(product.harvest_date, {"month":"short","day":"numeric"}) : 'Not specified';
+        const expiryDate = product.expiry_date ? FormatUtil.formatDateOnly(product.expiry_date, {"month":"short","day":"numeric"}) : 'Not specified';
         const reviewCount = this.fmtNumber(product.total_reviews || 0);
         const avgRating = this.fmtNumber(product.average_rating || 0, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
@@ -9865,23 +10117,23 @@ class FarmerDashboard {
     getOrderActionButtons(order) {
         const status = order.status;
         const orderId = order.id;
-        
+
         if (status === 'pending') {
             return `
-                <button class="btn btn-sm btn-success order-confirm-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">
-                    <i class="bi bi-check-lg me-1"></i>Confirm
-                </button>
                 <button class="btn btn-sm btn-danger order-cancel-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">
                     <i class="bi bi-x-lg me-1"></i>Cancel
+                </button>
+                <button class="btn btn-sm btn-success order-confirm-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">
+                    <i class="bi bi-check-lg me-1"></i>Confirm
                 </button>
             `;
         } else if (status === 'preorder_reserved') {
             return `
-                <button class="btn btn-sm btn-success order-confirm-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">
-                    <i class="bi bi-check-lg me-1"></i>Confirm
-                </button>
                 <button class="btn btn-sm btn-danger order-cancel-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="cancelled">
                     <i class="bi bi-x-lg me-1"></i>Cancel
+                </button>
+                <button class="btn btn-sm btn-success order-confirm-btn" data-action="item-status" data-order-id="${orderId}" data-order-item-id="${orderId}" data-status="confirmed">
+                    <i class="bi bi-check-lg me-1"></i>Confirm
                 </button>
             `;
         } else if (status === 'confirmed') {
@@ -9967,7 +10219,7 @@ class FarmerDashboard {
             const orderId = Number(order.id);
             const orderDate = order.created_at ? new Date(order.created_at) : null;
             const deliveryAddress = String(order.delivery_address || '').trim();
-            const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : 'Not specified';
+            const deliveryDate = order.delivery_date ? FormatUtil.formatDateOnly(order.delivery_date, {"month":"short","day":"numeric"}) : 'Not specified';
             const specialInstructions = String(order.special_instructions || '').trim();
             const customerName = String(order.customer_name || '—').trim();
             const customerVerified = order.customer_is_verified === true;
@@ -9975,7 +10227,7 @@ class FarmerDashboard {
             const customerTotalRatings = Number(order.customer_total_ratings || 0);
             const searchText = `${String(orderId)} ${productName} ${customerName}`.toLowerCase();
             const dateLabel = orderDate && !Number.isNaN(orderDate.getTime())
-                ? orderDate.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })
+                ? FormatUtil.formatDateOnly(orderDate, {"month":"short","day":"numeric"})
                 : '—';
             
             return `
@@ -10067,8 +10319,8 @@ class FarmerDashboard {
         const customerVerified = order.customer_is_verified === true;
         const deliveryAddress = String(order.delivery_address || '').trim();
         const specialInstructions = String(order.special_instructions || '').trim();
-        const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : 'Not specified';
-        const orderDate = order.created_at ? new Date(order.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+        const deliveryDate = order.delivery_date ? FormatUtil.formatDateOnly(order.delivery_date, {"month":"short","day":"numeric"}) : 'Not specified';
+        const orderDate = order.created_at ? FormatUtil.formatDate(order.created_at, {"month":"short","day":"numeric"}) : '—';
         const harvestDate = item.harvest_date || order.harvest_date || '';
         const expiryDate = item.expiry_date || order.expiry_date || '';
         const productLocation = String(item.location || order.location || '').trim();
@@ -10084,7 +10336,7 @@ class FarmerDashboard {
                         <i class="bi bi-calendar-check"></i>
                         <div>
                             <div class="order-info-label">Harvest Date</div>
-                            <div class="order-info-value">${this.escapeHtml(harvestDateObj.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }))}</div>
+                            <div class="order-info-value">${this.escapeHtml(FormatUtil.formatDateOnly(harvestDateObj, {"month":"short","day":"numeric"}))}</div>
                         </div>
                     </div>
                 `);
@@ -10098,7 +10350,7 @@ class FarmerDashboard {
                         <i class="bi bi-clock-history"></i>
                         <div>
                             <div class="order-info-label">Best Before</div>
-                            <div class="order-info-value">${this.escapeHtml(expiryDateObj.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }))}</div>
+                            <div class="order-info-value">${this.escapeHtml(FormatUtil.formatDateOnly(expiryDateObj, {"month":"short","day":"numeric"}))}</div>
                         </div>
                     </div>
                 `);
@@ -10160,6 +10412,13 @@ class FarmerDashboard {
                             <span class="order-total-price">${this.fmtCurrency(totalAmount)}</span>
                         </div>
                         <div class="order-product-meta">
+                            <div class="order-meta-item">
+                                <i class="bi bi-clock"></i>
+                                <div>
+                                    <div class="order-info-label">Order Date</div>
+                                    <div class="order-info-value">${this.escapeHtml(orderDate)}</div>
+                                </div>
+                            </div>
                             ${productMeta.join('')}
                         </div>
                     </div>
@@ -10217,14 +10476,6 @@ class FarmerDashboard {
                             ${timelineHtml}
                         </div>
                     </div>
-                    <div class="order-info-card order-actions">
-                        <div class="order-card-header">
-                            <i class="bi bi-gear"></i> Actions
-                        </div>
-                        <div class="order-card-actions">
-                            ${this.getOrderActionButtons({ id: order.id, status: currentStatus })}
-                        </div>
-                    </div>
                 </div>
             </div>
         `;
@@ -10243,11 +10494,14 @@ class FarmerDashboard {
 
     buildOrderStatusTimeline(order, currentStatus) {
         const statusOrder = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered'];
-        const orderDate = order.created_at ? new Date(order.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
-        const scheduledDate = order.scheduled_delivery_date ? new Date(order.scheduled_delivery_date).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
-        const deliveredDate = order.delivered_at ? new Date(order.delivered_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+        const orderDate = order.created_at ? FormatUtil.formatDate(order.created_at, {"month":"short","day":"numeric"}) : '—';
+        const confirmedDate = order.confirmed_at ? FormatUtil.formatDate(order.confirmed_at, {"month":"short","day":"numeric"}) : null;
+        const preparedDate = order.prepared_at ? FormatUtil.formatDate(order.prepared_at, {"month":"short","day":"numeric"}) : null;
+        const outForDeliveryDate = order.out_for_delivery_at ? FormatUtil.formatDate(order.out_for_delivery_at, {"month":"short","day":"numeric"}) : null;
+        const scheduledDate = order.scheduled_delivery_date ? FormatUtil.formatDateOnly(order.scheduled_delivery_date, {"month":"short","day":"numeric"}) : null;
+        const deliveredDate = order.delivered_at ? FormatUtil.formatDate(order.delivered_at, {"month":"short","day":"numeric"}) : null;
 
-        // Map order statuses to timeline steps
+        // Map order statuses to timeline steps with actual timestamps
         let steps = [];
         if (currentStatus === 'preorder_reserved') {
             steps = [
@@ -10257,15 +10511,15 @@ class FarmerDashboard {
         } else if (currentStatus === 'scheduled') {
             steps = [
                 { title: 'Order Placed', time: orderDate, status: 'pending' },
-                { title: 'Confirmed', time: 'Waiting for confirmation', status: 'confirmed' },
+                { title: 'Confirmed', time: confirmedDate || 'Waiting for confirmation', status: 'confirmed' },
                 { title: 'Scheduled', time: scheduledDate || 'Delivery scheduled', status: 'scheduled' }
             ];
         } else {
             steps = [
                 { title: 'Order Placed', time: orderDate, status: 'pending' },
-                { title: 'Confirmed', time: 'Waiting for confirmation', status: 'confirmed' },
-                { title: 'Preparing', time: 'Getting ready for delivery', status: 'preparing' },
-                { title: 'Out for Delivery', time: scheduledDate || 'Scheduled', status: 'out_for_delivery' },
+                { title: 'Confirmed', time: confirmedDate || 'Waiting for confirmation', status: 'confirmed' },
+                { title: 'Preparing', time: preparedDate || 'Getting ready for delivery', status: 'preparing' },
+                { title: 'Out for Delivery', time: outForDeliveryDate || scheduledDate || 'Scheduled', status: 'out_for_delivery' },
                 { title: 'Delivered', time: deliveredDate || 'Pending', status: 'delivered' }
             ];
         }
@@ -10279,14 +10533,9 @@ class FarmerDashboard {
             const isCompleted = (currentIndex >= 0 && stepIndex < currentIndex && currentStatus !== 'cancelled') ||
                                 (currentIndex === -1 && index < steps.findIndex(s => s.status === currentStatus) && currentStatus !== 'cancelled');
             let time = step.time;
-            if (isCompleted) {
-                if (step.status === 'confirmed' && order.confirmed_at) time = new Date(order.confirmed_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                if (step.status === 'preparing' && order.prepared_at) time = new Date(order.prepared_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                if (step.status === 'out_for_delivery' && order.out_for_delivery_at) time = new Date(order.out_for_delivery_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            }
             if (currentStatus === 'cancelled') {
                 if (step.status === 'pending') return { title: 'Order Placed', time: orderDate, completed: true, active: false };
-                if (step.status === 'confirmed') return { title: 'Order Cancelled', time: order.cancelled_at ? new Date(order.cancelled_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Cancelled', completed: false, active: true };
+                if (step.status === 'confirmed') return { title: 'Order Cancelled', time: order.cancelled_at ? FormatUtil.formatDate(order.cancelled_at, {"month":"short","day":"numeric"}) : 'Cancelled', completed: false, active: true };
                 return { title: step.title, time: '—', completed: false, active: false };
             }
             return { title: step.title, time, completed: isCompleted, active: isActive };
@@ -11178,7 +11427,7 @@ class FarmerDashboard {
         };
         const style = statusStyles[this.currentVerificationRequest.status] || statusStyles.pending;
         document.getElementById('display-status').innerHTML = `<span style="background:${style.bg};color:${style.color};font-size:0.75rem;font-weight:600;padding:4px 10px;border-radius:9999px;text-transform:uppercase;">${style.label}</span>`;
-        document.getElementById('display-submitted-date').textContent = new Date(this.currentVerificationRequest.created_at).toLocaleDateString();
+        document.getElementById('display-submitted-date').textContent = FormatUtil.formatDate(this.currentVerificationRequest.created_at);
         document.getElementById('display-estimated-time').textContent = '1-2 business days';
 
         if (this.currentVerificationRequest.admin_notes) {
@@ -11238,7 +11487,7 @@ class FarmerDashboard {
             const isTruncated = notes.length > 50;
             return `
                 <tr>
-                    <td>${new Date(request.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td>${FormatUtil.formatDate(request.created_at, {"month":"short","day":"numeric"})}</td>
                     <td><span class="badge ${badgeClass}">${request.status.charAt(0).toUpperCase() + request.status.slice(1)}</span></td>
                     <td class="text-muted small" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="farmerDashboard.showVerificationNotes('${notes.replace(/'/g, "\\'").replace(/"/g, '\\"')}')" title="${isTruncated ? 'Click to view full notes' : notes}">${truncatedNotes}</td>
                 </tr>
@@ -11451,7 +11700,7 @@ class FarmerDashboard {
                     <td>${this.escapeHtml(ticket.subject)}</td>
                     <td class="text-center">#${ticket.id}</td>
                     <td class="text-center"><span style="background:${style.bg};color:${style.color};font-size:0.75rem;font-weight:600;padding:4px 10px;border-radius:9999px;text-transform:uppercase;">${style.label}</span></td>
-                    <td>${new Date(ticket.created_at).toLocaleDateString('en-PH')}</td>
+                    <td>${FormatUtil.formatDate(ticket.created_at)}</td>
                     <td>
                         <button class="btn btn-sm btn-outline-primary view-ticket-btn" data-id="${ticket.id}">Chat</button>
                         ${ticket.unread_count > 0 ? '<i class="bi bi-dot text-danger ms-1"></i>' : ''}
@@ -11564,6 +11813,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const resubmitBtn = document.getElementById('resubmit-verification-btn');
     if (resubmitBtn) {
         resubmitBtn.addEventListener('click', () => farmerDashboard.handleResubmitRequest());
+    }
+
+    // Reviews filter and sort event listeners
+    const reviewsFilterRating = document.getElementById('reviews-filter-rating');
+    const reviewsSort = document.getElementById('reviews-sort');
+    const reviewsResetFilters = document.getElementById('reviews-reset-filters');
+
+    if (reviewsFilterRating) {
+        reviewsFilterRating.addEventListener('change', () => {
+            if (farmerDashboard._reviewsData) {
+                farmerDashboard._renderReviews(farmerDashboard._reviewsData, document.getElementById('reviews-list'), document.getElementById('reviews-pagination'));
+            }
+        });
+    }
+
+    if (reviewsSort) {
+        reviewsSort.addEventListener('change', () => {
+            if (farmerDashboard._reviewsData) {
+                farmerDashboard._renderReviews(farmerDashboard._reviewsData, document.getElementById('reviews-list'), document.getElementById('reviews-pagination'));
+            }
+        });
+    }
+
+    if (reviewsResetFilters) {
+        reviewsResetFilters.addEventListener('click', () => {
+            if (reviewsFilterRating) reviewsFilterRating.value = '';
+            if (reviewsSort) reviewsSort.value = 'newest';
+            if (farmerDashboard._reviewsData) {
+                farmerDashboard._renderReviews(farmerDashboard._reviewsData, document.getElementById('reviews-list'), document.getElementById('reviews-pagination'));
+            }
+        });
     }
 
     // Verification history pagination

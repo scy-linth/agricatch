@@ -1,0 +1,280 @@
+[
+  {
+    "page": "Customer Profile API",
+    "scenario": "update profile with new phone",
+    "pass": true,
+    "details": {
+      "phone": "9259326941",
+      "requestPhone": "9259326941",
+      "dbBefore": null,
+      "dbAfter": "9259326941",
+      "status": 200,
+      "response": {
+        "message": "Profile updated successfully",
+        "user": {
+          "id": 103,
+          "username": "testcustomer",
+          "email": "testcustomer@test.com",
+          "full_name": "Test Customer",
+          "first_name": "Test",
+          "middle_name": null,
+          "last_name": "Customer",
+          "shop_name": null,
+          "phone": "9259326941",
+          "address": null,
+          "role": "customer",
+          "is_verified": false,
+          "is_disabled": false,
+          "disabled_reason": null,
+          "created_at": "2026-06-26T14:32:53.686Z"
+        }
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:35.816Z"
+  },
+  {
+    "page": "Customer Profile API",
+    "scenario": "update profile with same phone",
+    "pass": true,
+    "details": {
+      "phone": "9259326941",
+      "dbAfter": "9259326941",
+      "status": 200,
+      "response": {
+        "message": "Profile updated successfully",
+        "user": {
+          "id": 103,
+          "username": "testcustomer",
+          "email": "testcustomer@test.com",
+          "full_name": "Test Customer",
+          "first_name": "Test",
+          "middle_name": null,
+          "last_name": "Customer",
+          "shop_name": null,
+          "phone": "9259326941",
+          "address": null,
+          "role": "customer",
+          "is_verified": false,
+          "is_disabled": false,
+          "disabled_reason": null,
+          "created_at": "2026-06-26T14:32:53.686Z"
+        }
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:36.358Z"
+  },
+  {
+    "page": "Customer Profile API",
+    "scenario": "update profile with duplicate phone fails",
+    "pass": true,
+    "details": {
+      "duplicatePhone": "9879678966",
+      "dbAfter": "9259326941",
+      "status": 409,
+      "response": {
+        "message": "This phone number is already registered."
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:36.534Z"
+  },
+  {
+    "page": "Customer Profile API",
+    "scenario": "update profile with new phone B",
+    "pass": true,
+    "details": {
+      "phone": "9830221698",
+      "requestPhone": "9830221698",
+      "dbAfter": "9830221698",
+      "status": 200,
+      "response": {
+        "message": "Profile updated successfully",
+        "user": {
+          "id": 103,
+          "username": "testcustomer",
+          "email": "testcustomer@test.com",
+          "full_name": "Test Customer",
+          "first_name": "Test",
+          "middle_name": null,
+          "last_name": "Customer",
+          "shop_name": null,
+          "phone": "9830221698",
+          "address": null,
+          "role": "customer",
+          "is_verified": false,
+          "is_disabled": false,
+          "disabled_reason": null,
+          "created_at": "2026-06-26T14:32:53.686Z"
+        }
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:36.834Z"
+  },
+  {
+    "page": "Customer Profile API",
+    "scenario": "reset test data",
+    "pass": true,
+    "details": {
+      "dbPhone": "NULL"
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:36.870Z"
+  },
+  {
+    "page": "Phone Check API",
+    "scenario": "check available phone",
+    "pass": true,
+    "details": {
+      "phone": "9461755976",
+      "status": 200,
+      "response": {
+        "available": true
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:37.007Z"
+  },
+  {
+    "page": "Phone Check API",
+    "scenario": "check duplicate phone fails",
+    "pass": true,
+    "details": {
+      "phone": "9879678966",
+      "status": 409,
+      "response": {
+        "message": "This phone number is already registered."
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:37.089Z"
+  },
+  {
+    "page": "Phone Check API",
+    "scenario": "check own phone with userId",
+    "pass": true,
+    "details": {
+      "phone": "9404610487",
+      "userId": 103,
+      "status": 200,
+      "response": {
+        "available": true
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:37.465Z"
+  },
+  {
+    "page": "Phone Format Validation",
+    "scenario": "reject invalid phone: 1234567890",
+    "pass": true,
+    "details": {
+      "phone": "1234567890",
+      "status": 400,
+      "response": {
+        "message": "Invalid phone number format"
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:37.542Z"
+  },
+  {
+    "page": "Phone Format Validation",
+    "scenario": "reject invalid phone: 912345678",
+    "pass": true,
+    "details": {
+      "phone": "912345678",
+      "status": 400,
+      "response": {
+        "message": "Invalid phone number format"
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:37.585Z"
+  },
+  {
+    "page": "Phone Format Validation",
+    "scenario": "reject invalid phone: 912345678901",
+    "pass": true,
+    "details": {
+      "phone": "912345678901",
+      "status": 400,
+      "response": {
+        "message": "Invalid phone number format"
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:37.621Z"
+  },
+  {
+    "page": "Phone Format Validation",
+    "scenario": "reject invalid phone: 9123456789a",
+    "pass": false,
+    "details": {
+      "phone": "9123456789a",
+      "status": 200,
+      "response": {
+        "available": true
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:37.700Z"
+  },
+  {
+    "page": "Phone Format Validation",
+    "scenario": "reject invalid phone: +639123456789",
+    "pass": true,
+    "details": {
+      "phone": "+639123456789",
+      "status": 400,
+      "response": {
+        "message": "Invalid phone number format"
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:37.738Z"
+  },
+  {
+    "page": "Phone Format Validation",
+    "scenario": "reject invalid phone: 09123456789",
+    "pass": true,
+    "details": {
+      "phone": "09123456789",
+      "status": 400,
+      "response": {
+        "message": "Invalid phone number format"
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:37.805Z"
+  },
+  {
+    "page": "Phone Format Validation",
+    "scenario": "accept valid phone: 9066326141",
+    "pass": true,
+    "details": {
+      "phone": "9066326141",
+      "status": 200,
+      "response": {
+        "available": true
+      }
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:37.931Z"
+  },
+  {
+    "page": "Database Storage",
+    "scenario": "database stores 10-digit local number",
+    "pass": true,
+    "details": {
+      "sentPhone": "9700368018",
+      "storedPhone": "9700368018",
+      "length": 10,
+      "startsWith9": true
+    },
+    "evidence": {},
+    "time": "2026-07-08T23:19:38.515Z"
+  }
+]

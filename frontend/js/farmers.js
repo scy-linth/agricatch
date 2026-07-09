@@ -76,7 +76,7 @@ class FarmersPage {
                 <div class="farmer-card-body">
                     <div class="farmer-stats">
                         <span><strong>${farmer.product_count || 0}</strong> products</span>
-                        <span>${new Date(farmer.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                        <span>${FormatUtil.formatDateOnly(farmer.created_at, {"month":"short","day":"numeric"})}</span>
                     </div>
                 </div>
                 <div class="farmer-card-footer">

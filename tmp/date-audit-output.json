@@ -1,0 +1,1891 @@
+[
+  {
+    "file": "backend\\routes\\activityMonitor.js",
+    "matches": [
+      {
+        "file": "backend\\routes\\activityMonitor.js",
+        "line": 95,
+        "type": "parse",
+        "text": "params.push(new Date(dateFrom));"
+      },
+      {
+        "file": "backend\\routes\\activityMonitor.js",
+        "line": 101,
+        "type": "parse",
+        "text": "params.push(new Date(dateTo + 'T23:59:59'));"
+      }
+    ]
+  },
+  {
+    "file": "backend\\routes\\admin.js",
+    "matches": [
+      {
+        "file": "backend\\routes\\admin.js",
+        "line": 4659,
+        "type": "parse",
+        "text": "const originalExpiresAt = new Date(sub.expires_at);"
+      }
+    ]
+  },
+  {
+    "file": "backend\\routes\\auth.js",
+    "matches": [
+      {
+        "file": "backend\\routes\\auth.js",
+        "line": 465,
+        "type": "parse",
+        "text": "const otpExpiresAt = new Date(otpRecord.expires_at);"
+      },
+      {
+        "file": "backend\\routes\\auth.js",
+        "line": 471,
+        "type": "parse",
+        "text": "const effectiveExpiresAt = new Date(otpRecord.created_at.getTime() + expirationMinutes * 60 * 1000);"
+      },
+      {
+        "file": "backend\\routes\\auth.js",
+        "line": 1199,
+        "type": "parse",
+        "text": "const expiresAt = new Date(Date.now() + PASSWORD_RESET_OTP_TTL_MINUTES * 60 * 1000);"
+      },
+      {
+        "file": "backend\\routes\\auth.js",
+        "line": 1306,
+        "type": "parse",
+        "text": "const expiresAt = new Date(Date.now() + PASSWORD_RESET_OTP_TTL_MINUTES * 60 * 1000);"
+      },
+      {
+        "file": "backend\\routes\\auth.js",
+        "line": 1373,
+        "type": "parse",
+        "text": "if (new Date(record.expires_at) < new Date()) {"
+      },
+      {
+        "file": "backend\\routes\\auth.js",
+        "line": 1432,
+        "type": "parse",
+        "text": "if (new Date(record.expires_at) < new Date()) {"
+      }
+    ]
+  },
+  {
+    "file": "backend\\routes\\cart.js",
+    "matches": [
+      {
+        "file": "backend\\routes\\cart.js",
+        "line": 262,
+        "type": "parse",
+        "text": "if (product.expiry_date && new Date(product.expiry_date) < new Date(new Date().toDateString())) {"
+      },
+      {
+        "file": "backend\\routes\\cart.js",
+        "line": 558,
+        "type": "parse",
+        "text": "if (cartItem.expiry_date && new Date(cartItem.expiry_date) < new Date(new Date().toDateString())) {"
+      }
+    ]
+  },
+  {
+    "file": "backend\\routes\\farmers.js",
+    "matches": [
+      {
+        "file": "backend\\routes\\farmers.js",
+        "line": 58,
+        "type": "parse",
+        "text": "if (subRes.rows.length === 0 || new Date(subRes.rows[0].expires_at) < new Date()) return 'free';"
+      }
+    ]
+  },
+  {
+    "file": "backend\\routes\\orders.js",
+    "matches": [
+      {
+        "file": "backend\\routes\\orders.js",
+        "line": 555,
+        "type": "parse",
+        "text": "const today = new Date(new Date().toDateString());"
+      },
+      {
+        "file": "backend\\routes\\orders.js",
+        "line": 557,
+        "type": "parse",
+        "text": "const expired = item.expiry_date && new Date(item.expiry_date) < today;"
+      }
+    ]
+  },
+  {
+    "file": "backend\\routes\\otp.js",
+    "matches": [
+      {
+        "file": "backend\\routes\\otp.js",
+        "line": 161,
+        "type": "parse",
+        "text": "const lastSent = new Date(recentOtp.rows[0].created_at);"
+      },
+      {
+        "file": "backend\\routes\\otp.js",
+        "line": 180,
+        "type": "parse",
+        "text": "const expiresAt = new Date(Date.now() + 10 * 60 * 1000);"
+      },
+      {
+        "file": "backend\\routes\\otp.js",
+        "line": 298,
+        "type": "parse",
+        "text": "const expiresAt = new Date(Date.now() + 10 * 60 * 1000);"
+      },
+      {
+        "file": "backend\\routes\\otp.js",
+        "line": 353,
+        "type": "parse",
+        "text": "if (new Date(otpRecord.expires_at) < new Date()) {"
+      }
+    ]
+  },
+  {
+    "file": "backend\\routes\\products.js",
+    "matches": [
+      {
+        "file": "backend\\routes\\products.js",
+        "line": 45,
+        "type": "parse",
+        "text": "if (subRes.rows.length === 0 || new Date(subRes.rows[0].expires_at) < new Date()) return 'free';"
+      },
+      {
+        "file": "backend\\routes\\products.js",
+        "line": 1442,
+        "type": "parse",
+        "text": "const availabilityDate = new Date(preorderAvailabilityDateValue);"
+      },
+      {
+        "file": "backend\\routes\\products.js",
+        "line": 1443,
+        "type": "parse",
+        "text": "const expiryDate = new Date(expiryDateValue);"
+      },
+      {
+        "file": "backend\\routes\\products.js",
+        "line": 1842,
+        "type": "parse",
+        "text": "const availabilityDate = new Date(nextPreorderAvailabilityDate);"
+      },
+      {
+        "file": "backend\\routes\\products.js",
+        "line": 1843,
+        "type": "parse",
+        "text": "const expiryDate = new Date(nextExpiryDate);"
+      }
+    ]
+  },
+  {
+    "file": "backend\\routes\\subscriptions.js",
+    "matches": [
+      {
+        "file": "backend\\routes\\subscriptions.js",
+        "line": 80,
+        "type": "parse",
+        "text": "if (sub.status === 'active' && sub.expires_at && new Date(sub.expires_at) < new Date()) {"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\admin-charts.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\admin-charts.js",
+        "line": 51,
+        "type": "parse",
+        "text": "const dayKey = new Date(order.created_at).toISOString().slice(0, 10);"
+      },
+      {
+        "file": "frontend\\js\\admin-charts.js",
+        "line": 59,
+        "type": "display",
+        "text": "return date.toLocaleDateString([], { month: 'short', day: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\admin-charts.js",
+        "line": 148,
+        "type": "display",
+        "text": "return `PHP ${Number(context.raw || 0).toLocaleString('en-PH', {"
+      },
+      {
+        "file": "frontend\\js\\admin-charts.js",
+        "line": 171,
+        "type": "display",
+        "text": "return `PHP ${Number(value).toLocaleString('en-PH')}`;"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\admin.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 2030,
+        "type": "parse",
+        "text": "const fromDate = new Date(dateFrom);"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 2031,
+        "type": "parse",
+        "text": "const toDate = new Date(dateTo);"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 2114,
+        "type": "parse",
+        "text": "valA = new Date(a.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 2115,
+        "type": "parse",
+        "text": "valB = new Date(b.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 2197,
+        "type": "display",
+        "text": "<td class=\"text-muted small\">${log.created_at ? new Date(log.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 2256,
+        "type": "display",
+        "text": "const time = log.created_at ? new Date(log.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 2558,
+        "type": "display",
+        "text": "if (period === 'year' || period === 'all') return dt.toLocaleString('default', { month: 'short' });"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 2559,
+        "type": "display",
+        "text": "return dt.toLocaleDateString('default', { month: 'short', day: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 2599,
+        "type": "display",
+        "text": "formatter: (v, { seriesIndex }) => seriesIndex === 0 ? '₱' + Number(v).toLocaleString() : String(Math.round(v))"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3005,
+        "type": "parse",
+        "text": "valA = new Date(a.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3006,
+        "type": "parse",
+        "text": "valB = new Date(b.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3056,
+        "type": "display",
+        "text": "<td class=\"text-muted\">${user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3155,
+        "type": "parse",
+        "text": "valA = new Date(a.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3156,
+        "type": "parse",
+        "text": "valB = new Date(b.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3195,
+        "type": "display",
+        "text": "<td class=\"text-muted\">${user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3319,
+        "type": "parse",
+        "text": "const dateA = new Date(a.created_at || 0);"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3320,
+        "type": "parse",
+        "text": "const dateB = new Date(b.created_at || 0);"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3377,
+        "type": "display",
+        "text": "<td class=\"text-muted\">${user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3575,
+        "type": "parse",
+        "text": "valA = new Date(a.flagged_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3576,
+        "type": "parse",
+        "text": "valB = new Date(b.flagged_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3609,
+        "type": "display",
+        "text": "<td class=\"text-muted\">${user.flagged_at ? new Date(user.flagged_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3781,
+        "type": "display",
+        "text": "<small class=\"text-muted\">Last updated: ${data.updated_at ? new Date(data.updated_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</small>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 3793,
+        "type": "display",
+        "text": "<small class=\"text-muted\">Last updated: ${data.updated_at ? new Date(data.updated_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</small>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 4450,
+        "type": "display",
+        "text": "<span class=\"text-muted\" style=\"font-size:.74rem\">${flag.updated_at ? new Date(flag.updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</span>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 4565,
+        "type": "display",
+        "text": "lastUpdated.textContent = `Last Updated: ${now.toLocaleTimeString('en-PH', {"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 4688,
+        "type": "display",
+        "text": "lastUpdated.textContent = `Last Updated: ${now.toLocaleTimeString('en-PH', {"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 4844,
+        "type": "display",
+        "text": "const time = new Date(activity.timestamp).toLocaleTimeString('en-PH', {"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 4850,
+        "type": "display",
+        "text": "const date = new Date(activity.timestamp).toLocaleDateString('en-PH', {"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5210,
+        "type": "display",
+        "text": "document.getElementById('am-detail-timestamp').textContent = new Date(activity.timestamp).toLocaleString('en-PH', {"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5258,
+        "type": "display",
+        "text": "const time = new Date(item.created_at || item.timestamp).toLocaleTimeString('en-PH', {"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5289,
+        "type": "parse",
+        "text": "const baseTime = new Date(activity.timestamp);"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5363,
+        "type": "parse",
+        "text": "const fromDate = new Date(dateFrom.value);"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5377,
+        "type": "parse",
+        "text": "const toDate = new Date(dateTo.value);"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5775,
+        "type": "parse",
+        "text": "valA = new Date(a.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5776,
+        "type": "parse",
+        "text": "valB = new Date(b.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5802,
+        "type": "parse",
+        "text": "const createdAt = product.created_at ? new Date(product.created_at) : null;"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5803,
+        "type": "display",
+        "text": "const createdLabel = createdAt ? createdAt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5895,
+        "type": "display",
+        "text": "['Joined', safeUser.created_at ? new Date(safeUser.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 5918,
+        "type": "display",
+        "text": "<td class=\"small text-muted\">${o.created_at ? new Date(o.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 6088,
+        "type": "display",
+        "text": "['Joined', farmer.created_at ? new Date(farmer.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 6301,
+        "type": "display",
+        "text": "<td class=\"small text-muted\">${new Date(a.timestamp).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 6336,
+        "type": "display",
+        "text": "['Joined', user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 6430,
+        "type": "display",
+        "text": "['Joined', user.created_at ? new Date(user.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'],"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 6892,
+        "type": "parse",
+        "text": "const relTime = this._relativeTime(new Date(n.created_at));"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 7002,
+        "type": "parse",
+        "text": "const relTime    = this._relativeTime(new Date(n.created_at));"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 7063,
+        "type": "relative",
+        "text": "_relativeTime(date) {"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 7065,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 7595,
+        "type": "display",
+        "text": "const created = a.created_at ? new Date(a.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '';"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 7596,
+        "type": "parse",
+        "text": "const isActive = a.is_active && (!a.expires_at || new Date(a.expires_at) > new Date());"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8217,
+        "type": "parse",
+        "text": "valA = new Date(a.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8218,
+        "type": "parse",
+        "text": "valB = new Date(b.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8242,
+        "type": "display",
+        "text": "${p.is_preorder && p.preorder_availability_date ? `<div class=\"text-muted\" style=\"font-size:.75rem\">Available: ${new Date(p.preorder_availability_date).toLocaleDateString()}</div>` : ''}"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8248,
+        "type": "display",
+        "text": "<td class=\"small text-muted\">${p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8405,
+        "type": "display",
+        "text": "<td>${new Date(ticket.created_at).toLocaleDateString('en-PH')}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8406,
+        "type": "display",
+        "text": "<td>${ticket.updated_at ? new Date(ticket.updated_at).toLocaleDateString('en-PH') : '—'}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8492,
+        "type": "display",
+        "text": "document.getElementById('admin-ticket-detail-created').textContent = new Date(ticket.created_at).toLocaleDateString('en-PH');"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8509,
+        "type": "parse",
+        "text": "new Date(a.created_at) - new Date(b.created_at)"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8518,
+        "type": "parse",
+        "text": "const msgDate = new Date(msg.created_at);"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8560,
+        "type": "display",
+        "text": "const exactTime = new Date(msg.created_at).toLocaleString('en-PH');"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8821,
+        "type": "parse",
+        "text": "valA = new Date(a.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8822,
+        "type": "parse",
+        "text": "valB = new Date(b.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8848,
+        "type": "display",
+        "text": "const date   = request.created_at ? new Date(request.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 8849,
+        "type": "parse",
+        "text": "const dateOrder = request.created_at ? new Date(request.created_at).getTime() : 0;"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 9408,
+        "type": "parse",
+        "text": "const hDate = new Date(harvestDate);"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 9592,
+        "type": "display",
+        "text": "<p>Date: ${new Date(order.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 9593,
+        "type": "display",
+        "text": "${order.delivery_date ? `<p>Delivery Date: ${new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 9600,
+        "type": "display",
+        "text": "${order.items[0].harvest_date ? `<p style=\"margin:4px 0;font-size:0.875rem;\"><strong>Expected Harvest:</strong> ${new Date(order.items[0].harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 9609,
+        "type": "display",
+        "text": "${order.preorder_availability_date ? `<p style=\"margin:4px 0;font-size:0.875rem;\"><strong>Availability Date:</strong> ${new Date(order.preorder_availability_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 9610,
+        "type": "display",
+        "text": "${order.items[0].harvest_date_updated_at ? `<p style=\"margin:4px 0;font-size:0.875rem;\"><strong>Last Updated:</strong> ${new Date(order.items[0].harvest_date_updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 9612,
+        "type": "display",
+        "text": "${order.items[0].previous_harvest_date ? `<p style=\"margin:4px 0;font-size:0.875rem;\"><strong>Previous Harvest Date:</strong> ${new Date(order.items[0].previous_harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</p>` : ''}"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 10369,
+        "type": "display",
+        "text": "<div class=\"fw-semibold\">${new Date(product.harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 10395,
+        "type": "display",
+        "text": "<div class=\"fw-semibold\">${new Date(product.preorder_availability_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 10789,
+        "type": "display",
+        "text": "const time = entry.created_at ? new Date(entry.created_at).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' }) : '';"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 10790,
+        "type": "display",
+        "text": "const date = entry.created_at ? new Date(entry.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' }) : '';"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 10908,
+        "type": "parse",
+        "text": "valA = new Date(a.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 10909,
+        "type": "parse",
+        "text": "valB = new Date(b.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 10946,
+        "type": "display",
+        "text": "<td class=\"text-muted\">${order.created_at ? new Date(order.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 11110,
+        "type": "parse",
+        "text": "valA = new Date(a.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 11111,
+        "type": "parse",
+        "text": "valB = new Date(b.created_at || 0).getTime();"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 11138,
+        "type": "display",
+        "text": "<td class=\"text-muted\">${f.created_at ? new Date(f.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 11784,
+        "type": "display",
+        "text": "<td>${new Date(request.created_at).toLocaleDateString()}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 11997,
+        "type": "display",
+        "text": "<tr><td><strong>Submitted:</strong></td><td>${new Date(request.created_at).toLocaleString()}</td></tr>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 11998,
+        "type": "display",
+        "text": "<tr><td><strong>Reviewed:</strong></td><td>${request.reviewed_at ? new Date(request.reviewed_at).toLocaleString() : '—'}</td></tr>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 12201,
+        "type": "display",
+        "text": "<td>₱${Number(s.amount_paid || 0).toLocaleString()}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 12203,
+        "type": "display",
+        "text": "<td>${new Date(s.created_at).toLocaleDateString('en-PH')}</td>"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 12245,
+        "type": "display",
+        "text": "document.getElementById('sub-detail-amount').textContent = `₱${Number(subscription.amount_paid || 0).toLocaleString()}`;"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 12273,
+        "type": "display",
+        "text": "document.getElementById('sub-detail-created-at').textContent = new Date(subscription.created_at).toLocaleDateString('en-PH');"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 12279,
+        "type": "display",
+        "text": "document.getElementById('sub-detail-starts-at').textContent = subscription.starts_at ? new Date(subscription.starts_at).toLocaleDateString('en-PH') : '—';"
+      },
+      {
+        "file": "frontend\\js\\admin.js",
+        "line": 12280,
+        "type": "display",
+        "text": "document.getElementById('sub-detail-expires-at').textContent = subscription.expires_at ? new Date(subscription.expires_at).toLocaleDateString('en-PH') : '—';"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\app.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 2590,
+        "type": "parse",
+        "text": "const lastMessageTime = conv.last_message_at ? this._relativeTime(new Date(conv.last_message_at)) : '';"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 2612,
+        "type": "relative",
+        "text": "_relativeTime(date) {"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 2614,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 2728,
+        "type": "parse",
+        "text": "const noteDate = note.created_at ? new Date(note.created_at) : null;"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 2730,
+        "type": "relative",
+        "text": "? this._relativeTime(noteDate)"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 2788,
+        "type": "relative",
+        "text": "_relativeTime(date) {"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 2790,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 2874,
+        "type": "parse",
+        "text": "const relTime = this._relativeTime(new Date(n.created_at));"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 5253,
+        "type": "parse",
+        "text": "const expiryDate = new Date(product.expiry_date);"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 5826,
+        "type": "parse",
+        "text": "const harvestDate = new Date(product.harvest_date);"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 5838,
+        "type": "display",
+        "text": "const harvestFormatted = new Date(product.harvest_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 5861,
+        "type": "display",
+        "text": "? new Date(product.expiry_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 6181,
+        "type": "parse",
+        "text": "const harvest = new Date(product.harvest_date);"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 6193,
+        "type": "display",
+        "text": "harvestDate = harvest.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 6210,
+        "type": "parse",
+        "text": "const expiry = new Date(product.expiry_date);"
+      },
+      {
+        "file": "frontend\\js\\app.js",
+        "line": 6211,
+        "type": "display",
+        "text": "expiryDate = expiry.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\chat.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 395,
+        "type": "display",
+        "text": "? new Date(meta.created_at).toLocaleDateString('en-PH', {"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 926,
+        "type": "parse",
+        "text": "new Date(a.created_at) - new Date(b.created_at)"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 951,
+        "type": "parse",
+        "text": "new Date(a.created_at) - new Date(b.created_at)"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 964,
+        "type": "parse",
+        "text": "const msgDate = new Date(msg.created_at);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1001,
+        "type": "parse",
+        "text": "const firstMsgDate = new Date(firstMsg.created_at);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1013,
+        "type": "parse",
+        "text": "const msgDay = new Date(firstMsgDate);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1023,
+        "type": "display",
+        "text": "dayLabel = firstMsgDate.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1028,
+        "type": "display",
+        "text": "dayLabel = firstMsgDate.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1179,
+        "type": "parse",
+        "text": "new Date(a.created_at) - new Date(b.created_at)"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1188,
+        "type": "parse",
+        "text": "const msgDate = new Date(msg.created_at);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1229,
+        "type": "parse",
+        "text": "const firstMsgDate = new Date(firstMsg.created_at);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1237,
+        "type": "parse",
+        "text": "const msgDay = new Date(firstMsgDate);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1247,
+        "type": "display",
+        "text": "dayLabel = firstMsgDate.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1252,
+        "type": "display",
+        "text": "dayLabel = firstMsgDate.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1597,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1598,
+        "type": "display",
+        "text": "return d.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1611,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1623,
+        "type": "display",
+        "text": "const timeStr = d.toLocaleTimeString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1637,
+        "type": "display",
+        "text": "const dayName = d.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1647,
+        "type": "display",
+        "text": "return d.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1654,
+        "type": "display",
+        "text": "return d.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1664,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1708,
+        "type": "parse",
+        "text": "const d1 = new Date(date1);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1709,
+        "type": "parse",
+        "text": "const d2 = new Date(date2);"
+      },
+      {
+        "file": "frontend\\js\\chat.js",
+        "line": 1717,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\customer-account.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\customer-account.js",
+        "line": 298,
+        "type": "display",
+        "text": "const joined = profile.created_at ? new Date(profile.created_at).toLocaleDateString() : '—';"
+      },
+      {
+        "file": "frontend\\js\\customer-account.js",
+        "line": 800,
+        "type": "display",
+        "text": "if (displaySubmitted) displaySubmitted.textContent = request.created_at ? new Date(request.created_at).toLocaleString() : '—';"
+      },
+      {
+        "file": "frontend\\js\\customer-account.js",
+        "line": 911,
+        "type": "display",
+        "text": "<td>${new Date(ticket.created_at).toLocaleDateString('en-PH')}</td>"
+      },
+      {
+        "file": "frontend\\js\\customer-account.js",
+        "line": 1248,
+        "type": "display",
+        "text": "<td>${new Date(request.created_at).toLocaleDateString()}</td>"
+      },
+      {
+        "file": "frontend\\js\\customer-account.js",
+        "line": 1474,
+        "type": "parse",
+        "text": "const lastMessageTime = conv.last_message_at ? this._relativeTime(new Date(conv.last_message_at)) : '';"
+      },
+      {
+        "file": "frontend\\js\\customer-account.js",
+        "line": 1540,
+        "type": "parse",
+        "text": "const relTime = this._relativeTime(new Date(n.created_at));"
+      },
+      {
+        "file": "frontend\\js\\customer-account.js",
+        "line": 1573,
+        "type": "relative",
+        "text": "_relativeTime(date) {"
+      },
+      {
+        "file": "frontend\\js\\customer-account.js",
+        "line": 1575,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\farmer.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 1526,
+        "type": "display",
+        "text": "const when = new Date(r.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 1597,
+        "type": "display",
+        "text": "const when = new Date(r.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 1652,
+        "type": "display",
+        "text": "const when = new Date(product.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 4297,
+        "type": "parse",
+        "text": "const dt = new Date(`${harvestVal}T00:00:00`);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 4830,
+        "type": "display",
+        "text": "? new Date(user.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 4954,
+        "type": "display",
+        "text": "const date = new Date(sub.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 4956,
+        "type": "display",
+        "text": "const amount = sub.amount_paid ? `₱${parseFloat(sub.amount_paid).toLocaleString()}` : '—';"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 4963,
+        "type": "display",
+        "text": "const start = new Date(sub.starts_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 4964,
+        "type": "display",
+        "text": "const end = new Date(sub.expires_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5045,
+        "type": "display",
+        "text": "<div>₱${Number(subscription.amount_paid || 0).toLocaleString()}</div>"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5053,
+        "type": "display",
+        "text": "<div>${new Date(subscription.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</div>"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5058,
+        "type": "display",
+        "text": "<div>${new Date(subscription.starts_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</div>"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5064,
+        "type": "display",
+        "text": "<div>${new Date(subscription.expires_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</div>"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5126,
+        "type": "display",
+        "text": "if (expEl && d.expires_at) expEl.textContent = new Date(d.expires_at).toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'});"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5130,
+        "type": "parse",
+        "text": "const daysLeft = Math.ceil((new Date(d.expires_at) - new Date()) / (1000*60*60*24));"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5212,
+        "type": "display",
+        "text": "<p class=\"fw-bold mb-1\" style=\"color:var(--ac-primary,#2d7a3a);\">₱${info.total.toLocaleString()}</p>"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5224,
+        "type": "display",
+        "text": "document.getElementById('sub-amount-total').textContent = `₱${info.total.toLocaleString()}`;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5231,
+        "type": "display",
+        "text": "document.getElementById('sub-amount-total').textContent = `₱${settings.durations[1].total.toLocaleString()}`;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5238,
+        "type": "display",
+        "text": "document.getElementById('sub-current-expiry').textContent = new Date(this.subscriptionData.expires_at).toLocaleDateString('en-PH');"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5258,
+        "type": "parse",
+        "text": "const currentExpiry = this.subscriptionData?.expires_at ? new Date(this.subscriptionData.expires_at) : new Date();"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5259,
+        "type": "parse",
+        "text": "const newExpiry = new Date(currentExpiry);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5262,
+        "type": "display",
+        "text": "if (el) el.textContent = newExpiry.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5569,
+        "type": "parse",
+        "text": "const relTime = this._relativeTime(new Date(n.created_at));"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5692,
+        "type": "parse",
+        "text": "const lastMessageTime = conv.last_message_at ? this._relativeTime(new Date(conv.last_message_at)) : '';"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5879,
+        "type": "relative",
+        "text": "_relativeTime(date) {"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5881,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 5975,
+        "type": "parse",
+        "text": "const relTime    = this._relativeTime(new Date(n.created_at));"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 6437,
+        "type": "display",
+        "text": "<div style=\"font-size:0.75rem;color:#9ca3af;margin-top:3px;\">${n.created_at ? new Date(n.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : ''}</div>"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 6625,
+        "type": "display",
+        "text": "lastUpdatedEl.textContent = `${periodLabel} • Updated: ${ts.toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 6671,
+        "type": "display",
+        "text": "lastUpdatedEl.textContent = `Basic View • Updated: ${ts.toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 7000,
+        "type": "display",
+        "text": "if (period === 'year' || period === 'all') return dt.toLocaleString('default', { month: 'short' });"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 7001,
+        "type": "display",
+        "text": "return dt.toLocaleDateString('default', { month: 'short', day: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 7051,
+        "type": "display",
+        "text": "formatter: (v, { seriesIndex }) => seriesIndex === 0 ? '₱' + Number(v).toLocaleString() : String(Math.round(v))"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 7458,
+        "type": "parse",
+        "text": "const createdAt = product.created_at ? new Date(product.created_at) : null;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 7459,
+        "type": "display",
+        "text": "const createdLabel = createdAt ? createdAt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 7689,
+        "type": "display",
+        "text": "<td class=\"small\">${product.harvest_date ? new Date(product.harvest_date).toLocaleDateString() : 'N/A'}</td>"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 7749,
+        "type": "parse",
+        "text": "const harvestDate = new Date(product.harvest_date);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 7804,
+        "type": "parse",
+        "text": "if (product.preorder_availability_date && new Date(product.preorder_availability_date) <= new Date()) {"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 7818,
+        "type": "parse",
+        "text": "const hDate = new Date(harvestDate);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 7888,
+        "type": "parse",
+        "text": "const harvestDate = new Date(p.preorder_availability_date);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 8058,
+        "type": "parse",
+        "text": "filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 8061,
+        "type": "parse",
+        "text": "filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 8126,
+        "type": "display",
+        "text": "const date = r.created_at ? new Date(r.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : '—';"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 8200,
+        "type": "display",
+        "text": "const harvestDate = product.harvest_date ? new Date(product.harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : 'Not specified';"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 8201,
+        "type": "display",
+        "text": "const expiryDate = product.expiry_date ? new Date(product.expiry_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : 'Not specified';"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 8646,
+        "type": "parse",
+        "text": "const selectedDate = new Date(harvestDate);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 9116,
+        "type": "parse",
+        "text": "const expiryDate = new Date(product.expiry_date);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 9147,
+        "type": "parse",
+        "text": "const harvestDate = new Date(product.preorder_availability_date);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10122,
+        "type": "parse",
+        "text": "const orderDate = order.created_at ? new Date(order.created_at) : null;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10124,
+        "type": "display",
+        "text": "const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : 'Not specified';"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10132,
+        "type": "display",
+        "text": "? orderDate.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10224,
+        "type": "display",
+        "text": "const deliveryDate = order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }) : 'Not specified';"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10225,
+        "type": "display",
+        "text": "const orderDate = order.created_at ? new Date(order.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10234,
+        "type": "parse",
+        "text": "const harvestDateObj = new Date(harvestDate);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10241,
+        "type": "display",
+        "text": "<div class=\"order-info-value\">${this.escapeHtml(harvestDateObj.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }))}</div>"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10248,
+        "type": "parse",
+        "text": "const expiryDateObj = new Date(expiryDate);"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10255,
+        "type": "display",
+        "text": "<div class=\"order-info-value\">${this.escapeHtml(expiryDateObj.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' }))}</div>"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10399,
+        "type": "display",
+        "text": "const orderDate = order.created_at ? new Date(order.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10400,
+        "type": "display",
+        "text": "const confirmedDate = order.confirmed_at ? new Date(order.confirmed_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10401,
+        "type": "display",
+        "text": "const preparedDate = order.prepared_at ? new Date(order.prepared_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10402,
+        "type": "display",
+        "text": "const outForDeliveryDate = order.out_for_delivery_at ? new Date(order.out_for_delivery_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10403,
+        "type": "display",
+        "text": "const scheduledDate = order.scheduled_delivery_date ? new Date(order.scheduled_delivery_date).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10404,
+        "type": "display",
+        "text": "const deliveredDate = order.delivered_at ? new Date(order.delivered_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 10440,
+        "type": "display",
+        "text": "if (step.status === 'confirmed') return { title: 'Order Cancelled', time: order.cancelled_at ? new Date(order.cancelled_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Cancelled', completed: false, active: true };"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 11332,
+        "type": "display",
+        "text": "document.getElementById('display-submitted-date').textContent = new Date(this.currentVerificationRequest.created_at).toLocaleDateString();"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 11392,
+        "type": "display",
+        "text": "<td>${new Date(request.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>"
+      },
+      {
+        "file": "frontend\\js\\farmer.js",
+        "line": 11605,
+        "type": "display",
+        "text": "<td>${new Date(ticket.created_at).toLocaleDateString('en-PH')}</td>"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\farmers.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\farmers.js",
+        "line": 79,
+        "type": "display",
+        "text": "<span>${new Date(farmer.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</span>"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\format.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\format.js",
+        "line": 60,
+        "type": "parse",
+        "text": "return new Date(cachedServerTime + (now - (cacheExpiry - CACHE_DURATION)));"
+      },
+      {
+        "file": "frontend\\js\\format.js",
+        "line": 71,
+        "type": "parse",
+        "text": "return new Date(data.timestamp);"
+      },
+      {
+        "file": "frontend\\js\\format.js",
+        "line": 79,
+        "type": "display",
+        "text": "async function formatDate(dateInput, options = {}) {"
+      },
+      {
+        "file": "frontend\\js\\format.js",
+        "line": 81,
+        "type": "parse",
+        "text": "const date = dateInput instanceof Date ? dateInput : new Date(dateInput);"
+      },
+      {
+        "file": "frontend\\js\\format.js",
+        "line": 95,
+        "type": "display",
+        "text": "return date.toLocaleString('en-PH', defaultOptions);"
+      },
+      {
+        "file": "frontend\\js\\format.js",
+        "line": 107,
+        "type": "display",
+        "text": "return formatDate(dateInput, defaultOptions);"
+      },
+      {
+        "file": "frontend\\js\\format.js",
+        "line": 118,
+        "type": "display",
+        "text": "return formatDate(dateInput, defaultOptions);"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\notifications-page.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\notifications-page.js",
+        "line": 157,
+        "type": "display",
+        "text": "const date = n.created_at ? new Date(n.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\orders.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 532,
+        "type": "parse",
+        "text": "const fromMs = this.dateFrom ? new Date(this.dateFrom).getTime() : 0;"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 533,
+        "type": "parse",
+        "text": "const toMs = this.dateTo ? new Date(this.dateTo + 'T23:59:59').getTime() : Infinity;"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 539,
+        "type": "parse",
+        "text": "const orderDate = new Date(order.created_at).getTime();"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 567,
+        "type": "parse",
+        "text": "const createdAt = new Date(order.created_at);"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 568,
+        "type": "display",
+        "text": "const displayDate = Number.isNaN(createdAt.getTime()) ? '—' : createdAt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 569,
+        "type": "display",
+        "text": "const displayTime = Number.isNaN(createdAt.getTime()) ? '' : createdAt.toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' });"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 585,
+        "type": "parse",
+        "text": "stepTimestamps[h.status] = new Date(h.timestamp);"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 590,
+        "type": "parse",
+        "text": "if (!stepTimestamps['pending'] && order.created_at) stepTimestamps['pending'] = new Date(order.created_at);"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 591,
+        "type": "parse",
+        "text": "if (!stepTimestamps['delivered'] && (order.delivered_at || item.delivered_at)) stepTimestamps['delivered'] = new Date(order.delivered_at || item.delivered_at);"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 592,
+        "type": "parse",
+        "text": "if (!stepTimestamps[currentStatus] && order.updated_at && currentStatus !== 'delivered') stepTimestamps[currentStatus] = new Date(order.updated_at);"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 599,
+        "type": "parse",
+        "text": "stepTimestamps[s] = new Date(order.updated_at);"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 606,
+        "type": "display",
+        "text": "const d = dt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' });"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 607,
+        "type": "display",
+        "text": "const t = dt.toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' });"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 656,
+        "type": "display",
+        "text": "${isPreorder && item.harvest_date ? `<div class=\"order-item-meta\"><strong>Expected Harvest:</strong> ${new Date(item.harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 657,
+        "type": "display",
+        "text": "${isPreorder && item.harvest_date_updated_at ? `<div class=\"order-item-meta\"><strong>Last Updated:</strong> ${new Date(item.harvest_date_updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 659,
+        "type": "display",
+        "text": "${isPreorder && item.previous_harvest_date ? `<div class=\"order-item-meta\"><strong>Previous Harvest Date:</strong> ${new Date(item.previous_harvest_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 661,
+        "type": "display",
+        "text": "${isPreorder && item.preorder_availability_date ? `<div class=\"order-item-meta\"><strong>Harvest Date:</strong> ${new Date(item.preorder_availability_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}"
+      },
+      {
+        "file": "frontend\\js\\orders.js",
+        "line": 665,
+        "type": "display",
+        "text": "${order.delivery_date ? `<div class=\"order-item-meta\"><strong>Delivery Date Announced:</strong> ${new Date(order.delivery_date).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'short', day: 'numeric' })}</div>` : ''}"
+      }
+    ]
+  },
+  {
+    "file": "frontend\\js\\support-ticket-chat.js",
+    "matches": [
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 387,
+        "type": "parse",
+        "text": "new Date(a.created_at) - new Date(b.created_at)"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 395,
+        "type": "parse",
+        "text": "const msgDate = new Date(msg.created_at);"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 431,
+        "type": "parse",
+        "text": "const firstMsgDate = new Date(firstMsg.created_at);"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 438,
+        "type": "parse",
+        "text": "const msgDay = new Date(firstMsgDate);"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 448,
+        "type": "display",
+        "text": "dayLabel = firstMsgDate.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 453,
+        "type": "display",
+        "text": "dayLabel = firstMsgDate.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 516,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 517,
+        "type": "display",
+        "text": "return d.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 530,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 542,
+        "type": "display",
+        "text": "const timeStr = d.toLocaleTimeString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 556,
+        "type": "display",
+        "text": "const dayName = d.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 562,
+        "type": "display",
+        "text": "return d.toLocaleDateString('en-US', {"
+      },
+      {
+        "file": "frontend\\js\\support-ticket-chat.js",
+        "line": 572,
+        "type": "parse",
+        "text": "const d = new Date(date);"
+      }
+    ]
+  },
+  {
+    "file": "tests\\customer-notifications-page.spec.js",
+    "matches": [
+      {
+        "file": "tests\\customer-notifications-page.spec.js",
+        "line": 10,
+        "type": "parse",
+        "text": "created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString()"
+      },
+      {
+        "file": "tests\\customer-notifications-page.spec.js",
+        "line": 18,
+        "type": "parse",
+        "text": "created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()"
+      },
+      {
+        "file": "tests\\customer-notifications-page.spec.js",
+        "line": 26,
+        "type": "parse",
+        "text": "created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString()"
+      }
+    ]
+  },
+  {
+    "file": "tests\\customer-notifications.spec.js",
+    "matches": [
+      {
+        "file": "tests\\customer-notifications.spec.js",
+        "line": 9,
+        "type": "parse",
+        "text": "created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),"
+      },
+      {
+        "file": "tests\\customer-notifications.spec.js",
+        "line": 17,
+        "type": "parse",
+        "text": "created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),"
+      },
+      {
+        "file": "tests\\customer-notifications.spec.js",
+        "line": 25,
+        "type": "parse",
+        "text": "created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),"
+      }
+    ]
+  },
+  {
+    "file": "tests\\preorder-data-persistence-verification.spec.js",
+    "matches": [
+      {
+        "file": "tests\\preorder-data-persistence-verification.spec.js",
+        "line": 253,
+        "type": "parse",
+        "text": "const dbDate = new Date(product.preorder_availability_date);"
+      },
+      {
+        "file": "tests\\preorder-data-persistence-verification.spec.js",
+        "line": 254,
+        "type": "display",
+        "text": "const localDateStr = dbDate.toLocaleDateString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }); // YYYY-MM-DD format"
+      }
+    ]
+  },
+  {
+    "file": "tests\\test-harvest-reminder-customer.js",
+    "matches": [
+      {
+        "file": "tests\\test-harvest-reminder-customer.js",
+        "line": 11,
+        "type": "parse",
+        "text": "const harvest = new Date(harvestDate);"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-customer.js",
+        "line": 21,
+        "type": "display",
+        "text": "const harvestFormatted = harvest.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-customer.js",
+        "line": 42,
+        "type": "display",
+        "text": "{ date: in7Days, expected: in7Days.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) },"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-customer.js",
+        "line": 95,
+        "type": "parse",
+        "text": "const harvest = new Date(product.harvest_date);"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-customer.js",
+        "line": 105,
+        "type": "display",
+        "text": "const harvestFormatted = harvest.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'long', day: 'numeric' });"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-customer.js",
+        "line": 118,
+        "type": "display",
+        "text": "{ product: { is_preorder: true, harvest_date: in7Days.toISOString() }, expected: in7Days.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }) },"
+      }
+    ]
+  },
+  {
+    "file": "tests\\test-harvest-reminder-frontend.js",
+    "matches": [
+      {
+        "file": "tests\\test-harvest-reminder-frontend.js",
+        "line": 16,
+        "type": "parse",
+        "text": "harvest_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 days from now"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-frontend.js",
+        "line": 23,
+        "type": "parse",
+        "text": "harvest_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 5 days ago"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-frontend.js",
+        "line": 30,
+        "type": "parse",
+        "text": "harvest_date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 8 days ago"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-frontend.js",
+        "line": 51,
+        "type": "parse",
+        "text": "const harvestDate = new Date(product.harvest_date);"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-frontend.js",
+        "line": 73,
+        "type": "parse",
+        "text": "const selectedDate = new Date(harvestDate);"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-frontend.js",
+        "line": 121,
+        "type": "parse",
+        "text": "const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];"
+      },
+      {
+        "file": "tests\\test-harvest-reminder-frontend.js",
+        "line": 122,
+        "type": "parse",
+        "text": "const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];"
+      }
+    ]
+  }
+]

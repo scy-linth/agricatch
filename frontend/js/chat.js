@@ -19,6 +19,14 @@ class ChatUI {
         this._lastMarkReadAt = 0;
         this.MAX_MESSAGE_LENGTH = 500;
         this.currentProductId = null; // Store product context from URL
+        this._messageCount = 0;
+        this._sendingMessage = false;
+        this._productModalNewChat = false;
+        this.FAQ_REPLIES = {
+            available: { label: 'Is this still available?', text: 'Hi! Is this product still available?' },
+            delivery: { label: 'When can this product be delivered?', text: 'Hi! When can this product be delivered?' },
+            fresh: { label: 'Is this product freshly harvested?', text: 'Hi! Is this product freshly harvested?' }
+        };
         window.chatUI = this;
 
         // Support Center filter state
@@ -62,6 +70,7 @@ class ChatUI {
             this.openMostRecentConversation();
         }
         this.setupEventListeners();
+        this.setupFaqButtons();
         // Update UI to reflect 'open' as default
         this.updateSupportFilterUI();
     }
@@ -383,13 +392,7 @@ class ChatUI {
         }
 
         document.getElementById('ticket-detail-created').textContent = meta.created_at
-            ? new Date(meta.created_at).toLocaleDateString('en-PH', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })
+            ? FormatUtil.formatDate(meta.created_at)
             : '—';
 
         document.getElementById('ticket-detail-subject').textContent = meta.subject || '—';
@@ -715,11 +718,18 @@ class ChatUI {
         `;
     }
 
-    async openConversation(conversationId) {
+    async openConversation(conversationId, { isProductModalNewChat = false } = {}) {
         if (!conversationId) return;
 
         this.currentConversation = conversationId;
         this.currentItemType = 'chat';
+        this._productModalNewChat = isProductModalNewChat;
+
+        // Clear any existing poll; loadMessages will start a fresh one once the conversation is confirmed.
+        if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+            this.pollInterval = null;
+        }
 
         // Update active state in conversation list
         document.querySelectorAll('.conversation-item').forEach(el => {
@@ -765,8 +775,13 @@ class ChatUI {
             await this.checkUserOpenTicket(meta.otherId);
         }
 
-        // Load messages
-        await this.loadMessages(conversationId);
+        // Load messages, but skip the network call for a brand-new product-modal chat
+        // (the conversation row is created on first message send). This avoids an expected 404 in the console.
+        if (this._productModalNewChat) {
+            this.renderMessages([]);
+        } else {
+            await this.loadMessages(conversationId);
+        }
 
         // Don't auto-scroll on open to avoid page scroll issues
         // User can manually scroll if needed
@@ -775,16 +790,6 @@ class ChatUI {
         if (!isAdminPage) {
             await this.markConversationRead(conversationId);
         }
-
-        // Start polling for new messages
-        if (this.pollInterval) {
-            clearInterval(this.pollInterval);
-        }
-        this.pollInterval = setInterval(() => {
-            if (this.currentConversation === conversationId && this.currentItemType === 'chat') {
-                this.loadMessages(conversationId);
-            }
-        }, 3000);
     }
 
     async checkUserOpenTicket(userId) {
@@ -1077,8 +1082,12 @@ class ChatUI {
             });
 
             if (!response.ok) {
-                // If conversation not found (404), stop polling and clear the chat view
+                // If conversation not found (404), check if this is a brand-new product-modal chat
                 if (response.status === 404) {
+                    if (this._productModalNewChat) {
+                        this.renderMessages([]);
+                        return;
+                    }
                     if (this.pollInterval) {
                         clearInterval(this.pollInterval);
                         this.pollInterval = null;
@@ -1094,6 +1103,11 @@ class ChatUI {
 
             const data = await response.json();
             this.renderMessages(data.messages || []);
+
+            // Start polling for the active chat conversation once we know it exists
+            if (this.currentConversation === conversationId && this.currentItemType === 'chat' && !this.pollInterval) {
+                this.startChatPolling(conversationId);
+            }
 
             // Mark as read after rendering (throttled)
         } catch (error) {
@@ -1140,15 +1154,18 @@ class ChatUI {
         const container = document.getElementById('chat-messages');
         if (!container) return;
 
+        this._messageCount = (messages || []).length;
+
         // Check if user is near bottom before re-rendering
         const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
 
         if (!messages || messages.length === 0) {
             container.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
+            this.updateFaqVisibility();
             return;
         }
 
-        const meta = this.conversationMeta.get(String(this.currentConversation));
+        const meta = this.conversationMeta.get(`chat_${String(this.currentConversation)}`);
         const otherName = meta?.otherName || 'User';
 
         // Sort messages by timestamp
@@ -1284,10 +1301,13 @@ class ChatUI {
         if (isNearBottom) {
             container.scrollTop = container.scrollHeight;
         }
+
+        this.updateFaqVisibility();
     }
 
     async sendMessage(e) {
         e.preventDefault();
+        if (this._sendingMessage) return;
 
         if (!this.currentConversation) {
             this.showError('Please select a conversation first.');
@@ -1308,11 +1328,16 @@ class ChatUI {
         input.value = '';
         this.updateCharCounter();
 
-        // Handle ticket messages vs chat messages
-        if (this.currentItemType === 'ticket') {
-            await this.sendTicketMessage(messageText);
-        } else {
-            await this.sendChatMessage(messageText);
+        this._sendingMessage = true;
+        try {
+            // Handle ticket messages vs chat messages
+            if (this.currentItemType === 'ticket') {
+                await this.sendTicketMessage(messageText);
+            } else {
+                await this.sendChatMessage(messageText);
+            }
+        } finally {
+            this._sendingMessage = false;
         }
     }
 
@@ -1345,6 +1370,7 @@ class ChatUI {
 
             // Clear product context after first message
             this.currentProductId = null;
+            this._productModalNewChat = false;
 
             // Reload messages immediately
             await this.loadMessages(this.currentConversation);
@@ -1436,9 +1462,9 @@ class ChatUI {
             if (subtitleText) {
                 window.__chatContext = { subtitle: subtitleText };
             }
-            // Create conversation if it doesn't exist by sending an initial message
-            this.createConversationIfNotExists(parseInt(farmerIdParam, 10), conversationId, subtitleText);
-            this.openConversation(conversationId);
+            // Let the conversation be created on the first real message instead of auto-sending "Hello"
+            const existing = (this._chatItems || []).some(c => c.conversation_id === conversationId);
+            this.openConversation(conversationId, { isProductModalNewChat: !existing && !!productIdParam });
             return true;
         } else if (customerIdParam && this.currentUserId) {
             const conversationId = `${this.currentUserId}_${customerIdParam}`;
@@ -1452,42 +1478,71 @@ class ChatUI {
         return false;
     }
 
-    async createConversationIfNotExists(farmerId, conversationId, contextText = '') {
+    setupFaqButtons() {
+        const container = document.getElementById('chat-faq-section');
+        if (!container) return;
+
+        container.querySelectorAll('.chat-faq-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const question = btn.dataset.question;
+                const reply = this.FAQ_REPLIES[question];
+                if (reply && reply.text) {
+                    this.sendQuickReply(reply.text);
+                }
+            });
+        });
+    }
+
+    async sendQuickReply(messageText) {
+        if (this._sendingMessage) return;
+        if (!messageText || messageText.length > this.MAX_MESSAGE_LENGTH) {
+            this.showError(`Message too long. Maximum ${this.MAX_MESSAGE_LENGTH} characters.`);
+            return;
+        }
+
+        this._sendingMessage = true;
+        this.setFaqButtonsDisabled(true);
+
         try {
-            // Check if conversation already exists
-            const response = await fetch(`${this.apiBase}/messages/conversation/${conversationId}`, {
-                headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-
-            if (response.ok) {
-                // Conversation exists, no need to create
-                return true;
-            }
-
-            // Conversation doesn't exist - create it with a minimal message
-            // This is needed so the conversation exists in the database
-            const initialMessage = contextText ? `I'm interested in: ${contextText}` : 'Hello';
-            await fetch(`${this.apiBase}/messages/send`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    receiver_id: farmerId,
-                    message: initialMessage,
-                    product_id: this.currentProductId || null
-                })
-            });
-            return true;
-        } catch (error) {
-            console.error('Create conversation error:', error);
-            return false;
+            await this.sendChatMessage(messageText);
+        } finally {
+            this._sendingMessage = false;
+            this.setFaqButtonsDisabled(false);
         }
     }
 
+    setFaqButtonsDisabled(disabled) {
+        document.querySelectorAll('.chat-faq-btn').forEach(btn => {
+            btn.disabled = disabled;
+        });
+    }
+
+    updateFaqVisibility() {
+        const section = document.getElementById('chat-faq-section');
+        if (!section) return;
+
+        const isCustomer = this.getUserRole() === 'customer';
+        const isChat = this.currentItemType === 'chat';
+        const isEmpty = this._messageCount === 0;
+        const hasProductContext = this.currentProductId !== null;
+
+        section.style.display = (isCustomer && isChat && isEmpty && hasProductContext) ? 'block' : 'none';
+    }
+
+    startChatPolling(conversationId) {
+        if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+        }
+        this.pollInterval = setInterval(() => {
+            if (this.currentConversation === conversationId && this.currentItemType === 'chat') {
+                this.loadMessages(conversationId);
+            }
+        }, 3000);
+    }
+
     ensureConversationMeta(conversationId, otherId, otherName = 'User') {
-        const key = String(conversationId);
+        const key = `chat_${String(conversationId)}`;
         if (this.conversationMeta.has(key)) return;
         this.conversationMeta.set(key, {
             otherName,
@@ -1601,26 +1656,45 @@ class ChatUI {
     formatConversationPreviewTime(date) {
         if (!date) return '';
         const d = new Date(date);
+        
+        // Check for invalid date
+        if (isNaN(d.getTime())) return '';
+        
         const now = new Date();
         const diffMs = now - d;
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffMs / 86400000);
 
-        if (diffMins < 1) return 'Now';
-        if (diffMins < 60) return `${diffMins}m`;
-        if (diffHours < 24) return `${diffHours}h`;
-        if (diffDays < 7) {
-            return d.toLocaleDateString('en-US', {
-                timeZone: 'Asia/Manila',
-                weekday: 'short'
-            });
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}min ago`;
+        
+        if (diffHours < 24) return `${diffHours}hr ago`;
+        
+        // Check if yesterday (exactly 1 day ago and different calendar day)
+        // Only show "Yesterday" when it's actually yesterday AND at least 24 hours ago
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (d.toDateString() === yesterday.toDateString() && diffDays === 1) return 'Yesterday';
+        
+        // Days ago (2-6 days)
+        if (diffDays < 7) return `${diffDays}d ago`;
+        
+        // Weeks ago (7-27 days)
+        const diffWeeks = Math.floor(diffDays / 7);
+        if (diffWeeks < 4) return `${diffWeeks}w ago`;
+        
+        // Months ago (28-364 days)
+        const diffMonths = Math.floor(diffDays / 30);
+        if (diffDays < 365) {
+            // Ensure at least 1 month for 28+ days
+            return `${Math.max(1, diffMonths)}mo ago`;
         }
-        return d.toLocaleDateString('en-US', {
-            timeZone: 'Asia/Manila',
-            month: 'short',
-            day: 'numeric'
-        });
+        
+        // Years ago (365+ days)
+        const diffYears = Math.floor(diffDays / 365);
+        // Ensure at least 1 year for 365+ days
+        return `${Math.max(1, diffYears)}y ago`;
     }
 
     isSameDay(date1, date2) {

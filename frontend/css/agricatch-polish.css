@@ -754,6 +754,14 @@ button:not(:disabled):not(.disabled):hover {
 }
 
 /* Header login/register buttons stay transparent on hover */
+.header-actions .user-menu {
+    margin-left: -4rem !important;
+}
+
+.header-actions .user-menu #login-btn {
+    margin-left: -3rem !important;
+}
+
 .header-actions .user-menu .btn-primary,
 .header-actions .user-menu .btn-primary:hover,
 .header-actions .user-menu .btn-primary:focus {
@@ -761,6 +769,8 @@ button:not(:disabled):not(.disabled):hover {
     background-color: transparent !important;
     border-color: rgba(255, 255, 255, 0.65) !important;
     color: var(--white, #fff) !important;
+    padding: 0.6rem 2rem !important;
+    min-width: 120px !important;
 }
 
 .header-actions .user-menu .btn-primary:hover,
@@ -1347,10 +1357,9 @@ a:not([aria-label]):not([aria-labelledby]):empty {
 
 /* Hero */
 #home.hero {
-    min-height: 620px;
-    height: calc(100vh - 80px);
-    padding: 7rem 0 5rem;
-    margin-top: 80px;
+    min-height: 100vh;
+    padding: 120px 0 5rem;
+    margin-top: -120px;
     box-shadow: none;
 }
 
@@ -1975,8 +1984,8 @@ a:not([aria-label]):not([aria-labelledby]):empty {
    ============================================================ */
 
 #home.hero {
-    margin-top: 80px;
-    min-height: calc(100vh - 80px);
+    margin-top: 0;
+    min-height: calc(100vh - 120px);
 }
 
 #home.hero .hero-video-wrapper,
