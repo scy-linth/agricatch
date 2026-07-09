@@ -339,13 +339,6 @@
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link collapsed sidebar-link" href="#notifications" data-section="notifications">
-                <i class="bi bi-bell"></i>
-                <span>Notifications</span>
-                <span id="notif-sidebar-badge" class="badge bg-danger ms-auto" style="display:none;">0</span>
-            </a>
-        </li>
-
         <!-- ── System ─────────────────────────────────────────── -->
         <li class="nav-heading" data-roles="super_admin">Security</li>
 
@@ -431,14 +424,19 @@
 
 
     <!-- Page title — admin.js updates .page-title textContent on section change -->
-    <div class="pagetitle">
-        <h1 class="page-title">Dashboard Overview</h1>
-        <nav>
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item">Home</li>
-                <li class="breadcrumb-item active" id="breadcrumb-current">Dashboard</li>
-            </ol>
-        </nav>
+    <div class="pagetitle d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="page-title">Dashboard Overview</h1>
+            <nav>
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">Home</li>
+                    <li class="breadcrumb-item active" id="breadcrumb-current">Dashboard</li>
+                </ol>
+            </nav>
+        </div>
+        <button id="export-dashboard-btn" class="btn btn-success">
+            <i class="bi bi-file-earmark-excel me-2"></i>Export Dashboard Report
+        </button>
     </div>
 
 
@@ -446,7 +444,6 @@
          § 1 — OVERVIEW SECTION (default active)
     ═══════════════════════════════════════════════════════════════════ -->
     <section id="overview" class="admin-section-card active">
-
         <!-- KPI Cards Row 1: Sales and Harvest Attention -->
         <div class="row g-3 mb-4">
 
@@ -467,7 +464,7 @@
                         </ul>
                     </div>
                     <div class="card-body">
-                        <h5 class="card-title">Sales <span id="kpi-sales-period">| Today</span></h5>
+                        <h5 class="card-title">Sold <span id="kpi-sales-period">| Today</span></h5>
                         <div class="d-flex align-items-center">
                             <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                                 <i class="bi bi-cart3 text-success"></i>
@@ -1051,6 +1048,14 @@
                             <option value="25">25</option>
                             <option value="50" selected>50</option>
                             <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Verification</label>
+                        <select id="users-verification-filter" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="verified">Verified</option>
+                            <option value="unverified">Unverified</option>
                         </select>
                     </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
@@ -2287,6 +2292,14 @@
                             <option value="admin">Admin</option>
                             <option value="farmer">Farmer</option>
                             <option value="customer">Customer</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Verification</label>
+                        <select id="all-users-verification-filter" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="verified">Verified</option>
+                            <option value="unverified">Unverified</option>
                         </select>
                     </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
@@ -4126,6 +4139,42 @@
 </div>
 
 
+<!-- ── Export Dashboard Period Modal ─────────────────────────────────── -->
+<div id="export-period-modal" class="admin-modal-backdrop">
+    <div class="admin-modal modal-sm">
+        <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-file-earmark-excel me-2"></i>Export Dashboard Report</h5>
+            <button class="modal-close-btn" data-close-modal="export-period-modal" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p class="text-muted small mb-3">Select the time period for the dashboard report:</p>
+            <div class="list-group">
+                <button class="list-group-item list-group-item-action export-period-btn" data-period="today">
+                    <i class="bi bi-calendar-day me-2"></i>Today
+                </button>
+                <button class="list-group-item list-group-item-action export-period-btn" data-period="week">
+                    <i class="bi bi-calendar-week me-2"></i>This Week
+                </button>
+                <button class="list-group-item list-group-item-action export-period-btn" data-period="month">
+                    <i class="bi bi-calendar-month me-2"></i>This Month
+                </button>
+                <button class="list-group-item list-group-item-action export-period-btn" data-period="year">
+                    <i class="bi bi-calendar-range me-2"></i>This Year
+                </button>
+                <button class="list-group-item list-group-item-action export-period-btn" data-period="all">
+                    <i class="bi bi-calendar3 me-2"></i>All Time
+                </button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" data-close-modal="export-period-modal">Cancel</button>
+        </div>
+    </div>
+</div>
+
+
 <!-- ── Edit User Modal ────────────────────────────────────────────── -->
 <div id="edit-user-modal" class="admin-modal-backdrop">
     <div class="admin-modal modal-lg">
@@ -5228,6 +5277,7 @@ window.addEventListener('load', function() {
 });
 </script>
 
+  <script src="/js/validation-standardizer.js"></script>
 </body>
 </html>
 </html>

@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const ExcelJS = require('exceljs');
 const { writeAdminAuditLog, ensureAuditTable } = require('../utils/auditLog');
 const adminCache = require('../utils/adminCache');
 const { broadcastEvent } = require('../utils/realtime');
@@ -13,6 +14,7 @@ const { sendVerificationEmail, sendUnverificationEmail, sendPremiumUpgradeEmail,
 const activityLogger = require('../services/activityLogger');
 const { restoreInventoryOnCancel, updateStatisticsOnDeliver, getOrderForBusinessLogic } = require('../utils/orderBusinessLogic');
 const { getValidStatuses } = require('../utils/orderTransitions');
+const { getPeriodFilter } = require('../services/dashboardService');
 
 const router = express.Router();
 
@@ -241,15 +243,17 @@ const normalizeManagedUserPayload = (body = {}) => {
   const phone = String(body.phone || '').trim();
   const address = String(body.address || '').trim();
   const shopName = String(body.shop_name || '').trim();
-  
-  // Validate phone number format
+
+  // Validate and normalize phone number format
+  let normalizedPhone = null;
   if (phone) {
     const phoneDigits = phone.replace(/\D/g, '');
     if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
       throw new Error('Phone number must be 10 digits starting with 9');
     }
+    normalizedPhone = phoneDigits; // Store only 10-digit phone number
   }
-  
+
   const displayName = buildDisplayName({
     firstName,
     middleName,
@@ -268,7 +272,7 @@ const normalizeManagedUserPayload = (body = {}) => {
     username,
     password,
     role,
-    phone,
+    phone: normalizedPhone,
     address,
     shopName
   };
@@ -653,6 +657,7 @@ router.get('/users', requireAdmin, async (req, res) => {
       'disabled_at',
       'disabled_reason',
       'disable_type',
+      'is_debug_account',
       'shop_name'
     ].filter(hasUserColumn);
 
@@ -716,6 +721,18 @@ router.post('/users', requireAdmin, async (req, res) => {
     );
     if (existing.rows.length) {
       return res.status(409).json({ message: 'Email or username already exists' });
+    }
+
+    // Check phone number uniqueness
+    if (normalized.phone) {
+      const phoneDigits = normalized.phone.replace(/\D/g, '');
+      const phoneExists = await pool.query(
+        'SELECT id FROM users WHERE phone = $1',
+        [phoneDigits]
+      );
+      if (phoneExists.rows.length) {
+        return res.status(409).json({ message: 'This phone number is already registered.' });
+      }
     }
 
     // Force plaintext password storage
@@ -1029,9 +1046,17 @@ router.put('/users/:id', requireAdmin, async (req, res) => {
         if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
           return res.status(400).json({ message: 'Phone number must be 10 digits starting with 9' });
         }
+        // Check phone uniqueness (allow target user to keep their own phone)
+        const phoneExists = await pool.query(
+          'SELECT id FROM users WHERE phone = $1 AND id <> $2',
+          [phoneDigits, targetUserId]
+        );
+        if (phoneExists.rows.length > 0) {
+          return res.status(409).json({ message: 'This phone number is already registered.' });
+        }
       }
       updates.push(`phone = $${paramIndex}`);
-      values.push(phone);
+      values.push(phoneDigits); // Store only 10-digit phone number
       paramIndex++;
     }
 
@@ -3402,20 +3427,7 @@ router.get('/orders/:id', requireAdmin, async (req, res) => {
 // DASHBOARD ANALYTICS ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const getPeriodFilter = (period, alias = 'o', useSimpleTimeRef = false) => {
-  // Use same time reference as farmer metrics: delivered orders use updated_at (delivery date)
-  // For tables without status field (like users), use simple created_at reference
-  const timeRef = useSimpleTimeRef 
-    ? (alias ? `${alias}.created_at` : 'created_at')
-    : (alias ? `CASE WHEN ${alias}.status = 'delivered' THEN COALESCE(${alias}.updated_at, ${alias}.created_at) ELSE ${alias}.created_at END` : `CASE WHEN status = 'delivered' THEN COALESCE(updated_at, created_at) ELSE created_at END`);
-  switch (period) {
-    case 'today':    return `DATE(${timeRef}) = CURRENT_DATE`;
-    case 'week':     return `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE)`;
-    case 'month':    return `${timeRef} >= DATE_TRUNC('month', CURRENT_DATE)`;
-    case 'year':     return `${timeRef} >= DATE_TRUNC('year', CURRENT_DATE)`;
-    default:         return '1=1'; // all time
-  }
-};
+const { getAdminDashboardStats } = require('../services/dashboardService');
 
 const getAuditLogPeriodFilter = (period, alias = 'al') => {
   // Simple period filter for audit logs (just uses created_at)
@@ -3426,21 +3438,6 @@ const getAuditLogPeriodFilter = (period, alias = 'al') => {
     case 'month':    return `${timeRef} >= DATE_TRUNC('month', CURRENT_DATE)`;
     case 'year':     return `${timeRef} >= DATE_TRUNC('year', CURRENT_DATE)`;
     default:         return '1=1'; // all time
-  }
-};
-
-const getPrevPeriodFilter = (period, alias = 'o', useSimpleTimeRef = false) => {
-  // Use same time reference as farmer metrics: delivered orders use updated_at (delivery date)
-  // For tables without status field (like users), use simple created_at reference
-  const timeRef = useSimpleTimeRef 
-    ? (alias ? `${alias}.created_at` : 'created_at')
-    : (alias ? `CASE WHEN ${alias}.status = 'delivered' THEN COALESCE(${alias}.updated_at, ${alias}.created_at) ELSE ${alias}.created_at END` : `CASE WHEN status = 'delivered' THEN COALESCE(updated_at, created_at) ELSE created_at END`);
-  switch (period) {
-    case 'today':  return `DATE(${timeRef}) = CURRENT_DATE - INTERVAL '1 day'`;
-    case 'week':   return `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '1 week' AND ${timeRef} < DATE_TRUNC('week', CURRENT_DATE)`;
-    case 'month':  return `${timeRef} >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' AND ${timeRef} < DATE_TRUNC('month', CURRENT_DATE)`;
-    case 'year':   return `${timeRef} >= DATE_TRUNC('year', CURRENT_DATE) - INTERVAL '1 year' AND ${timeRef} < DATE_TRUNC('year', CURRENT_DATE)`;
-    default:       return '1=0';
   }
 };
 
@@ -3455,55 +3452,411 @@ router.get('/dashboard/stats', requireAdmin, async (req, res) => {
     const cached = adminCache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    const periodFilter = getPeriodFilter(period, 'o');
-    const prevFilter   = getPrevPeriodFilter(period, 'o');
-    const userPeriodFilter = getPeriodFilter(period, 'u', true); // Use simple time ref for users table
-    const userPrevFilter   = getPrevPeriodFilter(period, 'u', true); // Use simple time ref for users table
-
-    const [salesRes, prevSalesRes, revenueRes, prevRevenueRes, custRes, prevCustRes, farmerRes, prevFarmerRes, harvestRes, prevHarvestRes] = await Promise.all([
-      pool.query(`SELECT COUNT(*) AS count FROM orders o WHERE ${periodFilter} AND o.status != 'cancelled'`),
-      pool.query(`SELECT COUNT(*) AS count FROM orders o WHERE ${prevFilter} AND o.status != 'cancelled'`),
-      pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) AS total FROM orders o WHERE ${periodFilter} AND o.status NOT IN ('cancelled','disabled')`),
-      pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) AS total FROM orders o WHERE ${prevFilter} AND o.status NOT IN ('cancelled','disabled')`),
-      pool.query(`SELECT COUNT(*) AS count FROM users u WHERE u.role = 'customer' AND ${userPeriodFilter}`),
-      pool.query(`SELECT COUNT(*) AS count FROM users u WHERE u.role = 'customer' AND ${userPrevFilter}`),
-      pool.query(`SELECT COUNT(*) AS count FROM users u WHERE u.role = 'farmer' AND ${userPeriodFilter}`),
-      pool.query(`SELECT COUNT(*) AS count FROM users u WHERE u.role = 'farmer' AND ${userPrevFilter}`),
-      pool.query(`SELECT COUNT(*) AS count FROM products p WHERE p.is_available = true AND p.harvest_date IS NOT NULL AND p.harvest_date < CURRENT_DATE`),
-      pool.query(`SELECT COUNT(*) AS count FROM products p WHERE p.is_available = true AND p.harvest_date IS NOT NULL AND p.harvest_date < CURRENT_DATE`),
-    ]);
-
-    const calcChange = (curr, prev) => {
-      const c = parseFloat(curr) || 0;
-      const p = parseFloat(prev) || 0;
-      if (p === 0) return c > 0 ? 100 : 0;
-      return Math.round(((c - p) / p) * 100);
-    };
-
-    const sales   = parseInt(salesRes.rows[0].count);
-    const prevSales = parseInt(prevSalesRes.rows[0].count);
-    const revenue = parseFloat(revenueRes.rows[0].total);
-    const prevRevenue = parseFloat(prevRevenueRes.rows[0].total);
-    const customers = parseInt(custRes.rows[0].count);
-    const prevCustomers = parseInt(prevCustRes.rows[0].count);
-    const farmers = parseInt(farmerRes.rows[0].count);
-    const prevFarmers = parseInt(prevFarmerRes.rows[0].count);
-    const harvestAttention = parseInt(harvestRes.rows[0].count);
-    const prevHarvestAttention = parseInt(prevHarvestRes.rows[0].count);
-
-    const result = {
-      stats: {
-        sales,   salesChange: calcChange(sales, prevSales),
-        revenue, revenueChange: calcChange(revenue, prevRevenue),
-        customers, customersChange: calcChange(customers, prevCustomers),
-        farmers, farmersChange: calcChange(farmers, prevFarmers),
-        harvest_attention: harvestAttention, harvest_attentionChange: calcChange(harvestAttention, prevHarvestAttention),
-      }
-    };
+    // Use shared dashboard service
+    const result = await getAdminDashboardStats(pool, period);
+    
     adminCache.set(cacheKey, result, 2 * 60 * 1000); // 2 min cache
     res.json(result);
   } catch (err) {
     console.error('Dashboard stats error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/admin/dashboard/export.xlsx?period=today|week|month|year|all
+// Export dashboard KPIs as Excel
+router.get('/dashboard/export.xlsx', requireAdmin, async (req, res) => {
+  try {
+    const period = req.query.period || 'all';
+
+    // Use shared dashboard service
+    const dashboardData = await getAdminDashboardStats(pool, period);
+    const { stats } = dashboardData;
+
+    // Fetch additional dashboard data for comprehensive report
+    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.updated_at, o.created_at) ELSE o.created_at END`;
+    let groupExpr, filterExpr;
+    if (period === 'today') {
+      groupExpr = `DATE_TRUNC('hour', ${timeRef})`;
+      filterExpr = `DATE(${timeRef}) = CURRENT_DATE`;
+    } else if (period === 'week') {
+      groupExpr = `DATE(${timeRef})`;
+      filterExpr = `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE)`;
+    } else if (period === 'month') {
+      groupExpr = `DATE(${timeRef})`;
+      filterExpr = `${timeRef} >= DATE_TRUNC('month', CURRENT_DATE)`;
+    } else if (period === 'year') {
+      groupExpr = `DATE_TRUNC('month', ${timeRef})`;
+      filterExpr = `${timeRef} >= DATE_TRUNC('year', CURRENT_DATE)`;
+    } else {
+      groupExpr = `DATE_TRUNC('month', ${timeRef})`;
+      filterExpr = '1=1';
+    }
+
+    const [reportData, topProductsData, topFarmersData] = await Promise.all([
+      pool.query(`
+        SELECT ${groupExpr} AS period_label,
+               COUNT(*) FILTER (WHERE o.status != 'cancelled') AS sales,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE o.status NOT IN ('cancelled','disabled')), 0) AS revenue
+        FROM orders o
+        WHERE ${filterExpr} AND COALESCE(o.is_disabled, false) = false
+        GROUP BY ${groupExpr}
+        HAVING COUNT(*) FILTER (WHERE o.status != 'cancelled') > 0
+        ORDER BY ${groupExpr} ASC
+      `),
+      pool.query(`
+        SELECT p.name AS product_name,
+               COUNT(o.id) AS order_count,
+               COALESCE(SUM(o.quantity), 0) AS sold_qty,
+               COALESCE(SUM(o.total_amount), 0) AS revenue
+        FROM products p
+        JOIN orders o ON o.product_id = p.id
+        WHERE o.status NOT IN ('cancelled') AND ${filterExpr}
+        GROUP BY p.name
+        ORDER BY sold_qty DESC, revenue DESC
+        LIMIT 10
+      `),
+      pool.query(`
+        SELECT u.full_name AS farmer_name,
+               u.shop_name,
+               COUNT(DISTINCT p.id) AS product_count,
+               COUNT(o.id) AS order_count,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'delivered'), 0) AS revenue
+        FROM users u
+        JOIN products p ON p.farmer_id = u.id
+        JOIN orders o ON o.product_id = p.id
+        WHERE u.role = 'farmer' AND ${filterExpr}
+        GROUP BY u.id, u.full_name, u.shop_name
+        ORDER BY revenue DESC
+        LIMIT 10
+      `)
+    ]);
+
+    // Create Excel workbook using ExcelJS
+    const ExcelJS = require('exceljs');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Dashboard Report');
+
+    // Header section
+    const generatedAt = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'full', timeStyle: 'long' });
+    const periodLabel = period.charAt(0).toUpperCase() + period.slice(1);
+    const generatedBy = {
+      name: req.user.full_name || 'N/A',
+      email: req.user.email || 'N/A',
+      phone: req.user.phone || 'N/A',
+      role: req.user.role === 'super_admin' ? 'Super Admin' : (req.user.role === 'admin' ? 'Administrator' : req.user.role)
+    };
+
+    // Add AgriCatch logo
+    const fs = require('fs');
+    const path = require('path');
+    const logoPath = path.join(__dirname, '../../frontend/images/resendlogo.png');
+    let logoId = null;
+    let logoBuffer = null;
+    let logoNaturalWidth = 0;
+    let logoNaturalHeight = 0;
+    if (fs.existsSync(logoPath)) {
+      logoBuffer = fs.readFileSync(logoPath);
+      logoId = wb.addImage({
+        buffer: logoBuffer,
+        extension: 'png'
+      });
+      if (logoBuffer && logoBuffer.length >= 24 && logoBuffer.toString('ascii', 1, 4) === 'PNG') {
+        logoNaturalWidth = logoBuffer.readUInt32BE(16);
+        logoNaturalHeight = logoBuffer.readUInt32BE(20);
+      }
+    }
+
+    // Add header data with professional styling
+    ws.addRow([]); // Row 1: spacer for logo
+    ws.addRow([]); // Row 2: spacer
+    ws.addRow(['Admin Dashboard Report']); // Row 3: title
+    ws.addRow([]); // Row 4: spacer
+    ws.addRow(['Report Information']); // Row 5: section header
+    ws.addRow(['Report Period:', periodLabel]); // Row 6
+    ws.addRow(['Generated Date & Time:', generatedAt]); // Row 7
+    ws.addRow([]); // Row 8: spacer
+    ws.addRow(['Generated By']); // Row 9: section header
+    ws.addRow(['Name:', generatedBy.name]); // Row 10
+    ws.addRow(['Email:', generatedBy.email]); // Row 11
+    ws.addRow(['Phone:', generatedBy.phone]); // Row 12
+    ws.addRow(['Role:', generatedBy.role]); // Row 13
+    ws.addRow([]); // Row 14: spacer
+    ws.addRow(['Key Performance Indicators']); // Row 15: KPI section header
+    ws.addRow([]); // Row 16: spacer
+    ws.addRow(['Metric', 'Value', 'Change vs Previous Period']); // Row 17: KPI table header
+    ws.addRow(['Sold', stats.sales, `${stats.salesChange}%`]); // Row 18
+    ws.addRow(['Total Sales', `₱${stats.revenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, `${stats.revenueChange}%`]); // Row 19
+    ws.addRow(['Customers', stats.customers, `${stats.customersChange}%`]); // Row 20
+    ws.addRow(['Farmers', stats.farmers, `${stats.farmersChange}%`]); // Row 21
+    ws.addRow(['Harvest Attention', stats.harvest_attention, `${stats.harvest_attentionChange}%`]); // Row 22
+    ws.addRow([]); // Row 23: spacer
+    ws.addRow([]); // Row 24: spacer
+
+    // Sold & Total Sales Trend section
+    ws.addRow(['Sold & Total Sales Trend']); // Row 25: section header
+    ws.addRow(['Period', 'Sold', 'Total Sales']); // Row 26: table header
+    let currentRow = 27;
+    for (const r of reportData.rows) {
+      ws.addRow([r.period_label, r.sales, `₱${parseFloat(r.revenue).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+      currentRow++;
+    }
+
+    // Top Products section
+    currentRow += 2;
+    ws.addRow([]); // spacer
+    ws.addRow(['Top Selling Products']); // section header
+    ws.addRow(['Product', 'Orders', 'Sold Qty', 'Total Sales']); // table header
+    currentRow += 3;
+    for (const r of topProductsData.rows) {
+      ws.addRow([r.product_name, r.order_count, r.sold_qty, `₱${parseFloat(r.revenue).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+      currentRow++;
+    }
+
+    // Top Farmers section
+    currentRow += 2;
+    ws.addRow([]); // spacer
+    ws.addRow(['Top Farmers']); // section header
+    ws.addRow(['Farmer', 'Shop', 'Products', 'Orders', 'Total Sales']); // table header
+    currentRow += 3;
+    for (const r of topFarmersData.rows) {
+      ws.addRow([r.farmer_name, r.shop_name, r.product_count, r.order_count, `₱${parseFloat(r.revenue).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+      currentRow++;
+    }
+
+    // Footer
+    currentRow += 2;
+    ws.addRow([]); // spacer
+    ws.addRow([]); // spacer
+    ws.addRow(['', 'Generated by AgriCatch Platform']); // footer (aligned to B)
+    ws.addRow(['', 'Copyright © 2026 AgriCatch. All rights reserved.']); // footer (aligned to B)
+
+    // Position logo at top center
+    const targetLogoWidth = 150;
+    const targetLogoHeight = logoNaturalWidth
+      ? Math.round(targetLogoWidth * (logoNaturalHeight / logoNaturalWidth))
+      : 50;
+    if (logoId !== null) {
+      ws.addImage(logoId, {
+        tl: { col: 1, row: 0 },
+        ext: { width: targetLogoWidth, height: targetLogoHeight }
+      });
+      // Increase the row height where the logo is placed so the image appears natural
+      ws.getRow(1).height = Math.max(15, targetLogoHeight * 0.75);
+    }
+
+    // Professional styling with AgriCatch green branding
+    const agricatchGreen = '2E7D32';
+    const lightGreen = 'E8F5E9';
+    const darkGreen = '1B5E20';
+
+    // Style title row (centered, bold, large)
+    const titleCell = ws.getCell('A3');
+    titleCell.font = { bold: true, size: 20, color: { argb: darkGreen } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.mergeCells('A3:C3');
+
+    // Style Report Information section header
+    const infoHeaderCell = ws.getCell('A5');
+    infoHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    infoHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    ws.mergeCells('A5:C5');
+
+    // Style Report Information data rows
+    for (let row = 6; row <= 7; row++) {
+      const labelCell = ws.getCell(`A${row}`);
+      labelCell.font = { bold: true, size: 11 };
+      labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F5F5F5' } };
+      labelCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      
+      const valueCell = ws.getCell(`B${row}`);
+      valueCell.alignment = { horizontal: 'left' };
+      valueCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      ws.mergeCells(`B${row}:C${row}`);
+    }
+
+    // Style Generated By section header
+    const genByHeaderCell = ws.getCell('A9');
+    genByHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    genByHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    ws.mergeCells('A9:C9');
+
+    // Style Generated By data rows
+    for (let row = 10; row <= 13; row++) {
+      const labelCell = ws.getCell(`A${row}`);
+      labelCell.font = { bold: true, size: 11 };
+      labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F5F5F5' } };
+      labelCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      
+      const valueCell = ws.getCell(`B${row}`);
+      valueCell.alignment = { horizontal: 'left' };
+      valueCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      ws.mergeCells(`B${row}:C${row}`);
+    }
+
+    // Style KPI section header
+    const kpiHeaderCell = ws.getCell('A15');
+    kpiHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    kpiHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    kpiHeaderCell.alignment = { horizontal: 'center' };
+    ws.mergeCells('A15:C15');
+
+    // Style KPI table header row
+    const kpiTableHeaderRow = 17;
+    for (let col = 1; col <= 3; col++) {
+      const cell = ws.getCell(kpiTableHeaderRow, col);
+      cell.font = { bold: true, size: 12, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: agricatchGreen } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    }
+
+    // Style KPI data rows
+    for (let row = 18; row <= 22; row++) {
+      for (let col = 1; col <= 3; col++) {
+        const cell = ws.getCell(row, col);
+        cell.font = { size: 11 };
+        cell.alignment = { horizontal: col === 1 ? 'left' : 'center', vertical: 'middle' };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        
+        // Alternate row colors
+        if (row % 2 === 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+        }
+      }
+    }
+
+    // Style Sold & Total Sales Trend section header
+    const trendHeaderCell = ws.getCell('A25');
+    trendHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    trendHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    trendHeaderCell.alignment = { horizontal: 'center' };
+    ws.mergeCells('A25:C25');
+
+    // Style Sold & Total Sales Trend table header
+    const trendTableHeaderRow = 26;
+    for (let col = 1; col <= 3; col++) {
+      const cell = ws.getCell(trendTableHeaderRow, col);
+      cell.font = { bold: true, size: 12, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: agricatchGreen } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    }
+
+    // Style Sold & Total Sales Trend data rows
+    const trendDataStartRow = 27;
+    const trendDataEndRow = trendDataStartRow + reportData.rows.length - 1;
+    for (let row = trendDataStartRow; row <= trendDataEndRow; row++) {
+      for (let col = 1; col <= 3; col++) {
+        const cell = ws.getCell(row, col);
+        cell.font = { size: 11 };
+        cell.alignment = { horizontal: col === 1 ? 'left' : 'right', vertical: 'middle' };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        
+        if (row % 2 === 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+        }
+      }
+    }
+
+    // Style Top Selling Products section header
+    const topProdHeaderRow = trendDataEndRow + 2;
+    const topProdHeaderCell = ws.getCell(`A${topProdHeaderRow}`);
+    topProdHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    topProdHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    topProdHeaderCell.alignment = { horizontal: 'center' };
+    ws.mergeCells(`A${topProdHeaderRow}:D${topProdHeaderRow}`);
+
+    // Style Top Selling Products table header
+    const topProdTableHeaderRow = topProdHeaderRow + 1;
+    for (let col = 1; col <= 4; col++) {
+      const cell = ws.getCell(topProdTableHeaderRow, col);
+      cell.font = { bold: true, size: 12, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: agricatchGreen } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    }
+
+    // Style Top Selling Products data rows
+    const topProdDataStartRow = topProdTableHeaderRow + 1;
+    const topProdDataEndRow = topProdDataStartRow + topProductsData.rows.length - 1;
+    for (let row = topProdDataStartRow; row <= topProdDataEndRow; row++) {
+      for (let col = 1; col <= 4; col++) {
+        const cell = ws.getCell(row, col);
+        cell.font = { size: 11 };
+        cell.alignment = { horizontal: col === 1 ? 'left' : 'center', vertical: 'middle' };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        
+        if (row % 2 === 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+        }
+      }
+    }
+
+    // Style Top Farmers section header
+    const topFarmHeaderRow = topProdDataEndRow + 2;
+    const topFarmHeaderCell = ws.getCell(`A${topFarmHeaderRow}`);
+    topFarmHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    topFarmHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    topFarmHeaderCell.alignment = { horizontal: 'center' };
+    ws.mergeCells(`A${topFarmHeaderRow}:E${topFarmHeaderRow}`);
+
+    // Style Top Farmers table header
+    const topFarmTableHeaderRow = topFarmHeaderRow + 1;
+    for (let col = 1; col <= 5; col++) {
+      const cell = ws.getCell(topFarmTableHeaderRow, col);
+      cell.font = { bold: true, size: 12, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: agricatchGreen } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    }
+
+    // Style Top Farmers data rows
+    const topFarmDataStartRow = topFarmTableHeaderRow + 1;
+    const topFarmDataEndRow = topFarmDataStartRow + topFarmersData.rows.length - 1;
+    for (let row = topFarmDataStartRow; row <= topFarmDataEndRow; row++) {
+      for (let col = 1; col <= 5; col++) {
+        const cell = ws.getCell(row, col);
+        cell.font = { size: 11 };
+        cell.alignment = { horizontal: col === 1 ? 'left' : 'center', vertical: 'middle' };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        
+        if (row % 2 === 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+        }
+      }
+    }
+
+    // Style footer rows
+    const footerStartRow = topFarmDataEndRow + 2;
+    for (let row = footerStartRow; row <= footerStartRow + 1; row++) {
+      const cell = ws.getCell(`A${row}`);
+      cell.font = { size: 10, color: { argb: '666666' } };
+      cell.alignment = { horizontal: 'center' };
+      cell.italic = true;
+      ws.mergeCells(`A${row}:E${row}`);
+    }
+
+    // Set column widths with auto-sizing
+    ws.getColumn(1).width = 30; // Metric/Period/Product/Farmer
+    ws.getColumn(2).width = 20; // Value/Sales/Orders/Shop
+    ws.getColumn(3).width = 30; // Change/Revenue/Sold Qty/Products
+    ws.getColumn(4).width = 20; // Revenue/Orders
+    ws.getColumn(5).width = 20; // Revenue
+
+    // Generate filename with timestamp
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = now.toTimeString().slice(0, 5).replace(':', '');
+    const filename = `Admin_Dashboard_Report_${dateStr}_${timeStr}.xlsx`;
+
+    // Send Excel file
+    const buffer = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(buffer);
+  } catch (err) {
+    console.error('Admin dashboard export error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

@@ -1,4 +1,5 @@
 ﻿const express = require('express');
+const ExcelJS = require('exceljs');
 const { pool } = require('../utils/db');
 const { broadcastEvent } = require('../utils/realtime');
 
@@ -224,6 +225,8 @@ router.get('/me/stats', async (req, res) => {
   }
 });
 
+const { getFarmerDashboardMetrics } = require('../services/dashboardService');
+
 // Farmer: overview metrics (charts-ready)
 router.get('/me/metrics', async (req, res) => {
   try {
@@ -264,254 +267,15 @@ router.get('/me/metrics', async (req, res) => {
       }
     }
 
-    // Use delivery date for delivered rows, and created_at for non-delivered rows.
-    // This keeps the delivered sales trend aligned with when orders were actually delivered.
-    // Defensive: handle case where delivered_at column might not exist in older DBs
-    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.updated_at, o.created_at) ELSE o.created_at END`;
-
-    const dateSelect = isAllTime
-      ? `DATE_TRUNC('month', ${timeRef})::date`
-      : `DATE(${timeRef})`;
-
-    let rangeWhere = '';
-    let paramsRange = [];
-    if (hasCustom) {
-      rangeWhere = `AND ${timeRef} >= $2::date AND ${timeRef} < ($3::date + INTERVAL '1 day')`;
-      paramsRange = [user.id, from, to];
-    } else if (isAllTime) {
-      rangeWhere = '';
-      paramsRange = [user.id];
-    } else {
-      rangeWhere = `
-        AND ${timeRef} >= (CURRENT_DATE - (($2::int - 1) * INTERVAL '1 day'))
-        AND ${timeRef} < (CURRENT_DATE + INTERVAL '1 day')
-      `;
-      paramsRange = [user.id, Number(rangeDays || 30)];
-    }
-
-    let prevRangeWhere = '';
-    let paramsPrevRange = [];
-    if (!hasCustom && !isAllTime) {
-      prevRangeWhere = `
-        AND ${timeRef} >= (CURRENT_DATE - (((($2::int) * 2) - 1) * INTERVAL '1 day'))
-        AND ${timeRef} < (CURRENT_DATE - (($2::int - 1) * INTERVAL '1 day'))
-      `;
-      paramsPrevRange = [user.id, Number(rangeDays || 30)];
-    }
-
-    // Revenue by day (delivered orders only)
-    const revenueByDayResult = await pool.query(`
-      SELECT TO_CHAR(${dateSelect}, 'YYYY-MM-DD') AS day,
-             COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
-      FROM orders o
-      JOIN products p ON o.product_id = p.id
-      WHERE p.farmer_id = $1
-        ${rangeWhere}
-        AND o.status = 'delivered'
-      GROUP BY ${dateSelect}
-      ORDER BY ${dateSelect} ASC
-    `, paramsRange);
-
-    // Orders by day (all non-cancelled orders)
-    const ordersByDayResult = await pool.query(`
-      SELECT TO_CHAR(${dateSelect}, 'YYYY-MM-DD') AS day,
-             COUNT(*)::int AS orders
-      FROM orders o
-      JOIN products p ON o.product_id = p.id
-      WHERE p.farmer_id = $1
-        ${rangeWhere}
-        AND o.status != 'cancelled'
-      GROUP BY ${dateSelect}
-      ORDER BY ${dateSelect} ASC
-    `, paramsRange);
-
-    // Items sold by day (delivered orders only)
-    const itemsSoldByDayResult = await pool.query(`
-      SELECT TO_CHAR(${dateSelect}, 'YYYY-MM-DD') AS day,
-             COALESCE(SUM(o.quantity), 0)::int AS items_sold
-      FROM orders o
-      JOIN products p ON o.product_id = p.id
-      WHERE p.farmer_id = $1
-        ${rangeWhere}
-        AND o.status = 'delivered'
-      GROUP BY ${dateSelect}
-      ORDER BY ${dateSelect} ASC
-    `, paramsRange);
-
-    // Products by day (available products)
-    // For products, we use created_at directly (no timeRef like orders)
-    const productDateSelect = isAllTime
-      ? `DATE_TRUNC('month', p.created_at)::date`
-      : `DATE(p.created_at)`;
-
-    let productWhere = '';
-    let productParams = [user.id];
-    if (hasCustom) {
-      productWhere = `AND p.created_at >= $2::date AND p.created_at < ($3::date + INTERVAL '1 day')`;
-      productParams = [user.id, from, to];
-    } else if (isAllTime) {
-      productWhere = '';
-      productParams = [user.id];
-    } else {
-      productWhere = `
-        AND p.created_at >= (CURRENT_DATE - (($2::int - 1) * INTERVAL '1 day'))
-        AND p.created_at < (CURRENT_DATE + INTERVAL '1 day')
-      `;
-      productParams = [user.id, Number(rangeDays || 30)];
-    }
-
-    const productsByDayResult = await pool.query(`
-      SELECT TO_CHAR(${productDateSelect}, 'YYYY-MM-DD') AS day,
-             COUNT(DISTINCT p.id)::int AS products
-      FROM products p
-      WHERE p.farmer_id = $1
-        AND p.is_available = true
-        ${productWhere}
-      GROUP BY ${productDateSelect}
-      ORDER BY ${productDateSelect} ASC
-    `, productParams);
-
-    // Orders by status (all statuses)
-    const ordersByStatusResult = await pool.query(`
-      SELECT o.status, COUNT(*)::int AS count
-      FROM orders o
-      JOIN products p ON o.product_id = p.id
-      WHERE p.farmer_id = $1
-        ${rangeWhere}
-      GROUP BY o.status
-    `, paramsRange);
-
-    const ordersByStatus = {
-      pending: 0,
-      confirmed: 0,
-      preparing: 0,
-      out_for_delivery: 0,
-      delivered: 0,
-      cancelled: 0
-    };
-    for (const row of ordersByStatusResult.rows) {
-      if (row?.status && Object.prototype.hasOwnProperty.call(ordersByStatus, row.status)) {
-        ordersByStatus[row.status] = Number(row.count) || 0;
-      }
-    }
-
-    // Top products by delivered quantity (and revenue)
-    const topProductsResult = await pool.query(`
-      SELECT p.id AS product_id,
-             p.name AS product_name,
-             p.image_url AS product_image,
-             p.price,
-             COALESCE(SUM(o.quantity), 0)::int AS sold_qty,
-             COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
-      FROM orders o
-      JOIN products p ON o.product_id = p.id
-      WHERE p.farmer_id = $1
-        ${rangeWhere}
-        AND o.status = 'delivered'
-      GROUP BY p.id, p.name, p.image_url, p.price
-      ORDER BY sold_qty DESC, revenue DESC
-      LIMIT 5
-    `, paramsRange);
-
-    // Recent orders (for Overview list)
-    const recentOrdersResult = await pool.query(`
-      SELECT o.id,
-             o.status,
-             o.price,
-             o.quantity,
-             o.total_amount,
-             o.created_at,
-             u.full_name AS customer_name,
-             p.name AS product_name,
-             p.image_url AS product_image
-      FROM orders o
-      JOIN products p ON o.product_id = p.id
-      LEFT JOIN users u ON o.user_id = u.id
-      WHERE p.farmer_id = $1
-        ${rangeWhere}
-      ORDER BY o.created_at DESC
-      LIMIT 8
-    `, paramsRange);
-
-    let ordersChange = 0;
-    let soldChange = 0;
-    let revenueChange = 0;
-    if (!hasCustom && !isAllTime) {
-      const [currentTotalsResult, previousTotalsResult] = await Promise.all([
-        pool.query(`
-          SELECT
-            COUNT(*) FILTER (WHERE o.status != 'cancelled')::int AS orders,
-            COALESCE(SUM(o.quantity) FILTER (WHERE o.status = 'delivered'), 0)::numeric AS sold,
-            COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'delivered'), 0)::numeric AS revenue
-          FROM orders o
-          JOIN products p ON o.product_id = p.id
-          WHERE p.farmer_id = $1
-            ${rangeWhere}
-        `, paramsRange),
-        pool.query(`
-          SELECT
-            COUNT(*) FILTER (WHERE o.status != 'cancelled')::int AS orders,
-            COALESCE(SUM(o.quantity) FILTER (WHERE o.status = 'delivered'), 0)::numeric AS sold,
-            COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'delivered'), 0)::numeric AS revenue
-          FROM orders o
-          JOIN products p ON o.product_id = p.id
-          WHERE p.farmer_id = $1
-            ${prevRangeWhere}
-        `, paramsPrevRange)
-      ]);
-
-      const currentTotals = currentTotalsResult.rows[0] || {};
-      const previousTotals = previousTotalsResult.rows[0] || {};
-      ordersChange = calcPercentChange(currentTotals.orders, previousTotals.orders);
-      soldChange = calcPercentChange(currentTotals.sold, previousTotals.sold);
-      revenueChange = calcPercentChange(currentTotals.revenue, previousTotals.revenue);
-    }
-
-    res.json({
-      range: hasCustom ? 'custom' : (isAllTime ? 'all' : 'days'),
-      rangeDays: (hasCustom || isAllTime) ? null : Number(rangeDays || 30),
-      from: hasCustom ? from : null,
-      to: hasCustom ? to : null,
-      ordersChange,
-      soldChange,
-      revenueChange,
-      revenueByDay: revenueByDayResult.rows.map(r => ({
-        date: r.day,
-        revenue: Number(r.revenue) || 0
-      })),
-      ordersByDay: ordersByDayResult.rows.map(r => ({
-        date: r.day,
-        orders: Number(r.orders) || 0
-      })),
-      itemsSoldByDay: itemsSoldByDayResult.rows.map(r => ({
-        date: r.day,
-        items_sold: Number(r.items_sold) || 0
-      })),
-      productsByDay: productsByDayResult.rows.map(r => ({
-        date: r.day,
-        products: Number(r.products) || 0
-      })),
-      ordersByStatus,
-      topProducts: topProductsResult.rows.map(r => ({
-        id: r.product_id,
-        product_name: r.product_name,
-        product_image: r.product_image,
-        price: Number(r.price) || 0,
-        sold_qty: Number(r.sold_qty) || 0,
-        revenue: Number(r.revenue) || 0
-      })),
-      recentOrders: recentOrdersResult.rows.map(r => ({
-        id: r.id,
-        status: r.status,
-        price: Number(r.price) || 0,
-        quantity: Number(r.quantity) || 1,
-        total_amount: Number(r.total_amount) || 0,
-        created_at: r.created_at,
-        customer_name: r.customer_name,
-        product_name: r.product_name,
-        product_image: r.product_image
-      }))
+    // Use shared dashboard service
+    const result = await getFarmerDashboardMetrics(pool, user.id, {
+      from,
+      to,
+      rangeDays,
+      tier
     });
+
+    res.json(result);
   } catch (error) {
     console.error('Get farmer metrics error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -709,8 +473,8 @@ router.get('/me/metrics/export.csv', async (req, res) => {
     lines.push(`${csvEscape(s.total_orders || 0)},${csvEscape(s.total_sold || 0)},${csvEscape(s.total_revenue || 0)}`);
     lines.push('');
 
-    lines.push(isAllTime ? 'Sales By Month' : 'Sales By Day');
-    lines.push('Date,Sales');
+    lines.push(isAllTime ? 'Total Sales By Month' : 'Total Sales By Day');
+    lines.push('Date,Total Sales');
     for (const row of revenue.rows) {
       // Prefix with a single quote so Excel will treat values as text and
       // avoid displaying "#####" when the column is too narrow or formatted
@@ -726,8 +490,8 @@ router.get('/me/metrics/export.csv', async (req, res) => {
     }
     lines.push('');
 
-    lines.push('Top Products (Delivered)');
-    lines.push('Product,Sold Qty,Sales');
+    lines.push('Top Selling Products (Delivered)');
+    lines.push('Product,Sold Qty,Total Sales');
     for (const row of topProducts.rows) {
       lines.push(`${csvEscape(row.product_name)},${csvEscape(row.sold_qty)},${csvEscape(row.revenue)}`);
     }
@@ -753,6 +517,480 @@ router.get('/me/metrics/export.csv', async (req, res) => {
   }
 });
 
+// Farmer: export overview metrics as Excel
+// GET /api/farmers/me/metrics/export.xlsx?rangeDays=30|from=YYYY-MM-DD&to=YYYY-MM-DD
+router.get('/me/metrics/export.xlsx', async (req, res) => {
+  try {
+    const user = await requireFarmer(req, res);
+    if (!user) return;
+
+    const tier = await getFarmerTier(user.id);
+    if (tier !== 'premium') {
+      return res.status(403).json({ message: 'Excel export is a Premium feature. Upgrade to Premium for advanced analytics.' });
+    }
+
+    // Fetch full user details for Generated By section
+    const userDetailResult = await pool.query(
+      'SELECT full_name, email, phone FROM users WHERE id = $1',
+      [user.id]
+    );
+    const userDetails = userDetailResult.rows[0] || {};
+    const fullUser = { ...user, ...userDetails };
+
+    const from = parseIsoDateOnly(req.query.from);
+    const to = parseIsoDateOnly(req.query.to);
+    const hasCustom = !!(from && to);
+
+    const rangeDays = parseRangeDays(req.query.rangeDays || req.query.range || null);
+    const isAllTime = !hasCustom && rangeDays === null;
+
+    if (hasCustom) {
+      const fromDt = new Date(`${from}T00:00:00Z`);
+      const toDt = new Date(`${to}T00:00:00Z`);
+      if (Number.isNaN(fromDt.getTime()) || Number.isNaN(toDt.getTime())) {
+        return res.status(400).json({ message: 'Invalid from/to dates' });
+      }
+      if (fromDt.getTime() > toDt.getTime()) {
+        return res.status(400).json({ message: 'From date must be before To date' });
+      }
+      const daysSpan = Math.floor((toDt.getTime() - fromDt.getTime()) / 86400000) + 1;
+      if (daysSpan > 366) {
+        return res.status(400).json({ message: 'Date range too large (max 366 days)' });
+      }
+    }
+
+    // Use shared dashboard service (same as dashboard API)
+    const dashboardData = await getFarmerDashboardMetrics(pool, user.id, {
+      from,
+      to,
+      rangeDays,
+      tier
+    });
+
+    // Extract data needed for Excel export from dashboard data
+    // Calculate summary from aggregated data (not limited recentOrders)
+    const summary = {
+      total_orders: Object.values(dashboardData.ordersByStatus || {}).reduce((sum, count) => sum + Number(count || 0), 0),
+      total_sold: (dashboardData.itemsSoldByDay || []).reduce((sum, day) => sum + Number(day.items_sold || 0), 0),
+      total_revenue: (dashboardData.revenueByDay || []).reduce((sum, day) => sum + Number(day.revenue || 0), 0)
+    };
+
+    const revenue = (dashboardData.revenueByDay || []).map(r => ({
+      day: r.date,
+      revenue: r.revenue
+    }));
+
+    const byStatus = Object.entries(dashboardData.ordersByStatus || {}).map(([status, count]) => ({
+      status,
+      count
+    }));
+
+    const topProducts = (dashboardData.topProducts || []).map(p => ({
+      product_name: p.product_name,
+      sold_qty: p.sold_qty,
+      revenue: p.revenue
+    }));
+
+    const recentOrders = (dashboardData.recentOrders || []).map(o => ({
+      id: o.id,
+      created_at: o.created_at,
+      status: o.status,
+      total_amount: o.total_amount,
+      customer_name: o.customer_name,
+      product_name: o.product_name
+    }));
+
+    // Create Excel workbook using ExcelJS
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Dashboard Report');
+
+    // Header section
+    const generatedAt = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'full', timeStyle: 'long' });
+    let rangeLabel = '';
+    if (hasCustom) {
+      rangeLabel = `${from} to ${to}`;
+    } else if (isAllTime) {
+      rangeLabel = 'All Time';
+    } else {
+      rangeLabel = `Last ${rangeDays} Days`;
+    }
+    const generatedBy = {
+      name: (fullUser && fullUser.full_name) || 'N/A',
+      email: (fullUser && fullUser.email) || 'N/A',
+      phone: (fullUser && fullUser.phone) || 'N/A',
+      role: 'Farmer'
+    };
+
+    // Add AgriCatch logo
+    const fs = require('fs');
+    const path = require('path');
+    const logoPath = path.join(__dirname, '../../frontend/images/resendlogo.png');
+    let logoId = null;
+    let logoBuffer = null;
+    let logoNaturalWidth = 0;
+    let logoNaturalHeight = 0;
+    if (fs.existsSync(logoPath)) {
+      logoBuffer = fs.readFileSync(logoPath);
+      logoId = wb.addImage({
+        buffer: logoBuffer,
+        extension: 'png'
+      });
+      if (logoBuffer && logoBuffer.length >= 24 && logoBuffer.toString('ascii', 1, 4) === 'PNG') {
+        logoNaturalWidth = logoBuffer.readUInt32BE(16);
+        logoNaturalHeight = logoBuffer.readUInt32BE(20);
+      }
+    }
+
+    // Add header data with professional styling
+    ws.addRow([]); // Row 1: spacer for logo
+    ws.addRow([]); // Row 2: spacer
+    ws.addRow(['Farmer Dashboard Report']); // Row 3: title
+    ws.addRow([]); // Row 4: spacer
+    ws.addRow(['Report Information']); // Row 5: section header
+    ws.addRow(['Report Period:', rangeLabel]); // Row 6
+    ws.addRow(['Generated Date & Time:', generatedAt]); // Row 7
+    ws.addRow([]); // Row 8: spacer
+    ws.addRow(['Generated By']); // Row 9: section header
+    ws.addRow(['Name:', generatedBy.name]); // Row 10
+    ws.addRow(['Email:', generatedBy.email]); // Row 11
+    ws.addRow(['Phone:', generatedBy.phone]); // Row 12
+    ws.addRow(['Role:', generatedBy.role]); // Row 13
+    ws.addRow([]); // Row 14: spacer
+    ws.addRow(['Key Performance Indicators']); // Row 15: KPI section header
+    ws.addRow([]); // Row 16: spacer
+    ws.addRow(['Total Orders', 'Total Sold (Delivered)', 'Total Sales']); // Row 17: KPI table header
+    ws.addRow([summary.total_orders || 0, summary.total_sold || 0, `₱${(summary.total_revenue || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]); // Row 18
+    ws.addRow([]); // Row 19: spacer
+    ws.addRow([]); // Row 20: spacer
+    ws.addRow(['Total Sales By Day']); // Row 21: section header
+    ws.addRow(['Date', 'Total Sales']); // Row 22: table header
+
+    // Add sales by day data
+    let currentRow = 23;
+    for (const r of revenue) {
+      ws.addRow([r.day, parseFloat(r.revenue).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })]);
+      currentRow++;
+    }
+
+    // Add orders by status
+    currentRow += 2;
+    ws.addRow([]); // spacer
+    ws.addRow(['Orders By Status']); // section header
+    ws.addRow(['Status', 'Count']); // table header
+    currentRow += 3;
+    for (const r of byStatus) {
+      ws.addRow([r.status, r.count]);
+      currentRow++;
+    }
+
+    // Add top products
+    currentRow += 2;
+    ws.addRow([]); // spacer
+    ws.addRow(['Top Selling Products (Delivered)']); // section header
+    ws.addRow(['Product', 'Sold Qty', 'Total Sales']); // table header
+    currentRow += 3;
+    for (const r of topProducts) {
+      ws.addRow([r.product_name, r.sold_qty, `₱${parseFloat(r.revenue).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+      currentRow++;
+    }
+
+    // Add recent orders
+    currentRow += 2;
+    ws.addRow([]); // spacer
+    ws.addRow(['Recent Orders']); // section header
+    ws.addRow(['Order ID', 'Date', 'Customer', 'Product', 'Status', 'Total Amount']); // table header
+    currentRow += 3;
+    for (const r of recentOrders) {
+      ws.addRow([
+        r.id,
+        r.created_at,
+        r.customer_name || '',
+        r.product_name || '',
+        r.status,
+        `₱${parseFloat(r.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ]);
+      currentRow++;
+    }
+
+    // Add footer
+    currentRow += 2;
+    ws.addRow([]); // spacer
+    ws.addRow([]); // spacer
+    ws.addRow(['', 'Generated by AgriCatch Platform']); // footer (aligned to B)
+    ws.addRow(['', 'Copyright © 2026 AgriCatch. All rights reserved.']); // footer (aligned to B)
+
+    // Position logo at top center
+    const targetLogoWidth = 150;
+    const targetLogoHeight = logoNaturalWidth
+      ? Math.round(targetLogoWidth * (logoNaturalHeight / logoNaturalWidth))
+      : 50;
+    if (logoId !== null) {
+      ws.addImage(logoId, {
+        tl: { col: 1, row: 0 },
+        ext: { width: targetLogoWidth, height: targetLogoHeight }
+      });
+      // Increase the row height where the logo is placed so the image appears natural
+      ws.getRow(1).height = Math.max(15, targetLogoHeight * 0.75);
+    }
+
+    // Professional styling with AgriCatch green branding
+    const agricatchGreen = '2E7D32';
+    const lightGreen = 'E8F5E9';
+    const darkGreen = '1B5E20';
+
+    // Style title row (centered, bold, large)
+    const titleCell = ws.getCell('A3');
+    titleCell.font = { bold: true, size: 20, color: { argb: darkGreen } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.mergeCells('A3:F3');
+
+    // Style Report Information section header
+    const infoHeaderCell = ws.getCell('A5');
+    infoHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    infoHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    ws.mergeCells('A5:F5');
+
+    // Style Report Information data rows
+    for (let row = 6; row <= 7; row++) {
+      const labelCell = ws.getCell(`A${row}`);
+      labelCell.font = { bold: true, size: 11 };
+      labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F5F5F5' } };
+      labelCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      
+      const valueCell = ws.getCell(`B${row}`);
+      valueCell.alignment = { horizontal: 'left' };
+      valueCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      ws.mergeCells(`B${row}:F${row}`);
+    }
+
+    // Style Generated By section header
+    const genByHeaderCell = ws.getCell('A9');
+    genByHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    genByHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    ws.mergeCells('A9:F9');
+
+    // Style Generated By data rows
+    for (let row = 10; row <= 13; row++) {
+      const labelCell = ws.getCell(`A${row}`);
+      labelCell.font = { bold: true, size: 11 };
+      labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F5F5F5' } };
+      labelCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      
+      const valueCell = ws.getCell(`B${row}`);
+      valueCell.alignment = { horizontal: 'left' };
+      valueCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      ws.mergeCells(`B${row}:F${row}`);
+    }
+
+    // Style KPI section header
+    const kpiHeaderCell = ws.getCell('A15');
+    kpiHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    kpiHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    kpiHeaderCell.alignment = { horizontal: 'center' };
+    ws.mergeCells('A15:F15');
+
+    // Style KPI table header row
+    const kpiTableHeaderRow = 17;
+    for (let col = 1; col <= 3; col++) {
+      const cell = ws.getCell(kpiTableHeaderRow, col);
+      cell.font = { bold: true, size: 12, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: agricatchGreen } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    }
+
+    // Style KPI data row
+    for (let col = 1; col <= 3; col++) {
+      const cell = ws.getCell(18, col);
+      cell.font = { size: 11 };
+      cell.alignment = { horizontal: col === 1 ? 'left' : 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    }
+
+    // Style Total Sales By Day section header
+    const salesHeaderCell = ws.getCell('A21');
+    salesHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    salesHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    salesHeaderCell.alignment = { horizontal: 'center' };
+    ws.mergeCells('A21:B21');
+
+    // Style Total Sales By Day table header
+    const salesTableHeaderRow = 22;
+    for (let col = 1; col <= 2; col++) {
+      const cell = ws.getCell(salesTableHeaderRow, col);
+      cell.font = { bold: true, size: 12, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: agricatchGreen } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    }
+
+    // Style Total Sales By Day data rows
+    const salesDataStartRow = 23;
+    const salesDataEndRow = revenue.length > 0 ? salesDataStartRow + revenue.length - 1 : salesDataStartRow;
+    if (revenue.length > 0) {
+      for (let row = salesDataStartRow; row <= salesDataEndRow; row++) {
+        for (let col = 1; col <= 2; col++) {
+          const cell = ws.getCell(row, col);
+          cell.font = { size: 11 };
+          cell.alignment = { horizontal: col === 1 ? 'left' : 'right', vertical: 'middle' };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          
+          // Alternate row colors
+          if (row % 2 === 0) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+          }
+        }
+      }
+    }
+
+    // Style Orders By Status section header
+    const statusHeaderRow = salesDataEndRow + 2;
+    const statusHeaderCell = ws.getCell(`A${statusHeaderRow}`);
+    statusHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    statusHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    statusHeaderCell.alignment = { horizontal: 'center' };
+    ws.mergeCells(`A${statusHeaderRow}:B${statusHeaderRow}`);
+
+    // Style Orders By Status table header
+    const statusTableHeaderRow = statusHeaderRow + 1;
+    for (let col = 1; col <= 2; col++) {
+      const cell = ws.getCell(statusTableHeaderRow, col);
+      cell.font = { bold: true, size: 12, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: agricatchGreen } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    }
+
+    // Style Orders By Status data rows
+    const statusDataStartRow = statusTableHeaderRow + 1;
+    const statusDataEndRow = byStatus.length > 0 ? statusDataStartRow + byStatus.length - 1 : statusDataStartRow;
+    if (byStatus.length > 0) {
+      for (let row = statusDataStartRow; row <= statusDataEndRow; row++) {
+        for (let col = 1; col <= 2; col++) {
+          const cell = ws.getCell(row, col);
+          cell.font = { size: 11 };
+          cell.alignment = { horizontal: col === 1 ? 'left' : 'center', vertical: 'middle' };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          
+          // Alternate row colors
+          if (row % 2 === 0) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+          }
+        }
+      }
+    }
+
+    // Style Top Selling Products section header
+    const productsHeaderRow = statusDataEndRow + 2;
+    const productsHeaderCell = ws.getCell(`A${productsHeaderRow}`);
+    productsHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    productsHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    productsHeaderCell.alignment = { horizontal: 'center' };
+    ws.mergeCells(`A${productsHeaderRow}:C${productsHeaderRow}`);
+
+    // Style Top Selling Products table header
+    const productsTableHeaderRow = productsHeaderRow + 1;
+    for (let col = 1; col <= 3; col++) {
+      const cell = ws.getCell(productsTableHeaderRow, col);
+      cell.font = { bold: true, size: 12, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: agricatchGreen } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    }
+
+    // Style Top Selling Products data rows
+    const productsDataStartRow = productsTableHeaderRow + 1;
+    const productsDataEndRow = topProducts.length > 0 ? productsDataStartRow + topProducts.length - 1 : productsDataStartRow;
+    if (topProducts.length > 0) {
+      for (let row = productsDataStartRow; row <= productsDataEndRow; row++) {
+        for (let col = 1; col <= 3; col++) {
+          const cell = ws.getCell(row, col);
+          cell.font = { size: 11 };
+          cell.alignment = { horizontal: col === 1 ? 'left' : (col === 2 ? 'center' : 'right'), vertical: 'middle' };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          
+          // Alternate row colors
+          if (row % 2 === 0) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+          }
+        }
+      }
+    }
+
+    // Style Recent Orders section header
+    const ordersHeaderRow = productsDataEndRow + 2;
+    const ordersHeaderCell = ws.getCell(`A${ordersHeaderRow}`);
+    ordersHeaderCell.font = { bold: true, size: 14, color: { argb: agricatchGreen } };
+    ordersHeaderCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+    ordersHeaderCell.alignment = { horizontal: 'center' };
+    ws.mergeCells(`A${ordersHeaderRow}:F${ordersHeaderRow}`);
+
+    // Style Recent Orders table header
+    const ordersTableHeaderRow = ordersHeaderRow + 1;
+    for (let col = 1; col <= 6; col++) {
+      const cell = ws.getCell(ordersTableHeaderRow, col);
+      cell.font = { bold: true, size: 12, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: agricatchGreen } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    }
+
+    // Style Recent Orders data rows
+    const ordersDataStartRow = ordersTableHeaderRow + 1;
+    const ordersDataEndRow = recentOrders.length > 0 ? ordersDataStartRow + recentOrders.length - 1 : ordersDataStartRow;
+    if (recentOrders.length > 0) {
+      for (let row = ordersDataStartRow; row <= ordersDataEndRow; row++) {
+        for (let col = 1; col <= 6; col++) {
+          const cell = ws.getCell(row, col);
+          cell.font = { size: 11 };
+          cell.alignment = { horizontal: col === 1 || col === 2 || col === 3 || col === 4 ? 'left' : 'center', vertical: 'middle' };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          
+          // Alternate row colors
+          if (row % 2 === 0) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGreen } };
+          }
+        }
+      }
+    }
+
+    // Style footer rows
+    const footerStartRow = ordersDataEndRow + 3;
+    for (let row = footerStartRow; row <= footerStartRow + 1; row++) {
+      const cell = ws.getCell(`A${row}`);
+      cell.font = { size: 10, color: { argb: '666666' } };
+      cell.alignment = { horizontal: 'center' };
+      cell.italic = true;
+      ws.mergeCells(`A${row}:F${row}`);
+    }
+
+    // Set column widths with auto-sizing
+    ws.getColumn(1).width = 20; // A
+    ws.getColumn(2).width = 20; // B
+    ws.getColumn(3).width = 30; // C
+    ws.getColumn(4).width = 20; // D
+    ws.getColumn(5).width = 15; // E
+    ws.getColumn(6).width = 20; // F
+
+    // Generate filename with timestamp
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = now.toTimeString().slice(0, 5).replace(':', '');
+    const rangeTag = hasCustom ? `${from}_to_${to}` : (isAllTime ? 'all' : `${rangeDays}d`);
+    const filename = `Farmer_Dashboard_Report_${dateStr}_${timeStr}.xlsx`;
+
+    // Send Excel file
+    const buffer = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(buffer);
+  } catch (error) {
+    console.error('Export farmer metrics Excel error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Farmer: update shop profile
 router.put('/profile', async (req, res) => {
   try {
@@ -760,7 +998,7 @@ router.put('/profile', async (req, res) => {
     if (!user) return;
 
     const body = req.body || {};
-    const { shop_name, shop_description, shop_banner_url, shop_avatar_url, full_name, address } = body;
+    const { shop_name, shop_description, shop_banner_url, shop_avatar_url, full_name, address, phone } = body;
     const hasPersonalNameFields = ['first_name', 'middle_name', 'last_name'].some((key) => Object.prototype.hasOwnProperty.call(body, key));
     const firstName = String(body.first_name || '').trim();
     const middleName = String(body.middle_name || '').trim();
@@ -857,6 +1095,24 @@ router.put('/profile', async (req, res) => {
         // Continue with user update even if product sync fails
         // The error is logged but doesn't block the shop profile update
       }
+    }
+
+    if (phone !== undefined && phone !== null && phone !== '') {
+      const phoneDigits = String(phone).replace(/\D/g, '');
+      if (phoneDigits.length !== 10 || phoneDigits[0] !== '9') {
+        return res.status(400).json({ message: 'Phone number must be 10 digits starting with 9' });
+      }
+      // Check phone uniqueness (allow current farmer to keep their own phone)
+      const phoneExists = await pool.query(
+        'SELECT id FROM users WHERE phone = $1 AND id <> $2',
+        [phoneDigits, user.id]
+      );
+      if (phoneExists.rows.length > 0) {
+        return res.status(409).json({ message: 'This phone number is already registered.' });
+      }
+      updates.push(`phone = $${paramIndex}`);
+      values.push(phoneDigits);
+      paramIndex++;
     }
 
     if (shop_description !== undefined && shop_description !== null && shop_description !== '') {

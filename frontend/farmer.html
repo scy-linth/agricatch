@@ -103,6 +103,9 @@
   background: linear-gradient(135deg, #2d7a3a 0%, #1e5a2e 100%);
   color: #fff;
   border-bottom: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .order-details-modal-header h3 {
   color: #fff;
@@ -1212,12 +1215,6 @@
                 <span id="chat-unread-badge" class="badge bg-danger ms-auto" style="display:none;">0</span>
             </a>
         </li>
-        <li class="nav-item">
-            <a class="nav-link collapsed sidebar-link" href="#notifications" data-section="notifications">
-                <i class="bi bi-bell"></i><span>Notifications</span>
-                <span id="notif-sidebar-badge" class="badge bg-danger ms-auto" style="display:none;">0</span>
-            </a>
-        </li>
         <li class="nav-heading">Account</li>
         <li class="nav-item">
             <a class="nav-link collapsed sidebar-link" href="#reviews" data-section="reviews">
@@ -1246,14 +1243,19 @@
 <!-- MAIN CONTENT -->
 <main id="main" class="main admin-main">
     <div id="farmer-verif-banner" style="display:none;"></div>
-    <div class="pagetitle">
-        <h1 id="farmer-page-title" class="page-title">Farmer Dashboard</h1>
-        <nav>
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item">Home</li>
-                <li class="breadcrumb-item active" id="breadcrumb-current">Farmer Dashboard</li>
-            </ol>
-        </nav>
+    <div class="pagetitle d-flex justify-content-between align-items-center">
+        <div>
+            <h1 id="farmer-page-title" class="page-title">Farmer Dashboard</h1>
+            <nav>
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">Home</li>
+                    <li class="breadcrumb-item active" id="breadcrumb-current">Farmer Dashboard</li>
+                </ol>
+            </nav>
+        </div>
+        <button id="export-dashboard-btn" class="btn btn-success" style="display:none;">
+            <i class="bi bi-file-earmark-excel me-2"></i>Export Dashboard Report
+        </button>
     </div>
 
     <!-- OVERVIEW SECTION -->
@@ -2031,6 +2033,29 @@
         <div class="card">
             <div class="card-body">
                 <div id="reviews-aggregate"></div>
+                <div class="row mb-3 align-items-center">
+                    <div class="col-md-4">
+                        <select id="reviews-filter-rating" class="form-select form-select-sm">
+                            <option value="">All Ratings</option>
+                            <option value="5">5 Stars</option>
+                            <option value="4">4 Stars</option>
+                            <option value="3">3 Stars</option>
+                            <option value="2">2 Stars</option>
+                            <option value="1">1 Star</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <select id="reviews-sort" class="form-select form-select-sm">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="highest">Highest Rating</option>
+                            <option value="lowest">Lowest Rating</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <button id="reviews-reset-filters" class="btn btn-sm btn-outline-secondary">Reset Filters</button>
+                    </div>
+                </div>
                 <div id="reviews-list">
                     <div class="text-center py-5 text-muted">
                         <span class="spinner-border spinner-border-sm"></span>
@@ -3589,6 +3614,23 @@
     </div>
 </div>
 
+<!-- MODAL: ORDER ACTION CONFIRMATION -->
+<div id="order-action-confirm-modal" class="modal">
+    <div class="modal-content" style="max-width:480px;">
+        <div class="modal-header">
+            <h3 id="order-action-modal-title"><i class="bi bi-exclamation-circle me-2 text-warning"></i>Confirm Action</h3>
+            <button class="close-btn" id="close-order-action-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body" style="padding:1.5rem;">
+            <p id="order-action-modal-message" class="mb-0">Are you sure you want to perform this action?</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" id="cancel-order-action-btn" class="btn btn-sm btn-secondary">Cancel</button>
+            <button type="button" id="confirm-order-action-btn" class="btn btn-sm btn-primary">Confirm</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: REJECTION REASON -->
 <div id="rejection-reason-modal" class="modal">
     <div class="modal-content" style="max-width:500px;">
@@ -3741,6 +3783,39 @@
     </div>
 </div>
 
+<!-- MODAL: EXPORT DASHBOARD PERIOD -->
+<div id="export-period-modal" class="modal">
+    <div class="modal-content" style="max-width:400px;">
+        <div class="modal-header">
+            <h3><i class="bi bi-file-earmark-excel me-2"></i>Export Dashboard Report</h3>
+            <button class="close-btn" id="close-export-period-modal" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-body" style="padding:1.5rem;">
+            <p class="text-muted small mb-3">Select the time period for the dashboard report:</p>
+            <div class="list-group">
+                <button class="list-group-item list-group-item-action export-period-btn" data-period="today">
+                    <i class="bi bi-calendar-day me-2"></i>Today
+                </button>
+                <button class="list-group-item list-group-item-action export-period-btn" data-period="week">
+                    <i class="bi bi-calendar-week me-2"></i>This Week
+                </button>
+                <button class="list-group-item list-group-item-action export-period-btn" data-period="month">
+                    <i class="bi bi-calendar-month me-2"></i>This Month
+                </button>
+                <button class="list-group-item list-group-item-action export-period-btn" data-period="year">
+                    <i class="bi bi-calendar-range me-2"></i>This Year
+                </button>
+                <button class="list-group-item list-group-item-action export-period-btn" data-period="all">
+                    <i class="bi bi-calendar3 me-2"></i>All Time
+                </button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" id="cancel-export-period-modal" class="btn btn-sm btn-secondary">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- SCRIPTS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -3800,5 +3875,6 @@ window.addEventListener('load', function() {
 });
 </script>
 
+  <script src="/js/validation-standardizer.js"></script>
 </body>
 </html>
