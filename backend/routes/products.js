@@ -1500,7 +1500,7 @@ router.post('/', multer().none(), async (req, res) => {
       
       // Prevent Pre-order + Pre-order
       if (isPreorderValue && existingIsPreorder) {
-        return res.status(409).json({ 
+        return res.status(409).json({
           message: 'You already have a Pre-order product with this name and category. You can edit the existing product instead of creating a duplicate.',
           existing_product_id: existing.id
         });
@@ -1672,9 +1672,9 @@ router.put('/:id/harvest-date', async (req, res) => {
     // Collect SSE broadcast targets (send after COMMIT)
     const sseBroadcastTargets = [];
 
-    // Notify customers with active preorder reservations
+    // Notify customers with active pre-orders
     if (oldHarvestDate !== newHarvestDate) {
-      const reservationResult = await client.query(`
+      const preorderResult = await client.query(`
         SELECT DISTINCT o.user_id
         FROM orders o
         WHERE o.product_id = $1
@@ -1682,7 +1682,7 @@ router.put('/:id/harvest-date', async (req, res) => {
           AND o.status IN ('pending', 'confirmed')
       `, [id]);
 
-      for (const row of reservationResult.rows) {
+      for (const row of preorderResult.rows) {
         await client.query(`
           INSERT INTO notifications (user_id, type, title, message, product_id, is_read, created_at)
           VALUES ($1, 'harvest_date_changed', 'Expected Harvest Date Adjusted', $2, $3, false, CURRENT_TIMESTAMP)
@@ -1852,17 +1852,17 @@ router.put('/:id', multer().none(), async (req, res) => {
 
     // Block unsafe preorder edits when active preorders exist
     if (current.reserved_quantity > 0) {
-      // Cannot disable preorder when there are active reservations
+      // Cannot disable preorder when there are active pre-orders
       if (current.is_preorder === true && nextIsPreorder === false) {
-        return res.status(400).json({ message: 'Cannot disable pre-order status while there are active pre-order reservations' });
+        return res.status(400).json({ message: 'Cannot disable pre-order status while there are active pre-orders' });
       }
       // Cannot reduce max_preorder_quantity below already reserved
       if (nextMaxPreorderQuantity !== null && Number(nextMaxPreorderQuantity) < Number(current.reserved_quantity)) {
         return res.status(400).json({ message: `Cannot reduce max pre-order quantity (${nextMaxPreorderQuantity}) below already reserved quantity (${current.reserved_quantity})` });
       }
-      // Cannot remove preorder_availability_date when there are active reservations
+      // Cannot remove preorder_availability_date when there are active pre-orders
       if (current.is_preorder === true && nextIsPreorder === true && nextPreorderAvailabilityDate === null) {
-        return res.status(400).json({ message: 'Cannot remove pre-order availability date while there are active pre-order reservations' });
+        return res.status(400).json({ message: 'Cannot remove pre-order availability date while there are active pre-orders' });
       }
     }
 
@@ -2061,7 +2061,7 @@ router.post('/:id/convert-preorders', async (req, res) => {
       const shortageQuantity = Math.max(product.reserved_quantity - harvestQuantity, 0);
 
       // Update product: add surplus to stock (treat null as 0), reduce reserved by allocated amount
-      // Also reset harvest tracking fields and enable reservations again
+      // Also reset harvest tracking fields and enable pre-orders again
       await client.query(`
         UPDATE products
         SET stock_quantity = COALESCE(stock_quantity, 0) + $1,
@@ -2095,7 +2095,7 @@ router.post('/:id/convert-preorders', async (req, res) => {
       for (const order of orderResult.rows) {
         if (remainingToAllocate <= 0) break;
 
-        // Allocate against the remaining reservation for this order, not the original quantity.
+        // Allocate against the remaining pre-order for this order, not the original quantity.
         // This prevents double-allocating orders that were already fulfilled in a previous harvest.
         const orderRemaining = order.preorder_reserved_quantity;
         const allocateToOrder = Math.min(remainingToAllocate, orderRemaining);
@@ -2122,7 +2122,7 @@ router.post('/:id/convert-preorders', async (req, res) => {
           try {
             await client.query(`
               INSERT INTO notifications (user_id, type, title, message, order_id, product_id, is_read, created_at)
-              SELECT user_id, 'order_update', 'Pre-order Confirmed', 
+              SELECT user_id, 'order_update', 'Pre-order Confirmed',
                      'Your pre-order #' || id || ' has been harvested and confirmed. The farmer will schedule delivery soon.',
                      id, product_id, false, CURRENT_TIMESTAMP
               FROM orders WHERE id = $1

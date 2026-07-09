@@ -93,7 +93,7 @@ class ProductPage {
                     <i class="fas fa-clock me-2"></i>
                     <strong>Pre-order Item</strong>
                     ${product.preorder_availability_date ? `<br>Available on: ${product.preorder_availability_date}` : ''}
-                    ${product.max_preorder_quantity ? `<br>Reservations: ${this.fmtNumber(product.reserved_quantity ?? 0)} / ${this.fmtNumber(product.max_preorder_quantity)}` : ''}
+                    ${product.max_preorder_quantity ? `<br>Pre-orders: ${this.fmtNumber(product.reserved_quantity ?? 0)} / ${this.fmtNumber(product.max_preorder_quantity)}` : ''}
                 </div>
                 ` : ''}
                 <img src="${imgSrc}"

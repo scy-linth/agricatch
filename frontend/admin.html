@@ -925,6 +925,17 @@
                 </div>
 
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-5 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Date Range</label>
+                        <div class="d-flex gap-2 align-items-end">
+                            <input type="date" id="order-date-from" class="form-control form-control-sm">
+                            <span class="text-muted small">-</span>
+                            <input type="date" id="order-date-to" class="form-control form-control-sm">
+                            <button id="order-export-btn" class="btn btn-sm btn-ac-green" type="button">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Export
+                            </button>
+                        </div>
+                    </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">

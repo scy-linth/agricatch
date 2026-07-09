@@ -5815,7 +5815,7 @@ class AgricultureMarket {
             const isPreorder = product.is_preorder === true;
             const preorderBadge = isPreorder ? '<span class="badge harvest-soon-badge mb-2">HARVEST SOON</span>' : '<span class="badge bg-success mb-2">Available Now</span>';
 
-            // Check if reservations are disabled
+            // Check if pre-orders are disabled
             const reservationsDisabled = product.reservations_disabled === true || product.reservations_disabled === 't' || product.reservations_disabled === 'true';
 
             // Calculate harvest status for preorder products
@@ -5855,7 +5855,7 @@ class AgricultureMarket {
                     dateDisplay = `<div class="harvest-date-display"><i class="bi bi-calendar-check-fill"></i>Expected Harvest: <strong class="${harvestStatusClass}">${harvestStatus}</strong></div>`;
                 }
                 if (reservationsDisabled) {
-                    dateDisplay += `<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle"></i> Reservations Temporarily Unavailable</div>`;
+                    dateDisplay += `<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle"></i> Pre-orders Temporarily Unavailable</div>`;
                 }
             } else if (section === 'available' && !isPreorder) {
                 const bestBefore = product.expiry_date
@@ -5864,18 +5864,18 @@ class AgricultureMarket {
                 dateDisplay = `<div class="text-muted small mb-2"><i class="bi bi-hourglass-split me-1"></i>Best Before: ${bestBefore}</div>`;
             }
 
-            // Cart button logic - disable if reservations disabled for preorder
+            // Cart button logic - disable if pre-orders disabled for preorder
             let cartBtnAttr;
             let cartBtnText;
             let cartBtnTitle = '';
             if (reservationsDisabled && isPreorder) {
                 cartBtnAttr = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
-                cartBtnText = 'Reservations Temporarily Unavailable';
-                cartBtnTitle = 'Reservations are temporarily disabled for this product';
+                cartBtnText = 'Pre-orders Temporarily Unavailable';
+                cartBtnTitle = 'Pre-orders are temporarily disabled for this product';
             } else if (!isPurchasable) {
                 cartBtnAttr = 'disabled style="opacity: 0.5; cursor: not-allowed;"';
-                cartBtnText = isPreorder ? 'Reserve' : 'Add to Cart';
-                cartBtnTitle = isPreorder ? 'This product is not currently available for reservation' : 'This product is not currently available';
+                cartBtnText = isPreorder ? 'Pre-order' : 'Add to Cart';
+                cartBtnTitle = isPreorder ? 'This product is not currently available for pre-order' : 'This product is not currently available';
             } else if (hasValidId) {
                 cartBtnAttr = `onclick="event.stopPropagation(); app.addToCart(${product.id})"`;
                 cartBtnText = isPreorder ? 'Reserve' : 'Add to Cart';
@@ -6351,7 +6351,7 @@ class AgricultureMarket {
                     const max = Number(product.max_preorder_quantity ?? 0);
                     const remaining = max > 0 ? max - reserved : 0;
                     stockEl.textContent = `${this.fmtNumber(remaining)} ${product.unit || 'unit'} remaining`;
-                    if (stockLabelEl) stockLabelEl.textContent = 'Reservation Capacity';
+                    if (stockLabelEl) stockLabelEl.textContent = 'Pre-order Capacity';
                 } else {
                     stockEl.textContent = `${this.fmtNumber(product.stock_quantity || 0)} ${product.unit || 'unit'}`;
                     if (stockLabelEl) stockLabelEl.textContent = 'Available Stock';
@@ -6365,14 +6365,14 @@ class AgricultureMarket {
             }
             if (expiryEl) expiryEl.textContent = expiryDate;
 
-            // Add reservation status for preorder products
+            // Add pre-order status for preorder products
             const reservationsDisabled = product.reservations_disabled === true || product.reservations_disabled === 't' || product.reservations_disabled === 'true';
             if (isPreorder && reservationsDisabled) {
-                // Add reservation disabled indicator after harvest date
+                // Add pre-order disabled indicator after harvest date
                 if (harvestEl && harvestEl.parentElement) {
                     const reservationStatus = document.createElement('div');
                     reservationStatus.className = 'text-danger small mt-1';
-                    reservationStatus.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Reservations Temporarily Unavailable';
+                    reservationStatus.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Pre-orders Temporarily Unavailable';
                     harvestEl.parentElement.appendChild(reservationStatus);
                 }
             }
@@ -7379,7 +7379,7 @@ class AgricultureMarket {
                                     const reserved = Number(item.reserved_quantity ?? 0);
                                     const max = Number(item.max_preorder_quantity ?? 0);
                                     const remaining = max > 0 ? max - reserved : 0;
-                                    return `<div class="cart-item-stock" style="color: #eab308;">Reservation: ${this.fmtNumber(remaining)} ${item.unit || 'unit'} remaining</div>`;
+                                    return `<div class="cart-item-stock" style="color: #eab308;">Pre-order: ${this.fmtNumber(remaining)} ${item.unit || 'unit'} remaining</div>`;
                                 })()
                                 : `<div class="cart-item-stock">Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}</div>`
                             }
@@ -7961,7 +7961,7 @@ class AgricultureMarket {
                     const reserved = Number(item.reserved_quantity ?? 0);
                     const max = Number(item.max_preorder_quantity ?? 0);
                     const remaining = max > 0 ? max - reserved : 0;
-                    return `Reservation: ${this.fmtNumber(remaining)} ${item.unit || 'unit'} remaining`;
+                    return `Pre-order: ${this.fmtNumber(remaining)} ${item.unit || 'unit'} remaining`;
                 })()
                 : `Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}`;
             return `

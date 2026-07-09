@@ -1,0 +1,112 @@
+[
+  {
+    "period": "today",
+    "kpi": {
+      "totalSold": 0,
+      "totalRevenue": 0,
+      "totalOrders": 0
+    },
+    "metrics": {
+      "message": "Authentication required"
+    },
+    "report": {
+      "message": "Authentication required"
+    },
+    "excel": {
+      "path": "",
+      "data": []
+    },
+    "csv": {
+      "path": "",
+      "text": ""
+    }
+  },
+  {
+    "period": "week",
+    "kpi": {
+      "totalSold": 0,
+      "totalRevenue": 0,
+      "totalOrders": 0
+    },
+    "metrics": {
+      "message": "Authentication required"
+    },
+    "report": {
+      "message": "Authentication required"
+    },
+    "excel": {
+      "path": "",
+      "data": []
+    },
+    "csv": {
+      "path": "",
+      "text": ""
+    }
+  },
+  {
+    "period": "month",
+    "kpi": {
+      "totalSold": 0,
+      "totalRevenue": 0,
+      "totalOrders": 0
+    },
+    "metrics": {
+      "message": "Authentication required"
+    },
+    "report": {
+      "message": "Authentication required"
+    },
+    "excel": {
+      "path": "",
+      "data": []
+    },
+    "csv": {
+      "path": "",
+      "text": ""
+    }
+  },
+  {
+    "period": "year",
+    "kpi": {
+      "totalSold": 0,
+      "totalRevenue": 0,
+      "totalOrders": 0
+    },
+    "metrics": {
+      "message": "Authentication required"
+    },
+    "report": {
+      "message": "Authentication required"
+    },
+    "excel": {
+      "path": "",
+      "data": []
+    },
+    "csv": {
+      "path": "",
+      "text": ""
+    }
+  },
+  {
+    "period": "all",
+    "kpi": {
+      "totalSold": 0,
+      "totalRevenue": 0,
+      "totalOrders": 0
+    },
+    "metrics": {
+      "message": "Authentication required"
+    },
+    "report": {
+      "message": "Authentication required"
+    },
+    "excel": {
+      "path": "",
+      "data": []
+    },
+    "csv": {
+      "path": "",
+      "text": ""
+    }
+  }
+]

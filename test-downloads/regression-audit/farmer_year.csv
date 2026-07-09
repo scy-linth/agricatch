@@ -1,0 +1,47 @@
+Overview Report (Last 365 days)
+Generated At,2026-07-09T06:15:39.072Z
+
+Summary
+Total Orders,Total Sold (Delivered),Total Sales (Delivered)
+44,2,115.00
+
+Total Sales By Day
+Date,Total Sales
+'2026-06-28,'115.00
+
+Orders By Status
+Status,Count
+cancelled,5
+confirmed,3
+delivered,2
+pending,34
+preorder_reserved,1
+preparing,4
+
+Top Selling Products (Delivered)
+Product,Sold Qty,Total Sales
+Test Linked Available,1,70.00
+Fresh Carrots,1,45.00
+
+Recent Orders
+Order ID,Date,Customer,Product,Status,Total Amount
+385,'2026-06-29 22:39:53,andeng Baay,Fresh Carrots,pending,'45.00
+366,'2026-06-29 22:17:37,andeng Baay,Fresh Carrots,pending,'45.00
+363,'2026-06-29 22:17:26,andeng Baay,Fresh Carrots,pending,'90.00
+337,'2026-06-29 22:14:12,andeng Baay,Fresh Carrots,pending,'45.00
+327,'2026-06-29 22:10:10,andeng Baay,Fresh Carrots,pending,'45.00
+316,'2026-06-29 21:43:47,andeng Baay,Fresh Carrots,pending,'90.00
+301,'2026-06-28 14:31:40,asdasfname midname lasnem,Test Scenario 2 Pre-order,preorder_reserved,'540.00
+294,'2026-06-28 09:10:07,Test Customer,Test Linked Available,pending,'70.00
+293,'2026-06-28 09:10:07,Test Customer,Fresh Carrots,pending,'45.00
+291,'2026-06-28 09:07:58,Test Customer,Fresh Carrots,pending,'45.00
+292,'2026-06-28 09:07:58,Test Customer,Test Linked Available,pending,'70.00
+288,'2026-06-28 09:05:18,Test Customer,Fresh Carrots,pending,'990.00
+289,'2026-06-28 09:05:18,Test Customer,Test Linked Available,pending,'420.00
+286,'2026-06-28 05:30:08,Test Customer,Fresh Carrots,delivered,'45.00
+254,'2026-06-28 03:20:10,Test Customer,Test Linked Available,delivered,'70.00
+237,'2026-06-28 00:58:48,Test Customer,Test Linked Pre-order,pending,'70.00
+236,'2026-06-28 00:58:48,Test Customer,Test Linked Available,pending,'70.00
+235,'2026-06-28 00:58:40,Test Customer,Test Linked Available,pending,'140.00
+225,'2026-06-28 00:56:43,Test Customer,Test Linked Available,pending,'70.00
+226,'2026-06-28 00:56:43,Test Customer,Test Linked Pre-order,pending,'70.00

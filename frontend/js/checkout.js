@@ -665,7 +665,7 @@ class CheckoutPage {
                     const reserved = Number(item.reserved_quantity ?? 0);
                     const max = Number(item.max_preorder_quantity ?? 0);
                     const remaining = max > 0 ? max - reserved : 0;
-                    return `Reservation: ${this.fmtNumber(remaining)} ${item.unit || 'unit'} remaining`;
+                    return `Pre-order: ${this.fmtNumber(remaining)} ${item.unit || 'unit'} remaining`;
                 })()
                 : `Stocks: ${this.fmtNumber(item.stock_quantity ?? 0)}`;
             const moqDisplay = moq > 1 ? `<div class="co-item-meta co-item-moq" style="font-size:0.75rem;color:#6b7280;">Min. order: ${moq} ${item.unit || 'unit'}</div>` : '';

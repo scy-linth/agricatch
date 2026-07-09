@@ -1,0 +1,87 @@
+[
+  {
+    "period": "today",
+    "kpi": {
+      "sales": 0,
+      "revenue": 0
+    },
+    "stats": {
+      "message": "Invalid or expired token"
+    },
+    "report": {
+      "message": "Invalid or expired token"
+    },
+    "excel": {
+      "path": "",
+      "data": []
+    }
+  },
+  {
+    "period": "week",
+    "kpi": {
+      "sales": 0,
+      "revenue": 0
+    },
+    "stats": {
+      "message": "Invalid or expired token"
+    },
+    "report": {
+      "message": "Invalid or expired token"
+    },
+    "excel": {
+      "path": "",
+      "data": []
+    }
+  },
+  {
+    "period": "month",
+    "kpi": {
+      "sales": 0,
+      "revenue": 0
+    },
+    "stats": {
+      "message": "Invalid or expired token"
+    },
+    "report": {
+      "message": "Invalid or expired token"
+    },
+    "excel": {
+      "path": "",
+      "data": []
+    }
+  },
+  {
+    "period": "year",
+    "kpi": {
+      "sales": 0,
+      "revenue": 0
+    },
+    "stats": {
+      "message": "Invalid or expired token"
+    },
+    "report": {
+      "message": "Invalid or expired token"
+    },
+    "excel": {
+      "path": "",
+      "data": []
+    }
+  },
+  {
+    "period": "all",
+    "kpi": {
+      "sales": 0,
+      "revenue": 0
+    },
+    "stats": {
+      "message": "Invalid or expired token"
+    },
+    "report": {
+      "message": "Invalid or expired token"
+    },
+    "excel": {
+      "path": "",
+      "data": []
+    }
+  }
+]

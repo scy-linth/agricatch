@@ -10,11 +10,8 @@
  */
 
 const getPeriodFilter = (period, alias = 'o', useSimpleTimeRef = false) => {
-  // Use same time reference as farmer metrics: delivered orders use updated_at (delivery date)
-  // For tables without status field (like users), use simple created_at reference
-  const timeRef = useSimpleTimeRef 
-    ? (alias ? `${alias}.created_at` : 'created_at')
-    : (alias ? `CASE WHEN ${alias}.status = 'delivered' THEN COALESCE(${alias}.updated_at, ${alias}.created_at) ELSE ${alias}.created_at END` : `CASE WHEN status = 'delivered' THEN COALESCE(updated_at, created_at) ELSE created_at END`);
+  // Always use simple created_at for consistency across all dashboards
+  const timeRef = alias ? `${alias}.created_at` : 'created_at';
   switch (period) {
     case 'today':    return `DATE(${timeRef}) = CURRENT_DATE`;
     case 'week':     return `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE)`;
@@ -25,11 +22,8 @@ const getPeriodFilter = (period, alias = 'o', useSimpleTimeRef = false) => {
 };
 
 const getPrevPeriodFilter = (period, alias = 'o', useSimpleTimeRef = false) => {
-  // Use same time reference as farmer metrics: delivered orders use updated_at (delivery date)
-  // For tables without status field (like users), use simple created_at reference
-  const timeRef = useSimpleTimeRef 
-    ? (alias ? `${alias}.created_at` : 'created_at')
-    : (alias ? `CASE WHEN ${alias}.status = 'delivered' THEN COALESCE(${alias}.updated_at, ${alias}.created_at) ELSE ${alias}.created_at END` : `CASE WHEN status = 'delivered' THEN COALESCE(updated_at, created_at) ELSE created_at END`);
+  // Always use simple created_at for consistency across all dashboards
+  const timeRef = alias ? `${alias}.created_at` : 'created_at';
   switch (period) {
     case 'today':  return `DATE(${timeRef}) = CURRENT_DATE - INTERVAL '1 day'`;
     case 'week':   return `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '1 week' AND ${timeRef} < DATE_TRUNC('week', CURRENT_DATE)`;
@@ -60,10 +54,10 @@ async function getAdminDashboardStats(pool, period = 'all') {
   const userPrevFilter   = getPrevPeriodFilter(period, 'u', true);
 
   const [salesRes, prevSalesRes, revenueRes, prevRevenueRes, custRes, prevCustRes, farmerRes, prevFarmerRes, harvestRes, prevHarvestRes] = await Promise.all([
-    pool.query(`SELECT COUNT(*) AS count FROM orders o WHERE ${periodFilter} AND o.status != 'cancelled'`),
-    pool.query(`SELECT COUNT(*) AS count FROM orders o WHERE ${prevFilter} AND o.status != 'cancelled'`),
-    pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) AS total FROM orders o WHERE ${periodFilter} AND o.status NOT IN ('cancelled','disabled')`),
-    pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) AS total FROM orders o WHERE ${prevFilter} AND o.status NOT IN ('cancelled','disabled')`),
+    pool.query(`SELECT COUNT(*) AS count FROM orders o WHERE ${periodFilter} AND o.status NOT IN ('cancelled','disabled') AND COALESCE(o.is_disabled, false) = false`),
+    pool.query(`SELECT COUNT(*) AS count FROM orders o WHERE ${prevFilter} AND o.status NOT IN ('cancelled','disabled') AND COALESCE(o.is_disabled, false) = false`),
+    pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) AS total FROM orders o WHERE ${periodFilter} AND o.status NOT IN ('cancelled','disabled') AND COALESCE(o.is_disabled, false) = false`),
+    pool.query(`SELECT COALESCE(SUM(o.total_amount), 0) AS total FROM orders o WHERE ${prevFilter} AND o.status NOT IN ('cancelled','disabled') AND COALESCE(o.is_disabled, false) = false`),
     pool.query(`SELECT COUNT(*) AS count FROM users u WHERE u.role = 'customer' AND ${userPeriodFilter}`),
     pool.query(`SELECT COUNT(*) AS count FROM users u WHERE u.role = 'customer' AND ${userPrevFilter}`),
     pool.query(`SELECT COUNT(*) AS count FROM users u WHERE u.role = 'farmer' AND ${userPeriodFilter}`),
@@ -136,7 +130,7 @@ async function getFarmerDashboardMetrics(pool, farmerId, options = {}) {
     }
   }
 
-  const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.updated_at, o.created_at) ELSE o.created_at END`;
+  const timeRef = `o.created_at`;
   const dateSelect = isAllTime ? `DATE_TRUNC('month', ${timeRef})::date` : `DATE(${timeRef})`;
 
   let rangeWhere = '';
@@ -150,7 +144,7 @@ async function getFarmerDashboardMetrics(pool, farmerId, options = {}) {
   } else {
     rangeWhere = `
       AND ${timeRef} >= (CURRENT_DATE - (($2::int - 1) * INTERVAL '1 day'))
-      AND ${timeRef} < (CURRENT_DATE + INTERVAL '1 day')
+      AND ${timeRef} <= CURRENT_DATE
     `;
     paramsRange = [farmerId, Number(rangeDays || 30)];
   }
@@ -174,6 +168,7 @@ async function getFarmerDashboardMetrics(pool, farmerId, options = {}) {
     WHERE p.farmer_id = $1
       ${rangeWhere}
       AND o.status = 'delivered'
+      AND COALESCE(o.is_disabled, false) = false
     GROUP BY ${dateSelect}
     ORDER BY ${dateSelect} ASC
   `, paramsRange);
@@ -187,6 +182,7 @@ async function getFarmerDashboardMetrics(pool, farmerId, options = {}) {
     WHERE p.farmer_id = $1
       ${rangeWhere}
       AND o.status != 'cancelled'
+      AND COALESCE(o.is_disabled, false) = false
     GROUP BY ${dateSelect}
     ORDER BY ${dateSelect} ASC
   `, paramsRange);
@@ -200,6 +196,7 @@ async function getFarmerDashboardMetrics(pool, farmerId, options = {}) {
     WHERE p.farmer_id = $1
       ${rangeWhere}
       AND o.status = 'delivered'
+      AND COALESCE(o.is_disabled, false) = false
     GROUP BY ${dateSelect}
     ORDER BY ${dateSelect} ASC
   `, paramsRange);
@@ -244,6 +241,7 @@ async function getFarmerDashboardMetrics(pool, farmerId, options = {}) {
     JOIN products p ON o.product_id = p.id
     WHERE p.farmer_id = $1
       ${rangeWhere}
+      AND COALESCE(o.is_disabled, false) = false
     GROUP BY o.status
   `, paramsRange);
 
@@ -274,6 +272,7 @@ async function getFarmerDashboardMetrics(pool, farmerId, options = {}) {
     WHERE p.farmer_id = $1
       ${rangeWhere}
       AND o.status = 'delivered'
+      AND COALESCE(o.is_disabled, false) = false
     GROUP BY p.id, p.name, p.image_url, p.price
     ORDER BY sold_qty DESC, revenue DESC
     LIMIT 5
@@ -295,6 +294,7 @@ async function getFarmerDashboardMetrics(pool, farmerId, options = {}) {
     LEFT JOIN users u ON o.user_id = u.id
     WHERE p.farmer_id = $1
       ${rangeWhere}
+      AND COALESCE(o.is_disabled, false) = false
     ORDER BY o.created_at DESC
     LIMIT 8
   `, paramsRange);
@@ -320,6 +320,7 @@ async function getFarmerDashboardMetrics(pool, farmerId, options = {}) {
         JOIN products p ON o.product_id = p.id
         WHERE p.farmer_id = $1
           ${rangeWhere}
+          AND COALESCE(o.is_disabled, false) = false
       `, paramsRange),
       pool.query(`
         SELECT
@@ -330,6 +331,7 @@ async function getFarmerDashboardMetrics(pool, farmerId, options = {}) {
         JOIN products p ON o.product_id = p.id
         WHERE p.farmer_id = $1
           ${prevRangeWhere}
+          AND COALESCE(o.is_disabled, false) = false
       `, paramsPrevRange)
     ]);
 

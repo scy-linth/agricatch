@@ -291,9 +291,8 @@ router.get('/me/report', async (req, res) => {
 
     const period = req.query.period || 'today';
 
-    // Use same time reference as /me/metrics for consistency
-    // Delivered orders use updated_at (delivery date), others use created_at
-    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.updated_at, o.created_at) ELSE o.created_at END`;
+    // Use simple created_at for consistency with dashboard service
+    const timeRef = `o.created_at`;
 
     let groupExpr, filterExpr;
     if (period === 'today') {
@@ -323,6 +322,7 @@ router.get('/me/report', async (req, res) => {
       JOIN products p ON o.product_id = p.id
       WHERE p.farmer_id = $1
         AND ${filterExpr}
+        AND COALESCE(o.is_disabled, false) = false
       GROUP BY ${groupExpr}
       ORDER BY ${groupExpr} ASC
     `;
@@ -396,13 +396,14 @@ router.get('/me/metrics/export.csv', async (req, res) => {
     // Summary totals for the same timeframe
     const summary = await pool.query(`
       SELECT
-        COUNT(*)::int AS total_orders,
-        COALESCE(SUM(CASE WHEN o.status = 'delivered' THEN 1 ELSE 0 END), 0)::int AS total_sold,
+        COUNT(*) FILTER (WHERE o.status != 'cancelled')::int AS total_orders,
+        COALESCE(SUM(o.quantity) FILTER (WHERE o.status = 'delivered'), 0)::int AS total_sold,
         COALESCE(SUM(CASE WHEN o.status = 'delivered' THEN o.total_amount ELSE 0 END), 0)::numeric AS total_revenue
       FROM orders o
       JOIN products p ON o.product_id = p.id
       WHERE p.farmer_id = $1
         ${rangeWhere}
+        AND COALESCE(o.is_disabled, false) = false
     `, paramsRange);
 
     // Fetch blocks separately (clear + simple for CSV generation)
@@ -414,6 +415,7 @@ router.get('/me/metrics/export.csv', async (req, res) => {
       WHERE p.farmer_id = $1
         ${rangeWhere}
         AND o.status = 'delivered'
+        AND COALESCE(o.is_disabled, false) = false
       GROUP BY ${dateSelect}
       ORDER BY ${dateSelect} ASC
     `, paramsRange);
@@ -424,6 +426,7 @@ router.get('/me/metrics/export.csv', async (req, res) => {
       JOIN products p ON o.product_id = p.id
       WHERE p.farmer_id = $1
         ${rangeWhere}
+        AND COALESCE(o.is_disabled, false) = false
       GROUP BY o.status
       ORDER BY o.status ASC
     `, paramsRange);
@@ -437,6 +440,7 @@ router.get('/me/metrics/export.csv', async (req, res) => {
       WHERE p.farmer_id = $1
         ${rangeWhere}
         AND o.status = 'delivered'
+        AND COALESCE(o.is_disabled, false) = false
       GROUP BY p.name
       ORDER BY sold_qty DESC, revenue DESC
       LIMIT 10
@@ -454,6 +458,7 @@ router.get('/me/metrics/export.csv', async (req, res) => {
       LEFT JOIN users u ON o.user_id = u.id
       WHERE p.farmer_id = $1
         ${rangeWhere}
+        AND COALESCE(o.is_disabled, false) = false
       ORDER BY o.created_at DESC
       LIMIT 20
     `, paramsRange);
@@ -570,7 +575,7 @@ router.get('/me/metrics/export.xlsx', async (req, res) => {
     // Extract data needed for Excel export from dashboard data
     // Calculate summary from aggregated data (not limited recentOrders)
     const summary = {
-      total_orders: Object.values(dashboardData.ordersByStatus || {}).reduce((sum, count) => sum + Number(count || 0), 0),
+      total_orders: (dashboardData.ordersByDay || []).reduce((sum, day) => sum + Number(day.orders || 0), 0),
       total_sold: (dashboardData.itemsSoldByDay || []).reduce((sum, day) => sum + Number(day.items_sold || 0), 0),
       total_revenue: (dashboardData.revenueByDay || []).reduce((sum, day) => sum + Number(day.revenue || 0), 0)
     };

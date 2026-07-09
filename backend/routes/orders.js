@@ -651,15 +651,15 @@ router.post('/', async (req, res) => {
 
         console.log(`[Create Order] Creating order for item: Product ${item.product_id}, Qty: ${item.quantity}, Price: ${item.price}, Total: ${itemTotal}`);
 
-        // Reservation threshold check: Block new preorder reservations if harvest is overdue for 7+ days
+        // Pre-order threshold check: Block new pre-orders if harvest is overdue for 7+ days
         if (item.is_preorder) {
           await client.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS reservations_disabled BOOLEAN DEFAULT false");
-          const reservationCheck = await client.query(
+          const preorderCheck = await client.query(
             'SELECT reservations_disabled FROM products WHERE id = $1',
             [item.product_id]
           );
-          if (reservationCheck.rows.length > 0 && reservationCheck.rows[0].reservations_disabled === true) {
-            throw new Error(`Product "${item.name}" is not accepting new pre-order reservations due to harvest delay. Please check back later.`);
+          if (preorderCheck.rows.length > 0 && preorderCheck.rows[0].reservations_disabled === true) {
+            throw new Error(`Product "${item.name}" is not accepting new pre-orders due to harvest delay. Please check back later.`);
           }
         }
 
@@ -689,7 +689,7 @@ router.post('/', async (req, res) => {
         createdOrderIds.push(orderId);
         console.log(`[Create Order] Order #${orderId} created for product ${item.product_id}`);
 
-        // Stock/reservation already updated atomically above
+        // Stock/pre-order already updated atomically above
         // Now handle low stock notification for regular orders
         if (!item.is_preorder && item.stockUpdateResult) {
           const productInfo = item.stockUpdateResult;
@@ -1028,7 +1028,7 @@ router.put('/:id/cancel', async (req, res) => {
     }
 
     const orderStatus = orderResult.rows[0].status;
-    // Customer can cancel pending orders and unconverted pre-order reservations.
+    // Customer can cancel pending orders and unconverted pre-orders.
     // Once an order is confirmed or beyond, cancellation is blocked for customers.
     // Use shared transition matrix for validation
     const validation = validateTransition(orderStatus, 'cancelled', 'customer');

@@ -15,6 +15,7 @@ const activityLogger = require('../services/activityLogger');
 const { restoreInventoryOnCancel, updateStatisticsOnDeliver, getOrderForBusinessLogic } = require('../utils/orderBusinessLogic');
 const { getValidStatuses } = require('../utils/orderTransitions');
 const { getPeriodFilter } = require('../services/dashboardService');
+const { getAdminOrders, buildAdminOrdersExcel } = require('../services/orderExportService');
 
 const router = express.Router();
 
@@ -1960,59 +1961,60 @@ router.get('/orders', requireAdmin, async (req, res) => {
     try {
         const page = Math.max(parseInt(req.query.page || '1', 10), 1);
         const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 200);
-        const offset = (page - 1) * limit;
         const search = req.query.search ? String(req.query.search).trim() : null;
         const status = req.query.status ? String(req.query.status).trim() : null;
         const dateFrom = req.query.date_from ? String(req.query.date_from).trim() : null;
         const dateTo = req.query.date_to ? String(req.query.date_to).trim() : null;
         const minTotal = req.query.min_total !== undefined ? Number(req.query.min_total) : null;
         const maxTotal = req.query.max_total !== undefined ? Number(req.query.max_total) : null;
+        const sort = req.query.sort ? String(req.query.sort).trim() : null;
 
-        const whereParts = [];
-        const whereValues = [];
-        let idx = 1;
-        if (search) {
-          whereParts.push(`(u.username ILIKE $${idx} OR u.full_name ILIKE $${idx} OR u.email ILIKE $${idx} OR CAST(o.id AS TEXT) ILIKE $${idx})`);
-          whereValues.push(`%${search}%`);
-          idx++;
-        }
-        if (status) {
-          whereParts.push(`o.status = $${idx++}`);
-          whereValues.push(status);
-        }
-        if (dateFrom) {
-          whereParts.push(`o.created_at >= $${idx++}::date`);
-          whereValues.push(dateFrom);
-        }
-        if (dateTo) {
-          whereParts.push(`o.created_at < ($${idx++}::date + interval '1 day')`);
-          whereValues.push(dateTo);
-        }
-        if (Number.isFinite(minTotal)) {
-          whereParts.push(`o.total_amount >= $${idx++}`);
-          whereValues.push(minTotal);
-        }
-        if (Number.isFinite(maxTotal)) {
-          whereParts.push(`o.total_amount <= $${idx++}`);
-          whereValues.push(maxTotal);
-        }
-        const whereSql = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
-
-        const totalRes = await pool.query(`SELECT COUNT(*)::int AS count FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereSql}`, whereValues);
-        const result = await pool.query(`
-            SELECT o.*, u.username, u.email, u.full_name, p.name AS product_name, p.image_url AS product_image,
-                   p.is_preorder, p.preorder_availability_date, p.reserved_quantity, p.max_preorder_quantity,
-                   p.harvest_date
-            FROM orders o
-            LEFT JOIN users u ON o.user_id = u.id
-            LEFT JOIN products p ON o.product_id = p.id
-            ${whereSql}
-            ORDER BY o.created_at DESC
-            LIMIT $${idx} OFFSET $${idx + 1}
-        `, [...whereValues, limit, offset]);
-        res.json({ orders: result.rows, total: totalRes.rows[0]?.count || 0, page, limit });
+        const { orders, total } = await getAdminOrders(pool, {
+            search,
+            status,
+            dateFrom,
+            dateTo,
+            minTotal,
+            maxTotal,
+            sort,
+            page,
+            limit,
+            includeCount: true
+        });
+        res.json({ orders, total, page, limit });
     } catch (error) {
         console.error('Get orders error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// GET /api/admin/orders/export.xlsx
+// Export the filtered admin orders table as an Excel report
+router.get('/orders/export.xlsx', requireAdmin, async (req, res) => {
+    try {
+        const search = req.query.search ? String(req.query.search).trim() : null;
+        const status = req.query.status ? String(req.query.status).trim() : null;
+        const dateFrom = req.query.date_from ? String(req.query.date_from).trim() : null;
+        const dateTo = req.query.date_to ? String(req.query.date_to).trim() : null;
+        const minTotal = req.query.min_total !== undefined ? Number(req.query.min_total) : null;
+        const maxTotal = req.query.max_total !== undefined ? Number(req.query.max_total) : null;
+        const sort = req.query.sort ? String(req.query.sort).trim() : null;
+
+        const { buffer, filename } = await buildAdminOrdersExcel(pool, {
+            search,
+            status,
+            dateFrom,
+            dateTo,
+            minTotal,
+            maxTotal,
+            sort
+        }, req.user);
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.status(200).send(buffer);
+    } catch (error) {
+        console.error('Export admin orders error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -3474,7 +3476,8 @@ router.get('/dashboard/export.xlsx', requireAdmin, async (req, res) => {
     const { stats } = dashboardData;
 
     // Fetch additional dashboard data for comprehensive report
-    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.updated_at, o.created_at) ELSE o.created_at END`;
+    // Use simple created_at for consistency with stats endpoint
+    const timeRef = `o.created_at`;
     let groupExpr, filterExpr;
     if (period === 'today') {
       groupExpr = `DATE_TRUNC('hour', ${timeRef})`;
@@ -3496,12 +3499,12 @@ router.get('/dashboard/export.xlsx', requireAdmin, async (req, res) => {
     const [reportData, topProductsData, topFarmersData] = await Promise.all([
       pool.query(`
         SELECT ${groupExpr} AS period_label,
-               COUNT(*) FILTER (WHERE o.status != 'cancelled') AS sales,
+               COUNT(*) FILTER (WHERE o.status NOT IN ('cancelled','disabled')) AS sales,
                COALESCE(SUM(o.total_amount) FILTER (WHERE o.status NOT IN ('cancelled','disabled')), 0) AS revenue
         FROM orders o
         WHERE ${filterExpr} AND COALESCE(o.is_disabled, false) = false
         GROUP BY ${groupExpr}
-        HAVING COUNT(*) FILTER (WHERE o.status != 'cancelled') > 0
+        HAVING COUNT(*) FILTER (WHERE o.status NOT IN ('cancelled','disabled')) > 0
         ORDER BY ${groupExpr} ASC
       `),
       pool.query(`
@@ -3511,7 +3514,7 @@ router.get('/dashboard/export.xlsx', requireAdmin, async (req, res) => {
                COALESCE(SUM(o.total_amount), 0) AS revenue
         FROM products p
         JOIN orders o ON o.product_id = p.id
-        WHERE o.status NOT IN ('cancelled') AND ${filterExpr}
+        WHERE o.status NOT IN ('cancelled','disabled') AND COALESCE(o.is_disabled, false) = false AND ${filterExpr}
         GROUP BY p.name
         ORDER BY sold_qty DESC, revenue DESC
         LIMIT 10
@@ -3520,12 +3523,12 @@ router.get('/dashboard/export.xlsx', requireAdmin, async (req, res) => {
         SELECT u.full_name AS farmer_name,
                u.shop_name,
                COUNT(DISTINCT p.id) AS product_count,
-               COUNT(o.id) AS order_count,
-               COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'delivered'), 0) AS revenue
+               COUNT(o.id) FILTER (WHERE o.status NOT IN ('cancelled','disabled')) AS order_count,
+               COALESCE(SUM(o.total_amount) FILTER (WHERE o.status NOT IN ('cancelled','disabled')), 0) AS revenue
         FROM users u
         JOIN products p ON p.farmer_id = u.id
         JOIN orders o ON o.product_id = p.id
-        WHERE u.role = 'farmer' AND ${filterExpr}
+        WHERE u.role = 'farmer' AND COALESCE(o.is_disabled, false) = false AND ${filterExpr}
         GROUP BY u.id, u.full_name, u.shop_name
         ORDER BY revenue DESC
         LIMIT 10
@@ -3871,38 +3874,33 @@ router.get('/dashboard/report', requireAdmin, async (req, res) => {
     const cached = adminCache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    // Use same time reference as farmer metrics: delivered orders use updated_at (delivery date)
-    const timeRef = `CASE WHEN o.status = 'delivered' THEN COALESCE(o.updated_at, o.created_at) ELSE o.created_at END`;
+    // Use shared period filter for consistency with stats endpoint
+    const { getPeriodFilter } = require('../services/dashboardService');
+    const filterExpr = getPeriodFilter(period, 'o');
 
-    let groupExpr, filterExpr;
+    // Use simple created_at for consistency with stats endpoint
+    const timeRef = `o.created_at`;
+
+    let groupExpr;
     if (period === 'today') {
       groupExpr = `DATE_TRUNC('hour', ${timeRef})`;
-      filterExpr = `DATE(${timeRef}) = CURRENT_DATE`;
-    } else if (period === 'week') {
+    } else if (period === 'week' || period === 'month') {
       groupExpr = `DATE(${timeRef})`;
-      filterExpr = `${timeRef} >= DATE_TRUNC('week', CURRENT_DATE)`;
-    } else if (period === 'month') {
-      groupExpr = `DATE(${timeRef})`;
-      filterExpr = `${timeRef} >= DATE_TRUNC('month', CURRENT_DATE)`;
-    } else if (period === 'year') {
-      groupExpr = `DATE_TRUNC('month', ${timeRef})`;
-      filterExpr = `${timeRef} >= DATE_TRUNC('year', CURRENT_DATE)`;
     } else {
-      // 'all' - show all data grouped by month
+      // year or all - show all data grouped by month
       groupExpr = `DATE_TRUNC('month', ${timeRef})`;
-      filterExpr = '1=1';
     }
 
     const sql = `
       SELECT
         ${groupExpr} AS period_label,
-        COUNT(*) FILTER (WHERE o.status != 'cancelled') AS sales,
+        COUNT(*) FILTER (WHERE o.status NOT IN ('cancelled','disabled')) AS sales,
         COALESCE(SUM(o.total_amount) FILTER (WHERE o.status NOT IN ('cancelled','disabled')), 0) AS revenue
       FROM orders o
       WHERE ${filterExpr}
         AND COALESCE(o.is_disabled, false) = false
       GROUP BY ${groupExpr}
-      HAVING COUNT(*) FILTER (WHERE o.status != 'cancelled') > 0
+      HAVING COUNT(*) FILTER (WHERE o.status NOT IN ('cancelled','disabled')) > 0
       ORDER BY ${groupExpr} ASC
     `;
     const [rowsRes, totalCustomersRes, totalFarmersRes] = await Promise.all([
@@ -3950,7 +3948,7 @@ router.get('/dashboard/top-products', requireAdmin, async (req, res) => {
         SELECT p.id
         FROM products p
         JOIN orders o ON o.product_id = p.id
-        WHERE o.status NOT IN ('cancelled') AND ${filterExpr}
+        WHERE o.status NOT IN ('cancelled','disabled') AND COALESCE(o.is_disabled, false) = false AND ${filterExpr}
         GROUP BY p.id
       ) grouped_products
     `;
@@ -3962,7 +3960,7 @@ router.get('/dashboard/top-products', requireAdmin, async (req, res) => {
         COALESCE(SUM(o.total_amount), 0) AS revenue
       FROM products p
       JOIN orders o ON o.product_id = p.id
-      WHERE o.status NOT IN ('cancelled') AND ${filterExpr}
+      WHERE o.status NOT IN ('cancelled','disabled') AND COALESCE(o.is_disabled, false) = false AND ${filterExpr}
       GROUP BY p.id, p.name, p.price, p.image_url
       ORDER BY sold_count DESC
       LIMIT $1 OFFSET $2

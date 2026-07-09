@@ -1112,7 +1112,7 @@ class FarmerDashboard {
         const minimumOrderQuantity = document.getElementById('product-moq').value || '';
 
         if (Number(maxQuantity) < 1) {
-            throw new Error('Reservation capacity must be at least 1.');
+            throw new Error('Pre-order capacity must be at least 1.');
         }
 
         const formData = new FormData();
@@ -1209,7 +1209,7 @@ class FarmerDashboard {
             throw new Error('Stock quantity must be zero or higher.');
         }
         if (Number(maxQuantity) < 1) {
-            throw new Error('Reservation capacity must be at least 1.');
+            throw new Error('Pre-order capacity must be at least 1.');
         }
 
         const formData = new FormData();
@@ -1365,10 +1365,10 @@ class FarmerDashboard {
 
             if (!maxQuantity || !maxQuantity.value || maxQuantity.value.trim() === '' || Number(maxQuantity.value) < 1) {
                 if (maxQuantity) maxQuantity.classList.add('is-invalid');
-                errors.push('Reservation Capacity is required and must be at least 1');
+                errors.push('Pre-order Capacity is required and must be at least 1');
             } else if (Number(maxQuantity.value) > 99999) {
                 if (maxQuantity) maxQuantity.classList.add('is-invalid');
-                errors.push('Reservation Capacity must not exceed 99,999');
+                errors.push('Pre-order Capacity must not exceed 99,999');
             } else {
                 if (maxQuantity) maxQuantity.classList.remove('is-invalid');
             }
@@ -6885,7 +6885,10 @@ class FarmerDashboard {
                 }
                 return;
             }
-            const totalOrders = Object.values(statusCounts).reduce((sum, v) => sum + Number(v || 0), 0);
+            // Total orders = non-cancelled orders to match chart/export
+            const totalOrders = Array.isArray(metrics?.ordersByDay)
+                ? metrics.ordersByDay.reduce((sum, row) => sum + Number(row?.orders || 0), 0)
+                : 0;
             if (el) el.textContent = this.fmtNumber(totalOrders);
             this.updateKpiChange('total-orders-change', 'total-orders-change-label', metrics?.ordersChange, period);
         }
@@ -6902,7 +6905,11 @@ class FarmerDashboard {
                 }
                 return;
             }
-            if (el) el.textContent = this.fmtNumber(statusCounts.delivered || 0);
+            // Items Sold = total delivered quantity to match chart/export
+            const itemsSold = Array.isArray(metrics?.itemsSoldByDay)
+                ? metrics.itemsSoldByDay.reduce((sum, row) => sum + Number(row?.items_sold || 0), 0)
+                : 0;
+            if (el) el.textContent = this.fmtNumber(itemsSold);
             this.updateKpiChange('items-sold-change', 'items-sold-change-label', metrics?.soldChange, period);
         }
         if (card === 'kpi-revenue') {
@@ -7764,10 +7771,10 @@ class FarmerDashboard {
             // Harvest badge for status column
             const harvestBadge = this.getHarvestBadgeHtml(product.harvest_date, product.status);
 
-            // Reservation disabled indicator
+            // Pre-order disabled indicator
             let reservationIndicator = '';
             if (product.reservations_disabled === true || product.reservations_disabled === 't' || product.reservations_disabled === 'true') {
-                reservationIndicator = `<div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle"></i> Reservations Temporarily Unavailable</div>`;
+                reservationIndicator = `<div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle"></i> Pre-orders Temporarily Unavailable</div>`;
             }
 
             // Action buttons
@@ -8444,10 +8451,10 @@ class FarmerDashboard {
             }
             if (!maxQuantity || !maxQuantity.value || maxQuantity.value.trim() === '' || Number(maxQuantity.value) < 1) {
                 if (maxQuantity) maxQuantity.classList.add('is-invalid');
-                errors.push('Maximum Reservation Quantity is required and must be at least 1');
+                errors.push('Maximum Pre-order Quantity is required and must be at least 1');
             } else if (Number(maxQuantity.value) > 99999) {
                 if (maxQuantity) maxQuantity.classList.add('is-invalid');
-                errors.push('Maximum Reservation Quantity must not exceed 99,999');
+                errors.push('Maximum Pre-order Quantity must not exceed 99,999');
             }
         } else {
             if (!stockQuantity || !stockQuantity.value || stockQuantity.value.trim() === '' || Number(stockQuantity.value) < 0) {
@@ -8823,7 +8830,7 @@ class FarmerDashboard {
     }
 
     async handleHarvestFulfill(productId, quantity) {
-        // Check if product has reservations to determine which endpoint to use
+        // Check if product has pre-orders to determine which endpoint to use
         const product = this.myProductsCache?.find(p => String(p.id) === String(productId));
         const reservedQty = Number(product?.reserved_quantity || 0);
 
@@ -8833,7 +8840,7 @@ class FarmerDashboard {
             let response, data;
 
             if (reservedQty > 0) {
-                // Use convert-preorders for products with reservations
+                // Use convert-preorders for products with pre-orders
                 response = await fetch(`${this.apiBase}/products/${productId}/convert-preorders`, {
                     method: 'POST',
                     headers: {
@@ -8861,7 +8868,7 @@ class FarmerDashboard {
                         message += `${surplus} added to Available Now stock. `;
                     }
                     if (shortage > 0) {
-                        message += `Shortage: ${shortage} units not enough to fulfill all reservations. `;
+                        message += `Shortage: ${shortage} units not enough to fulfill all pre-orders. `;
                     }
                     message += `New stock: ${newStock}.`;
 
@@ -8872,7 +8879,7 @@ class FarmerDashboard {
                     this.showMessage(data.message || 'Failed to harvest and fulfill pre-orders', 'error');
                 }
             } else {
-                // Use harvest-lifecycle for products without reservations (Harvest YES workflow)
+                // Use harvest-lifecycle for products without pre-orders (Harvest YES workflow)
                 response = await fetch(`${this.apiBase}/products/${productId}/harvest-lifecycle`, {
                     method: 'POST',
                     headers: {

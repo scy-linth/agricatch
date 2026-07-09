@@ -1390,6 +1390,9 @@ class AdminDashboard {
         const sortFilter   = document.getElementById('order-sort-filter');
         const orderSearch  = document.getElementById('order-search-btn');
         const orderInput   = document.getElementById('order-search-input');
+        const dateFrom     = document.getElementById('order-date-from');
+        const dateTo       = document.getElementById('order-date-to');
+        const exportBtn    = document.getElementById('order-export-btn');
         
         // Order status tabs
         document.querySelectorAll('.order-tabs .tab-btn').forEach(btn => {
@@ -1406,6 +1409,9 @@ class AdminDashboard {
         if (sortFilter)   sortFilter.addEventListener('change',   () => this.loadOrders(1));
         if (orderSearch)  orderSearch.addEventListener('click',   () => this.loadOrders(1));
         if (orderInput)   orderInput.addEventListener('keydown',  (e) => { if (e.key === 'Enter') this.loadOrders(1); });
+        if (dateFrom)     dateFrom.addEventListener('change',     () => this.loadOrders(1));
+        if (dateTo)       dateTo.addEventListener('change',       () => this.loadOrders(1));
+        if (exportBtn)    exportBtn.addEventListener('click',     () => this.exportOrders());
 
         const closePanel   = document.getElementById('close-order-panel');
         const closeCategoryPanel = document.getElementById('close-category-panel');
@@ -1503,7 +1509,7 @@ class AdminDashboard {
 
         // ── Clear + Refresh buttons ─────────────────────────────────────────
         document.getElementById('orders-refresh-btn')?.addEventListener('click', async () => {
-            ['order-price-filter','order-sort-filter','order-search-input'].forEach(id => {
+            ['order-price-filter','order-sort-filter','order-search-input','order-date-from','order-date-to'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) { el.tagName === 'SELECT' ? (el.selectedIndex = 0) : (el.value = ''); }
             });
@@ -2854,6 +2860,28 @@ class AdminDashboard {
         }
     }
 
+    getCurrentOrderSort() {
+        const sortFilter = document.getElementById('order-sort-filter');
+        if (sortFilter && sortFilter.value) return sortFilter.value;
+
+        const saved = localStorage.getItem('adminTableSort_orders-table');
+        if (saved) {
+            try {
+                const [colIndex, direction] = JSON.parse(saved);
+                const dir = direction === 'asc' ? 'asc' : 'desc';
+                const map = {
+                    1: 'id',
+                    2: 'customer',
+                    3: 'total',
+                    4: 'status',
+                    5: 'date'
+                };
+                if (map[colIndex]) return `${map[colIndex]}_${dir}`;
+            } catch (e) {}
+        }
+        return 'date_desc';
+    }
+
     async loadOrders(page = 1) {
         try {
             const pg = this.pagination?.orders || { page: 1, total: 0, limit: 50 };
@@ -2861,8 +2889,10 @@ class AdminDashboard {
             const activeTab = document.querySelector('.order-tabs .tab-btn.active');
             const status = activeTab ? activeTab.getAttribute('data-status') : '';
             const price = document.getElementById('order-price-filter')?.value || '';
-            const sort = document.getElementById('order-sort-filter')?.value || 'date_desc';
+            const sort = this.getCurrentOrderSort();
             const search = (document.getElementById('order-search-input')?.value || '').trim();
+            const dateFrom = document.getElementById('order-date-from')?.value || '';
+            const dateTo = document.getElementById('order-date-to')?.value || '';
             const params = new URLSearchParams({
                 page: String(page),
                 limit: String(pg.limit),
@@ -2871,6 +2901,8 @@ class AdminDashboard {
             });
             if (status) params.set('status', status);
             if (search) params.set('search', search);
+            if (dateFrom) params.set('date_from', dateFrom);
+            if (dateTo) params.set('date_to', dateTo);
             if (price) {
                 if (price === '3000+') {
                     params.set('min_total', '3000');
@@ -8227,7 +8259,7 @@ class AdminDashboard {
                 <td class="small">
                     <div class="fw-semibold">${this.escapeHtml(p.farmer_shop_name || p.farmer_name || '—')}</div>
                     ${p.farmer_name && p.farmer_name !== p.farmer_shop_name ? `<div class="text-muted" style="font-size:.75rem">${this.escapeHtml(p.farmer_name)}</div>` : ''}
-                    ${p.is_preorder && p.reservations_disabled ? `<div class="text-danger" style="font-size:.75rem"><i class="bi bi-exclamation-triangle"></i> Reservations Disabled</div>` : ''}
+                    ${p.is_preorder && p.reservations_disabled ? `<div class="text-danger" style="font-size:.75rem"><i class="bi bi-exclamation-triangle"></i> Pre-orders Disabled</div>` : ''}
                     ${p.is_preorder && p.preorder_availability_date ? `<div class="text-muted" style="font-size:.75rem">Available: ${new Date(p.preorder_availability_date).toLocaleDateString()}</div>` : ''}
                     ${p.is_preorder && p.max_preorder_quantity ? `<div class="text-muted" style="font-size:.75rem">Max: ${this.fmtNumber(p.max_preorder_quantity)}</div>` : ''}
                 </td>
@@ -10318,7 +10350,7 @@ class AdminDashboard {
                             <div class="fw-semibold">${this.fmtNumber(product.stock_quantity || 0)}</div>
                         </div>
                         <div class="col-6">
-                            <label class="form-label text-muted small">Reservation Progress:</label>
+                            <label class="form-label text-muted small">Pre-order Progress:</label>
                             <div class="fw-semibold">${product.max_preorder_quantity > 0 ? Math.round((product.reserved_quantity / product.max_preorder_quantity) * 100) : 0}%</div>
                         </div>
                     </div>
@@ -12456,6 +12488,70 @@ class AdminDashboard {
             if (exportBtn) {
                 exportBtn.disabled = false;
                 exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>Export Dashboard Report';
+            }
+        }
+    }
+
+    async exportOrders() {
+        try {
+            const exportBtn = document.getElementById('order-export-btn');
+            if (exportBtn) {
+                exportBtn.disabled = true;
+                exportBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Exporting...';
+            }
+
+            const activeTab = document.querySelector('.order-tabs .tab-btn.active');
+            const status = activeTab ? activeTab.getAttribute('data-status') : '';
+            const search = (document.getElementById('order-search-input')?.value || '').trim();
+            const price = document.getElementById('order-price-filter')?.value || '';
+            const dateFrom = document.getElementById('order-date-from')?.value || '';
+            const dateTo = document.getElementById('order-date-to')?.value || '';
+            const sort = this.getCurrentOrderSort();
+
+            const params = new URLSearchParams({ sort });
+            if (status) params.set('status', status);
+            if (search) params.set('search', search);
+            if (dateFrom) params.set('date_from', dateFrom);
+            if (dateTo) params.set('date_to', dateTo);
+            if (price) {
+                if (price === '3000+') {
+                    params.set('min_total', '3000');
+                } else {
+                    const [min, max] = price.split('-').map(Number);
+                    if (!Number.isNaN(min)) params.set('min_total', String(min));
+                    if (!Number.isNaN(max)) params.set('max_total', String(max));
+                }
+            }
+
+            const response = await fetch(`${this.apiBase}/admin/orders/export.xlsx?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
+                const json = await response.json().catch(() => null);
+                throw new Error(json?.message || 'Export failed');
+            }
+
+            const blob = await response.blob();
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'Admin_Orders_Report.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+
+            this.showToast('Orders report exported successfully!', 'success');
+        } catch (error) {
+            console.error('Export orders error:', error);
+            this.showToast('Failed to export orders report. Please try again.', 'error');
+        } finally {
+            const exportBtn = document.getElementById('order-export-btn');
+            if (exportBtn) {
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export';
             }
         }
     }

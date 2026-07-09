@@ -1751,7 +1751,7 @@ body.sidebar-collapsed #main.main {
 }
 .support-search-input {
   width: 100%;
-  padding: 6px 10px 6px 28px;
+  padding: 6px 10px 6px 32px !important;
   border: 1px solid var(--ac-border);
   border-radius: 8px;
   font-size: .8rem;
