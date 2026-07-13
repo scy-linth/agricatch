@@ -19,6 +19,27 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Validate field lengths
+    const MAX_LENGTHS = {
+      name: 100,
+      email: 254,
+      subject: 150,
+      message: 500
+    };
+
+    if (name.length > MAX_LENGTHS.name) {
+      return res.status(400).json({ message: 'Name is too long' });
+    }
+    if (email.length > MAX_LENGTHS.email) {
+      return res.status(400).json({ message: 'Email is too long' });
+    }
+    if (subject.length > MAX_LENGTHS.subject) {
+      return res.status(400).json({ message: 'Subject is too long' });
+    }
+    if (message.length > MAX_LENGTHS.message) {
+      return res.status(400).json({ message: 'Message is too long' });
+    }
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {

@@ -287,7 +287,7 @@
             <div class="marketplace-filter-bar">
                 <div class="mf-search-wrap">
                     <i class="fas fa-search mf-search-icon"></i>
-                    <input type="text" id="global-search-input" class="mf-search-input" placeholder="Search products..." autocomplete="off">
+                    <input type="text" id="global-search-input" class="mf-search-input" placeholder="Search products..." autocomplete="off" maxlength="30">
                 </div>
                 <div class="mf-categories-wrap" id="global-category-tabs"></div>
                 <div class="mf-sort-wrap">
@@ -1200,16 +1200,16 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="contact-name">Name</label>
-                            <input type="text" id="contact-name" required>
+                            <input type="text" id="contact-name" required maxlength="100">
                         </div>
                         <div class="form-group">
                             <label for="contact-email">Email</label>
-                            <input type="email" id="contact-email" required>
+                            <input type="email" id="contact-email" required maxlength="254">
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="contact-subject">Subject</label>
-                        <input type="text" id="contact-subject" required>
+                        <input type="text" id="contact-subject" required maxlength="150">
                     </div>
                     <div class="form-group">
                         <label for="contact-message">Message</label>
@@ -1235,7 +1235,7 @@
                     <ul>
                         <li><a href="#home">Home</a></li>
                         <li><a href="#featured">Featured</a></li>
-                        <li><a href="#products">Products</a></li>
+                        <li><a href="#available-now">Products</a></li>
                         <li><a href="#about">About</a></li>
                         <li><a href="#contact">Contact</a></li>
                     </ul>

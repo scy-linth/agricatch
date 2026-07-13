@@ -353,7 +353,7 @@
     if (/(address[-_ ]?label|label)/.test(text) && /address/.test(text)) return 'addressLabel';
     if (/street/.test(text)) return 'street';
 
-    if (/(phone|mobile|contact[-_ ]?number|contact)/.test(text)) return 'phone';
+    if (/(phone|mobile|contact[-_ ]?(number|no|num))\b/.test(text)) return 'phone';
 
     if (tag === 'textarea') {
       if (/review|comment|feedback/.test(text)) return 'review';
@@ -455,6 +455,7 @@
 
   function processElement(el) {
     if (!isEditableField(el)) return;
+    if (el.closest && el.closest('.contact-form')) return;
     const category = detectCategory(el);
     if (!category) return;
     applyRule(el, category);
