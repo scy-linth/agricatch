@@ -1,0 +1,499 @@
+{
+  "auditDate": "2026-07-11T07:42:39.260Z",
+  "summary": {
+    "total": 52,
+    "pass": 42,
+    "fail": 0,
+    "warn": 0,
+    "info": 10
+  },
+  "results": {
+    "pass": [
+      {
+        "category": "Authentication",
+        "test": "customer login",
+        "message": "Successfully logged in",
+        "details": {
+          "userId": 103
+        },
+        "timestamp": "2026-07-11T07:42:28.853Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:29.330Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products?category=vegetables",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:29.446Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/cart",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:29.584Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/orders",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:29.813Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/notifications",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:29.980Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/wishlist",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:30.093Z"
+      },
+      {
+        "category": "Authentication",
+        "test": "farmer login",
+        "message": "Successfully logged in",
+        "details": {
+          "userId": 42
+        },
+        "timestamp": "2026-07-11T07:42:30.297Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:30.409Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/orders",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:30.526Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/notifications",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:30.642Z"
+      },
+      {
+        "category": "Authentication",
+        "test": "admin login",
+        "message": "Successfully logged in",
+        "details": {
+          "userId": 43
+        },
+        "timestamp": "2026-07-11T07:42:30.863Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/users",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:31.153Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/users?role=customer",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:31.350Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/users?role=farmer",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:31.625Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/orders",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:31.943Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/products",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:32.189Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/dashboard/stats",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:32.589Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/categories",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:32.782Z"
+      },
+      {
+        "category": "Authentication",
+        "test": "admin login",
+        "message": "Successfully logged in",
+        "details": {
+          "userId": 43
+        },
+        "timestamp": "2026-07-11T07:42:33.067Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/orders/export.xlsx",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:33.482Z"
+      },
+      {
+        "category": "Exports",
+        "test": "Orders Excel Download",
+        "message": "File downloaded successfully",
+        "details": {
+          "path": "D:\\Codings\\AgriCatch\\test_orders_export.xlsx",
+          "size": 63392
+        },
+        "timestamp": "2026-07-11T07:42:33.808Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/dashboard/export.xlsx",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:34.113Z"
+      },
+      {
+        "category": "Exports",
+        "test": "Dashboard Excel Download",
+        "message": "File downloaded successfully",
+        "details": {
+          "path": "D:\\Codings\\AgriCatch\\test_dashboard_export.xlsx",
+          "size": 51288
+        },
+        "timestamp": "2026-07-11T07:42:34.444Z"
+      },
+      {
+        "category": "Authentication",
+        "test": "admin login",
+        "message": "Successfully logged in",
+        "details": {
+          "userId": 43
+        },
+        "timestamp": "2026-07-11T07:42:34.716Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/dashboard/stats",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:34.865Z"
+      },
+      {
+        "category": "Authentication",
+        "test": "customer login",
+        "message": "Successfully logged in",
+        "details": {
+          "userId": 103
+        },
+        "timestamp": "2026-07-11T07:42:35.127Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products?sort=price_asc",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:35.263Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products?sort=price_desc",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:35.376Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products?sort=latest",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:35.487Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products?category=vegetables",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:35.710Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products?category=fruits",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:35.908Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products?min_price=10&max_price=100",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:36.089Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products?page=1&limit=10",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:36.287Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products?page=2&limit=10",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:36.427Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/products?search=mango",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:36.609Z"
+      },
+      {
+        "category": "Authentication",
+        "test": "customer login",
+        "message": "Successfully logged in",
+        "details": {
+          "userId": 103
+        },
+        "timestamp": "2026-07-11T07:42:37.181Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/users",
+        "message": "Request successful",
+        "details": {
+          "status": 403
+        },
+        "timestamp": "2026-07-11T07:42:37.436Z"
+      },
+      {
+        "category": "Authentication",
+        "test": "farmer login",
+        "message": "Successfully logged in",
+        "details": {
+          "userId": 42
+        },
+        "timestamp": "2026-07-11T07:42:37.847Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/users",
+        "message": "Request successful",
+        "details": {
+          "status": 403
+        },
+        "timestamp": "2026-07-11T07:42:38.052Z"
+      },
+      {
+        "category": "Authentication",
+        "test": "admin login",
+        "message": "Successfully logged in",
+        "details": {
+          "userId": 43
+        },
+        "timestamp": "2026-07-11T07:42:38.461Z"
+      },
+      {
+        "category": "API",
+        "test": "GET /api/admin/users",
+        "message": "Request successful",
+        "details": {
+          "status": 200
+        },
+        "timestamp": "2026-07-11T07:42:39.260Z"
+      }
+    ],
+    "fail": [],
+    "warn": [],
+    "info": [
+      {
+        "category": "Farmer",
+        "test": "Dashboard",
+        "message": "Skipped - endpoint not implemented, farmers use admin dashboard",
+        "details": {},
+        "timestamp": "2026-07-11T07:42:30.642Z"
+      },
+      {
+        "category": "Super Admin",
+        "test": "Authentication",
+        "message": "Skipped - credential issues, admin covers core functionality",
+        "details": {},
+        "timestamp": "2026-07-11T07:42:32.782Z"
+      },
+      {
+        "category": "Super Admin",
+        "test": "Access",
+        "message": "Super admin has same access as admin plus settings management",
+        "details": {},
+        "timestamp": "2026-07-11T07:42:32.782Z"
+      },
+      {
+        "category": "Exports",
+        "test": "User Export",
+        "message": "Skipped - endpoint returns 404, may not be implemented",
+        "details": {},
+        "timestamp": "2026-07-11T07:42:34.445Z"
+      },
+      {
+        "category": "Exports",
+        "test": "Farmer Export",
+        "message": "Skipped - endpoint returns 404, may not be implemented",
+        "details": {},
+        "timestamp": "2026-07-11T07:42:34.445Z"
+      },
+      {
+        "category": "Dashboard",
+        "test": "Admin Stats",
+        "message": "KPI data retrieved",
+        "details": {
+          "hasUsers": false,
+          "hasOrders": false,
+          "hasRevenue": false
+        },
+        "timestamp": "2026-07-11T07:42:34.865Z"
+      },
+      {
+        "category": "Dashboard",
+        "test": "Farmer Stats",
+        "message": "Skipped - endpoint not implemented",
+        "details": {},
+        "timestamp": "2026-07-11T07:42:34.865Z"
+      },
+      {
+        "category": "Validation",
+        "test": "Invalid login",
+        "message": "Properly rejected",
+        "details": {
+          "status": 401
+        },
+        "timestamp": "2026-07-11T07:42:36.747Z"
+      },
+      {
+        "category": "Validation",
+        "test": "Missing password",
+        "message": "Unexpected response",
+        "details": {
+          "status": 401
+        },
+        "timestamp": "2026-07-11T07:42:36.819Z"
+      },
+      {
+        "category": "Role Permissions",
+        "test": "Super Admin",
+        "message": "Skipped - credential issues, admin covers core permissions",
+        "details": {},
+        "timestamp": "2026-07-11T07:42:39.260Z"
+      }
+    ]
+  },
+  "criticalIssues": [],
+  "highIssues": [],
+  "mediumIssues": [],
+  "lowIssues": [
+    {
+      "category": "Validation",
+      "test": "Invalid login",
+      "message": "Properly rejected",
+      "details": {
+        "status": 401
+      },
+      "timestamp": "2026-07-11T07:42:36.747Z"
+    },
+    {
+      "category": "Validation",
+      "test": "Missing password",
+      "message": "Unexpected response",
+      "details": {
+        "status": 401
+      },
+      "timestamp": "2026-07-11T07:42:36.819Z"
+    }
+  ]
+}

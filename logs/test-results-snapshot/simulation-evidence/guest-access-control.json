@@ -1,0 +1,58 @@
+[
+  {
+    "page": "Checkout",
+    "url": "/checkout.html",
+    "isProtected": true,
+    "currentUrl": "http://localhost:3000/index.html#login",
+    "hasLoginModal": false,
+    "hasLoginPrompt": false
+  },
+  {
+    "page": "Orders",
+    "url": "/orders.html",
+    "isProtected": true,
+    "currentUrl": "http://localhost:3000/index.html#login",
+    "hasLoginModal": false,
+    "hasLoginPrompt": false
+  },
+  {
+    "page": "Customer Account",
+    "url": "/customer-account.html",
+    "isProtected": true,
+    "currentUrl": "http://localhost:3000/index.html#login",
+    "hasLoginModal": false,
+    "hasLoginPrompt": false
+  },
+  {
+    "page": "Farmer Dashboard",
+    "url": "/farmer.html",
+    "isProtected": true,
+    "currentUrl": "http://localhost:3000/index.html#login",
+    "hasLoginModal": false,
+    "hasLoginPrompt": false
+  },
+  {
+    "page": "Admin Dashboard",
+    "url": "/admin.html",
+    "isProtected": true,
+    "currentUrl": "http://localhost:3000/index.html#login",
+    "hasLoginModal": false,
+    "hasLoginPrompt": false
+  },
+  {
+    "page": "Notifications",
+    "url": "/notifications.html",
+    "isProtected": false,
+    "currentUrl": "http://localhost:3000/notifications.html",
+    "hasLoginModal": false,
+    "hasLoginPrompt": false
+  },
+  {
+    "page": "Chat",
+    "url": "/chat.html",
+    "isProtected": false,
+    "currentUrl": "http://localhost:3000/",
+    "hasLoginModal": false,
+    "hasLoginPrompt": false
+  }
+]

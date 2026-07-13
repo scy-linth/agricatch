@@ -2703,9 +2703,25 @@ class FarmerDashboard {
         if (ordersRefreshBtn) {
             ordersRefreshBtn.addEventListener('click', () => {
                 document.getElementById('orders-search-input').value = '';
+                document.getElementById('orders-date-from').value = '';
+                document.getElementById('orders-date-to').value = '';
                 this.applyOrdersSearch();
             });
         }
+
+        // Orders date range filters
+        const ordersDateFrom = document.getElementById('orders-date-from');
+        const ordersDateTo = document.getElementById('orders-date-to');
+        if (ordersDateFrom) ordersDateFrom.addEventListener('change', () => this.applyOrdersSearch());
+        if (ordersDateTo) ordersDateTo.addEventListener('change', () => this.applyOrdersSearch());
+
+        // Orders sort filter
+        const ordersSortFilter = document.getElementById('orders-sort-filter');
+        if (ordersSortFilter) ordersSortFilter.addEventListener('change', () => this.applyOrdersSearch());
+
+        // Orders export button
+        const ordersExportBtn = document.getElementById('orders-export-btn');
+        if (ordersExportBtn) ordersExportBtn.addEventListener('click', () => this.exportOrders());
 
         const accountBtn = document.getElementById('farmer-account-btn');
         if (accountBtn) {
@@ -6478,6 +6494,65 @@ class FarmerDashboard {
             if (exportBtn) {
                 exportBtn.disabled = false;
                 exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-2"></i>Export Dashboard Report';
+            }
+        }
+    }
+
+    async exportOrders() {
+        try {
+            if (!this.isPremium()) {
+                this.showToast('Excel export is a Premium feature. Upgrade to Premium for advanced analytics.', 'warning');
+                return;
+            }
+
+            const exportBtn = document.getElementById('orders-export-btn');
+            if (exportBtn) {
+                exportBtn.disabled = true;
+                exportBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Exporting...';
+            }
+
+            const activeTab = document.querySelector('.order-tabs .tab-btn.active');
+            const status = activeTab ? activeTab.id.replace('-orders-tab', '') : '';
+            const search = (document.getElementById('orders-search-input')?.value || '').trim();
+            const dateFrom = document.getElementById('orders-date-from')?.value || '';
+            const dateTo = document.getElementById('orders-date-to')?.value || '';
+            const sort = document.getElementById('orders-sort-filter')?.value || 'date_desc';
+
+            const params = new URLSearchParams({ sort });
+            if (status) params.set('status', status);
+            if (search) params.set('search', search);
+            if (dateFrom) params.set('date_from', dateFrom);
+            if (dateTo) params.set('date_to', dateTo);
+
+            const response = await fetch(`${this.apiBase}/farmers/me/orders/export.xlsx?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
+                const json = await response.json().catch(() => null);
+                throw new Error(json?.message || 'Export failed');
+            }
+
+            const blob = await response.blob();
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'Farmer_Orders_Report.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+
+            this.showToast('Orders report exported successfully!', 'success');
+        } catch (error) {
+            console.error('Export orders error:', error);
+            this.showToast('Failed to export orders report. Please try again.', 'error');
+        } finally {
+            const exportBtn = document.getElementById('orders-export-btn');
+            if (exportBtn) {
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export';
             }
         }
     }

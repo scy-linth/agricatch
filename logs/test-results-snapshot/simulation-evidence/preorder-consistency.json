@@ -1,0 +1,17 @@
+[
+  {
+    "page": "Landing Page",
+    "preorderIndicatorsFound": 0,
+    "hasPreorder": false
+  },
+  {
+    "page": "Checkout",
+    "preorderIndicatorsFound": 0,
+    "hasPreorder": false
+  },
+  {
+    "page": "Orders",
+    "preorderIndicatorsFound": 0,
+    "hasPreorder": false
+  }
+]

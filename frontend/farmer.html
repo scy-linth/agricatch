@@ -1253,8 +1253,8 @@
                 </ol>
             </nav>
         </div>
-        <button id="export-dashboard-btn" class="btn btn-success" style="display:none;">
-            <i class="bi bi-file-earmark-excel me-2"></i>Export Dashboard Report
+        <button id="export-dashboard-btn" class="btn ac-btn-primary btn-sm" style="display:none;">
+            <i class="bi bi-file-earmark-excel me-1"></i>Export Dashboard Report
         </button>
     </div>
 
@@ -1920,6 +1920,11 @@
                 <h4 class="ac-section-hero__title">Order Management</h4>
                 <p class="ac-section-hero__sub">View and manage customer orders for your products.</p>
             </div>
+            <div class="ac-section-hero__actions">
+                <button id="orders-export-btn" class="btn ac-btn-primary btn-sm" type="button">
+                    <i class="bi bi-file-earmark-excel me-1"></i>Export
+                </button>
+            </div>
         </div>
         <div class="card">
             <div class="card-body">
@@ -1984,12 +1989,29 @@
                 </div>
 
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Date Range</label>
+                        <div class="d-flex gap-2 align-items-end">
+                            <input type="date" id="orders-date-from" class="form-control form-control-sm">
+                            <span class="text-muted small">-</span>
+                            <input type="date" id="orders-date-to" class="form-control form-control-sm">
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Sort</label>
+                        <select id="orders-sort-filter" class="form-select form-select-sm">
+                            <option value="date_desc">Latest First</option>
+                            <option value="date_asc">Oldest First</option>
+                            <option value="total_desc">Highest Total</option>
+                            <option value="total_asc">Lowest Total</option>
+                        </select>
+                    </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm flex-grow-1">
                                 <input type="text" id="orders-search-input" class="form-control me-2"
-                                       placeholder="Order ID, product name, or customer...">
+                                       placeholder="Order ID, product name, or customer…">
                                 <button id="orders-search-btn" class="btn btn-sm btn-ac-green" type="button">
                                     <i class="bi bi-search me-1"></i>Search
                                 </button>
@@ -2000,7 +2022,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="order-tabs">
+                <div class="order-tabs mb-3">
                     <button id="preorder_reserved-orders-tab" class="tab-btn active" type="button">Pre-order Reserved <span class="tab-count" id="preorder_reserved-orders-count">0</span></button>
                     <button id="pending-orders-tab" class="tab-btn" type="button">Pending <span class="tab-count" id="pending-orders-count">0</span></button>
                     <button id="confirmed-orders-tab" class="tab-btn" type="button">Confirmed <span class="tab-count" id="confirmed-orders-count">0</span></button>
@@ -3190,7 +3212,7 @@
                     </div>
                     <div class="form-group mt-2">
                         <label for="edit-moq" class="form-label small fw-semibold">Minimum Order Quantity (Optional)</label>
-                        <input type="number" id="edit-moq" class="form-control form-control-sm" name="minimum_order_quantity" min="1" max="99999" placeholder="Leave empty for no minimum">
+                        <input type="number" id="edit-moq" class="form-control form-control-sm" name="minimum_order_quantity" min="1" max="99999" placeholder="Leave empty for no minimum.">
                         <small class="text-muted" style="font-size:0.75rem;">Smallest quantity customers can order per transaction (1 if empty). Example: 10 for a 10kg minimum order</small>
                     </div>
                 </div>
@@ -3215,7 +3237,7 @@
                     </div>
                     <div class="mt-2">
                         <label for="edit-available-description" class="form-label small fw-semibold">Available Description</label>
-                        <textarea id="edit-available-description" class="form-control form-control-sm" rows="2" maxlength="500" placeholder="Describe the harvested product customers will receive immediately."></textarea>
+                        <textarea id="edit-available-description" class="form-control form-control-sm" rows="2" maxlength="500" placeholder="Describe the harvested product customers will receive immediately"></textarea>
                         <small class="text-muted" style="font-size:0.7rem;">Describe the harvested product customers will receive immediately.</small>
                     </div>
                 </div>
@@ -3240,7 +3262,7 @@
                     </div>
                     <div class="mt-2">
                         <label for="edit-preorder-description" class="form-label small fw-semibold">Pre-order Description</label>
-                        <textarea id="edit-preorder-description" class="form-control form-control-sm" rows="2" maxlength="500" placeholder="Describe the expected harvest or important information before harvesting."></textarea>
+                        <textarea id="edit-preorder-description" class="form-control form-control-sm" rows="2" maxlength="500" placeholder="Describe the expected harvest or important information before harvesting"></textarea>
                         <small class="text-muted" style="font-size:0.7rem;">Describe the expected harvest or important information before harvesting.</small>
                     </div>
                 </div>
@@ -3253,7 +3275,7 @@
                 </div>
                 <div class="card-body">
                     <div style="display:flex;gap:.5rem;align-items:flex-start;">
-                        <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set — click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
+                        <textarea id="edit-product-location-display" class="form-control form-control-sm" rows="2" placeholder="No address set - click Set Location to change" readonly style="flex:1;cursor:default;resize:none;"></textarea>
                         <button type="button" id="open-edit-product-address-modal" class="btn btn-sm" style="white-space:nowrap;background-color:#2d7a3a;color:#fff;border-color:#2d7a3a;margin-top:0;">
                             <i class="bi bi-geo-alt me-1"></i>Set Location
                         </button>
@@ -3304,7 +3326,7 @@
         <div class="modal-body" style="padding:1.5rem;">
             <div class="form-group mb-3">
                 <label for="harvest-lifecycle-quantity" class="fw-semibold">How many kilograms did you harvest? <span class="text-danger">*</span></label>
-                <input type="number" id="harvest-lifecycle-quantity" class="form-control form-control-sm" min="1" max="99999" placeholder="Enter harvested quantity">
+                <input type="number" id="harvest-lifecycle-quantity" class="form-control form-control-sm" min="1" max="99999" placeholder="Enter harvested quantity.">
             </div>
 
             <div class="alert alert-info mb-3" style="font-size:0.9rem;padding:0.85rem;">
@@ -3334,7 +3356,7 @@
         <div class="modal-body" style="padding:1.5rem;">
             <div class="form-group mb-3">
                 <label for="harvest-fulfill-quantity" class="fw-semibold">How many kilograms did you harvest today? <span class="text-danger">*</span></label>
-                <input type="number" id="harvest-fulfill-quantity" class="form-control form-control-sm" min="1" max="99999" placeholder="Enter harvested quantity">
+                <input type="number" id="harvest-fulfill-quantity" class="form-control form-control-sm" min="1" max="99999" placeholder="Enter harvested quantity.">
             </div>
 
             <div id="harvest-fulfill-summary" class="alert alert-info small mb-0" style="display:none;font-size:0.85rem;padding:0.75rem;">
@@ -3393,7 +3415,7 @@
             </div>
             <div class="form-group mb-3">
                 <label for="update-harvest-reason">Reason <span class="text-danger">*</span></label>
-                <textarea id="update-harvest-reason" class="form-control" rows="3" required placeholder="Please explain why you need to update the harvest date"></textarea>
+                <textarea id="update-harvest-reason" class="form-control" rows="3" required placeholder="Please explain why you need to update the harvest date."></textarea>
                 <small class="text-muted">This will be recorded for audit purposes</small>
             </div>
         </form>
@@ -3440,11 +3462,11 @@
             </div>
             <div class="form-group">
                 <label for="product-location-street">Street / Building / House No. <span class="text-danger">*</span></label>
-                <input type="text" id="product-location-street" class="form-control form-control-sm" placeholder="Enter street, building, or house number">
+                <input type="text" id="product-location-street" class="form-control form-control-sm" placeholder="Enter street, building, or house number.">
             </div>
             <div class="form-group">
                 <label for="product-location-full">Address Preview</label>
-                <textarea id="product-location-full" class="form-control form-control-sm" rows="3" placeholder="Formatted address will appear here" readonly></textarea>
+                <textarea id="product-location-full" class="form-control form-control-sm" rows="3" placeholder="Formatted address will appear here." readonly></textarea>
                 <small class="field-hint">Street / Building, Barangay, City, Province</small>
             </div>
             </div>
@@ -3507,12 +3529,12 @@
                 <div class="form-group">
                     <label for="request-product-name">Product Name <span class="text-danger">*</span></label>
                     <input type="text" id="request-product-name" class="form-control form-control-sm"
-                           placeholder="Enter the product name you want to request" required maxlength="30">
+                           placeholder="Enter the product name you want to request." required maxlength="30">
                 </div>
                 <div class="form-group">
                     <label for="request-product-notes">Notes for Admin <span class="text-muted">(optional)</span></label>
                     <textarea id="request-product-notes" class="form-control form-control-sm" rows="3" maxlength="500"
-                              placeholder="e.g., local name, usual unit of sale, quality details..."></textarea>
+                              placeholder="e.g., local name, usual unit of sale, quality details"></textarea>
                 </div>
                 </div>
                 <div class="modal-footer">
@@ -3599,7 +3621,7 @@
             </div>
             <div class="mb-3" id="reschedule-reason-container" style="display:none;">
                 <label for="reschedule-reason-input" class="form-label fw-semibold">Reason for Rescheduling <span class="text-danger">*</span></label>
-                <textarea id="reschedule-reason-input" class="form-control" rows="3" maxlength="300" placeholder="Explain why the delivery date needs to be changed..."></textarea>
+                <textarea id="reschedule-reason-input" class="form-control" rows="3" maxlength="300" placeholder="Explain why the delivery date needs to be changed."></textarea>
                 <div class="text-muted small mt-1" style="font-size:0.75rem;">
                     <span id="reschedule-reason-count">0</span>/300 characters
                 </div>

@@ -1,0 +1,68 @@
+{
+  "validationDate": "2026-07-09T13:05:00.383Z",
+  "summary": {
+    "total": 6,
+    "pass": 4,
+    "fail": 2,
+    "warn": 0,
+    "info": 0
+  },
+  "results": [
+    {
+      "status": "pass",
+      "category": "Authentication",
+      "test": "admin login",
+      "message": "Successfully logged in",
+      "details": {
+        "userId": 43
+      }
+    },
+    {
+      "status": "fail",
+      "category": "Excel Export",
+      "test": "/api/admin/users/export.xlsx",
+      "message": "Unexpected status",
+      "details": {
+        "expected": 200,
+        "actual": 404
+      }
+    },
+    {
+      "status": "pass",
+      "category": "Authentication",
+      "test": "farmer login",
+      "message": "Successfully logged in",
+      "details": {
+        "userId": 42
+      }
+    },
+    {
+      "status": "fail",
+      "category": "Excel Export",
+      "test": "/api/farmers/me/orders/export.xlsx",
+      "message": "Unexpected status",
+      "details": {
+        "expected": 200,
+        "actual": 404
+      }
+    },
+    {
+      "status": "pass",
+      "category": "API",
+      "test": "GET /api/farmers/me/stats",
+      "message": "Request successful",
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "status": "pass",
+      "category": "API",
+      "test": "GET /api/farmers/me/metrics",
+      "message": "Request successful",
+      "details": {
+        "status": 200
+      }
+    }
+  ]
+}

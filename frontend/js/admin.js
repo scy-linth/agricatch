@@ -1443,6 +1443,10 @@ class AdminDashboard {
         if (usersSearchBtn) usersSearchBtn.addEventListener('click', () => this.loadUsers(1));
         if (usersSearchInput) usersSearchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.loadUsers(1); });
 
+        // Users export button
+        const usersExportBtn = document.getElementById('users-export-btn');
+        if (usersExportBtn) usersExportBtn.addEventListener('click', () => this.exportUsers());
+
         // Products in-section filter - use API search across all pages
         const productsSearchBtn = document.getElementById('products-search-btn');
         const productsSearchInput = document.getElementById('products-search-input');
@@ -12549,6 +12553,58 @@ class AdminDashboard {
             this.showToast('Failed to export orders report. Please try again.', 'error');
         } finally {
             const exportBtn = document.getElementById('order-export-btn');
+            if (exportBtn) {
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export';
+            }
+        }
+    }
+
+    async exportUsers() {
+        try {
+            const exportBtn = document.getElementById('users-export-btn');
+            if (exportBtn) {
+                exportBtn.disabled = true;
+                exportBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Exporting...';
+            }
+
+            const search = (document.getElementById('users-search-input')?.value || '').trim();
+            const role = document.getElementById('users-role-filter')?.value || '';
+            const status = document.getElementById('users-status-filter')?.value || '';
+            const verification = document.getElementById('users-verification-filter')?.value || '';
+
+            const params = new URLSearchParams();
+            if (search) params.set('search', search);
+            if (role) params.set('role', role);
+            if (status) params.set('status', status);
+            if (verification) params.set('verification', verification);
+
+            const response = await fetch(`${this.apiBase}/admin/users/export.xlsx?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
+                const json = await response.json().catch(() => null);
+                throw new Error(json?.message || 'Export failed');
+            }
+
+            const blob = await response.blob();
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'Admin_Users_Report.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+
+            this.showToast('Users report exported successfully!', 'success');
+        } catch (error) {
+            console.error('Export users error:', error);
+            this.showToast('Failed to export users report. Please try again.', 'error');
+        } finally {
+            const exportBtn = document.getElementById('users-export-btn');
             if (exportBtn) {
                 exportBtn.disabled = false;
                 exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export';

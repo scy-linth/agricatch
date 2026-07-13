@@ -434,8 +434,8 @@
                 </ol>
             </nav>
         </div>
-        <button id="export-dashboard-btn" class="btn btn-success">
-            <i class="bi bi-file-earmark-excel me-2"></i>Export Dashboard Report
+        <button id="export-dashboard-btn" class="btn ac-btn-primary btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i>Export Dashboard Report
         </button>
     </div>
 
@@ -860,6 +860,11 @@
                 <h4 class="ac-section-hero__title">Order Management</h4>
                 <p class="ac-section-hero__sub">View, filter, and manage all customer orders across the platform.</p>
             </div>
+            <div class="ac-section-hero__actions">
+                <button id="order-export-btn" class="btn ac-btn-primary btn-sm" type="button">
+                    <i class="bi bi-file-earmark-excel me-1"></i>Export
+                </button>
+            </div>
         </div>
 
         <div class="card">
@@ -925,16 +930,22 @@
                 </div>
 
                 <div class="section-filter-bar row g-2 mb-3 align-items-end">
-                    <div class="col-md-5 col-sm-6">
+                    <div class="col-md-3 col-sm-6">
                         <label class="form-label small fw-semibold mb-1">Date Range</label>
                         <div class="d-flex gap-2 align-items-end">
                             <input type="date" id="order-date-from" class="form-control form-control-sm">
                             <span class="text-muted small">-</span>
                             <input type="date" id="order-date-to" class="form-control form-control-sm">
-                            <button id="order-export-btn" class="btn btn-sm btn-ac-green" type="button">
-                                <i class="bi bi-file-earmark-excel me-1"></i>Export
-                            </button>
                         </div>
+                    </div>
+                    <div class="col-md-2 col-sm-6">
+                        <label class="form-label small fw-semibold mb-1">Sort</label>
+                        <select id="order-sort-filter" class="form-select form-select-sm">
+                            <option value="date_desc">Latest First</option>
+                            <option value="date_asc">Oldest First</option>
+                            <option value="total_desc">Highest Total</option>
+                            <option value="total_asc">Lowest Total</option>
+                        </select>
                     </div>
                     <div class="col-md-4 col-sm-6 ms-md-auto">
                         <label class="form-label small fw-semibold mb-1">Search</label>
@@ -954,7 +965,7 @@
                 </div>
 
                 <!-- Status Tabs -->
-                <div class="verification-tabs order-tabs mb-3">
+                <div class="order-tabs mb-3">
                     <button class="tab-btn active" data-status="">All</button>
                     <button class="tab-btn" data-status="preorder_reserved">Pre-order Reserved</button>
                     <button class="tab-btn" data-status="pending">Pending</button>
@@ -1016,6 +1027,9 @@
             <div class="ac-section-hero__actions">
                 <button id="open-create-user-modal" class="btn ac-btn-primary btn-sm" type="button">
                     <i class="bi bi-plus-lg me-1"></i>New Customer
+                </button>
+                <button id="users-export-btn" class="btn ac-btn-primary btn-sm" type="button">
+                    <i class="bi bi-file-earmark-excel me-1"></i>Export
                 </button>
             </div>
         </div>
