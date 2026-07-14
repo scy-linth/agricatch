@@ -1257,9 +1257,7 @@
     <script src="/js/format.js" defer></script>
     <script>
         window.agriCatchRecaptchaOnLoad = function() {
-            // Don't render on load - render when modal opens instead
-            console.log('reCAPTCHA loaded, will render when modal opens');
-        };
+            // Don't render on load - render when modal opens instead        };
     </script>
     <script src="https://www.google.com/recaptcha/api.js?onload=agriCatchRecaptchaOnLoad&render=explicit" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
@@ -1295,7 +1293,7 @@
             // Wait for video metadata to get duration
             heroVideo.addEventListener('loadedmetadata', () => {
                 videoDuration = heroVideo.duration;
-                console.log('Video duration:', videoDuration, 'seconds');
+
                 
                 // Only proceed if we have a valid duration
                 if (videoDuration && videoDuration > 1) {
@@ -1307,12 +1305,12 @@
                             
                             // Start playing
                             heroVideo.play().catch(error => {
-                                console.log('Video autoplay prevented:', error);
+
                             });
                         }
                     }, { once: true });
                 } else {
-                    console.warn('Video duration seems incorrect:', videoDuration);
+
                     hideLoader();
                 }
             }, { once: true });
@@ -1356,7 +1354,7 @@
             // Hide loader after a short timeout so slow connections don't show a spinner forever
             setTimeout(() => {
                 if (!hasStartedPlaying) {
-                    console.warn('Video is taking too long to load, showing fallback');
+
                     hideLoader();
                 }
             }, 6000);
@@ -1370,11 +1368,11 @@
                 retryCount++;
                 
                 if (retryCount <= maxRetries) {
-                    console.log(`Retrying video load (${retryCount}/${maxRetries})...`);
+
                     setTimeout(() => {
                         heroVideo.load();
                         heroVideo.play().catch(() => {
-                            console.log('Autoplay prevented after retry');
+
                         });
                     }, 1000 * retryCount);
                 } else {
