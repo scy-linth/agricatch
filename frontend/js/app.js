@@ -155,7 +155,7 @@ class AgricultureMarket {
             if (response.ok) {
                 const data = await response.json();
                 this.otpMode = data.otp_mode || 'strict';
-                console.log('OTP mode:', this.otpMode);
+
                 this.updateOtpSectionsVisibility();
             }
         } catch (error) {
@@ -176,7 +176,7 @@ class AgricultureMarket {
                 this.isDebugAccount = !!user.is_debug_account;
                 this.debugUserInfo = user;
                 if (this.isDebugAccount) {
-                    console.log('[DEBUG LANDING] Debug mode enabled for user:', user.email);
+
                 }
             }
         } catch (error) {
@@ -186,7 +186,7 @@ class AgricultureMarket {
 
     debugLog(action, data = {}) {
         if (this.isDebugAccount) {
-            console.log(`[DEBUG LANDING] ${action}`, data);
+
         }
     }
 
@@ -205,9 +205,9 @@ class AgricultureMarket {
             const forgotOtpSection = document.getElementById('forgot-otp-section');
             if (forgotOtpSection) forgotOtpSection.style.display = 'none';
             
-            console.log('OTP sections hidden (OTP mode: disabled)');
+
         } else {
-            console.log('OTP sections visible (OTP mode:', this.otpMode + ')');
+
         }
     }
 
@@ -434,10 +434,7 @@ class AgricultureMarket {
     }
 
     init() {
-        try {
-            console.log('AgriCatch app initialized');
-
-            // Check debug mode
+        try {            // Check debug mode
             this.checkDebugMode();
 
             // Disable browser's default scroll restoration to control it manually
@@ -733,9 +730,7 @@ class AgricultureMarket {
             const response = await fetch(`${this.apiBase}/settings/recaptcha-mode`);
             if (response.ok) {
                 const data = await response.json();
-                this.recaptchaMode = data.recaptcha_mode || 'auto';
-                console.log('Platform settings loaded - recaptcha_mode:', this.recaptchaMode);
-            }
+                this.recaptchaMode = data.recaptcha_mode || 'auto';            }
         } catch (error) {
             console.error('Failed to fetch platform settings:', error);
             // Keep default 'auto' mode
@@ -863,15 +858,11 @@ class AgricultureMarket {
             }
         })
         .then(response => {
-            if (response.ok) {
-                console.log('✅ Server wake-up ping successful');
-            }
+            if (response.ok) {            }
         })
         .catch(error => {
             // Silently fail - this is just a wake-up ping, not critical
-            // Server might be cold starting, which is expected
-            console.log('Server wake-up ping sent');
-        });
+            // Server might be cold starting, which is expected        });
         
     }
 
@@ -990,18 +981,14 @@ class AgricultureMarket {
         if (cartSidebarEl && cartSidebarEl.parentElement !== document.body) {
             try {
                 document.body.appendChild(cartSidebarEl);
-            } catch (e) {
-                console.warn('Could not move cart sidebar to body:', e);
-            }
+            } catch (e) {            }
         }
         // Also ensure cart overlay is moved to body so it covers the full viewport
         const cartOverlayEl = document.getElementById('cart-overlay');
         if (cartOverlayEl && cartOverlayEl.parentElement !== document.body) {
             try {
                 document.body.appendChild(cartOverlayEl);
-            } catch (e) {
-                console.warn('Could not move cart overlay to body:', e);
-            }
+            } catch (e) {            }
         }
         // Ensure checkout modal is a direct child of body so it can float above other UI
         const checkoutModalEl = document.getElementById('checkout-modal');
@@ -1016,9 +1003,7 @@ class AgricultureMarket {
                     modalContent.style.zIndex = '100006';
                     modalContent.style.position = 'relative';
                 }
-            } catch (e) {
-                console.warn('Could not move checkout modal to body:', e);
-            }
+            } catch (e) {            }
         }
         // Ensure add-address modal is a direct child of body and floats above checkout
         const addAddressModalEl = document.getElementById('add-address-modal');
@@ -1032,9 +1017,7 @@ class AgricultureMarket {
                     addModalContent.style.position = 'relative';
                     addModalContent.style.zIndex = '100008';
                 }
-            } catch (e) {
-                console.warn('Could not move add-address-modal to body:', e);
-            }
+            } catch (e) {            }
         }
         const closeCartBtn = document.getElementById('close-cart');
         if (closeCartBtn) {
@@ -1117,9 +1100,7 @@ class AgricultureMarket {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const tab = btn.dataset.tab;
-                console.log('Dropdown navigation clicked:', tab);
-                localStorage.setItem('customerActiveSection', tab);
+                const tab = btn.dataset.tab;                localStorage.setItem('customerActiveSection', tab);
                 window.location.href = '/customer-account.html';
             });
         });
@@ -2139,9 +2120,7 @@ class AgricultureMarket {
             const otpInput = document.getElementById('forgot-otp');
             if (otpInput) otpInput.focus();
 
-            if (data.debugOtp) {
-                console.log('DEBUG forgot password OTP:', data.debugOtp);
-            }
+            if (data.debugOtp) {            }
         } catch (error) {
             console.error('Forgot password send error:', error);
             this.resetRecaptcha('forgot');
@@ -2190,9 +2169,7 @@ class AgricultureMarket {
             }
 
             this.showMessage(data.message || "If that email exists, we've sent a verification code.", 'info');
-            if (data.debugOtp) {
-                console.log('DEBUG forgot password OTP:', data.debugOtp);
-            }
+            if (data.debugOtp) {            }
         } catch (error) {
             console.error('Forgot password resend error:', error);
             this.resetRecaptcha('forgot');
@@ -2440,11 +2417,7 @@ class AgricultureMarket {
         const userNameEl = document.getElementById('user-name');
         const userNameDdEl = document.getElementById('user-name-dd');
         const userInitialEl = document.getElementById('user-initial');
-        const userEmailEl = document.getElementById('user-email');
-
-        console.log('Showing profile from token:', { fullName, firstName, email: payload.email });
-
-        if (userNameEl) userNameEl.textContent = firstName;
+        const userEmailEl = document.getElementById('user-email');        if (userNameEl) userNameEl.textContent = firstName;
         if (userNameDdEl) userNameDdEl.textContent = fullName;
         if (userInitialEl) userInitialEl.textContent = String(firstName).charAt(0).toUpperCase();
         if (userEmailEl) userEmailEl.textContent = payload.email || '';
@@ -3763,7 +3736,7 @@ class AgricultureMarket {
 
     getRecaptchaResponse(scope = 'auth') {
         if (!window.grecaptcha || typeof window.grecaptcha.getResponse !== 'function') {
-            console.warn('reCAPTCHA not loaded, cannot get response');
+
             return '';
         }
         const resolvedScope = this.resolveRecaptchaScope(scope);
@@ -3773,7 +3746,7 @@ class AgricultureMarket {
         }
         const widgetId = this.recaptchaWidgetIds[resolvedScope];
         if (widgetId === null || widgetId === undefined) {
-            console.warn(`reCAPTCHA widget ID for ${resolvedScope} is null/undefined`);
+
             return '';
         }
         return String(window.grecaptcha.getResponse(widgetId) || '').trim();
@@ -3788,7 +3761,7 @@ class AgricultureMarket {
                 try {
                     window.grecaptcha.reset(widgetId);
                 } catch (error) {
-                    console.warn(`Failed to reset ${resolvedScope} reCAPTCHA:`, error);
+
                 }
             }
             this.clearRecaptchaError(resolvedScope);
@@ -3835,14 +3808,7 @@ class AgricultureMarket {
         // Check if reCAPTCHA should be required based on platform setting
         const requireRecaptcha = this.shouldRequireRecaptcha();
         const skipRecaptcha = !recaptchaElement || recaptchaElement.children.length === 0 || !requireRecaptcha;
-        console.log('DEBUG login recaptcha check:', { 
-            hasResponse: !!recaptchaResponse, 
-            elementExists: !!recaptchaElement,
-            elementHasChildren: recaptchaElement ? recaptchaElement.children.length > 0 : false,
-            recaptchaMode: this.recaptchaMode,
-            requireRecaptcha,
-            skipRecaptcha 
-        });
+
         if (!recaptchaResponse && !skipRecaptcha) {
             this.setRecaptchaError('auth', 'Please complete the CAPTCHA before logging in.');
             this.showMessage('Please complete the CAPTCHA before logging in.', 'error');
@@ -4056,15 +4022,9 @@ class AgricultureMarket {
     }
 
     async handleRegistrationStep(step, direction) {
-        if (this.isLoading) return; // Prevent multiple clicks during loading
-        
-        console.log('handleRegistrationStep called:', { step, direction });
-        
-        if (direction === 'next') {
+        if (this.isLoading) return; // Prevent multiple clicks during loading        if (direction === 'next') {
             // Validate current step before proceeding
-            if (!this.validateRegistrationStep(step)) {
-                console.log('Step validation failed for step:', step);
-                return;
+            if (!this.validateRegistrationStep(step)) {                return;
             }
             
             // Show loading animation
@@ -4076,9 +4036,7 @@ class AgricultureMarket {
                 
                 // CRITICAL: Only allow proceeding if OTP is verified for the current email
                 if (this.otpVerified && this.otpEmail && this.otpEmail === email) {
-                    // OTP is verified and email matches - proceed to step 2
-                    console.log('OTP verified for this email, proceeding to step 2');
-                    this.setButtonLoading(`register-next-${step}`, false);
+                    // OTP is verified and email matches - proceed to step 2                    this.setButtonLoading(`register-next-${step}`, false);
                     this.goToRegistrationStep(2);
                     // Clear persisted registration fields after OTP is verified and proceeding
                     localStorage.removeItem('register_email');
@@ -4089,14 +4047,10 @@ class AgricultureMarket {
                 // OTP not verified - check if OTP section is shown
                 const otpSection = document.getElementById('register-otp-section');
                 if (!otpSection || otpSection.style.display === 'none') {
-                    // OTP section not shown - send OTP first
-                    console.log('Sending OTP for registration...');
-                    this.sendOtpForRegistration();
+                    // OTP section not shown - send OTP first                    this.sendOtpForRegistration();
                     return;
                 } else {
-                    // OTP section is shown - verify OTP first before proceeding
-                    console.log('Verifying OTP for registration...');
-                    // Don't return here - let verifyOtpForRegistration handle the flow
+                    // OTP section is shown - verify OTP first before proceeding                    // Don't return here - let verifyOtpForRegistration handle the flow
                     // It will call goToRegistrationStep(2) on success
                     await this.verifyOtpForRegistration();
                     return;
@@ -4123,7 +4077,7 @@ class AgricultureMarket {
                 }
                 
                 // Username is available, proceed to next step
-                console.log('Moving to step:', step + 1);
+
                 setTimeout(() => {
                     this.setButtonLoading(`register-next-${step}`, false);
                     this.goToRegistrationStep(step + 1);
@@ -4133,7 +4087,7 @@ class AgricultureMarket {
             
             // Move to next step
             if (step < this.maxRegistrationSteps) {
-                console.log('Moving to step:', step + 1);
+
                 setTimeout(() => {
                     this.setButtonLoading(`register-next-${step}`, false);
                     this.goToRegistrationStep(step + 1);
@@ -4143,11 +4097,11 @@ class AgricultureMarket {
             if (step > 1) {
                 // Prevent going back to step 1 if OTP is already verified
                 if (step - 1 === 1 && this.otpVerified) {
-                    console.log('Cannot go back to step 1 - OTP already verified');
+
                     this.showMessage('Step 1 is locked after OTP verification. Please refresh the page to start over.', 'info');
                     return;
                 }
-                console.log('Moving back to step:', step - 1);
+
                 this.goToRegistrationStep(step - 1);
             }
         }
@@ -4383,9 +4337,7 @@ class AgricultureMarket {
 
     goToRegistrationStep(step) {
         // Prevent going back to step 1 if OTP is already verified (lock step 1)
-        if (step === 1 && this.otpVerified) {
-            console.log('Cannot navigate to step 1 - OTP already verified and step 1 is locked');
-            this.showMessage('Step 1 is locked after OTP verification. Please refresh the page to start over.', 'info');
+        if (step === 1 && this.otpVerified) {            this.showMessage('Step 1 is locked after OTP verification. Please refresh the page to start over.', 'info');
             // Stay on current step instead of going to step 1
             return;
         }
@@ -4622,16 +4574,16 @@ class AgricultureMarket {
         }
 
         try {
-            console.log('Sending OTP request:', { email, purpose: 'register', apiBase: this.apiBase });
+
             const response = await fetch(`${this.apiBase}/otp/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, purpose: 'register', resend: !!options.resend, 'g-recaptcha-response': recaptchaResponse })
             });
             
-            console.log('OTP response status:', response.status);
+
             const data = await response.json();
-            console.log('OTP response data:', data);
+
 
             // Don't reset CAPTCHA on server errors (5xx) - allow retry without new solve
             if (response.status >= 500) {
@@ -4669,9 +4621,9 @@ class AgricultureMarket {
                 }
                 // Display OTP for testing if provided by backend
                 if (data.otp_for_frontend) {
-                    console.log('🔑 OTP Code (for testing):', data.otp_for_frontend);
-                    console.log('📧 Email:', email);
-                    console.log('⏰ Valid for 10 minutes');
+
+
+
                     // Display OTP in the UI
                     const otpDisplay = document.getElementById('otp-test-display');
                     const otpCodeDisplay = document.getElementById('otp-code-display');
@@ -4914,7 +4866,7 @@ class AgricultureMarket {
             }
         } catch (phoneCheckError) {
             // If phone check fails, continue with registration (backend will validate)
-            console.warn('Phone uniqueness check failed, continuing with registration');
+
         }
 
         // Validate required fields with specific messages
@@ -5336,14 +5288,14 @@ class AgricultureMarket {
             if (this.globalFilters.sort) params.append('sort', this.globalFilters.sort);
             params.append('preorder', 'false');
 
-            console.log('Loading available products from:', `${this.apiBase}/products?${params}`);
+
             let response;
             try {
                 response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
                     headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
                 }, 25000);
             } catch (firstErr) {
-                console.warn('Available products request timed out, attempting wake-up retry...', firstErr?.message || firstErr);
+
                 response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
                     headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
                 }, 25000);
@@ -5354,7 +5306,7 @@ class AgricultureMarket {
             }
 
             const data = await response.json();
-            console.log('Available products loaded:', data.products?.length || 0, 'products');
+
 
             if (!data.products || data.products.length === 0) {
                 container.innerHTML = (window.renderEmptyState || function() { return ''; })({
@@ -5367,11 +5319,11 @@ class AgricultureMarket {
             }
 
             if (data.products && data.products.length > 0) {
-                console.log('Rendering', data.products.length, 'available products');
+
                 this.renderProducts(data.products, 'available');
                 this.renderSectionPagination('available', data.pagination);
             } else {
-                console.warn('No available products in response:', data);
+
                 container.innerHTML = (window.renderEmptyState || function() { return ''; })({
                     icon: 'fas fa-basket-shopping',
                     title: 'No available products at the moment',
@@ -5423,14 +5375,14 @@ class AgricultureMarket {
             if (this.globalFilters.sort) params.append('sort', this.globalFilters.sort);
             params.append('preorder', 'true');
 
-            console.log('Loading preorder products from:', `${this.apiBase}/products?${params}`);
+
             let response;
             try {
                 response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
                     headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
                 }, 25000);
             } catch (firstErr) {
-                console.warn('Preorder products request timed out, attempting wake-up retry...', firstErr?.message || firstErr);
+
                 response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
                     headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
                 }, 25000);
@@ -5441,7 +5393,7 @@ class AgricultureMarket {
             }
 
             const data = await response.json();
-            console.log('Preorder products loaded:', data.products?.length || 0, 'products');
+
 
             if (!data.products || data.products.length === 0) {
                 container.innerHTML = (window.renderEmptyState || function() { return ''; })({
@@ -5454,11 +5406,11 @@ class AgricultureMarket {
             }
 
             if (data.products && data.products.length > 0) {
-                console.log('Rendering', data.products.length, 'preorder products');
+
                 this.renderProducts(data.products, 'preorder');
                 this.renderSectionPagination('preorder', data.pagination);
             } else {
-                console.warn('No preorder products in response:', data);
+
                 container.innerHTML = (window.renderEmptyState || function() { return ''; })({
                     icon: 'fas fa-seedling',
                     title: 'No preorder products at the moment',
@@ -5516,7 +5468,7 @@ class AgricultureMarket {
                 params.append('preorder', 'false');
             }
 
-            console.log('Loading products from:', `${this.apiBase}/products?${params}`);
+
             let response;
             try {
                 response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
@@ -5524,7 +5476,7 @@ class AgricultureMarket {
                 }, 25000);
             } catch (firstErr) {
                 // Render cold starts can be slow; wake server and retry once with a longer timeout.
-                console.warn('Products request timed out, attempting wake-up retry...', firstErr?.message || firstErr);
+
                 response = await this.fetchJsonWithTimeout(`${this.apiBase}/products?${params}`, {
                     headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
                 }, 70000);
@@ -5537,7 +5489,7 @@ class AgricultureMarket {
             }
 
             const data = await response.json();
-            console.log('Products loaded:', data.products?.length || 0, 'products');
+
             
             if (!data.products || data.products.length === 0) {
                 container.innerHTML = (window.renderEmptyState || function() { return ''; })({
@@ -5550,7 +5502,7 @@ class AgricultureMarket {
             }
 
             if (data.products && data.products.length > 0) {
-                console.log('Rendering', data.products.length, 'products');
+
                 // Filter out out of stock products from landing page
                 const availableProducts = data.products.filter(product => {
                     const stock = Number(product.stock_quantity ?? 0);
@@ -5572,7 +5524,7 @@ class AgricultureMarket {
                 this.renderProducts(availableProducts);
                 this.renderPagination(data.pagination);
             } else {
-                console.warn('No products in response:', data);
+
                 container.innerHTML = (window.renderEmptyState || function() { return ''; })({
                     icon: 'fas fa-basket-shopping',
                     title: 'No products available at the moment',
@@ -5608,7 +5560,7 @@ class AgricultureMarket {
                     headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
                 }, 25000);
             } catch (firstErr) {
-                console.warn('Featured products request timed out, retrying once...', firstErr?.message || firstErr);
+
                 response = await this.fetchJsonWithTimeout(`${this.apiBase}/products/featured?${params.toString()}`, {
                     headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {}
                 }, 70000);
@@ -5789,7 +5741,7 @@ class AgricultureMarket {
             return;
         }
 
-        console.log('Rendering products to container:', container, 'Section:', section, 'Products count:', products.length);
+
         container.innerHTML = products.map(product => {
             const isPurchasable = this.isProductPurchasable(product);
             const totalReviews = this.fmtNumber(product.total_reviews || 0);
@@ -6155,7 +6107,7 @@ class AgricultureMarket {
             const data = await response.json();
             // API returns { product: {...} }, so extract the product object
             const product = data.product || data;
-            console.log('Product data received:', product); // Debug log
+// Debug log
 
             // Cache the product data
             this.productCache.set(cacheKey, { product, timestamp: now });
@@ -6250,7 +6202,7 @@ class AgricultureMarket {
 
                 // Add error handler to show no-image text if image fails to load
                 imageElement.onerror = function() {
-                    console.warn('Product image failed to load:', imageUrl);
+
                     this.style.display = 'none';
                     let noImageText = document.getElementById('product-details-no-image');
                     if (!noImageText) {
@@ -7107,9 +7059,9 @@ class AgricultureMarket {
 
     toggleFarmerSelection(farmerName) {
         const farmerState = this.getFarmerSelectionState(farmerName);
-        console.log('toggleFarmerSelection - farmerName:', farmerName, 'farmerState:', farmerState);
-        console.log('selectedFarmerNames before:', Array.from(this.selectedFarmerNames));
-        console.log('selectedProductIds before:', Array.from(this.selectedProductIds));
+
+
+
         
         if (farmerState === 'selected') {
             // Deselect farmer and all its products
@@ -7132,8 +7084,8 @@ class AgricultureMarket {
                 this.selectedProductIds.add(item.id);
             });
         }
-        console.log('selectedFarmerNames after:', Array.from(this.selectedFarmerNames));
-        console.log('selectedProductIds after:', Array.from(this.selectedProductIds));
+
+
         this.updateAllSelectionState();
         this.saveSelectionState();
         this.renderCart({ cartItems: this.currentCartItems });
@@ -7203,14 +7155,14 @@ class AgricultureMarket {
     }
 
     getFarmerSelectionState(farmerName) {
-        console.log('getFarmerSelectionState - farmerName:', farmerName);
+
         const farmerProducts = this.currentCartItems.filter(item => item.farmer_name === farmerName);
-        console.log('getFarmerSelectionState - farmerProducts IDs:', JSON.stringify(farmerProducts.map(p => p.id)));
-        console.log('getFarmerSelectionState - selectedProductIds:', JSON.stringify(Array.from(this.selectedProductIds)));
+
+
         if (farmerProducts.length === 0) return 'unselected';
         
         const selectedCount = farmerProducts.filter(item => this.selectedProductIds.has(item.id)).length;
-        console.log('getFarmerSelectionState - selectedCount:', selectedCount, 'total:', farmerProducts.length);
+
         
         if (selectedCount === 0) return 'unselected';
         if (selectedCount === farmerProducts.length) return 'selected';
@@ -8223,7 +8175,7 @@ class AgricultureMarket {
                 if (regSel) regSel.querySelectorAll('.role-box-enhanced').forEach(btn => btn.style.display = 'inline-flex');
             }
         } catch (e) {
-            console.warn('Error adjusting role selector visibility:', e);
+
         }
 
         this.openAuthModal(role, mode);
@@ -9388,15 +9340,15 @@ class AgricultureMarket {
     }
 
     scrollToSection(sectionId) {
-        console.log('scrollToSection called with:', sectionId);
+
         const element = document.querySelector(sectionId);
-        console.log('Element found:', element);
+
         if (element) {
             const headerOffset = 100; // Account for fixed header
             const elementPosition = element.offsetTop;
             const offsetPosition = elementPosition - headerOffset;
 
-            console.log('Scrolling to position:', offsetPosition);
+
             // Use smooth scroll with better easing
             window.scrollTo({
                 top: offsetPosition,
@@ -9639,13 +9591,13 @@ let app;
 function initializeApp() {
     try {
         if (app) {
-            console.log('App already initialized');
+
             return;
         }
         app = new AgricultureMarket();
         // Make app globally accessible for onclick handlers
         window.app = app;
-        console.log('App initialized successfully');
+
         
         // Fetch platform settings including recaptcha_mode
         app.fetchPlatformSettings();
@@ -9757,7 +9709,7 @@ if (document.readyState === 'loading') {
 // Fallback: Try to initialize after a short delay if app is still not initialized
 setTimeout(() => {
     if (!window.app && !app) {
-        console.warn('App not initialized after 1 second, attempting fallback initialization...');
+
         initializeApp();
     }
 }, 1000);
@@ -9765,7 +9717,7 @@ setTimeout(() => {
 // Expose a global function to manually load products if needed
 window.loadProductsManually = function() {
     if (window.app && typeof window.app.loadAvailableProducts === 'function') {
-        console.log('Manually loading products...');
+
         window.app.loadAvailableProducts();
         window.app.loadPreorderProducts();
     } else {

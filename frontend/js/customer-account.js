@@ -556,7 +556,7 @@ class CustomerAccount {
             }
         } catch (phoneCheckError) {
             // If phone check fails, continue with profile update (backend will validate)
-            console.warn('Phone uniqueness check failed, continuing with profile update');
+
         }
 
         let address = null;

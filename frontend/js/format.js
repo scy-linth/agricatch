@@ -133,7 +133,7 @@ window.ServerTime = (function () {
       
       return new Date(data.timestamp);
     } catch (error) {
-      console.warn('Failed to fetch server time, falling back to local time:', error);
+
       return new Date();
     }
   }

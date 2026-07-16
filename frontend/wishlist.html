@@ -720,7 +720,7 @@ setTimeout(function() {
     const body = document.body;
 
     if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
-        console.warn('Loading screen timeout - forcing hide');
+
         loadingScreen.classList.add('hidden');
         body.classList.remove('loading');
     }

@@ -333,7 +333,7 @@ class ChatUI {
         return new Promise((resolve) => {
             const modal = document.getElementById('admin-confirm-modal');
             if (!modal) {
-                console.warn('[showConfirmModal] Confirm modal not found — using browser confirm');
+
                 resolve(confirm(message));
                 return;
             }

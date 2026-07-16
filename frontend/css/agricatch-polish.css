@@ -3124,3 +3124,138 @@ a:not([aria-label]):not([aria-labelledby]):empty {
 /* ============================================================
    END
    ============================================================ */
+
+/* ============================================================
+   Mobile UX Approved Fixes
+   Scoped to max-width: 767px so desktop and tablet layouts are
+   untouched. !important is used here to guarantee these mobile-only
+   overrides win against page-scoped, inline and later-loaded styles.
+   ============================================================ */
+@media (max-width: 767px) {
+  /* 1. All interactive touch targets at least 44x44 px */
+  body button,
+  body [role="button"],
+  body .btn,
+  body .btn-small,
+  body .admin-sidebar-toggle-btn,
+  body .mobile-menu-toggle,
+  body .header-nav .nav-link.nav-icon,
+  body .nav-profile,
+  body .float-cart-btn,
+  body .back-to-top,
+  body #featured .carousel-nav,
+  body .close-btn,
+  body .modal .close-btn,
+  body .product-details-close,
+  body .panel-close,
+  body #cart-sidebar .cart-close,
+  body #cart-sidebar .close-cart,
+  body #cart-sidebar #close-cart-btn,
+  body .cart-selection-circle,
+  body .icon-btn,
+  body #wishlist .remove-btn,
+  body #checkout-main .co-qty-btn,
+  body #checkout-main .co-remove-btn-qty,
+  body .checkout-remove-btn,
+  body #cart-sidebar .quantity-btn,
+  body #cart-sidebar .remove-item,
+  body .chat-send-btn,
+  body .btn-co-primary,
+  body .btn-co-secondary,
+  body .btn-co-blue,
+  body .co-set-address-btn,
+  body .back-btn,
+  body .sidebar-link,
+  body .sidebar-nav .nav-link,
+  body [class*="topbar"] a,
+  body header a,
+  body #marketplace-filter #global-category-tabs .btn,
+  body .products-category-tabs .btn,
+  body .featured-category-tabs .btn {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  /* 2. Inputs and primary buttons: at least 44px tall */
+  body input.form-control,
+  body select.form-control,
+  body textarea.form-control,
+  body .form-input,
+  body .form-select,
+  body .form-textarea,
+  body input[type="text"]:not([type="hidden"]),
+  body input[type="email"]:not([type="hidden"]),
+  body input[type="tel"]:not([type="hidden"]),
+  body input[type="password"]:not([type="hidden"]),
+  body input[type="search"]:not([type="hidden"]),
+  body input[type="number"]:not([type="hidden"]),
+  body textarea,
+  body select,
+  body .co-qty-input,
+  body .quantity-value-input,
+  body .chat-compose-input,
+  body .mf-search-input,
+  body .mf-sort-select,
+  body .address-form-floating .form-input,
+  body .address-form-floating .form-textarea {
+    min-height: 44px !important;
+  }
+
+  body [type="submit"],
+  body [type="button"] {
+    min-height: 44px !important;
+  }
+
+  /* 3. Reduce excessive card and modal padding on mobile */
+  body #orders-main,
+  body #notifications-main,
+  body #checkout-main {
+    padding: 1rem 0.75rem 2.5rem !important;
+  }
+
+  body .card-body,
+  body .admin-section-card,
+  body .modal .modal-body,
+  body .modal .modal-header,
+  body .product-details-info-section,
+  body .product-details-topbar,
+  body .co-card-body,
+  body .co-card-footer,
+  body .co-card-header,
+  body .address-form-floating,
+  body .profile-overview-card,
+  body #wishlist .product-info,
+  body .admin-detail-panel {
+    padding: 1rem !important;
+  }
+
+  /* 4. Badge and status labels: readable minimum size */
+  body .badge,
+  body .order-card-status,
+  body .status-badge,
+  body .co-item-farmer,
+  body .co-item-stock,
+  body #wishlist .product-card .badge,
+  body :where(#featured, #available-now, #preorder) .product-card .badge,
+  body #cart-sidebar .cart-item-stock,
+  body #cart-sidebar .cart-item-price {
+    font-size: 0.75rem !important;
+  }
+
+  /* 5. Fix 404 page image overflow on mobile */
+  body .error-404 img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* 6. Checkout and cart quantity controls: thumb-friendly */
+  body #cart-sidebar .quantity-controls {
+    grid-template-columns: 44px 48px 44px !important;
+    height: 44px !important;
+  }
+
+  /* Request Product page: reduce top margin on mobile */
+  #request-product-page {
+    margin: 1rem auto !important;
+  }
+}
