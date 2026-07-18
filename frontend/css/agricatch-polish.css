@@ -754,12 +754,21 @@ button:not(:disabled):not(.disabled):hover {
 }
 
 /* Header login/register buttons stay transparent on hover */
-.header-actions .user-menu {
-    margin-left: -4rem !important;
+@media (min-width: 769px) {
+    .header-actions .user-menu {
+        margin-left: -4rem !important;
+    }
+
+    .header-actions .user-menu #login-btn {
+        margin-left: -3rem !important;
+    }
 }
 
-.header-actions .user-menu #login-btn {
-    margin-left: -3rem !important;
+@media (max-width: 768px) {
+    .header-actions .user-menu,
+    .header-actions .user-menu #login-btn {
+        margin-left: 0 !important;
+    }
 }
 
 .header-actions .user-menu .btn-primary,
