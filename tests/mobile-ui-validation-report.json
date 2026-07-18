@@ -1,0 +1,2773 @@
+[
+  {
+    "page": "index",
+    "path": "index.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\index-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/index.html",
+          "documentWidth": 310,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 288,
+              "bottom": 546,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\index-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/index.html",
+          "documentWidth": 350,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 328,
+              "bottom": 778,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\index-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/index.html",
+          "documentWidth": 365,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 343,
+              "bottom": 790,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\index-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/index.html",
+          "documentWidth": 380,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 358,
+              "bottom": 822,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\index-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/index.html",
+          "documentWidth": 404,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 382,
+              "bottom": 874,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\index-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/index.html",
+          "documentWidth": 420,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 398,
+              "bottom": 910,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\index-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/index.html",
+          "documentWidth": 1270,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 1248,
+              "bottom": 698,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "product",
+    "path": "product.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\product-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/product.html",
+          "documentWidth": 310,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\product-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/product.html",
+          "documentWidth": 350,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\product-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/product.html",
+          "documentWidth": 365,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\product-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/product.html",
+          "documentWidth": 380,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\product-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/product.html",
+          "documentWidth": 404,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\product-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/product.html",
+          "documentWidth": 420,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\product-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/product.html",
+          "documentWidth": 1270,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "farmers",
+    "path": "farmers.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmers-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/farmers.html",
+          "documentWidth": 310,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmers-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/farmers.html",
+          "documentWidth": 350,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmers-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/farmers.html",
+          "documentWidth": 365,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmers-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/farmers.html",
+          "documentWidth": 380,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmers-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/farmers.html",
+          "documentWidth": 404,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmers-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/farmers.html",
+          "documentWidth": 420,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmers-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/farmers.html",
+          "documentWidth": 1270,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "admin",
+    "path": "admin.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-320x568.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-360x800.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-375x812.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-390x844.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-414x896.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-430x932.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-desktop.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      }
+    ]
+  },
+  {
+    "page": "farmer",
+    "path": "farmer.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmer-320x568.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmer-360x800.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmer-375x812.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmer-390x844.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmer-414x896.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmer-430x932.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\farmer-desktop.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      }
+    ]
+  },
+  {
+    "page": "customer-account",
+    "path": "customer-account.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\customer-account-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/customer-account.html",
+          "documentWidth": 310,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 288,
+              "bottom": 546,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\customer-account-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/customer-account.html",
+          "documentWidth": 350,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 328,
+              "bottom": 778,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\customer-account-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/customer-account.html",
+          "documentWidth": 365,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 343,
+              "bottom": 790,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\customer-account-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/customer-account.html",
+          "documentWidth": 380,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 358,
+              "bottom": 822,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\customer-account-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/customer-account.html",
+          "documentWidth": 404,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 382,
+              "bottom": 874,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\customer-account-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/customer-account.html",
+          "documentWidth": 420,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 398,
+              "bottom": 910,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\customer-account-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/customer-account.html",
+          "documentWidth": 1270,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 1248,
+              "bottom": 698,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "checkout",
+    "path": "checkout.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\checkout-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/checkout.html",
+          "documentWidth": 320,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\checkout-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/checkout.html",
+          "documentWidth": 360,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\checkout-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/checkout.html",
+          "documentWidth": 375,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\checkout-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/checkout.html",
+          "documentWidth": 390,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\checkout-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/checkout.html",
+          "documentWidth": 414,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\checkout-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/checkout.html",
+          "documentWidth": 430,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\checkout-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/checkout.html",
+          "documentWidth": 1280,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "orders",
+    "path": "orders.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\orders-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/orders.html",
+          "documentWidth": 320,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\orders-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/orders.html",
+          "documentWidth": 360,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\orders-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/orders.html",
+          "documentWidth": 375,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\orders-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/orders.html",
+          "documentWidth": 390,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\orders-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/orders.html",
+          "documentWidth": 414,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\orders-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/orders.html",
+          "documentWidth": 430,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\orders-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/orders.html",
+          "documentWidth": 1280,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "wishlist",
+    "path": "wishlist.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\wishlist-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/wishlist.html",
+          "documentWidth": 310,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\wishlist-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/wishlist.html",
+          "documentWidth": 350,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\wishlist-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/wishlist.html",
+          "documentWidth": 365,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\wishlist-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/wishlist.html",
+          "documentWidth": 380,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\wishlist-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/wishlist.html",
+          "documentWidth": 404,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\wishlist-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/wishlist.html",
+          "documentWidth": 420,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\wishlist-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/wishlist.html",
+          "documentWidth": 1270,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "chat",
+    "path": "chat.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\chat-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/chat.html",
+          "documentWidth": 310,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 288,
+              "bottom": 546,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\chat-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/chat.html",
+          "documentWidth": 350,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 328,
+              "bottom": 778,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\chat-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/chat.html",
+          "documentWidth": 365,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 343,
+              "bottom": 790,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\chat-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/chat.html",
+          "documentWidth": 380,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 358,
+              "bottom": 822,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\chat-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/chat.html",
+          "documentWidth": 404,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 382,
+              "bottom": 874,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\chat-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/chat.html",
+          "documentWidth": 420,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 398,
+              "bottom": 910,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\chat-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/chat.html",
+          "documentWidth": 1270,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [
+            {
+              "class": "float-cart-btn",
+              "right": 1248,
+              "bottom": 698,
+              "width": 56
+            }
+          ],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "notifications",
+    "path": "notifications.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\notifications-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/notifications.html",
+          "documentWidth": 310,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\notifications-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/notifications.html",
+          "documentWidth": 350,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\notifications-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/notifications.html",
+          "documentWidth": 365,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\notifications-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/notifications.html",
+          "documentWidth": 380,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\notifications-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/notifications.html",
+          "documentWidth": 404,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\notifications-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/notifications.html",
+          "documentWidth": 420,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\notifications-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/notifications.html",
+          "documentWidth": 1270,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": -10,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "request-product",
+    "path": "request-product.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\request-product-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/request-product.html",
+          "documentWidth": 320,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\request-product-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/request-product.html",
+          "documentWidth": 360,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\request-product-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/request-product.html",
+          "documentWidth": 375,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\request-product-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/request-product.html",
+          "documentWidth": 390,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\request-product-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/request-product.html",
+          "documentWidth": 414,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\request-product-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/request-product.html",
+          "documentWidth": 430,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\request-product-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/request-product.html",
+          "documentWidth": 1280,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "admin-backup",
+    "path": "admin-backup.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-backup-320x568.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-backup-360x800.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-backup-375x812.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-backup-390x844.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-backup-414x896.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-backup-430x932.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\admin-backup-desktop.png",
+        "checks": {
+          "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+        }
+      }
+    ]
+  },
+  {
+    "page": "404",
+    "path": "404.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\404-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/404.html",
+          "documentWidth": 360,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": true,
+          "horizontalScrollPx": 40,
+          "overflowingElements": [
+            {
+              "tag": "IMG",
+              "class": "img-fluid py-5",
+              "id": "",
+              "width": 400,
+              "right": 360,
+              "text": ""
+            }
+          ],
+          "imagesOverflowing": [
+            {
+              "src": "7486754.png",
+              "width": 400,
+              "naturalWidth": 512,
+              "right": 360
+            }
+          ],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\404-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/404.html",
+          "documentWidth": 380,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": true,
+          "horizontalScrollPx": 20,
+          "overflowingElements": [
+            {
+              "tag": "IMG",
+              "class": "img-fluid py-5",
+              "id": "",
+              "width": 400,
+              "right": 380,
+              "text": ""
+            }
+          ],
+          "imagesOverflowing": [
+            {
+              "src": "7486754.png",
+              "width": 400,
+              "naturalWidth": 512,
+              "right": 380
+            }
+          ],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\404-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/404.html",
+          "documentWidth": 388,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": true,
+          "horizontalScrollPx": 13,
+          "overflowingElements": [
+            {
+              "tag": "IMG",
+              "class": "img-fluid py-5",
+              "id": "",
+              "width": 400,
+              "right": 388,
+              "text": ""
+            }
+          ],
+          "imagesOverflowing": [
+            {
+              "src": "7486754.png",
+              "width": 400,
+              "naturalWidth": 512,
+              "right": 388
+            }
+          ],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\404-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/404.html",
+          "documentWidth": 395,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": true,
+          "horizontalScrollPx": 5,
+          "overflowingElements": [
+            {
+              "tag": "IMG",
+              "class": "img-fluid py-5",
+              "id": "",
+              "width": 400,
+              "right": 395,
+              "text": ""
+            }
+          ],
+          "imagesOverflowing": [
+            {
+              "src": "7486754.png",
+              "width": 400,
+              "naturalWidth": 512,
+              "right": 395
+            }
+          ],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\404-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/404.html",
+          "documentWidth": 414,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\404-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/404.html",
+          "documentWidth": 430,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\404-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/404.html",
+          "documentWidth": 1280,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "clear_cache",
+    "path": "clear_cache.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_cache-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_cache.html",
+          "documentWidth": 320,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_cache-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_cache.html",
+          "documentWidth": 360,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_cache-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_cache.html",
+          "documentWidth": 375,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_cache-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_cache.html",
+          "documentWidth": 390,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_cache-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_cache.html",
+          "documentWidth": 414,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_cache-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_cache.html",
+          "documentWidth": 430,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_cache-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_cache.html",
+          "documentWidth": 1280,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      }
+    ]
+  },
+  {
+    "page": "clear_ui_orders",
+    "path": "clear_ui_orders.html",
+    "viewports": [
+      {
+        "label": "320x568",
+        "width": 320,
+        "height": 568,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_ui_orders-320x568.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_ui_orders.html",
+          "documentWidth": 320,
+          "windowWidth": 320,
+          "windowHeight": 568,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "360x800",
+        "width": 360,
+        "height": 800,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_ui_orders-360x800.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_ui_orders.html",
+          "documentWidth": 360,
+          "windowWidth": 360,
+          "windowHeight": 800,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "375x812",
+        "width": 375,
+        "height": 812,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_ui_orders-375x812.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_ui_orders.html",
+          "documentWidth": 375,
+          "windowWidth": 375,
+          "windowHeight": 812,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "390x844",
+        "width": 390,
+        "height": 844,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_ui_orders-390x844.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_ui_orders.html",
+          "documentWidth": 390,
+          "windowWidth": 390,
+          "windowHeight": 844,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "414x896",
+        "width": 414,
+        "height": 896,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_ui_orders-414x896.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_ui_orders.html",
+          "documentWidth": 414,
+          "windowWidth": 414,
+          "windowHeight": 896,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "430x932",
+        "width": 430,
+        "height": 932,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_ui_orders-430x932.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_ui_orders.html",
+          "documentWidth": 430,
+          "windowWidth": 430,
+          "windowHeight": 932,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      },
+      {
+        "label": "desktop",
+        "width": 1280,
+        "height": 720,
+        "screenshot": "D:\\Codings\\AgriCatch\\tests\\mobile-ui-validation-screenshots\\clear_ui_orders-desktop.png",
+        "checks": {
+          "finalUrl": "http://localhost:8080/clear_ui_orders.html",
+          "documentWidth": 1280,
+          "windowWidth": 1280,
+          "windowHeight": 720,
+          "horizontalScroll": false,
+          "horizontalScrollPx": 0,
+          "overflowingElements": [],
+          "imagesOverflowing": [],
+          "inputsOverflowing": [],
+          "tablesHorizontalScroll": [],
+          "modalsExceedingScreen": [],
+          "sidebarIssues": [],
+          "navbarIssues": [],
+          "footerOverlap": false,
+          "clippedDropdowns": [],
+          "floatingButtonsOverlap": [],
+          "overflowingText": []
+        }
+      }
+    ]
+  }
+]

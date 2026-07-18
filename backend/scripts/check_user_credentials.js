@@ -7,8 +7,8 @@ const pool = new Pool({
 });
 
 async function checkUserCredentials() {
-  const email = 'dhelhilis@gmail.com';
-  const password = 'Theressa';
+  const email = 'customer@gmail.com';
+  const password = 'customercustomer';
 
   try {
     console.log(`Checking user: ${email}`);

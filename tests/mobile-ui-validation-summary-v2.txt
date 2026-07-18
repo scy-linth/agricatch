@@ -1,0 +1,128 @@
+=== index ===
+320x568 (320x568) -> /index.html | floatingButtons:1
+360x800 (360x800) -> /index.html | floatingButtons:1
+375x812 (375x812) -> /index.html | floatingButtons:1
+390x844 (390x844) -> /index.html | floatingButtons:1
+414x896 (414x896) -> /index.html | floatingButtons:1
+430x932 (430x932) -> /index.html | floatingButtons:1
+desktop (1280x720) -> /index.html | floatingButtons:1
+=== product ===
+320x568 (320x568) -> /product.html
+360x800 (360x800) -> /product.html
+375x812 (375x812) -> /product.html
+390x844 (390x844) -> /product.html
+414x896 (414x896) -> /product.html
+430x932 (430x932) -> /product.html
+desktop (1280x720) -> /product.html
+=== farmers ===
+320x568 (320x568) -> /farmers.html
+360x800 (360x800) -> /farmers.html
+375x812 (375x812) -> /farmers.html
+390x844 (390x844) -> /farmers.html
+414x896 (414x896) -> /farmers.html
+430x932 (430x932) -> /farmers.html
+desktop (1280x720) -> /farmers.html
+=== admin ===
+320x568 (320x568) -> /admin.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+360x800 (360x800) -> /admin.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+375x812 (375x812) -> /admin.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+390x844 (390x844) -> /admin.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+414x896 (414x896) -> /admin.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+430x932 (430x932) -> /admin.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+desktop (1280x720) -> /admin.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+=== farmer ===
+320x568 (320x568) -> /farmer.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+360x800 (360x800) -> /farmer.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+375x812 (375x812) -> /farmer.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+390x844 (390x844) -> /farmer.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+414x896 (414x896) -> /farmer.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+430x932 (430x932) -> /farmer.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+desktop (1280x720) -> /farmer.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+=== customer-account ===
+320x568 (320x568) -> /customer-account.html | floatingButtons:1
+360x800 (360x800) -> /customer-account.html | floatingButtons:1
+375x812 (375x812) -> /customer-account.html | floatingButtons:1
+390x844 (390x844) -> /customer-account.html | floatingButtons:1
+414x896 (414x896) -> /customer-account.html | floatingButtons:1
+430x932 (430x932) -> /customer-account.html | floatingButtons:1
+desktop (1280x720) -> /customer-account.html | floatingButtons:1
+=== checkout ===
+320x568 (320x568) -> /checkout.html
+360x800 (360x800) -> /checkout.html
+375x812 (375x812) -> /checkout.html
+390x844 (390x844) -> /checkout.html
+414x896 (414x896) -> /checkout.html
+430x932 (430x932) -> /checkout.html
+desktop (1280x720) -> /checkout.html
+=== orders ===
+320x568 (320x568) -> /orders.html
+360x800 (360x800) -> /orders.html
+375x812 (375x812) -> /orders.html
+390x844 (390x844) -> /orders.html
+414x896 (414x896) -> /orders.html
+430x932 (430x932) -> /orders.html
+desktop (1280x720) -> /orders.html
+=== wishlist ===
+320x568 (320x568) -> /wishlist.html
+360x800 (360x800) -> /wishlist.html
+375x812 (375x812) -> /wishlist.html
+390x844 (390x844) -> /wishlist.html
+414x896 (414x896) -> /wishlist.html
+430x932 (430x932) -> /wishlist.html
+desktop (1280x720) -> /wishlist.html
+=== chat ===
+320x568 (320x568) -> /chat.html | floatingButtons:1
+360x800 (360x800) -> /chat.html | floatingButtons:1
+375x812 (375x812) -> /chat.html | floatingButtons:1
+390x844 (390x844) -> /chat.html | floatingButtons:1
+414x896 (414x896) -> /chat.html | floatingButtons:1
+430x932 (430x932) -> /chat.html | floatingButtons:1
+desktop (1280x720) -> /chat.html | floatingButtons:1
+=== notifications ===
+320x568 (320x568) -> /notifications.html
+360x800 (360x800) -> /notifications.html
+375x812 (375x812) -> /notifications.html
+390x844 (390x844) -> /notifications.html
+414x896 (414x896) -> /notifications.html
+430x932 (430x932) -> /notifications.html
+desktop (1280x720) -> /notifications.html
+=== request-product ===
+320x568 (320x568) -> /request-product.html
+360x800 (360x800) -> /request-product.html
+375x812 (375x812) -> /request-product.html
+390x844 (390x844) -> /request-product.html
+414x896 (414x896) -> /request-product.html
+430x932 (430x932) -> /request-product.html
+desktop (1280x720) -> /request-product.html
+=== admin-backup ===
+320x568 (320x568) -> /admin-backup.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+360x800 (360x800) -> /admin-backup.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+375x812 (375x812) -> /admin-backup.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+390x844 (390x844) -> /admin-backup.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+414x896 (414x896) -> /admin-backup.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+430x932 (430x932) -> /admin-backup.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation
+desktop (1280x720) -> /admin-backup.html | ERROR:page.evaluate: Execution context was destroyed, most likely because of a navigation | NO_SCREENSHOT
+=== 404 ===
+320x568 (320x568) -> /404.html | horizontalScroll(40px) | overflowingElements:1 | imagesOverflowing:1
+360x800 (360x800) -> /404.html | horizontalScroll(20px) | overflowingElements:1 | imagesOverflowing:1
+375x812 (375x812) -> /404.html | horizontalScroll(13px) | overflowingElements:1 | imagesOverflowing:1
+390x844 (390x844) -> /404.html | horizontalScroll(5px) | overflowingElements:1 | imagesOverflowing:1
+414x896 (414x896) -> /404.html
+430x932 (430x932) -> /404.html
+desktop (1280x720) -> /404.html
+=== clear_cache ===
+320x568 (320x568) -> /clear_cache.html
+360x800 (360x800) -> /clear_cache.html
+375x812 (375x812) -> /clear_cache.html
+390x844 (390x844) -> /clear_cache.html
+414x896 (414x896) -> /clear_cache.html
+430x932 (430x932) -> /clear_cache.html
+desktop (1280x720) -> /clear_cache.html
+=== clear_ui_orders ===
+320x568 (320x568) -> /clear_ui_orders.html
+360x800 (360x800) -> /clear_ui_orders.html
+375x812 (375x812) -> /clear_ui_orders.html
+390x844 (390x844) -> /clear_ui_orders.html
+414x896 (414x896) -> /clear_ui_orders.html
+430x932 (430x932) -> /clear_ui_orders.html
+desktop (1280x720) -> /clear_ui_orders.html

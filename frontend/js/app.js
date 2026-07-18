@@ -434,7 +434,8 @@ class AgricultureMarket {
     }
 
     init() {
-        try {            // Check debug mode
+        try {
+            // Check debug mode
             this.checkDebugMode();
 
             // Disable browser's default scroll restoration to control it manually
@@ -730,7 +731,8 @@ class AgricultureMarket {
             const response = await fetch(`${this.apiBase}/settings/recaptcha-mode`);
             if (response.ok) {
                 const data = await response.json();
-                this.recaptchaMode = data.recaptcha_mode || 'auto';            }
+                this.recaptchaMode = data.recaptcha_mode || 'auto';
+            }
         } catch (error) {
             console.error('Failed to fetch platform settings:', error);
             // Keep default 'auto' mode
@@ -858,11 +860,13 @@ class AgricultureMarket {
             }
         })
         .then(response => {
-            if (response.ok) {            }
+            if (response.ok) {
+            }
         })
         .catch(error => {
             // Silently fail - this is just a wake-up ping, not critical
-            // Server might be cold starting, which is expected        });
+            // Server might be cold starting, which is expected
+        });
         
     }
 
@@ -974,22 +978,15 @@ class AgricultureMarket {
                     document.body.appendChild(cartBtn);
                 }
             } catch (e) {}
-            cartBtn.addEventListener('click', () => this.openCart());
+            cartBtn.addEventListener('click', () => {
+                cartBtn.classList.add('clicked');
+                setTimeout(() => cartBtn.classList.remove('clicked'), 300);
+                this.openCart();
+            });
         }
-        // Ensure cart sidebar is a direct child of body to avoid transformed ancestor issues
-        const cartSidebarEl = document.getElementById('cart-sidebar');
-        if (cartSidebarEl && cartSidebarEl.parentElement !== document.body) {
-            try {
-                document.body.appendChild(cartSidebarEl);
-            } catch (e) {            }
-        }
-        // Also ensure cart overlay is moved to body so it covers the full viewport
-        const cartOverlayEl = document.getElementById('cart-overlay');
-        if (cartOverlayEl && cartOverlayEl.parentElement !== document.body) {
-            try {
-                document.body.appendChild(cartOverlayEl);
-            } catch (e) {            }
-        }
+        // Cart sidebar and overlay are kept in their original DOM position as siblings
+        // so the CSS sibling selector (.cart-sidebar.open ~ .cart-overlay) works correctly.
+        // Moving them to body was causing DOM reflow and potential freeze issues.
         // Ensure checkout modal is a direct child of body so it can float above other UI
         const checkoutModalEl = document.getElementById('checkout-modal');
         if (checkoutModalEl && checkoutModalEl.parentElement !== document.body) {
@@ -1003,7 +1000,8 @@ class AgricultureMarket {
                     modalContent.style.zIndex = '100006';
                     modalContent.style.position = 'relative';
                 }
-            } catch (e) {            }
+            } catch (e) {
+            }
         }
         // Ensure add-address modal is a direct child of body and floats above checkout
         const addAddressModalEl = document.getElementById('add-address-modal');
@@ -1017,7 +1015,8 @@ class AgricultureMarket {
                     addModalContent.style.position = 'relative';
                     addModalContent.style.zIndex = '100008';
                 }
-            } catch (e) {            }
+            } catch (e) {
+            }
         }
         const closeCartBtn = document.getElementById('close-cart');
         if (closeCartBtn) {
@@ -1100,7 +1099,8 @@ class AgricultureMarket {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const tab = btn.dataset.tab;                localStorage.setItem('customerActiveSection', tab);
+                const tab = btn.dataset.tab;
+                localStorage.setItem('customerActiveSection', tab);
                 window.location.href = '/customer-account.html';
             });
         });
@@ -2120,7 +2120,8 @@ class AgricultureMarket {
             const otpInput = document.getElementById('forgot-otp');
             if (otpInput) otpInput.focus();
 
-            if (data.debugOtp) {            }
+            if (data.debugOtp) {
+            }
         } catch (error) {
             console.error('Forgot password send error:', error);
             this.resetRecaptcha('forgot');
@@ -2169,7 +2170,8 @@ class AgricultureMarket {
             }
 
             this.showMessage(data.message || "If that email exists, we've sent a verification code.", 'info');
-            if (data.debugOtp) {            }
+            if (data.debugOtp) {
+            }
         } catch (error) {
             console.error('Forgot password resend error:', error);
             this.resetRecaptcha('forgot');
@@ -2417,7 +2419,8 @@ class AgricultureMarket {
         const userNameEl = document.getElementById('user-name');
         const userNameDdEl = document.getElementById('user-name-dd');
         const userInitialEl = document.getElementById('user-initial');
-        const userEmailEl = document.getElementById('user-email');        if (userNameEl) userNameEl.textContent = firstName;
+        const userEmailEl = document.getElementById('user-email');
+        if (userNameEl) userNameEl.textContent = firstName;
         if (userNameDdEl) userNameDdEl.textContent = fullName;
         if (userInitialEl) userInitialEl.textContent = String(firstName).charAt(0).toUpperCase();
         if (userEmailEl) userEmailEl.textContent = payload.email || '';
@@ -3678,6 +3681,11 @@ class AgricultureMarket {
     }
 
     renderRecaptchaWidgets(mode = 'login') {
+        // Don't render when reCAPTCHA is disabled for this environment
+        if (!this.shouldRequireRecaptcha()) {
+            return;
+        }
+
         const renderWidget = (scope, containerId) => {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -3740,7 +3748,7 @@ class AgricultureMarket {
             return '';
         }
         const resolvedScope = this.resolveRecaptchaScope(scope);
-        if (this.recaptchaWidgetIds[resolvedScope] === null) {
+        if (this.recaptchaWidgetIds[resolvedScope] === null && this.shouldRequireRecaptcha()) {
             const mode = resolvedScope === 'authLogin' ? 'login' : resolvedScope === 'authRegister' ? 'register' : 'forgot';
             this.renderRecaptchaWidgets(mode);
         }
@@ -4022,9 +4030,11 @@ class AgricultureMarket {
     }
 
     async handleRegistrationStep(step, direction) {
-        if (this.isLoading) return; // Prevent multiple clicks during loading        if (direction === 'next') {
+        if (this.isLoading) return; // Prevent multiple clicks during loading
+        if (direction === 'next') {
             // Validate current step before proceeding
-            if (!this.validateRegistrationStep(step)) {                return;
+            if (!this.validateRegistrationStep(step)) {
+                return;
             }
             
             // Show loading animation
@@ -4036,7 +4046,8 @@ class AgricultureMarket {
                 
                 // CRITICAL: Only allow proceeding if OTP is verified for the current email
                 if (this.otpVerified && this.otpEmail && this.otpEmail === email) {
-                    // OTP is verified and email matches - proceed to step 2                    this.setButtonLoading(`register-next-${step}`, false);
+                    // OTP is verified and email matches - proceed to step 2
+                    this.setButtonLoading(`register-next-${step}`, false);
                     this.goToRegistrationStep(2);
                     // Clear persisted registration fields after OTP is verified and proceeding
                     localStorage.removeItem('register_email');
@@ -4047,10 +4058,12 @@ class AgricultureMarket {
                 // OTP not verified - check if OTP section is shown
                 const otpSection = document.getElementById('register-otp-section');
                 if (!otpSection || otpSection.style.display === 'none') {
-                    // OTP section not shown - send OTP first                    this.sendOtpForRegistration();
+                    // OTP section not shown - send OTP first
+                    this.sendOtpForRegistration();
                     return;
                 } else {
-                    // OTP section is shown - verify OTP first before proceeding                    // Don't return here - let verifyOtpForRegistration handle the flow
+                    // OTP section is shown - verify OTP first before proceeding
+                    // Don't return here - let verifyOtpForRegistration handle the flow
                     // It will call goToRegistrationStep(2) on success
                     await this.verifyOtpForRegistration();
                     return;
@@ -4337,7 +4350,8 @@ class AgricultureMarket {
 
     goToRegistrationStep(step) {
         // Prevent going back to step 1 if OTP is already verified (lock step 1)
-        if (step === 1 && this.otpVerified) {            this.showMessage('Step 1 is locked after OTP verification. Please refresh the page to start over.', 'info');
+        if (step === 1 && this.otpVerified) {
+            this.showMessage('Step 1 is locked after OTP verification. Please refresh the page to start over.', 'info');
             // Stay on current step instead of going to step 1
             return;
         }
@@ -7021,9 +7035,7 @@ class AgricultureMarket {
                 if (cartOverlay) {
                     cartOverlay.classList.add('active');
                 }
-                // Prevent background scrolling when cart is open
-                document.documentElement.classList.add('modal-open');
-                document.body.classList.add('modal-open');
+                // Background scroll lock disabled to avoid layout-reflow freeze
             } else {
                 console.error('Cart API error:', response.status);
                 const errorData = await response.json().catch(() => ({}));
@@ -7321,10 +7333,10 @@ class AgricultureMarket {
                             ${productCircle}
                         </button>
                         <img src="${item.image_url || '/images/logo.png'}"
-                             alt="${item.name}" class="cart-item-image" onerror="this.src='/images/logo.png'"
+                             alt="${item.name}" class="cart-item-image" onerror="this.onerror=null; this.src='/images/logo.png';"
                              onclick="app.closeCart(); app.showProductDetails(${item.product_id})" style="cursor: pointer;">
                         <div class="cart-item-details">
-                            <div class="cart-item-name">${item.name} ${badge}</div>
+                            <div class="cart-item-name" style="display:block !important; -webkit-line-clamp:unset !important; -webkit-box-orient:horizontal !important; line-clamp:unset !important; overflow:visible !important; text-overflow:clip !important; white-space:normal !important; overflow-wrap:normal !important;">${item.name} ${badge}</div>
                             <div class="cart-item-price">${this.fmtCurrency(item.price)} ${item.unit ? 'per ' + item.unit : ''}</div>
                             ${isPreorder
                                 ? (() => {
@@ -7340,11 +7352,10 @@ class AgricultureMarket {
                                 <div class="quantity-controls">
                                     <button class="quantity-btn" onclick="app.handleCartQuantityButton(${item.id}, -1, ${maxStock}, ${moq})" title="Decrease quantity" ${minusDisabled ? 'disabled' : ''}>−</button>
                                     <input
-                                        type="number"
+                                        type="text"
                                         class="quantity-value-input"
                                         value="${item.quantity}"
-                                        min="${moq}"
-                                        max="${maxStock}"
+                                        pattern="[0-9]*"
                                         inputmode="numeric"
                                         aria-label="Cart quantity"
                                         onchange="app.handleCartQuantityInput(${item.id}, this.value, ${maxStock}, ${moq}, this)"
@@ -8367,11 +8378,11 @@ class AgricultureMarket {
         this.activateAuthFocusTrap();
         this.focusAuthModalPrimaryField(mode);
         
-        // Force reCAPTCHA wrapper to be visible for login mode
+        // Force reCAPTCHA wrapper to be visible for login mode when required
         if (mode === 'login') {
             const authLoginRecaptchaWrap = document.getElementById('auth-login-recaptcha-wrap');
             if (authLoginRecaptchaWrap) {
-                authLoginRecaptchaWrap.style.display = 'block';
+                authLoginRecaptchaWrap.style.display = this.shouldRequireRecaptcha() ? 'block' : 'none';
             }
         }
         

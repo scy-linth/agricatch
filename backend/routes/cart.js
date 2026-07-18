@@ -662,9 +662,10 @@ router.delete('/:id', async (req, res) => {
     const sessionId = req.body?.sessionId;
 
     let userId = null;
+    let decoded = null;
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.id;
       } catch (error) {
         // Invalid token

@@ -1,0 +1,87 @@
+/* ============================================================
+   Cart Freeze Fix - Authoritative Overrides
+   Loaded after agricatch-polish.css to override problematic styles.
+   ============================================================ */
+
+/* Disable all transitions/animations and backdrop-filter inside cart */
+#cart-sidebar,
+#cart-sidebar *,
+#cart-overlay,
+#cart-overlay * {
+    transition: none !important;
+    animation: none !important;
+    will-change: auto !important;
+    backdrop-filter: none !important;
+}
+
+/* Sidebar is positioned off-screen with transform; no right offset */
+#cart-sidebar {
+    transform: translateX(100%);
+    right: 0 !important;
+}
+
+#cart-sidebar.open {
+    transform: translateX(0);
+}
+
+/* Avoid WebKit box/line-clamp layout freezes and ellipses reflow loops */
+body #cart-sidebar .cart-item-name,
+body #cart-sidebar .cart-item-price,
+body #cart-sidebar .cart-item-stock,
+body #cart-sidebar .cart-farmer-name,
+body #cart-sidebar .cart-farmer-shipping,
+body #cart-sidebar .cart-item-total {
+    white-space: normal !important;
+    text-overflow: clip !important;
+    overflow: visible !important;
+    min-width: 0 !important;
+    word-wrap: normal !important;
+    overflow-wrap: normal !important;
+    -webkit-line-clamp: unset !important;
+    -webkit-box-orient: horizontal !important;
+    line-clamp: unset !important;
+    box-orient: horizontal !important;
+    display: block !important;
+}
+
+body #cart-sidebar .cart-item-name .badge,
+body #cart-sidebar .cart-item-name .status-pill {
+    display: inline-block !important;
+    vertical-align: middle !important;
+}
+
+/* Simplify cart item grid to avoid complex intrinsic size calculations */
+body #cart-sidebar .cart-farmer-header,
+body #cart-sidebar .cart-farmer-products,
+body #cart-sidebar .cart-total,
+body #cart-sidebar .cart-item-quantity,
+body #cart-sidebar .quantity-controls,
+body #cart-sidebar .cart-item {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+}
+
+body #cart-sidebar .cart-farmer-products,
+body #cart-sidebar .cart-total {
+    flex-direction: column !important;
+    align-items: stretch !important;
+}
+
+body #cart-sidebar .cart-item-details {
+    display: block !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+}
+
+body #cart-sidebar .cart-item-total {
+    margin-left: auto !important;
+    align-self: flex-start !important;
+}
+
+/* Avoid scrollbar-gutter reflow issues */
+body #cart-sidebar .cart-items {
+    scrollbar-gutter: auto !important;
+    overflow-y: auto !important;
+}

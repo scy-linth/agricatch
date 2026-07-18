@@ -2902,7 +2902,6 @@ body.modal-open {
     .cart-sidebar {
         width: 100vw;
         max-width: 100vw;
-        right: -100vw;
     }
 
     .cart-item {
@@ -3427,7 +3426,7 @@ body.modal-open {
 .cart-sidebar {
     position: fixed;
     top: 0;
-    right: -420px;
+    right: 0;
     width: 420px;
     max-width: 90vw;
     height: 100vh;
@@ -3437,11 +3436,14 @@ body.modal-open {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.4s ease;
+    /* Transitions disabled to avoid browser freeze (backdrop-filter/overflow reflow issues) */
+    transform: translateX(100%);
+    transition: none;
+    will-change: transform;
 }
 
 .cart-sidebar.open {
-    right: 0;
+    transform: translateX(0);
     z-index: 10063; /* Above cart overlay (10062) and floating cart button (10060) */
 }
 
@@ -3456,8 +3458,8 @@ body.modal-open {
     opacity: 0;
     pointer-events: none;
     z-index: 10062; /* Above product details modal (10000) and cart sidebar (10061) */
-    backdrop-filter: blur(2px);
-    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), backdrop-filter 0.4s ease;
+    /* backdrop-filter removed; transitions disabled to avoid browser freeze */
+    transition: none;
 }
 
 .cart-sidebar.open ~ .cart-overlay,
@@ -9727,6 +9729,15 @@ textarea.invalid:focus {
     background-color: var(--primary-dark) !important;
     transform: translateY(-2px);
     box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+}
+
+.float-cart-btn.clicked {
+    animation: cartBtnClick 0.3s ease;
+}
+
+@keyframes cartBtnClick {
+    0%, 100% { transform: scale(1); }
+    40% { transform: scale(0.85); }
 }
 
 .float-cart-count {
