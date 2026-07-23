@@ -716,8 +716,8 @@ body {
 }
 
 /* Consistent hover transform for all buttons */
-.btn:not(:disabled):not(.disabled):hover,
-button:not(:disabled):not(.disabled):hover {
+.btn:not(:disabled):not(.disabled):not(.password-toggle):not(.pw-toggle-btn):hover,
+button:not(:disabled):not(.disabled):not(.password-toggle):not(.pw-toggle-btn):hover {
     transform: translateY(-1px);
 }
 

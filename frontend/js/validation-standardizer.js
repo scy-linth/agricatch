@@ -206,7 +206,7 @@
       required: true,
       minlength: 1,
       maxlength: 100,
-      pattern: '[a-zA-Z0-9\\s,.#/-()]+',
+      pattern: '[a-zA-Z0-9\\s,./#()-]+',
       title: 'Street/house number up to 100 characters.'
     },
     addressLine1: {
@@ -214,7 +214,7 @@
       required: true,
       minlength: 1,
       maxlength: 100,
-      pattern: '[a-zA-Z0-9\\s,.#/-()]+',
+      pattern: '[a-zA-Z0-9\\s,./#()-]+',
       title: 'Address line up to 100 characters.'
     },
     addressLine2: {
@@ -222,7 +222,7 @@
       required: false,
       minlength: 1,
       maxlength: 100,
-      pattern: '[a-zA-Z0-9\\s,.#/-()]+',
+      pattern: '[a-zA-Z0-9\\s,./#()-]+',
       title: 'Address line 2 up to 100 characters.'
     },
     addressLabel: {
@@ -436,7 +436,9 @@
     }
 
     el.setAttribute('data-validation-category', category);
-    el.classList.add('ac-validated');
+    if (!el.classList.contains('ac-validated')) {
+      el.classList.add('ac-validated');
+    }
   }
 
   function normalizeWhitespace(el) {
@@ -457,8 +459,7 @@
     if (!isEditableField(el)) return;
     if (el.closest && el.closest('.contact-form')) return;
     const category = detectCategory(el);
-    if (!category) return;
-    applyRule(el, category);
+    if (category) applyRule(el, category);
 
     if (el.getAttribute('data-ac-validation-bound') !== 'true') {
       el.addEventListener('blur', function () {
